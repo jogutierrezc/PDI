@@ -10,6 +10,7 @@
      /admin/udrive/tabla/:id        el editor de tablas
      /admin/udrive/grafica/:id      el constructor de gráficas
      /admin/udrive/cruce/:id        el cruce de tablas
+     /admin/udrive/documento/:id    el informe por bloques (fase 2, 0188)
 
    Quién entra lo decide la pantalla «udrive» del rol de acceso (has_screen) y
    la base (0187); qué ve y qué edita cada quien, las carpetas y sus permisos.
@@ -17,6 +18,7 @@
 
 import { useParams } from "react-router-dom";
 import { EditorCruce } from "./EditorCruce";
+import { EditorDocumento } from "./documento/EditorDocumento";
 import { EditorGrafica } from "./EditorGrafica";
 import { EditorTabla } from "./EditorTabla";
 import { Explorador } from "./Explorador";
@@ -26,5 +28,6 @@ export function UDrive() {
   if (id && vista === "tabla") return <EditorTabla key={id} id={id} />;
   if (id && vista === "grafica") return <EditorGrafica key={id} id={id} />;
   if (id && vista === "cruce") return <EditorCruce key={id} id={id} />;
+  if (id && vista === "documento") return <EditorDocumento key={id} id={id} />;
   return <Explorador key={vista ?? "explorador"} seccionInicial={vista === "galeria" ? "catalogo" : "archivos"} />;
 }

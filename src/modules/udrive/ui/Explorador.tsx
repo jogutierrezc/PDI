@@ -32,6 +32,7 @@ import type { ArchivoRow, CarpetaRow } from "../tipos";
 import { Detalles } from "./Detalles";
 import type { Seleccion } from "./Detalles";
 import { Compartir, Confirmar, MoverA, NuevaCarpeta, Previa } from "./Dialogos";
+import { NuevoInforme } from "./documento/NuevoInforme";
 import { Galeria } from "./Galeria";
 import { Estado, IconoItem, Miniatura, NOMBRE_TIPO, subtituloDe } from "./piezas";
 import { PanelSubidas, useSubidas } from "./Subidas";
@@ -42,16 +43,17 @@ import "../../../components/espacio/marco.css";
 import "./udrive.css";
 
 type Seccion = "archivos" | "compartidos" | "recientes" | "papelera" | "catalogo";
-type Filtro = "todo" | "tablas" | "graficas" | "archivos";
+type Filtro = "todo" | "tablas" | "graficas" | "informes" | "archivos";
 
 const FILTROS: { id: Filtro; etiqueta: string }[] = [
   { id: "todo", etiqueta: "Todo" },
   { id: "tablas", etiqueta: "Tablas" },
   { id: "graficas", etiqueta: "Gráficas" },
+  { id: "informes", etiqueta: "Informes" },
   { id: "archivos", etiqueta: "Archivos" },
 ];
 
-const pasaFiltro = (a: ArchivoRow, f: Filtro): boolean => f === "todo" || (f === "tablas" && a.tipo === "tabla") || (f === "graficas" && (a.tipo === "grafica" || a.tipo === "cruce")) || (f === "archivos" && a.tipo === "archivo");
+const pasaFiltro = (a: ArchivoRow, f: Filtro): boolean => f === "todo" || (f === "tablas" && a.tipo === "tabla") || (f === "graficas" && (a.tipo === "grafica" || a.tipo === "cruce")) || (f === "informes" && a.tipo === "documento") || (f === "archivos" && a.tipo === "archivo");
 
 const ACCIONES: EntradaBuscador[] = [
   { id: "x:carpeta", titulo: "Nueva carpeta", icono: "folder", pista: "Acción" },
@@ -82,7 +84,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
   const [detalles, setDetalles] = useState(true);
   const [sel, setSel] = useState<{ tipo: "carpeta" | "archivo"; id: string } | null>(null);
   const [buscando, setBuscando] = useState(false);
-  const [dialogo, setDialogo] = useState<null | { t: "carpeta" } | { t: "mover" | "compartir" | "borrar" | "previa" | "papelera"; s: Seleccion }>(null);
+  const [dialogo, setDialogo] = useState<null | { t: "carpeta" } | { t: "informe" } | { t: "mover" | "compartir" | "borrar" | "previa" | "papelera"; s: Seleccion }>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [soltando, setSoltando] = useState(false);
   const [sobre, setSobre] = useState<string | null>(null);
@@ -176,7 +178,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
       if (tipo === "carpeta") return irA(id);
       const a = todasA.find((x) => x.id === id);
       if (!a || a.borrado_en) return;
-      if (a.tipo === "tabla" || a.tipo === "grafica" || a.tipo === "cruce") return navigate(`/admin/udrive/${a.tipo}/${a.id}`);
+      if (a.tipo === "tabla" || a.tipo === "grafica" || a.tipo === "cruce" || a.tipo === "documento") return navigate(`/admin/udrive/${a.tipo}/${a.id}`);
       if (vistaPrevia(a.mime)) return setDialogo({ t: "previa", s: { tipo: "archivo", fila: a } });
       void descargar(a);
     },
@@ -506,11 +508,11 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
                               onKeyDown={(e) => alTeclearItem(e, "archivo", a.id)}
                               onDragStart={(e) => alArrastrar(e, "archivo", a.id)}
                             >
-                              <span className="es-thumb"><Miniatura tipo={a.tipo === "documento" ? "archivo" : a.tipo} nombre={a.nombre} /></span>
+                              <span className="es-thumb"><Miniatura tipo={a.tipo} nombre={a.nombre} /></span>
                               <span className="es-tile__meta">
                                 <span className="es-tile__nm"><IconoItem tipo={a.tipo} /><span>{a.nombre}</span></span>
                                 <span className="es-tile__sub">{subtituloDe(a)}</span>
-                                {a.tipo !== "archivo" ? <span className="es-tile__row2"><Estado estado={a.estado} /></span> : null}
+                                {a.tipo !== "archivo" && a.tipo !== "documento" ? <span className="es-tile__row2"><Estado estado={a.estado} /></span> : null}
                               </span>
                             </button>
                           ))}
@@ -539,7 +541,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
               ) : (
                 <div className="es-empty">
                   <b>{seccion === "compartidos" ? "Nadie ha compartido nada con usted" : seccion === "recientes" ? "Todavía no hay archivos" : filtro !== "todo" ? "No hay nada de este tipo aquí" : "Esta carpeta está vacía"}</b>
-                  <span>{seccion === "compartidos" ? "Cuando alguien le comparta una carpeta o un archivo, aparecerá aquí." : "Cree una tabla o una gráfica, o suba un archivo."}</span>
+                  <span>{seccion === "compartidos" ? "Cuando alguien le comparta una carpeta o un archivo, aparecerá aquí." : "Cree una tabla, una gráfica o un informe, o suba un archivo."}</span>
                 </div>
               )}
             </div>
@@ -563,6 +565,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
           <div className="es-h">Crear</div>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); setDialogo({ t: "carpeta" }); }}><Icon name="folder" size={16} />Nueva carpeta</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => void nuevaTabla()}><Icon name="table" size={16} />Nueva tabla</button>
+          <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); setDialogo({ t: "informe" }); }}><Icon name="document" size={16} />Nuevo informe</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); inputImportar.current?.click(); }}><Icon name="upload" size={16} />Tabla desde Excel o CSV</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); irA(null, "catalogo"); }}><Icon name="chart" size={16} />Nueva gráfica…</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); crear.mutate({ tipo: "cruce", nombre: nombreLibre("Cruce de tablas"), carpeta: carpetaActual, contenido: { version: 1, modo: "dos", tabla_a: null, tabla_b: null, columna_a: null, columna_b: null, conservar: "coinciden", resultado_id: null, grafica: null } }, { onSuccess: (id) => navigate(`/admin/udrive/cruce/${id}`), onError: (e) => decir(e.message) }); }}><Icon name="link" size={16} />Cruce de dos tablas</button>
@@ -570,6 +573,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
       ) : null}
 
       {buscando ? <Buscador entradas={entradas} onElegir={elegirBusqueda} onCerrar={() => setBuscando(false)} /> : null}
+      {dialogo?.t === "informe" ? <NuevoInforme carpetaInicial={carpetaActual} decir={decir} onCerrar={() => setDialogo(null)} /> : null}
       {dialogo?.t === "carpeta" ? <NuevaCarpeta padre={carpetaActual} hermanas={nombresEn(carpetaActual)} decir={decir} onCerrar={() => setDialogo(null)} onCreada={(id) => setSel({ tipo: "carpeta", id })} /> : null}
       {dialogo?.t === "mover" ? (
         <MoverA

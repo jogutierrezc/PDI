@@ -44,7 +44,17 @@ export function extensionDe(nombre: string): string {
 }
 
 export function Miniatura({ tipo, nombre }: { tipo: Exclude<TipoVisual, "carpeta">; nombre: string }) {
-  if (tipo === "archivo" || tipo === "documento") return <span className="ud-ext" aria-hidden="true">{extensionDe(nombre)}</span>;
+  if (tipo === "archivo") return <span className="ud-ext" aria-hidden="true">{extensionDe(nombre)}</span>;
+  if (tipo === "documento") {
+    return (
+      <svg className="ud-glifo" viewBox="0 0 120 70" aria-hidden="true">
+        <rect x="38" y="4" width="44" height="62" rx="3" fill="var(--es-panel)" className="tr" />
+        <rect x="44" y="12" width="32" height="6" fill="#2b6cc4" opacity="0.85" />
+        {[26, 32, 38, 44].map((y) => <path key={y} d={`M44 ${y}H76`} className="tr" />)}
+        <rect x="44" y="50" width="32" height="10" fill="#cde6a8" />
+      </svg>
+    );
+  }
   if (tipo === "tabla") {
     return (
       <svg className="ud-glifo" viewBox="0 0 120 70" aria-hidden="true">

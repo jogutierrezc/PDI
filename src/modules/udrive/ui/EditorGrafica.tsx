@@ -20,6 +20,7 @@ import type { ConfigGrafica, ContenidoGrafica, TablaDatos } from "../tipos";
 import { CajaGrafica, PanelDatos, PanelEstilo, SelectorTipo } from "./ConstructorGrafica";
 import { MarcoEditor, useAutoguardado } from "./MarcoEditor";
 import { Estado } from "./piezas";
+import { UsarEnInforme } from "./documento/UsarEnInforme";
 import "../../../components/espacio/espacio.css";
 import "./udrive.css";
 
@@ -35,6 +36,7 @@ export function EditorGrafica({ id }: { id: string }) {
   const [estado, setEstado] = useState<"borrador" | "listo">("borrador");
   const [nombre, setNombre] = useState("");
   const cargado = useRef(false);
+  const [usar, setUsar] = useState(false);
 
   const tablaLeida = useContenido(datos?.tabla_id ?? undefined);
   const tabla: TablaDatos | null = useMemo(() => {
@@ -114,6 +116,9 @@ export function EditorGrafica({ id }: { id: string }) {
         acciones={
           <>
             {datos.tabla_id && tabla ? <button type="button" className="es-btn" onClick={() => void vaciar().then(() => navigate(`/admin/udrive/tabla/${datos.tabla_id}`))}><Icon name="table" size={16} />Abrir la tabla</button> : null}
+            <button type="button" className="es-btn" disabled={!datos.tabla_id} title={datos.tabla_id ? undefined : "Elija primero la tabla de la gráfica"} onClick={() => void vaciar().then((ok) => ok && setUsar(true))}>
+              <Icon name="document" size={16} />Usar en un informe
+            </button>
             {editable ? (
               <button type="button" className="es-btn es-btn--pri" disabled={estado === "borrador" && Boolean(problema)} title={estado === "borrador" && problema ? problema : undefined} onClick={() => void alternarEstado()}>
                 {estado === "listo" ? "Volver a borrador" : "Marcar como lista"}
@@ -152,6 +157,7 @@ export function EditorGrafica({ id }: { id: string }) {
           </aside>
         </div>
       </MarcoEditor>
+      {usar ? <UsarEnInforme tipo="grafica" archivoId={id} decir={decir} onCerrar={() => setUsar(false)} /> : null}
       <Aviso texto={aviso} />
     </div>
   );

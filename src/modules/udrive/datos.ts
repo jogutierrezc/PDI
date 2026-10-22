@@ -33,11 +33,15 @@ const noExiste = (e: ErrorBase) =>
 
 /** Error legible; si faltan las tablas o las funciones, el aviso de migración. */
 export function errorDe(e: ErrorBase): Error {
-  if (noExiste(e)) return new FaltaMigracion("Falta aplicar la migración 0187 (UDrive).");
+  if (noExiste(e)) {
+    const de0188 = /drive_(versiones|comentarios|doc_|cifras)|estado_doc|bloqueado_/.test(e.message ?? "");
+    return new FaltaMigracion(de0188 ? "Falta aplicar la migración 0188 (documentos de UDrive)." : "Falta aplicar la migración 0187 (UDrive).");
+  }
   const m = e.message ?? "Error de la base de datos";
   if (/drive_carpetas_nombre_uq|drive_archivos_nombre_uq/.test(m)) return new Error("Ya hay algo con ese nombre en esa carpeta.");
   if (/row-level security/i.test(m)) return new Error("No tiene permiso para hacer eso en esa carpeta.");
   if (/permission denied/i.test(m)) return new Error("No tiene permiso para hacer eso.");
+  if (/lock_not_available|Otra persona está editando/i.test(m)) return new Error("Otra persona está editando este documento en este momento.");
   return new Error(m);
 }
 
@@ -55,7 +59,7 @@ async function todasLas<T>(pedir: (desde: number, hasta: number) => PromiseLike<
   return salida;
 }
 
-async function rpc<T>(nombre: string, args: Record<string, unknown>): Promise<T> {
+export async function rpc<T>(nombre: string, args: Record<string, unknown>): Promise<T> {
   const r = await supabase.rpc(nombre, args);
   if (r.error) throw errorDe(r.error);
   return r.data as T;
@@ -127,18 +131,21 @@ export interface ContenidoLeido {
   carpeta_id: string | null;
 }
 
-/** El contenido completo de un archivo (tabla, gráfica o cruce). */
+/** Lee el contenido completo de un archivo; nulo si no existe o no se puede ver. */
+export async function pedirContenido(id: string): Promise<ContenidoLeido | null> {
+  const r = await supabase.from("drive_archivos").select("id, tipo, nombre, estado, contenido, updated_at, carpeta_id").eq("id", id).maybeSingle();
+  if (r.error) throw errorDe(r.error);
+  return (r.data as ContenidoLeido | null) ?? null;
+}
+
+/** El contenido completo de un archivo (tabla, gráfica, cruce o documento). */
 export function useContenido(id: string | undefined) {
   return useQuery({
     queryKey: UD_CLAVES.contenido(id ?? ""),
     enabled: Boolean(id),
     retry: false,
     staleTime: 15_000,
-    queryFn: async (): Promise<ContenidoLeido | null> => {
-      const r = await supabase.from("drive_archivos").select("id, tipo, nombre, estado, contenido, updated_at, carpeta_id").eq("id", id!).maybeSingle();
-      if (r.error) throw errorDe(r.error);
-      return (r.data as ContenidoLeido | null) ?? null;
-    },
+    queryFn: () => pedirContenido(id!),
   });
 }
 

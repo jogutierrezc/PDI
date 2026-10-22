@@ -33,6 +33,7 @@ import type { Aplicar } from "./DialogosTabla";
 import { exportarCsv, exportarExcel } from "./navegador";
 import { PanelColumnas } from "./PanelColumnas";
 import { Estado } from "./piezas";
+import { UsarEnInforme } from "./documento/UsarEnInforme";
 import "../../../components/espacio/espacio.css";
 import "./udrive.css";
 
@@ -51,7 +52,7 @@ export function EditorTabla({ id }: { id: string }) {
   const ref = useRef<ContenidoTabla | null>(null);
   const [estado, setEstado] = useState<"borrador" | "listo">("borrador");
   const [nombre, setNombre] = useState("");
-  const [dialogo, setDialogo] = useState<null | "pegar" | { importar: File }>(null);
+  const [dialogo, setDialogo] = useState<null | "pegar" | "informe" | { importar: File }>(null);
   const inputImportar = useRef<HTMLInputElement>(null);
 
   // La primera vez que llega el archivo se arma el contenido local; después manda lo que esta pantalla guarda.
@@ -229,6 +230,9 @@ export function EditorTabla({ id }: { id: string }) {
             >
               <Icon name="chart" size={16} />Crear una gráfica
             </button>
+            <button type="button" className="es-btn" onClick={() => void guardarYa().then((ok) => ok && setDialogo("informe"))}>
+              <Icon name="document" size={16} />Usar en un informe
+            </button>
             {editable ? (
               <button
                 type="button"
@@ -274,6 +278,7 @@ export function EditorTabla({ id }: { id: string }) {
         enfocarAlAbrir={false}
       />
       {dialogo === "pegar" ? <PegarExcel columnas={contenido.columnas} onCerrar={() => setDialogo(null)} onAplicar={(a) => void aplicarEntrada(a)} /> : null}
+      {dialogo === "informe" ? <UsarEnInforme tipo="tabla" archivoId={id} decir={decir} onCerrar={() => setDialogo(null)} /> : null}
       {dialogo && typeof dialogo === "object" ? <ImportarTabla archivo={dialogo.importar} columnas={contenido.columnas} onCerrar={() => setDialogo(null)} onAplicar={(a) => void aplicarEntrada(a)} /> : null}
       <Aviso texto={aviso} />
       <ErroresPie filas={contenido.filas} columnas={contenido.columnas} />

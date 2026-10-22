@@ -70,7 +70,7 @@ export function MarcoEditor({
   onVolver,
   children,
 }: {
-  tipo: Exclude<TipoItem, "archivo" | "documento">;
+  tipo: Exclude<TipoItem, "archivo">;
   etiqueta: string;
   nombre: { valor: string; editable: boolean; renombrar: (n: string) => void };
   chip: ReactNode;

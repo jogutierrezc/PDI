@@ -1,0 +1,311 @@
+/* =============================================================================
+   UDrive · el documento impreso (clases ud-pdf-, ud-doc).
+
+   Carta, 816 × 1056 px (96 por pulgada), márgenes de 72 px a los lados y 76
+   arriba y abajo. Títulos en sans azul (#2b6cc4), cuerpo en serif justificado
+   de 15 px (≈ 11 pt) con interlineado de 22,5 px (las partes de un párrafo que
+   se parte entre páginas miden exactamente una línea). Pie de figura ARRIBA en
+   negrita cursiva y «Nota.» ABAJO. Sin gradientes decorativos. Estas mismas
+   clases las usa la hoja del editor, así lo que se ve es lo que sale.
+
+   Fuentes: la sans del portal (Open Sans, la misma del resto de la app) y la
+   serif del sistema (Georgia / Times): no se descarga ninguna fuente externa.
+   ========================================================================== */
+
+.ud-doc {
+  --ud-sans: var(--font-display, "Open Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif);
+  --ud-serif: Georgia, "Times New Roman", Times, serif;
+  --ud-azul: #2b6cc4;
+  font-family: var(--ud-serif);
+  font-size: 15px;
+  line-height: 22.5px;
+  color: #111;
+}
+
+/* ---- Las páginas ---- */
+
+.ud-pdf-paginas[data-pantalla] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.ud-pdf-pag {
+  position: relative;
+  width: 816px;
+  height: 1056px;
+  flex: none;
+  background: #fff;
+  overflow: hidden;
+  color: #111;
+}
+.ud-pdf-paginas[data-pantalla] .ud-pdf-pag {
+  box-shadow: 0 1px 4px rgba(10, 30, 70, 0.22);
+}
+
+.ud-pdf-corre,
+.ud-pdf-pie {
+  position: absolute;
+  left: 72px;
+  right: 72px;
+  display: flex;
+  font-family: var(--ud-sans);
+  font-size: 12px;
+  line-height: 16px;
+  color: #4b4b4b;
+}
+.ud-pdf-corre { top: 34px; justify-content: space-between; }
+.ud-pdf-pie { bottom: 34px; justify-content: flex-end; }
+
+.ud-pdf-cuerpo {
+  position: absolute;
+  left: 72px;
+  top: 76px;
+  width: 672px;
+  height: 904px;
+  overflow: hidden;
+}
+
+.ud-pdf-u { display: flow-root; }
+
+/* Copia de medida: fuera de pantalla, al ancho exacto del cuerpo. */
+.ud-pdf-medida {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 672px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ud-pdf-marca {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.ud-pdf-marca span {
+  transform: rotate(-38deg);
+  font-family: var(--ud-sans);
+  font-weight: 800;
+  font-size: 54px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: rgba(190, 40, 40, 0.1);
+}
+
+/* ---- Texto ---- */
+
+.ud-pdf-p {
+  margin: 0 0 10px;
+  text-align: justify;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+.ud-pdf-p[data-sangria="true"] { text-indent: 1.6em; }
+.ud-doc a { color: #174c9c; }
+.ud-doc .ud-ref { color: inherit; text-decoration: none; }
+.ud-doc .ud-ref[data-roto="true"] { color: #b42b2a; font-family: var(--ud-sans); font-size: 0.85em; }
+.ud-doc .ud-vacio-t { color: #8a97ab; font-style: italic; font-weight: 400; }
+
+.ud-pdf-cap-t {
+  font-family: var(--ud-sans);
+  font-weight: 600;
+  color: var(--ud-azul);
+  line-height: 1.2;
+  margin: 0;
+  hyphens: manual;
+  overflow-wrap: anywhere;
+}
+.ud-pdf-cap-t[data-nivel="1"] { font-size: 26px; padding: 0 0 18px; }
+.ud-pdf-cap-t[data-nivel="2"] { font-size: 19px; padding: 14px 0 12px; }
+.ud-pdf-cap-t[data-nivel="3"] { font-size: 16px; padding: 20px 0 8px; }
+.ud-pdf-ind-t { font-size: 24px !important; }
+
+.ud-pdf-lista { margin: 0 0 10px; padding-left: 1.6em; }
+.ud-pdf-lista li { padding-bottom: 4px; text-align: justify; hyphens: auto; }
+
+.ud-pdf-dest {
+  margin: 6px 0 14px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--ud-azul);
+  background: #f2f7fd;
+  font-style: italic;
+  font-size: 14.5px;
+  text-align: justify;
+}
+
+.ud-pdf-nota {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  text-align: left;
+}
+.ud-pdf-nota b { font-weight: 700; }
+
+.ud-pdf-vacio {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px dashed #b67a0c;
+  background: #fff7e0;
+  color: #5a3b00;
+  font-family: var(--ud-sans);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+/* ---- Figuras: pie ARRIBA, nota ABAJO ---- */
+
+.ud-pdf-fig { padding-bottom: 14px; }
+.ud-pdf-fcap {
+  padding: 14px 0 6px;
+  font-family: var(--ud-sans);
+  font-size: 13px;
+  line-height: 18px;
+  color: #111;
+}
+.ud-pdf-fcap b { font-weight: 700; font-style: italic; }
+.ud-pdf-fcap i { font-weight: 400; font-style: italic; }
+.ud-pdf-fcap[data-clase="Tabla"] b { font-style: normal; }
+
+.ud-pdf-graf { margin: 0 auto; }
+.ud-pdf-img { display: block; margin: 0 auto; height: auto; max-height: 520px; object-fit: contain; }
+
+.ud-pdf-tb {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--ud-sans);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+}
+.ud-pdf-tb th {
+  font-weight: 700;
+  vertical-align: bottom;
+  padding: 3px 4px;
+  border-top: 1px solid #111;
+  border-bottom: 1px solid #111;
+}
+.ud-pdf-tb td { padding: 2px 4px; border-bottom: 1px solid #cfd6e2; vertical-align: top; overflow-wrap: anywhere; }
+.ud-pdf-tb [data-num="true"] { text-align: right; font-variant-numeric: tabular-nums; }
+
+.ud-pdf-ley {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-family: var(--ud-sans);
+  font-size: 12px;
+  line-height: 16px;
+  color: #44566f;
+}
+.ud-pdf-ley-i { display: inline-flex; align-items: center; gap: 5px; }
+.ud-pdf-ley-i i { display: inline-block; width: 16px; height: 12px; border: 1px solid #c9cfda; }
+
+/* ---- Índices y referencias ---- */
+
+.ud-pdf-toc {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5.6px 0;
+  font-size: 13.5px;
+  line-height: 13.5px;
+  color: #111;
+  text-decoration: none;
+}
+.ud-pdf-toc i { flex: 1; min-width: 12px; border-bottom: 1.5px dotted #6b7280; transform: translateY(-3px); }
+.ud-pdf-toc-n { font-variant-numeric: tabular-nums; }
+.ud-pdf-toc[data-n="a"] { font-weight: 700; }
+.ud-pdf-toc[data-n="b"] { padding-left: 18px; }
+.ud-pdf-toc[data-n="c"] { padding-left: 36px; }
+
+.ud-pdf-fuente {
+  margin: 0 0 8px;
+  padding-left: 2em;
+  text-indent: -2em;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Portada a sangre ---- */
+
+.ud-pdf-portada { position: absolute; inset: 0; background: #eef5fc; color: #14307a; font-family: var(--ud-sans); }
+.ud-pdf-portada-img,
+.ud-pdf-portada-arte { position: absolute; left: 0; top: 0; width: 816px; height: 990px; object-fit: cover; }
+.ud-pdf-portada-t {
+  position: absolute;
+  left: 56px;
+  top: 64px;
+  max-width: 704px;
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+.ud-pdf-portada-s { margin-top: 12px; font-size: 18px; font-weight: 600; letter-spacing: 0; line-height: 1.3; }
+.ud-pdf-portada-pie {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 66px;
+  background: #fff;
+  border-top: 3px solid #14307a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 48px;
+}
+.ud-pdf-portada-ent { display: flex; align-items: center; gap: 12px; }
+.ud-pdf-portada-ent img { height: 40px; width: auto; }
+.ud-pdf-portada-ent div, .ud-pdf-portada-anio { display: flex; flex-direction: column; line-height: 1.15; }
+.ud-pdf-portada-ent b { font-size: 17px; font-weight: 800; color: #0a2d63; }
+.ud-pdf-portada-ent span { font-size: 11px; color: #44566f; }
+.ud-pdf-portada-anio { text-align: right; }
+.ud-pdf-portada-anio b { font-size: 15px; font-weight: 700; color: #0a2d63; }
+.ud-pdf-portada-anio span { font-size: 11px; color: #44566f; }
+
+/* ---- Papel ---- */
+
+@page {
+  size: letter;
+  margin: 0;
+}
+
+@media print {
+  html, body { background: #fff !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Solo se imprime la vista previa: todo lo demás de la página se esconde. */
+  body.ud-imprimiendo > *:not(#ud-pdf-raiz) { display: none !important; }
+  body.ud-imprimiendo #ud-pdf-raiz,
+  body.ud-imprimiendo #ud-pdf-raiz .ud-pv-escena,
+  body.ud-imprimiendo #ud-pdf-raiz .ud-esc,
+  body.ud-imprimiendo #ud-pdf-raiz .ud-esc > div {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    transform: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    inset: auto !important;
+  }
+  body.ud-imprimiendo .ud-noprint { display: none !important; }
+  body.ud-imprimiendo .ud-pdf-paginas[data-pantalla] { display: block !important; }
+  body.ud-imprimiendo .ud-pdf-pag {
+    box-shadow: none !important;
+    margin: 0 !important;
+    /* 1 px menos que la hoja Carta: el redondeo del navegador no debe fabricar una página en blanco. */
+    height: 1055px !important;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+  }
+  body.ud-imprimiendo .ud-pdf-pag:last-child { break-after: auto; page-break-after: auto; }
+}

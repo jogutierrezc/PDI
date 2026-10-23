@@ -62,3 +62,19 @@ En el panel «Bloque» de un párrafo, lista, cuadro destacado o nota (solo si s
 
 ## Para desplegar la fase 3 (Pilo)
 Sin migración nueva. Cambió la función `supabase/functions/pilo-informes/`: `udrive.ts` (nuevo), `index.ts` y `datos.ts` (parámetro opcional `fuente` en `bitacora`). Se despliega como las demás funciones (ver «servidor y funciones de Supabase»). Requiere que estén aplicadas 0187 y 0153.
+
+## Importar Word y PDF, a fondo (fase 3)
+El importador lee el archivo en el navegador (nada se sube todavía), arma un informe ordenado y deja revisarlo antes de crearlo. Código: `lib/importar.ts` (modelo y pasos comunes), `lib/importarDocx.ts` (Word), `lib/importarPdf.ts` (análisis del PDF, puro), `lib/importarPdfCarga.ts` (único que nombra pdfjs), `lib/importarEditar.ts` (operaciones de la revisión) y `ui/documento/ImportarInforme.tsx` + `subirFiguras.ts`.
+
+**Qué extrae**
+- **Word**: títulos por estilo u outline, listas con y sin número, tablas (celdas combinadas repartidas), imágenes de `word/media` en su posición del flujo, notas al pie (como «nota»), pies de figura por estilo `Caption`. La tabla de contenido (por estilo o campo) y una portada corta antes de ella se dejan fuera. EMF, WMF y otros formatos que el navegador no dibuja quedan como imagen pendiente con aviso.
+- **PDF**: texto con posición, tamaño y negrita (la negrita sale de `commonObjs`). Orden de lectura con dos columnas (calle de espacio en blanco y títulos de ancho completo), líneas → párrafos (separación vertical y sangría; sangría francesa en referencias), palabras cortadas por guion, listas, títulos por tamaño, negrita y numeración. Fuera: encabezados y pies repetidos, números de página, logos repetidos, portada (de la que sale el título) e índices del propio informe.
+- **Tablas del PDF**: (a) por rejilla de líneas y rectángulos (se leen los operadores de la página llevando la matriz `save/restore/transform`) y (b) por alineación de texto (ríos de espacio que cruzan las líneas; una línea sin primera celda y pegada a la anterior es continuación de celda). Un recuadro de una sola celda es un cuadro destacado. La cuadrícula de una gráfica no se toma por tabla.
+- **Figuras del PDF**: imágenes incrustadas y regiones de dibujo vectorial denso (rejilla de 12 pt con componentes conexos); el texto de ejes y leyendas se queda con la figura. Cada una se recorta del render de su página a 2x y se guarda como PNG (JPEG si es una foto grande).
+- **Pies y notas**: «Tabla 3. …» / «Gráfica 2. …» pasan a ser el título de la figura contigua (`asociarPies`, igual para Word y PDF) y «Nota. …» / «Fuente: …» su nota. La sección «Referencias» pasa a un bloque de referencias y cada entrada a una fuente APA (autores, año, título, origen) lo mejor que se pueda.
+
+**Guardar las figuras**: se suben como imágenes a una carpeta nueva «Imágenes de <informe>» con el flujo de Subir archivo (reducción a 2000 px, sesión de la persona), con concurrencia 2 y 3 reintentos con espera. Si las tres primeras fallan sin un solo éxito se deja de intentar (Storage caído) y todas quedan como imagen pendiente; el resto del informe no se pierde.
+
+**Revisar antes de crear**: lista virtualizada en orden de lectura con miniaturas, vista de tablas y título/nota editables; por elemento: incluir, cambiar de tipo, editar, unir con el anterior, partir en el cursor, subir/bajar, y pasar una tabla mal detectada a texto. Resumen de lo detectado y de lo descartado. «Reordenar con Pilo» reúne propuestas (niveles de título, palabras partidas, pies sueltos) que se aplican o no, con las mismas tareas de `pilo-informes` de antes: no hay cambios en la función edge.
+
+**Límites**: 150 páginas de PDF (con aviso), 25 MB, 30 tablas y 80 figuras por importación, 2000 bloques. PDF escaneado (sin texto): se avisa, no hay OCR. Página girada: el orden puede salir alterado (aviso).

@@ -32,7 +32,7 @@ import {
 } from "../../datosDocumento";
 import type { EstadoDeDocumento, Turno } from "../../datosDocumento";
 import { SIN_DATO, cifrasCambiadas, congelar } from "../../lib/cifras";
-import { ETIQUETA_ESTADO, archivosUsados, bajarBloque, bloqueNuevo, duplicarBloque, indiceDe, insertarBloque, moverBloque, normalizarDocumento, quitarBloque, reemplazarBloque, subirBloque, validarDocumento } from "../../lib/documento";
+import { ETIQUETA_ESTADO, LIMITES, archivosUsados, bajarBloque, bloqueNuevo, duplicarBloque, indiceDe, insertarBloque, moverBloque, normalizarDocumento, quitarBloque, reemplazarBloque, subirBloque, validarDocumento } from "../../lib/documento";
 import type { Bloque, Documento, ResultadoDocumento, TipoBloque } from "../../lib/documento";
 import { TITULO_INDICE, indicesActivos, referenciasRotas } from "../../lib/numeracion";
 import { ALTO_CUERPO } from "../../lib/paginado";
@@ -738,8 +738,8 @@ function Lienzo(p: LienzoProps) {
           plantillaDoc={doc}
           decir={decir}
           onCerrar={() => setDialogo(null)}
-          onAgregar={(bloques) => {
-            poner((d) => ({ ...d, bloques: [...d.bloques, ...bloques] }));
+          onAgregar={(bloques, fuentes) => {
+            poner((d) => ({ ...d, bloques: [...d.bloques, ...bloques], fuentes: [...d.fuentes, ...fuentes].slice(0, LIMITES.fuentes) }));
             setSeleccion(bloques[0]?.id ?? null);
           }}
         />

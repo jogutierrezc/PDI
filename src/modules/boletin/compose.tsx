@@ -54,7 +54,7 @@ import type { Series } from "./figures";
 import type { BulletinSettings, IndicatorShow } from "./model";
 import { parseSaberKey, saberHighlight, saberUnits } from "./saber";
 import { freeSourceUnits, freeUnits, parseFreeKey } from "./free";
-import { parseTytKey, tytHighlight, tytUnits } from "./tyt";
+import { aporteHighlight, aporteOfficeOf, aporteUnits, parseAporteKey } from "./aporte";
 import { deiUnits } from "./dei";
 import { modelUnits } from "./model-sheets";
 import { BIENESTAR_SLUG, DEI_SLUG } from "./model";
@@ -1680,9 +1680,9 @@ function datasetHighlights(report: Report, entry: BulletinSettings["reports"][nu
         unit: rank && scope ? `puesto ${SCOPE_LABEL[scope].toLowerCase()}` : edition.sdgs.length ? "ODS" : "categorías con estrellas",
         note: `Edición ${edition.year}${change ? ` · ${change.label} frente a ${previous!.year}` : ""}`,
       });
-    } else if (kind === "tyt") {
-      const parsed = parseTytKey(report, key);
-      const highlight = parsed ? tytHighlight(parsed.data, parsed.competency, settings.cut) : null;
+    } else if (kind === "aporte") {
+      const parsed = parseAporteKey(key);
+      const highlight = parsed ? aporteHighlight(parsed.test, parsed.part) : null;
       if (highlight) list.push({ key: item.ref, ...highlight });
     } else if (kind === "saber") {
       const parsed = parseSaberKey(key);
@@ -2076,7 +2076,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
           report.tables?.find((t) => `tabla:${t.id}` === set.key)?.source ??
           report.rankings?.find((r) => `ranking:${r.id}` === set.key)?.source ??
           report.saberPro?.find((sp) => set.key.startsWith(`saber:${sp.id}:`))?.source ??
-          report.saberTyt?.find((t) => set.key.startsWith(`tyt:${t.id}:`))?.source ??
+          aporteOfficeOf(set.key) ??
           (report.pipelines ?? []).find((p) => `tuberia:${p.id}` === set.key)?.source;
         if (source) credit(source, report);
       });
@@ -2149,11 +2149,11 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
         const node = settings.rankingsEvolution ? rankingsEvolutionUnit(report, settings) : null;
         const sources = Array.from(new Set((report.rankings ?? []).map((r) => r.source).filter(Boolean))).join(" · ");
         if (node) nodes.push({ node, source: sources, title: "Evolución de los rankings" });
-      } else if (kind === "tyt") {
-        const parsed = parseTytKey(report, key);
+      } else if (kind === "aporte") {
+        const parsed = parseAporteKey(key);
         if (parsed) {
-          tytUnits(parsed.data, parsed.competency, settings.cut, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
-            nodes.push({ node, source: parsed.data.source, title, tight }),
+          aporteUnits(parsed.test, parsed.part, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
+            nodes.push({ node, source: aporteOfficeOf(item.ref) ?? "", title, tight }),
           );
         }
       } else if (kind === "libre") {

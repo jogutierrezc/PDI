@@ -74,7 +74,7 @@ import { ExportSelector } from "./components/ExportSelector";
 import { RankingsBlock } from "./components/RankingsBlock";
 import { MedalBoardBlock } from "./components/MedalBoardBlock";
 import { SaberProBlock } from "./components/SaberProBlock";
-import { SaberTytBlock } from "./components/SaberTytBlock";
+import { SaberTytBlock } from "./components/SaberAporte";
 import { DiversityBoard } from "./components/DiversityBoard";
 import { OriginMap } from "./components/OriginMap";
 import { PredictiveModel } from "./components/PredictiveModel";
@@ -549,8 +549,8 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
       case "saber_tyt": {
         if (inSection) return null;
         const shown = saberTytOf(report, block);
-        if (!shown || shown.results.length === 0) return null;
-        return <SaberTytBlock key={key} data={shown} title={block.settings.title} anchor={block.settings.slot ? `od-saber-tyt-${block.settings.slot}` : "od-saber-tyt"} csv={csvById(`saber_tyt:${shown.id}`)} />;
+        if (!shown) return null;
+        return <SaberTytBlock key={key} title={block.settings.title} anchor={block.settings.slot ? `od-saber-tyt-${block.settings.slot}` : "od-saber-tyt"} />;
       }
       case "diversidad": {
         if (inSection) return null;

@@ -45,3 +45,6 @@ pilo-android/capacitor/capacitor-cordova-android-plugins
 *.p12
 pilo-android/keys/
 **/CLAVE-FIRMA*
+
+# Datos de estudiantes (Saber PRO + Saber 11): no se versionan
+Resultado_SaberPro_con_Saber11.xlsx

@@ -44,12 +44,25 @@ import type { MedalBoard, MedalEntry } from "./medals";
 import { parseRank, RANKING_SYSTEMS, SDGS } from "./rankings";
 import type { RankingData, RankingEdition } from "./rankings";
 import { formatReserved, RESERVE_DEFAULT, valueOf } from "./reserve";
-import { ALPHA_FIT_LABEL, ALPHA_PREDICTORS, entryAxisOf, QUADRANT_LABEL } from "./saber-alpha";
-import type { AlphaFit } from "./saber-alpha";
-import { competencyInfo, levelScale, SABER_COMPETENCIES, SABER_FEW_LEVELS, SABER_FEW_MEAN } from "./saber-pro";
+import {
+  APORTE_FEW,
+  APORTE_MODELED,
+  APORTE_TESTS,
+  COEF_PRO,
+  COEF_TYT,
+  PRO_CUADRANTES,
+  QUAD_NAMES,
+  VAR_PRO,
+  VAR_TYT,
+  aporteCompLabel,
+  aporteRows,
+  aporteSede,
+  icc,
+} from "./saber-aporte";
+import type { AporteTest, VarPair } from "./saber-aporte";
+import { competencyInfo, levelScale, SABER_COMPETENCIES, SABER_FEW_LEVELS, SABER_FEW_MEAN, saberPanorama, saberYears } from "./saber-pro";
+import type { SaberPanoKind } from "./saber-pro";
 import type { SaberProData, SaberResult, SaberScope } from "./saber-pro";
-import { PERCENTILE_STEP, TYT_COMPETENCIES, TYT_LEVEL_LABEL, tytInfo } from "./saber-tyt";
-import type { SaberTytData, TytResult } from "./saber-tyt";
 import { slugify } from "./slug";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, periodText, termLabel, TERMS } from "./terms";
 import type { Term } from "./terms";
@@ -679,130 +692,203 @@ export function saberProToTable(data: SaberProData): CsvTable {
   return { header, rows };
 }
 
-/* --- Saber TyT ------------------------------------------------------------------------ */
+/* --- Saber PRO frente al país ---------------------------------------------------------- */
+
+const PANO_KIND: Record<SaberPanoKind, string> = {
+  ok: "Normal",
+  few: "Pocos evaluados",
+  nonat: "Sin promedio nacional",
+  empty: "Sin dato",
+};
+
+const round2 = (n: number | null): number | null => (n === null ? null : Math.round(n * 100) / 100);
 
 /**
- * Umbral de «pocos evaluados» del Motor Beta. Es el `FEW` de
- * components/SaberTytBlock.tsx, repetido aquí porque este módulo no importa
- * componentes: si cambia allí, cambia aquí.
+ * Saber PRO frente al país: una fila por año, competencia y ámbito (el promedio
+ * nacional, toda la UDES y cada campus), con el promedio, el nacional, la
+ * diferencia en puntos, los evaluados y el origen del promedio. Los vacíos van
+ * en blanco, nunca en cero.
  */
-export const TYT_FEW = 10;
-
-const QUARTERS = ["1", "2", "3", "4"];
-const TRANSITIONS = QUARTERS.flatMap((from) => QUARTERS.map((to) => ({ from, to })));
-
-/** Un conteo existente y por debajo del umbral. Cero es «esa medida no aplica», no «pocos». */
-const few = (count: number | null): boolean => count !== null && count > 0 && count < TYT_FEW;
-
-const tytOrder = (a: TytResult, b: TytResult): number =>
-  a.year - b.year ||
-  a.level.localeCompare(b.level) ||
-  a.program.localeCompare(b.program, "es") ||
-  TYT_COMPETENCIES.findIndex((c) => c.key === a.competency) - TYT_COMPETENCIES.findIndex((c) => c.key === b.competency);
-
-/**
- * Saber TyT, resultados: una fila por año, nivel, programa y competencia, con
- * los escalares del Motor Beta, el tránsito entre cuartos y los del Motor
- * Alpha con sus cuadrantes. Las nubes y los histogramas (`histogram`,
- * `scatter`, `plane`, `quadPlane`) no salen.
- */
-export function saberTytResultsToTable(data: SaberTytData): CsvTable {
-  const header = [
-    "Año",
-    "Nivel",
-    "Programa",
-    "Competencia",
-    "Evaluados",
-    "Percentil medio de salida",
-    "Pareados",
-    "Percentil medio de entrada",
-    "Valor agregado (percentil)",
-    "Subieron de percentil",
-    "Puntaje medio de entrada",
-    "Puntaje medio de salida",
-    ...TRANSITIONS.map(({ from, to }) => `Tránsito del cuarto ${from} al ${to}`),
-    "Evaluados del modelo",
-    "Puntaje esperado",
-    "Puntaje real",
-    "Valor agregado (modelo)",
-    "Sobre lo esperado",
-    ...QUARTERS.map((q) => `Cuadrante ${q} · ${QUADRANT_LABEL[q]}`),
-    "Pocos evaluados",
-  ];
-  const rows: CsvCell[][] = [...data.results].sort(tytOrder).map((r) => [
-    r.year,
-    TYT_LEVEL_LABEL[r.level] ?? r.level,
-    r.program || "Todo el nivel",
-    tytInfo(r.competency)?.label ?? r.competency,
-    r.evaluated,
-    r.meanExit,
-    r.paired,
-    r.meanEntry,
-    r.meanDelta,
-    r.improved,
-    r.rawEntry,
-    r.rawExit,
-    ...TRANSITIONS.map(({ from, to }) => orNull(r.transitions[from]?.[to])),
-    r.alphaN,
-    r.alphaExpected,
-    r.alphaActual,
-    r.alphaVa,
-    r.alphaPositive,
-    ...QUARTERS.map((q) => orNull(r.quadrants[q])),
-    few(r.evaluated) || few(r.paired) ? FEW : null,
-  ]);
+export function saberPanoramaToTable(data: SaberProData): CsvTable {
+  const header = ["Año", "Competencia", "Código", "Ámbito", "Promedio", "Promedio nacional", "Diferencia con el país", "Evaluados", "Origen del promedio", "Pocos evaluados"];
+  const rows: CsvCell[][] = [];
+  const pano = saberPanorama(data, saberYears(data).slice(-1)[0] ?? 0);
+  for (const year of pano.years) {
+    for (const c of SABER_COMPETENCIES) {
+      const national = pano.rows.find((r) => r.competency === c.key)?.serie.find((p) => p.year === year)?.national ?? null;
+      if (national !== null) rows.push([year, c.label, c.code, "Nacional", national, null, null, null, "Oficial ICFES", null]);
+      for (const row of pano.rows.filter((r) => r.competency === c.key)) {
+        const p = row.serie.find((x) => x.year === year);
+        if (!p || p.value === null) continue;
+        rows.push([
+          year,
+          c.label,
+          c.code,
+          row.scope.kind === "udes" ? "UDES" : row.scope.label,
+          p.value,
+          p.national,
+          round2(p.gap),
+          p.evaluated,
+          p.official ? "Oficial ICFES" : "Ponderado por evaluados",
+          p.kind === "few" ? FEW : null,
+        ]);
+      }
+    }
+  }
   return { header, rows };
 }
 
-/** Saber TyT, curvas de referencia: el puntaje que deja por debajo a cada 5 % de la cohorte. */
-export function saberTytCurvesToTable(data: SaberTytData): CsvTable {
-  const header = ["Competencia", "Prueba", "Percentil", "Puntaje"];
-  const rows: CsvCell[][] = TYT_COMPETENCIES.flatMap((competency) => {
-    const curves = data.benchmarks[competency.key];
-    if (!curves) return [];
-    const points = (test: string, curve: number[]): CsvCell[][] =>
-      curve.map((score, i) => [competency.label, test, i * PERCENTILE_STEP, score]);
-    return [...points("Entrada (Saber 11)", curves.entrada), ...points("Salida (Saber TyT)", curves.salida)];
+/**
+ * Evolución de la brecha: una fila por año, competencia y ámbito, con el
+ * promedio, el nacional, la brecha y el tipo (normal, pocos, sin dato). Las
+ * columnas de resumen (variación, años seguidos, mejor y peor, lectura) van en
+ * la primera fila de cada serie. Un año sin dato queda en blanco.
+ */
+export function saberEvolucionToTable(data: SaberProData): CsvTable {
+  const header = [
+    "Competencia",
+    "Código",
+    "Ámbito",
+    "Año",
+    "Promedio",
+    "Promedio nacional",
+    "Brecha",
+    "Evaluados",
+    "Tipo",
+    "Variación de la brecha",
+    "Años seguidos",
+    "Lado del país",
+    "Mejor brecha",
+    "Año de la mejor",
+    "Peor brecha",
+    "Año de la peor",
+    "Lectura",
+  ];
+  const rows: CsvCell[][] = [];
+  const pano = saberPanorama(data, saberYears(data).slice(-1)[0] ?? 0);
+  for (const row of pano.rows) {
+    const c = competencyInfo(row.competency);
+    const v = row.variacion;
+    row.serie.forEach((p, i) => {
+      const first = i === 0 && v;
+      rows.push([
+        c.label,
+        c.code,
+        row.scope.kind === "udes" ? "UDES" : row.scope.label,
+        p.year,
+        p.value,
+        p.national,
+        round2(p.gap),
+        p.evaluated,
+        PANO_KIND[p.kind],
+        first ? round2(v.delta) : null,
+        first ? v.streak : null,
+        first ? (v.sign > 0 ? "Sobre" : v.sign < 0 ? "Bajo" : "Igual") : null,
+        first ? round2(v.best.gap) : null,
+        first ? v.best.year : null,
+        first ? round2(v.worst.gap) : null,
+        first ? v.worst.year : null,
+        first ? v.label : null,
+      ]);
+    });
+  }
+  return { header, rows };
+}
+
+/* --- Aporte de los programas (Saber PRO y Saber TyT) ------------------------------------- */
+
+/**
+ * Aporte de cada programa: una fila por competencia y programa, con su
+ * intervalo, de dónde sale y la oficina. Los vacíos salen vacíos, nunca ceros:
+ * con menos de 10 evaluados «se distingue de cero» queda sin respuesta.
+ */
+export function aporteToTable(test: AporteTest): CsvTable {
+  const T = APORTE_TESTS[test];
+  const header = ["Prueba", "Competencia", "Corte", "Sede", "Programa", "Evaluados", "Aporte (puntos)", "Intervalo inferior", "Intervalo superior", "Se distingue de cero", "Origen", "Página", "Oficina", "Pocos evaluados"];
+  const rows: CsvCell[][] = APORTE_MODELED.flatMap((comp) =>
+    aporteRows(test, comp).map((r) => [
+      T.label,
+      aporteCompLabel(comp),
+      T.cut,
+      aporteSede(test, r.name),
+      r.name,
+      r.n,
+      r.e,
+      r.lo,
+      r.hi,
+      r.s === "few" ? null : r.s === "up" || r.s === "down" ? "sí" : "no",
+      T.origin,
+      T.pages,
+      T.office,
+      r.n < APORTE_FEW ? FEW : null,
+    ]),
+  );
+  return { header, rows };
+}
+
+/** Parte de la variación que está entre programas, con y sin controles. */
+export function aporteVarianzaToTable(test: AporteTest): CsvTable {
+  const T = APORTE_TESTS[test];
+  const header = ["Prueba", "Competencia", "Corte", "Modelo", "Varianza dentro del programa", "Varianza entre programas", "Parte entre programas (%)", "Prueba de diferencias", "Página", "Oficina"];
+  const pro = test === "pro";
+  const sets: [string, VarPair | undefined, string][] = [];
+  const rows: CsvCell[][] = APORTE_MODELED.flatMap((comp) => {
+    sets.length = 0;
+    if (pro) {
+      sets.push(["Sin controles", VAR_PRO.nulo[comp], "20"], ["Con controles", VAR_PRO.final[comp], "20"], ["Solo 2023", VAR_PRO.y23[comp], "25"], ["Solo 2024", VAR_PRO.y24[comp], "31"]);
+    } else {
+      sets.push(["Sin controles", VAR_TYT.nulo[comp], "9"], ["Con controles", VAR_TYT.final[comp], "9"]);
+    }
+    return sets.map(([modelo, pair, page]) => [
+      T.label,
+      aporteCompLabel(comp),
+      T.cut,
+      modelo,
+      pair?.[0] ?? null,
+      pair?.[1] ?? null,
+      pair ? Math.round(icc(pair) * 100) / 100 : null,
+      !pro && modelo === "Con controles" ? VAR_TYT.p[comp] : null,
+      page,
+      T.office,
+    ]);
   });
   return { header, rows };
 }
 
-const ALPHA_FITS: AlphaFit[] = ["completo", "ampliado"];
-
-/**
- * Saber TyT, modelos del Motor Alpha: una fila por competencia y ajuste, con
- * sus coeficientes y los promedios nacionales que cortan los cuadrantes.
- */
-export function saberTytModelsToTable(data: SaberTytData): CsvTable {
-  const header = [
-    "Competencia",
-    "Ajuste",
-    "Intercepto",
-    ...ALPHA_PREDICTORS.map((predictor) => `Coeficiente · ${predictor.label}`),
-    "R²",
-    "Casos",
-    "Error típico",
-    "Promedio nacional Saber 11",
-    "Promedio nacional Saber TyT",
-  ];
-  const { nacional, modelos } = data.alpha;
-  const rows: CsvCell[][] = TYT_COMPETENCIES.flatMap((competency) =>
-    ALPHA_FITS.flatMap((fit) => {
-      const model = modelos[competency.key]?.[fit];
-      if (!model) return [];
-      const row: CsvCell[] = [
-        competency.label,
-        ALPHA_FIT_LABEL[fit],
-        model.coef.intercepto,
-        ...ALPHA_PREDICTORS.map((predictor) => orNull(model.coef[predictor.key])),
-        model.r2,
-        model.n,
-        model.rmse,
-        orNull(nacional.saber11[entryAxisOf(competency.key) ?? "global"]),
-        orNull(nacional.tyt[competency.key]),
-      ];
+/** Saber PRO, cuadrantes de aporte: el reparto de cada programa en AA−, AA−−, AA+ y AA++ (%). */
+export function aporteCuadrantesToTable(): CsvTable {
+  const T = APORTE_TESTS.pro;
+  const header = ["Prueba", "Competencia", "Corte", "Sede", "Programa", "Evaluados", ...QUAD_NAMES.map((n) => `${n} (%)`), "Sobre 150 (%)", "Origen", "Página", "Oficina", "Pocos evaluados"];
+  const rows: CsvCell[][] = APORTE_MODELED.flatMap((comp) =>
+    T.data[comp].flatMap(([name, n]) => {
+      const q = PRO_CUADRANTES[comp][name];
+      if (!q) return [];
+      const row: CsvCell[] = [T.label, aporteCompLabel(comp), T.cut, aporteSede("pro", name), name, n, ...q, Math.round((q[2] + q[3]) * 10) / 10, "Figura 5 y Tabla 2", "10-11", T.office, n < APORTE_FEW ? FEW : null];
       return [row];
     }),
+  );
+  return { header, rows };
+}
+
+/** Lo que acompaña al puntaje (Saber PRO) o lo que pesa Saber 11 (Saber TyT), con su error estándar. */
+export function aporteCoeficientesToTable(test: AporteTest): CsvTable {
+  const T = APORTE_TESTS[test];
+  const header = ["Prueba", "Competencia", "Corte", "Término", "Referencia", "Estimador", "Error estándar", "Intervalo inferior", "Intervalo superior", "Página", "Oficina"];
+  const data = test === "pro" ? COEF_PRO : COEF_TYT;
+  const rows: CsvCell[][] = APORTE_MODELED.flatMap((comp) =>
+    data[comp].map(([term, ref, est, se]) => [
+      T.label,
+      aporteCompLabel(comp),
+      T.cut,
+      term,
+      ref || null,
+      est,
+      se,
+      Math.round((est - 1.96 * se) * 100) / 100,
+      Math.round((est + 1.96 * se) * 100) / 100,
+      test === "pro" ? "20" : "8",
+      T.office,
+    ]),
   );
   return { header, rows };
 }

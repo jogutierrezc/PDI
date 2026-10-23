@@ -39,6 +39,7 @@ import {
 } from "../datos-abiertos/data/saber-pro";
 import type { SaberCompetency, SaberFigure, SaberLevelScale, SaberProData } from "../datos-abiertos/data/saber-pro";
 import { SwatchLegend } from "./figures";
+import { saberPaisUnits } from "./saber-pais";
 
 const integer = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const pct = (n: number) => `${integer.format(Math.round(n))} %`;
@@ -80,11 +81,12 @@ const latest = (figures: (SaberFigure | null)[], test: (f: SaberFigure) => boole
   [...figures].reverse().find((f): f is SaberFigure => f !== null && test(f)) ?? null;
 
 /** Separa "saber:<clave>:<competencia>" en sus dos partes. */
-export function parseSaberKey(key: string): { id: string; competency: SaberCompetency } | null {
+export function parseSaberKey(key: string): { id: string; competency: SaberCompetency | "pais" } | null {
   const at = key.lastIndexOf(":");
   if (at < 0) return null;
-  const competency = key.slice(at + 1) as SaberCompetency;
-  return SABER_COMPETENCIES.some((c) => c.key === competency) ? { id: key.slice(0, at), competency } : null;
+  const competency = key.slice(at + 1) as SaberCompetency | "pais";
+  // «pais» es la entrada «Frente al país»: el resumen y una hoja por competencia.
+  return competency === "pais" || SABER_COMPETENCIES.some((c) => c.key === competency) ? { id: key.slice(0, at), competency } : null;
 }
 
 /* --- Cifras clave de la hoja ------------------------------------------------------ */
@@ -277,11 +279,13 @@ function PaperRidges({ figures, width = 178 }: { figures: SaberFigure[]; width?:
 
 export function saberUnits(
   data: SaberProData,
-  competency: SaberCompetency,
+  entry: SaberCompetency | "pais",
   cut: number,
   Sheet: SheetComponent,
   Continuation: ContinuationComponent,
 ): { node: ReactNode; title: string; tight?: boolean }[] {
+  if (entry === "pais") return saberPaisUnits(data, cut, Sheet);
+  const competency = entry;
   const info = competencyInfo(competency);
   const scale = levelScale(competency);
   const years = yearsUpTo(data, cut);
@@ -521,7 +525,9 @@ function GapTable({
 /* --- Formato ejecutivo ------------------------------------------------------------ */
 
 /** La cifra de una competencia para la ficha ejecutiva y el resumen. */
-export function saberHighlight(data: SaberProData, competency: SaberCompetency, cut: number) {
+export function saberHighlight(data: SaberProData, entry: SaberCompetency | "pais", cut: number) {
+  if (entry === "pais") return null;
+  const competency = entry;
   const info = competencyInfo(competency);
   const years = yearsUpTo(data, cut);
   const figures = years.map((y) => saberFigure(data, competency, y));

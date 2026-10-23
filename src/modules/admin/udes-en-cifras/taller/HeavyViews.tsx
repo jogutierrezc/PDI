@@ -20,7 +20,7 @@ import { PivotTable } from "../../../datos-abiertos/components/PivotTable";
 import { PredictiveModel } from "../../../datos-abiertos/components/PredictiveModel";
 import { RankingsBlock } from "../../../datos-abiertos/components/RankingsBlock";
 import { SaberProBlock } from "../../../datos-abiertos/components/SaberProBlock";
-import { SaberTytBlock } from "../../../datos-abiertos/components/SaberTytBlock";
+import { SaberTytBlock } from "../../../datos-abiertos/components/SaberAporte";
 import { WorldMap } from "../../../datos-abiertos/components/WorldMap";
 import { blockPicks, saberProOf, saberTytOf } from "../../../datos-abiertos/data/groups";
 import { ALL_YEARS, cutLabel } from "../../../datos-abiertos/data/terms";
@@ -115,7 +115,7 @@ export default function HeavyBlock({ block, context }: { block: ReportBlock; con
     }
     case "saber_tyt": {
       const shown = saberTytOf(report, block);
-      return shown && shown.results.length ? <SaberTytBlock data={shown} title={block.settings.title} anchor={anchor} /> : null;
+      return shown ? <SaberTytBlock title={block.settings.title} anchor={anchor} /> : null;
     }
     case "diversidad":
       return <DiversityBoard report={report} campuses={catalog.campuses} year={year} campus={campus} setYear={noop} setCampus={noop} title={block.settings.title} anchor={anchor} csvOf={() => undefined} />;

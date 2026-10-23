@@ -29,10 +29,10 @@ import { DEFAULT_BLOCK_ORDER } from "./types";
 import type { Report, ReportBlock } from "./types";
 import { SABER_COMPETENCIES } from "./saber-pro";
 import type { SaberCompetency } from "./saber-pro";
-import { TYT_COMPETENCIES, isPaired } from "./saber-tyt";
+import { aporteRefList } from "./saber-aporte";
 
 /** Referencia de una competencia de un conjunto Saber PRO: "saber:<clave>:<competencia>". */
-export const saberRef = (id: string, competency: SaberCompetency) => `saber:${id}:${competency}`;
+export const saberRef = (id: string, competency: SaberCompetency | "pais") => `saber:${id}:${competency}`;
 
 export interface ReportGroup {
   /** Clave estable del separador: su slot, o su posición. */
@@ -212,15 +212,18 @@ export function reportGroups(report: Report): ReportGrouping {
       return;
     }
     if (block.kind === "saber_tyt") {
-      // Como en Saber PRO: una hoja por competencia con las dos pruebas.
-      const shown = saberTytOf(report, block);
-      if (shown) TYT_COMPETENCIES.filter((c) => isPaired(c.key)).forEach((c) => claim(`tyt:${shown.id}:${c.key}`, current));
+      // Las hojas del aporte de los programas: una por competencia con modelo y la del método.
+      if (saberTytOf(report, block)) aporteRefList("tyt").forEach(({ ref }) => claim(ref, current));
       return;
     }
     if (block.kind === "saber_pro") {
       // Una hoja del boletín por competencia: todas son del grupo del bloque.
       const shown = saberProOf(report, block);
-      if (shown) SABER_COMPETENCIES.forEach((c) => claim(saberRef(shown.id, c.key), current));
+      if (shown) {
+        SABER_COMPETENCIES.forEach((c) => claim(saberRef(shown.id, c.key), current));
+        claim(saberRef(shown.id, "pais"), current);
+        aporteRefList("pro").forEach(({ ref }) => claim(ref, current));
+      }
       return;
     }
     const prefix = DATASET_PREFIX[block.kind];

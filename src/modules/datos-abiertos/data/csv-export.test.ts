@@ -17,9 +17,6 @@ import {
   pipelineToTable,
   rankingToTable,
   saberProToTable,
-  saberTytCurvesToTable,
-  saberTytModelsToTable,
-  saberTytResultsToTable,
   tableToTable,
   toCsvText,
   uniqueLabels,
@@ -29,7 +26,6 @@ import type { MedalBoard } from "./medals";
 import type { RankingData, RankingEdition } from "./rankings";
 import { formatReserved, RESERVE_DEFAULT, valueOf } from "./reserve";
 import type { SaberProData, SaberResult } from "./saber-pro";
-import type { SaberTytData, TytResult } from "./saber-tyt";
 import { slugify } from "./slug";
 import { ALL_YEARS } from "./terms";
 import type { Breakdown, HeatmapData, HistoryData, Indicator, MapDataset, ModelData, PipelineData, TableData } from "./types";
@@ -783,117 +779,6 @@ describe("Saber PRO", () => {
     // Los tramos del fixture son 130, 140 y 160: ninguno aparece como celda.
     expect(cellsOf(table)).not.toContain("130");
     expect(cellsOf(table)).not.toContain("140");
-  });
-});
-
-const tytResult = (over: Partial<TytResult>): TytResult => ({
-  year: 2024,
-  level: "tecnologico",
-  program: "Tecnología en Sistemas",
-  competency: "lc",
-  evaluated: 20,
-  meanExit: 55.5,
-  paired: 18,
-  meanEntry: 48,
-  meanDelta: 7.5,
-  improved: 11,
-  rawEntry: 52,
-  rawExit: 101,
-  transitions: {},
-  histogram: {},
-  scatter: {},
-  alphaN: null,
-  alphaExpected: null,
-  alphaActual: null,
-  alphaVa: null,
-  alphaPositive: null,
-  plane: {},
-  quadrants: {},
-  quadPlane: {},
-  ...over,
-});
-
-describe("Saber TyT", () => {
-  const data: SaberTytData = {
-    id: "t",
-    title: "Saber TyT",
-    description: "",
-    note: "",
-    source: "ICFES",
-    benchmarks: { lc: { entrada: [30, 35.5], salida: [80] } },
-    alpha: {
-      nacional: { saber11: { lc: 58, global: 285 }, tyt: { lc: 97 } },
-      modelos: { lc: { ampliado: { coef: { intercepto: 12.345, m: 0.5, lc: 0.25 }, r2: 0.41, n: 300, rmse: 9.87 } } },
-    },
-    results: [
-      tytResult({
-        transitions: { "1": { "2": 4 }, "4": { "4": 3 } },
-        histogram: { "-5": 711 },
-        scatter: { "30|55": 722 },
-        plane: { "90|95": 733 },
-        quadPlane: { "50|100": 744 },
-        alphaN: 15,
-        alphaExpected: 99.1,
-        alphaActual: 101,
-        alphaVa: 1.9,
-        alphaPositive: 9,
-        quadrants: { "1": 6, "3": 9 },
-      }),
-      tytResult({ year: 2025, competency: "ce", evaluated: 6, paired: 0, meanEntry: null, meanDelta: null, improved: 0, rawEntry: null }),
-      tytResult({ year: 2025, program: "", competency: "global", evaluated: 60, paired: 50 }),
-    ],
-  };
-
-  it("exporta los escalares, el tránsito y los cuadrantes de cada fila", () => {
-    const table = saberTytResultsToTable(data);
-    expect(table.header).toHaveLength(12 + 16 + 5 + 4 + 1);
-    expect(table.header.slice(0, 5)).toEqual(["Año", "Nivel", "Programa", "Competencia", "Evaluados"]);
-    expect(table.header[table.header.length - 1]).toBe("Pocos evaluados");
-    const first = table.rows[0];
-    expect(first.slice(0, 12)).toEqual([2024, "Tecnológico", "Tecnología en Sistemas", "Lectura crítica", 20, 55.5, 18, 48, 7.5, 11, 52, 101]);
-    expect(first[table.header.indexOf("Tránsito del cuarto 1 al 2")]).toBe(4);
-    expect(first[table.header.indexOf("Tránsito del cuarto 4 al 4")]).toBe(3);
-    expect(first[table.header.indexOf("Tránsito del cuarto 1 al 1")]).toBeNull();
-    expect(first.slice(28, 33)).toEqual([15, 99.1, 101, 1.9, 9]);
-    expect(first.slice(33)).toEqual([6, null, 9, null, null]);
-  });
-
-  it("advierte con menos de 10 evaluados y nombra la fila de todo el nivel", () => {
-    const table = saberTytResultsToTable(data);
-    expect(table.rows.map((row) => [row[0], row[2], row[3], row[row.length - 1]])).toEqual([
-      [2024, "Tecnología en Sistemas", "Lectura crítica", null],
-      [2025, "Todo el nivel", "Puntaje global", null],
-      [2025, "Tecnología en Sistemas", "Comunicación escrita", "sí"],
-    ]);
-  });
-
-  it("no exporta las nubes ni el histograma", () => {
-    const cells = cellsOf(saberTytResultsToTable(data));
-    for (const hidden of ["711", "722", "733", "744", "30|55", "90|95", "50|100"]) expect(cells).not.toContain(hidden);
-  });
-
-  it("exporta las curvas de referencia, un percentil por fila", () => {
-    expect(saberTytCurvesToTable(data)).toEqual({
-      header: ["Competencia", "Prueba", "Percentil", "Puntaje"],
-      rows: [
-        ["Lectura crítica", "Entrada (Saber 11)", 0, 30],
-        ["Lectura crítica", "Entrada (Saber 11)", 5, 35.5],
-        ["Lectura crítica", "Salida (Saber TyT)", 0, 80],
-      ],
-    });
-  });
-
-  it("exporta los modelos Alpha con sus coeficientes y los promedios del país", () => {
-    const table = saberTytModelsToTable(data);
-    expect(table.header).toEqual([
-      "Competencia", "Ajuste", "Intercepto",
-      "Coeficiente · Matemáticas", "Coeficiente · Lectura crítica", "Coeficiente · Ciencias naturales",
-      "Coeficiente · Sociales y ciudadanas", "Coeficiente · Inglés",
-      "R²", "Casos", "Error típico", "Promedio nacional Saber 11", "Promedio nacional Saber TyT",
-    ]);
-    expect(table.rows).toEqual([
-      ["Lectura crítica", "Sin ciencias naturales · más estudiantes", 12.345, 0.5, 0.25, null, null, null, 0.41, 300, 9.87, 58, 97],
-    ]);
   });
 });
 

@@ -47,15 +47,19 @@ import { ChartFrame, ChartTooltip, ViewSwitch } from "./ChartFrame";
 import type { CsvSource } from "./CsvAction";
 import { LineChart } from "./LineChart";
 import { useInView, usePrefersReducedMotion } from "./motion";
+import { SaberAporte } from "./SaberAporte";
+import { SaberTrayectoria } from "./SaberTrayectoria";
 import { SplitFlap } from "./SplitFlap";
+import { SaberPanorama } from "./SaberPanorama";
 import "./saber-pro.css";
 
-type SaberView = "niveles" | "brecha" | "evolucion";
+type SaberView = "niveles" | "brecha" | "evolucion" | "pais";
 
 const VIEWS: { value: SaberView; label: string }[] = [
   { value: "niveles", label: "Niveles" },
   { value: "brecha", label: "Brecha con el país" },
   { value: "evolucion", label: "Evolución" },
+  { value: "pais", label: "Frente al país" },
 ];
 
 const FEW = SABER_FEW_LEVELS;
@@ -115,7 +119,13 @@ function useSaberState(data: SaberProData) {
     );
 
   const filter: SaberFilter = { campus: campus || undefined, faculty: faculty || undefined, program: program || undefined };
-  return { catalog, competency, view, campus, faculty, program, faculties, programs, filter, set };
+  // «Frente al país»: año (el último con dato si el enlace trae uno inválido), evolución y ámbito resaltado.
+  const allYears = saberYears(data);
+  const rawYear = Number(read("sp-anio"));
+  const panoYear = allYears.includes(rawYear) ? rawYear : allYears[allYears.length - 1];
+  const panoEvolution = read("sp-pano") === "evo";
+  const panoHighlight = read("sp-resalta");
+  return { catalog, competency, view, campus, faculty, program, faculties, programs, filter, set, panoYear, panoEvolution, panoHighlight };
 }
 
 /** Cómo se llama el corte: "Medicina · Cúcuta", "Ciencias Sociales", "UDES". */
@@ -267,7 +277,42 @@ export function SaberProBlock({ data, anchor, title, csv }: { data: SaberProData
           </ChartFrame>
         )}
 
+        {view === "pais" && (
+          <ChartFrame
+            title={state.panoEvolution ? "Evolución frente al país" : "Resultados Saber PRO UDES frente al país"}
+            subtitle={state.panoEvolution ? `${name} · brecha con el promedio nacional, ${years[0]}–${years[years.length - 1]}` : `${name} · ${state.panoYear}`}
+            source={data.source}
+            exportName="saber-pro-frente-al-pais"
+            csv={csv}
+          >
+            <SaberPanorama
+              data={data}
+              filter={filter}
+              competency={competency}
+              year={state.panoYear}
+              evolution={state.panoEvolution}
+              highlight={state.panoHighlight}
+              onYear={(y) => set({ "sp-anio": y === years[years.length - 1] ? "" : String(y) })}
+              onEvolution={(on) => set({ "sp-pano": on ? "evo" : "" })}
+              onHighlight={(key) => set({ "sp-resalta": key === "udes" ? "" : key })}
+              onCompetency={(c) => set({ sp: c === "global" ? "" : c })}
+              onCampus={(c) => set({ "sp-sede": c, "sp-programa": "" })}
+            />
+          </ChartFrame>
+        )}
+
         {data.note && <p className="od-saber__note">{data.note}</p>}
+
+        <ChartFrame
+          title={`Del Saber 11 al Saber PRO · ${info.label}`}
+          subtitle="Percentil de entrada y de salida por programa, sin datos individuales"
+          source="Saber 11 y Saber PRO (ICFES), cruce por estudiante agregado por programa"
+          exportName={`saber-trayectoria-${competency}`}
+        >
+          <SaberTrayectoria competency={competency} sede={state.campus} />
+        </ChartFrame>
+
+        <SaberAporte test="pro" anchor={`${anchor}-aporte`} />
       </div>
     </section>
   );

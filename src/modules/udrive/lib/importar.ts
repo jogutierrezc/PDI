@@ -125,6 +125,19 @@ const esObjeto = (x: Elemento | undefined): x is Objeto => x?.t === "tabla" || x
 export function asociarPies(el: readonly Elemento[]): Elemento[] {
   const salida: Elemento[] = el.map((x) => ({ ...x }) as Elemento);
   const quitar = new Set<number>();
+  // «Tabla 3.» en una línea y su título («Inventario de…») en la siguiente: es un solo pie.
+  for (let i = 0; i < salida.length - 1; i++) {
+    const x = salida[i];
+    const sig = salida[i + 1];
+    if (x.t !== "parrafo" || sig.t !== "parrafo") continue;
+    const m = PIE.exec(colapsar(sinMarcas(x.texto)));
+    if (!m || m[3].trim()) continue;
+    const resto = colapsar(sinMarcas(sig.texto));
+    if (!resto || resto.length > 220 || PIE.test(resto) || NOTA.test(resto)) continue;
+    x.texto = `${x.texto.replace(/\s+$/, "")} ${sig.texto}`;
+    quitar.add(i + 1);
+    i++;
+  }
   const vecino = (desde: number, paso: 1 | -1): number => {
     for (let k = desde + paso; k >= 0 && k < salida.length; k += paso) if (!quitar.has(k)) return k;
     return -1;

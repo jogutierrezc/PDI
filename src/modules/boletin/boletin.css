@@ -2161,7 +2161,7 @@
   print-color-adjust: exact;
 }
 
-/* --- Motor Beta ------------------------------------------------------------ */
+/* --- Escala secuencial del papel -------------------------------------------------- */
 
 /* La escala del papel para el tránsito: un solo azul, de claro a oscuro. */
 .bol-doc {
@@ -2171,64 +2171,93 @@
   --bol-seq-4: #cde2fb;
 }
 
-.bol-tyt-figure { margin: 0 0 3mm; }
+/* --- Aporte de los programas (aporte.tsx) ------------------------------------------ */
 
-.bol-tyt-figure__foot {
-  margin: 1mm 0 0;
-  color: var(--bol-ink-3);
+.bol-aporte-svg {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.bol-aporte-fig { margin: 0 0 2.5mm; }
+
+.bol-aporte-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8mm 4mm;
+  margin: 0 0 2mm;
+  color: var(--bol-ink-2);
   font-size: 2.2mm;
   line-height: 1.3;
 }
 
-.bol-tyt-figure figcaption {
-  margin-bottom: 1.2mm;
+.bol-aporte-read {
+  margin: 0 0 3mm;
+  color: var(--bol-ink);
+  font-size: 2.5mm;
+  line-height: 1.4;
+  text-align: justify;
+}
+
+.bol-aporte-read--small {
+  margin-top: 1.5mm;
   color: var(--bol-ink-2);
-  font-size: 2.4mm;
+  font-size: 2.3mm;
 }
 
-.bol-tyt-transit__pct { font-size: 2.1px; font-weight: 700; }
+.bol-aporte-block { margin: 0 0 3mm; }
 
-.bol-tyt-value,
-.bol-tyt-transit {
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+.bol-aporte-block h4 {
+  margin: 0 0 1.2mm;
+  color: var(--bol-navy);
+  font-size: 2.5mm;
+  font-weight: 700;
 }
 
-/* --- Saber TyT en el papel -------------------------------------------------- */
-
-/* Las cifras clave de la hoja, en una fila que no empuja el dibujo. */
-.bol-tyt-keys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2mm 8mm;
-  margin: 0 0 2mm;
-}
-
-.bol-tyt-alpha {
+.bol-aporte-two {
   display: grid;
-  grid-template-columns: 96mm minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 5mm;
   align-items: start;
 }
 
-.bol-tyt-alpha__side { display: grid; gap: 2mm; align-content: start; }
-
-.bol-tyt-alpha__note {
+.bol-aporte-list {
   margin: 0;
-  color: var(--bol-ink-2);
-  font-size: 2.3mm;
+  padding-left: 4mm;
+  color: var(--bol-ink);
+  font-size: 2.4mm;
   line-height: 1.35;
-  text-align: justify;
 }
 
-.bol-tyt-plane__diagonal { stroke: var(--bol-ink); stroke-width: 0.25; stroke-dasharray: 1.2 0.8; }
-.bol-tyt-plane__dot { opacity: 0.78; }
+.bol-aporte-list[data-numbered] { list-style: decimal; }
+.bol-aporte-list li { margin-bottom: 1mm; }
 
-.bol-tyt-plane,
-.bol-tyt-coef {
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+.bol-aporte-cite {
+  padding: 2mm 2.5mm;
+  color: var(--bol-ink);
+  font-size: 2.2mm;
+  line-height: 1.35;
+  background: var(--bol-paper-2);
+  border-top: 0.5mm solid var(--bol-band);
+  overflow-wrap: anywhere;
 }
+
+.bol-aporte-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2mm;
+  margin: 0 0 2.5mm;
+}
+
+.bol-aporte-tiles > div {
+  display: grid;
+  gap: 0.4mm;
+  padding: 1.5mm 2mm;
+  background: var(--bol-paper-2);
+}
+
+.bol-aporte-tiles small { color: var(--bol-navy); font-size: 2.2mm; font-weight: 700; }
+.bol-aporte-tiles b { color: var(--bol-ink); font-size: 4.4mm; }
+.bol-aporte-tiles span { color: var(--bol-ink-2); font-size: 2mm; line-height: 1.25; }
 
 /* --- Diversidad, Equidad e Inclusión (dei.tsx) ------------------------------------
    Estratos del 1 (tinta de la marca) al 6 (papel); mosaico con un color por

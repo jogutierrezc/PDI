@@ -361,7 +361,7 @@ export function renderBlock(block: ReportBlock, { catalog, report, cut, campus, 
         if (block.kind === "rankings") return blockPicks(report).rankings(block).some((key) => (report.rankings?.find((r) => r.id === key)?.editions.length ?? 0) > 0);
         if (block.kind === "medallero") return blockPicks(report).medals(block).some((key) => (report.medals?.find((m) => m.id === key)?.entries.length ?? 0) > 0);
         if (block.kind === "saber_pro") return (saberProOf(report, block)?.results.length ?? 0) > 0;
-        if (block.kind === "saber_tyt") return (saberTytOf(report, block)?.results.length ?? 0) > 0;
+        if (block.kind === "saber_tyt") return Boolean(saberTytOf(report, block));
         if (block.kind === "diversidad") return report.indicators.some((i) => i.id === "grupo-especial");
         if (block.kind === "modelo") return Boolean(report.models?.length);
         return report.indicators.length > 0;

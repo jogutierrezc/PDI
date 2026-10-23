@@ -1,0 +1,4661 @@
+{
+ "periodos": [
+  "2025"
+ ],
+ "programas": {
+  "Administración Financiera · Bucaramanga": {
+   "programa": "Administración Financiera",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 13,
+    "entrada": 283.9,
+    "salida": 147.8,
+    "pEntrada": 54.2,
+    "pSalida": 51.5,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 50.5
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 70.9
+     }
+    ]
+   },
+   "lc": {
+    "n": 15,
+    "entrada": 56.8,
+    "salida": 151.8,
+    "pEntrada": 49.9,
+    "pSalida": 50.0,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 34.8
+     },
+     null,
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 15,
+    "entrada": 61.2,
+    "salida": 159.3,
+    "pEntrada": 65.8,
+    "pSalida": 73.3,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 8,
+      "salida": 86.2
+     }
+    ]
+   },
+   "cc": {
+    "n": 15,
+    "entrada": 54.9,
+    "salida": 141.6,
+    "pEntrada": 54.5,
+    "pSalida": 48.2,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 45.7
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 70.1
+     }
+    ]
+   },
+   "ing": {
+    "n": 15,
+    "entrada": 58.3,
+    "salida": 161.7,
+    "pEntrada": 58.2,
+    "pSalida": 58.8,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 85.8
+     }
+    ]
+   }
+  },
+  "Administración Financiera · Cúcuta": {
+   "programa": "Administración Financiera",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 12,
+    "entrada": 278.5,
+    "salida": 144.8,
+    "pEntrada": 52.1,
+    "pSalida": 44.0,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "lc": {
+    "n": 16,
+    "entrada": 55.1,
+    "salida": 155.9,
+    "pEntrada": 44.1,
+    "pSalida": 54.5,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 22.6
+     },
+     null,
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 16,
+    "entrada": 54.4,
+    "salida": 135.2,
+    "pEntrada": 53.8,
+    "pSalida": 50.2,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 69.8
+     }
+    ]
+   },
+   "cc": {
+    "n": 16,
+    "entrada": 51.1,
+    "salida": 142.5,
+    "pEntrada": 46.3,
+    "pSalida": 50.9,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 33.8
+     },
+     null,
+     null,
+     null
+    ]
+   },
+   "ing": {
+    "n": 16,
+    "entrada": 51.2,
+    "salida": 148.1,
+    "pEntrada": 45.7,
+    "pSalida": 44.4,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 19.4
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 42.8
+     },
+     null
+    ]
+   }
+  },
+  "Administración Financiera · Valledupar": {
+   "programa": "Administración Financiera",
+   "sede": "Valledupar",
+   "global": {
+    "n": 31,
+    "entrada": 251.3,
+    "salida": 136.2,
+    "pEntrada": 32.8,
+    "pSalida": 35.8,
+    "cuartos": [
+     {
+      "n": 14,
+      "salida": 21.5
+     },
+     {
+      "n": 9,
+      "salida": 41.3
+     },
+     {
+      "n": 6,
+      "salida": 55.0
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 32,
+    "entrada": 52.3,
+    "salida": 144.8,
+    "pEntrada": 37.2,
+    "pSalida": 42.9,
+    "cuartos": [
+     {
+      "n": 10,
+      "salida": 34.1
+     },
+     {
+      "n": 11,
+      "salida": 47.2
+     },
+     {
+      "n": 9,
+      "salida": 47.4
+     },
+     null
+    ]
+   },
+   "rc": {
+    "n": 32,
+    "entrada": 52.7,
+    "salida": 133.8,
+    "pEntrada": 41.2,
+    "pSalida": 46.6,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 33.5
+     },
+     {
+      "n": 8,
+      "salida": 46.9
+     },
+     {
+      "n": 12,
+      "salida": 49.2
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 32,
+    "entrada": 48.4,
+    "salida": 131.4,
+    "pEntrada": 37.0,
+    "pSalida": 40.4,
+    "cuartos": [
+     {
+      "n": 14,
+      "salida": 27.5
+     },
+     {
+      "n": 8,
+      "salida": 45.4
+     },
+     {
+      "n": 5,
+      "salida": 51.1
+     },
+     {
+      "n": 5,
+      "salida": 57.8
+     }
+    ]
+   },
+   "ing": {
+    "n": 32,
+    "entrada": 46.8,
+    "salida": 140.8,
+    "pEntrada": 30.8,
+    "pSalida": 37.9,
+    "cuartos": [
+     {
+      "n": 17,
+      "salida": 29.5
+     },
+     {
+      "n": 8,
+      "salida": 29.9
+     },
+     {
+      "n": 5,
+      "salida": 65.6
+     },
+     null
+    ]
+   }
+  },
+  "Administración de Negocios · Bucaramanga": {
+   "programa": "Administración de Negocios",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 16,
+    "entrada": 292.0,
+    "salida": 154.2,
+    "pEntrada": 62.2,
+    "pSalida": 61.1,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 77.6
+     }
+    ]
+   },
+   "lc": {
+    "n": 17,
+    "entrada": 59.1,
+    "salida": 157.1,
+    "pEntrada": 59.9,
+    "pSalida": 55.5,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 42.3
+     },
+     {
+      "n": 6,
+      "salida": 75.6
+     }
+    ]
+   },
+   "rc": {
+    "n": 17,
+    "entrada": 59.4,
+    "salida": 141.9,
+    "pEntrada": 61.8,
+    "pSalida": 55.7,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 34.7
+     },
+     {
+      "n": 6,
+      "salida": 54.7
+     },
+     {
+      "n": 5,
+      "salida": 86.0
+     }
+    ]
+   },
+   "cc": {
+    "n": 17,
+    "entrada": 56.6,
+    "salida": 149.8,
+    "pEntrada": 59.3,
+    "pSalida": 57.4,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 45.5
+     },
+     {
+      "n": 5,
+      "salida": 51.7
+     },
+     {
+      "n": 5,
+      "salida": 82.7
+     }
+    ]
+   },
+   "ing": {
+    "n": 17,
+    "entrada": 58.6,
+    "salida": 170.6,
+    "pEntrada": 64.6,
+    "pSalida": 69.8,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 64.9
+     },
+     {
+      "n": 7,
+      "salida": 87.7
+     }
+    ]
+   }
+  },
+  "Bacteriología · Bucaramanga": {
+   "programa": "Bacteriología",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 42,
+    "entrada": 291.9,
+    "salida": 151.4,
+    "pEntrada": 62.8,
+    "pSalida": 57.0,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 53.0
+     },
+     {
+      "n": 17,
+      "salida": 51.5
+     },
+     {
+      "n": 15,
+      "salida": 69.0
+     }
+    ]
+   },
+   "lc": {
+    "n": 45,
+    "entrada": 58.5,
+    "salida": 152.6,
+    "pEntrada": 58.2,
+    "pSalida": 51.9,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 37.6
+     },
+     {
+      "n": 10,
+      "salida": 53.8
+     },
+     {
+      "n": 16,
+      "salida": 50.5
+     },
+     {
+      "n": 13,
+      "salida": 58.9
+     }
+    ]
+   },
+   "rc": {
+    "n": 45,
+    "entrada": 58.8,
+    "salida": 143.4,
+    "pEntrada": 60.0,
+    "pSalida": 57.1,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 39.5
+     },
+     {
+      "n": 13,
+      "salida": 45.2
+     },
+     {
+      "n": 6,
+      "salida": 52.3
+     },
+     {
+      "n": 20,
+      "salida": 71.5
+     }
+    ]
+   },
+   "cc": {
+    "n": 45,
+    "entrada": 54.6,
+    "salida": 145.6,
+    "pEntrada": 55.1,
+    "pSalida": 54.5,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 50.9
+     },
+     {
+      "n": 10,
+      "salida": 52.4
+     },
+     {
+      "n": 12,
+      "salida": 52.1
+     },
+     {
+      "n": 14,
+      "salida": 60.3
+     }
+    ]
+   },
+   "ing": {
+    "n": 45,
+    "entrada": 56.5,
+    "salida": 155.6,
+    "pEntrada": 55.7,
+    "pSalida": 53.5,
+    "cuartos": [
+     {
+      "n": 8,
+      "salida": 36.6
+     },
+     {
+      "n": 12,
+      "salida": 37.4
+     },
+     {
+      "n": 10,
+      "salida": 48.5
+     },
+     {
+      "n": 15,
+      "salida": 78.7
+     }
+    ]
+   }
+  },
+  "Bacteriología · Cúcuta": {
+   "programa": "Bacteriología",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 41,
+    "entrada": 271.1,
+    "salida": 146.1,
+    "pEntrada": 44.5,
+    "pSalida": 47.9,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 27.7
+     },
+     {
+      "n": 17,
+      "salida": 40.5
+     },
+     {
+      "n": 8,
+      "salida": 65.7
+     },
+     {
+      "n": 7,
+      "salida": 71.5
+     }
+    ]
+   },
+   "lc": {
+    "n": 43,
+    "entrada": 55.8,
+    "salida": 147.3,
+    "pEntrada": 47.4,
+    "pSalida": 46.5,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 30.6
+     },
+     {
+      "n": 15,
+      "salida": 41.1
+     },
+     {
+      "n": 10,
+      "salida": 46.1
+     },
+     {
+      "n": 9,
+      "salida": 71.6
+     }
+    ]
+   },
+   "rc": {
+    "n": 43,
+    "entrada": 55.2,
+    "salida": 141.2,
+    "pEntrada": 48.6,
+    "pSalida": 54.4,
+    "cuartos": [
+     {
+      "n": 8,
+      "salida": 36.7
+     },
+     {
+      "n": 16,
+      "salida": 49.7
+     },
+     {
+      "n": 11,
+      "salida": 54.1
+     },
+     {
+      "n": 8,
+      "salida": 82.0
+     }
+    ]
+   },
+   "cc": {
+    "n": 43,
+    "entrada": 50.5,
+    "salida": 132.9,
+    "pEntrada": 41.0,
+    "pSalida": 41.4,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 28.1
+     },
+     {
+      "n": 20,
+      "salida": 31.7
+     },
+     {
+      "n": 6,
+      "salida": 58.6
+     },
+     {
+      "n": 6,
+      "salida": 81.1
+     }
+    ]
+   },
+   "ing": {
+    "n": 43,
+    "entrada": 53.4,
+    "salida": 151.7,
+    "pEntrada": 47.4,
+    "pSalida": 48.5,
+    "cuartos": [
+     {
+      "n": 12,
+      "salida": 25.4
+     },
+     {
+      "n": 13,
+      "salida": 43.7
+     },
+     {
+      "n": 9,
+      "salida": 52.7
+     },
+     {
+      "n": 9,
+      "salida": 82.0
+     }
+    ]
+   }
+  },
+  "Bacteriología · Valledupar": {
+   "programa": "Bacteriología",
+   "sede": "Valledupar",
+   "global": {
+    "n": 36,
+    "entrada": 245.8,
+    "salida": 137.9,
+    "pEntrada": 28.8,
+    "pSalida": 36.6,
+    "cuartos": [
+     {
+      "n": 20,
+      "salida": 20.2
+     },
+     {
+      "n": 9,
+      "salida": 49.7
+     },
+     {
+      "n": 5,
+      "salida": 57.8
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 37,
+    "entrada": 50.9,
+    "salida": 146.4,
+    "pEntrada": 32.5,
+    "pSalida": 43.9,
+    "cuartos": [
+     {
+      "n": 16,
+      "salida": 27.0
+     },
+     {
+      "n": 13,
+      "salida": 52.4
+     },
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 37,
+    "entrada": 49.9,
+    "salida": 121.5,
+    "pEntrada": 32.9,
+    "pSalida": 32.3,
+    "cuartos": [
+     {
+      "n": 20,
+      "salida": 26.6
+     },
+     {
+      "n": 6,
+      "salida": 25.9
+     },
+     {
+      "n": 7,
+      "salida": 33.7
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 37,
+    "entrada": 46.9,
+    "salida": 132.7,
+    "pEntrada": 32.4,
+    "pSalida": 41.4,
+    "cuartos": [
+     {
+      "n": 15,
+      "salida": 24.9
+     },
+     {
+      "n": 12,
+      "salida": 41.4
+     },
+     {
+      "n": 5,
+      "salida": 67.8
+     },
+     {
+      "n": 5,
+      "salida": 64.7
+     }
+    ]
+   },
+   "ing": {
+    "n": 37,
+    "entrada": 48.1,
+    "salida": 134.7,
+    "pEntrada": 33.8,
+    "pSalida": 29.0,
+    "cuartos": [
+     {
+      "n": 15,
+      "salida": 18.4
+     },
+     {
+      "n": 12,
+      "salida": 25.0
+     },
+     {
+      "n": 8,
+      "salida": 41.5
+     },
+     null
+    ]
+   }
+  },
+  "Comercio Exterior · Cúcuta": {
+   "programa": "Comercio Exterior",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 34,
+    "entrada": 278.9,
+    "salida": 140.6,
+    "pEntrada": 52.8,
+    "pSalida": 42.2,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 12.7
+     },
+     {
+      "n": 10,
+      "salida": 43.2
+     },
+     {
+      "n": 9,
+      "salida": 40.6
+     },
+     {
+      "n": 9,
+      "salida": 62.3
+     }
+    ]
+   },
+   "lc": {
+    "n": 35,
+    "entrada": 56.6,
+    "salida": 137.5,
+    "pEntrada": 50.5,
+    "pSalida": 36.5,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 21.7
+     },
+     {
+      "n": 11,
+      "salida": 35.2
+     },
+     {
+      "n": 8,
+      "salida": 30.3
+     },
+     {
+      "n": 9,
+      "salida": 55.0
+     }
+    ]
+   },
+   "rc": {
+    "n": 35,
+    "entrada": 57.2,
+    "salida": 142.3,
+    "pEntrada": 55.4,
+    "pSalida": 56.6,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 26.1
+     },
+     {
+      "n": 10,
+      "salida": 52.3
+     },
+     {
+      "n": 9,
+      "salida": 68.4
+     },
+     {
+      "n": 10,
+      "salida": 68.7
+     }
+    ]
+   },
+   "cc": {
+    "n": 35,
+    "entrada": 53.6,
+    "salida": 130.9,
+    "pEntrada": 51.4,
+    "pSalida": 39.3,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 24.0
+     },
+     {
+      "n": 10,
+      "salida": 26.7
+     },
+     {
+      "n": 9,
+      "salida": 50.5
+     },
+     {
+      "n": 9,
+      "salida": 53.8
+     }
+    ]
+   },
+   "ing": {
+    "n": 35,
+    "entrada": 57.9,
+    "salida": 160.7,
+    "pEntrada": 61.1,
+    "pSalida": 59.1,
+    "cuartos": [
+     null,
+     {
+      "n": 10,
+      "salida": 53.0
+     },
+     {
+      "n": 11,
+      "salida": 63.4
+     },
+     {
+      "n": 11,
+      "salida": 74.1
+     }
+    ]
+   }
+  },
+  "Comunicación Social · Bucaramanga": {
+   "programa": "Comunicación Social",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 26,
+    "entrada": 264.2,
+    "salida": 144.5,
+    "pEntrada": 42.1,
+    "pSalida": 45.4,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 26.8
+     },
+     {
+      "n": 6,
+      "salida": 35.6
+     },
+     {
+      "n": 6,
+      "salida": 56.9
+     },
+     {
+      "n": 5,
+      "salida": 76.6
+     }
+    ]
+   },
+   "lc": {
+    "n": 26,
+    "entrada": 55.3,
+    "salida": 149.7,
+    "pEntrada": 46.5,
+    "pSalida": 47.2,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 30.5
+     },
+     {
+      "n": 6,
+      "salida": 57.8
+     },
+     {
+      "n": 10,
+      "salida": 45.6
+     },
+     null
+    ]
+   },
+   "rc": {
+    "n": 26,
+    "entrada": 53.0,
+    "salida": 126.5,
+    "pEntrada": 44.8,
+    "pSalida": 38.1,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 19.8
+     },
+     {
+      "n": 7,
+      "salida": 32.2
+     },
+     {
+      "n": 6,
+      "salida": 41.0
+     },
+     {
+      "n": 6,
+      "salida": 63.5
+     }
+    ]
+   },
+   "cc": {
+    "n": 26,
+    "entrada": 52.7,
+    "salida": 139.7,
+    "pEntrada": 48.2,
+    "pSalida": 48.6,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 26.3
+     },
+     null,
+     {
+      "n": 10,
+      "salida": 58.6
+     },
+     {
+      "n": 5,
+      "salida": 77.7
+     }
+    ]
+   },
+   "ing": {
+    "n": 26,
+    "entrada": 54.5,
+    "salida": 153.2,
+    "pEntrada": 50.7,
+    "pSalida": 50.9,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 34.0
+     },
+     null,
+     {
+      "n": 8,
+      "salida": 45.2
+     },
+     {
+      "n": 7,
+      "salida": 82.4
+     }
+    ]
+   }
+  },
+  "Comunicación Social · Valledupar": {
+   "programa": "Comunicación Social",
+   "sede": "Valledupar",
+   "global": {
+    "n": 14,
+    "entrada": 261.5,
+    "salida": 136.5,
+    "pEntrada": 39.7,
+    "pSalida": 32.7,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 23.2
+     },
+     null,
+     null,
+     null
+    ]
+   },
+   "lc": {
+    "n": 14,
+    "entrada": 54.1,
+    "salida": 142.4,
+    "pEntrada": 42.0,
+    "pSalida": 38.0,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 24.1
+     },
+     null,
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 14,
+    "entrada": 50.4,
+    "salida": 114.6,
+    "pEntrada": 35.3,
+    "pSalida": 27.0,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 23.0
+     },
+     {
+      "n": 5,
+      "salida": 19.7
+     },
+     null,
+     null
+    ]
+   },
+   "cc": {
+    "n": 14,
+    "entrada": 53.8,
+    "salida": 140.4,
+    "pEntrada": 50.6,
+    "pSalida": 48.2,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 42.8
+     },
+     {
+      "n": 5,
+      "salida": 45.2
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 14,
+    "entrada": 51.7,
+    "salida": 139.7,
+    "pEntrada": 45.0,
+    "pSalida": 37.1,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 23.6
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 40.0
+     },
+     null
+    ]
+   }
+  },
+  "Contaduría Pública · Bucaramanga": {
+   "programa": "Contaduría Pública",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 26,
+    "entrada": 274.1,
+    "salida": 146.2,
+    "pEntrada": 49.1,
+    "pSalida": 48.0,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 14.7
+     },
+     null,
+     {
+      "n": 10,
+      "salida": 59.8
+     },
+     {
+      "n": 5,
+      "salida": 77.3
+     }
+    ]
+   },
+   "lc": {
+    "n": 28,
+    "entrada": 55.8,
+    "salida": 147.9,
+    "pEntrada": 46.9,
+    "pSalida": 46.3,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 20.3
+     },
+     {
+      "n": 9,
+      "salida": 41.9
+     },
+     {
+      "n": 7,
+      "salida": 65.3
+     },
+     {
+      "n": 5,
+      "salida": 63.8
+     }
+    ]
+   },
+   "rc": {
+    "n": 28,
+    "entrada": 55.5,
+    "salida": 139.9,
+    "pEntrada": 49.2,
+    "pSalida": 54.1,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 28.4
+     },
+     {
+      "n": 6,
+      "salida": 45.3
+     },
+     {
+      "n": 9,
+      "salida": 64.8
+     },
+     {
+      "n": 6,
+      "salida": 76.8
+     }
+    ]
+   },
+   "cc": {
+    "n": 28,
+    "entrada": 52.5,
+    "salida": 138.0,
+    "pEntrada": 48.9,
+    "pSalida": 46.2,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 15.3
+     },
+     {
+      "n": 7,
+      "salida": 48.8
+     },
+     {
+      "n": 10,
+      "salida": 46.5
+     },
+     {
+      "n": 5,
+      "salida": 79.2
+     }
+    ]
+   },
+   "ing": {
+    "n": 28,
+    "entrada": 51.8,
+    "salida": 147.8,
+    "pEntrada": 43.4,
+    "pSalida": 45.1,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 23.6
+     },
+     {
+      "n": 5,
+      "salida": 46.2
+     },
+     {
+      "n": 7,
+      "salida": 63.7
+     },
+     {
+      "n": 5,
+      "salida": 65.1
+     }
+    ]
+   }
+  },
+  "Derecho · Bucaramanga": {
+   "programa": "Derecho",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 22,
+    "entrada": 265.0,
+    "salida": 149.1,
+    "pEntrada": 42.2,
+    "pSalida": 53.8,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 43.8
+     },
+     {
+      "n": 9,
+      "salida": 46.6
+     },
+     null,
+     null
+    ]
+   },
+   "lc": {
+    "n": 24,
+    "entrada": 55.7,
+    "salida": 153.6,
+    "pEntrada": 46.7,
+    "pSalida": 52.4,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 40.8
+     },
+     {
+      "n": 6,
+      "salida": 45.7
+     },
+     null,
+     {
+      "n": 6,
+      "salida": 79.1
+     }
+    ]
+   },
+   "rc": {
+    "n": 24,
+    "entrada": 51.8,
+    "salida": 134.1,
+    "pEntrada": 38.2,
+    "pSalida": 46.7,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 22.7
+     },
+     {
+      "n": 11,
+      "salida": 50.4
+     },
+     null,
+     null
+    ]
+   },
+   "cc": {
+    "n": 24,
+    "entrada": 53.4,
+    "salida": 155.0,
+    "pEntrada": 51.7,
+    "pSalida": 62.8,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 75.1
+     },
+     {
+      "n": 6,
+      "salida": 52.7
+     },
+     {
+      "n": 8,
+      "salida": 76.4
+     }
+    ]
+   },
+   "ing": {
+    "n": 23,
+    "entrada": 49.7,
+    "salida": 145.7,
+    "pEntrada": 39.4,
+    "pSalida": 44.5,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 23.1
+     },
+     {
+      "n": 7,
+      "salida": 49.5
+     },
+     null,
+     null
+    ]
+   }
+  },
+  "Derecho · Cúcuta": {
+   "programa": "Derecho",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 10,
+    "entrada": 265.2,
+    "salida": 150.2,
+    "pEntrada": 42.4,
+    "pSalida": 54.2,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "lc": {
+    "n": 21,
+    "entrada": 50.7,
+    "salida": 150.8,
+    "pEntrada": 30.6,
+    "pSalida": 49.2,
+    "cuartos": [
+     {
+      "n": 10,
+      "salida": 32.9
+     },
+     {
+      "n": 5,
+      "salida": 54.3
+     },
+     {
+      "n": 5,
+      "salida": 68.0
+     },
+     null
+    ]
+   },
+   "rc": {
+    "n": 21,
+    "entrada": 47.8,
+    "salida": 126.7,
+    "pEntrada": 28.3,
+    "pSalida": 39.6,
+    "cuartos": [
+     {
+      "n": 13,
+      "salida": 29.3
+     },
+     null,
+     null,
+     null
+    ]
+   },
+   "cc": {
+    "n": 21,
+    "entrada": 48.7,
+    "salida": 144.0,
+    "pEntrada": 36.4,
+    "pSalida": 52.2,
+    "cuartos": [
+     {
+      "n": 10,
+      "salida": 30.0
+     },
+     null,
+     {
+      "n": 7,
+      "salida": 65.9
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 21,
+    "entrada": 46.7,
+    "salida": 136.3,
+    "pEntrada": 30.9,
+    "pSalida": 33.7,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 13.3
+     },
+     {
+      "n": 5,
+      "salida": 33.5
+     },
+     null,
+     null
+    ]
+   }
+  },
+  "Derecho · Valledupar": {
+   "programa": "Derecho",
+   "sede": "Valledupar",
+   "global": {
+    "n": 59,
+    "entrada": 252.3,
+    "salida": 139.8,
+    "pEntrada": 32.4,
+    "pSalida": 40.2,
+    "cuartos": [
+     {
+      "n": 29,
+      "salida": 23.6
+     },
+     {
+      "n": 13,
+      "salida": 48.7
+     },
+     {
+      "n": 12,
+      "salida": 55.6
+     },
+     {
+      "n": 5,
+      "salida": 77.4
+     }
+    ]
+   },
+   "lc": {
+    "n": 67,
+    "entrada": 52.7,
+    "salida": 146.1,
+    "pEntrada": 37.2,
+    "pSalida": 44.9,
+    "cuartos": [
+     {
+      "n": 26,
+      "salida": 36.7
+     },
+     {
+      "n": 21,
+      "salida": 38.2
+     },
+     {
+      "n": 11,
+      "salida": 54.7
+     },
+     {
+      "n": 9,
+      "salida": 72.4
+     }
+    ]
+   },
+   "rc": {
+    "n": 67,
+    "entrada": 48.0,
+    "salida": 121.5,
+    "pEntrada": 29.9,
+    "pSalida": 34.7,
+    "cuartos": [
+     {
+      "n": 34,
+      "salida": 28.2
+     },
+     {
+      "n": 15,
+      "salida": 37.2
+     },
+     {
+      "n": 16,
+      "salida": 42.5
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 67,
+    "entrada": 50.7,
+    "salida": 145.3,
+    "pEntrada": 42.6,
+    "pSalida": 53.7,
+    "cuartos": [
+     {
+      "n": 21,
+      "salida": 38.1
+     },
+     {
+      "n": 20,
+      "salida": 47.3
+     },
+     {
+      "n": 15,
+      "salida": 64.3
+     },
+     {
+      "n": 11,
+      "salida": 80.7
+     }
+    ]
+   },
+   "ing": {
+    "n": 66,
+    "entrada": 48.8,
+    "salida": 135.1,
+    "pEntrada": 36.1,
+    "pSalida": 32.0,
+    "cuartos": [
+     {
+      "n": 29,
+      "salida": 14.6
+     },
+     {
+      "n": 17,
+      "salida": 28.6
+     },
+     {
+      "n": 14,
+      "salida": 53.0
+     },
+     {
+      "n": 6,
+      "salida": 77.2
+     }
+    ]
+   }
+  },
+  "Diseño Gráfico · Valledupar": {
+   "programa": "Diseño Gráfico",
+   "sede": "Valledupar",
+   "global": {
+    "n": 20,
+    "entrada": 269.8,
+    "salida": 146.1,
+    "pEntrada": 46.0,
+    "pSalida": 48.5,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 27.9
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 58.1
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 20,
+    "entrada": 56.0,
+    "salida": 140.3,
+    "pEntrada": 47.3,
+    "pSalida": 38.5,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 24.1
+     },
+     {
+      "n": 6,
+      "salida": 32.7
+     },
+     null,
+     {
+      "n": 6,
+      "salida": 49.7
+     }
+    ]
+   },
+   "rc": {
+    "n": 20,
+    "entrada": 53.9,
+    "salida": 133.7,
+    "pEntrada": 48.0,
+    "pSalida": 47.4,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 23.1
+     },
+     null,
+     null,
+     {
+      "n": 7,
+      "salida": 61.4
+     }
+    ]
+   },
+   "cc": {
+    "n": 20,
+    "entrada": 51.7,
+    "salida": 133.9,
+    "pEntrada": 46.1,
+    "pSalida": 41.8,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 25.0
+     },
+     null,
+     {
+      "n": 6,
+      "salida": 46.6
+     },
+     {
+      "n": 5,
+      "salida": 66.3
+     }
+    ]
+   },
+   "ing": {
+    "n": 20,
+    "entrada": 52.6,
+    "salida": 162.4,
+    "pEntrada": 47.0,
+    "pSalida": 58.8,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 29.3
+     },
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 93.3
+     }
+    ]
+   }
+  },
+  "Enfermería · Bucaramanga": {
+   "programa": "Enfermería",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 22,
+    "entrada": 269.0,
+    "salida": 139.7,
+    "pEntrada": 44.1,
+    "pSalida": 38.0,
+    "cuartos": [
+     null,
+     {
+      "n": 11,
+      "salida": 32.5
+     },
+     {
+      "n": 6,
+      "salida": 44.2
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 26,
+    "entrada": 55.1,
+    "salida": 142.5,
+    "pEntrada": 45.8,
+    "pSalida": 40.2,
+    "cuartos": [
+     null,
+     {
+      "n": 11,
+      "salida": 33.6
+     },
+     {
+      "n": 6,
+      "salida": 49.6
+     },
+     {
+      "n": 5,
+      "salida": 63.3
+     }
+    ]
+   },
+   "rc": {
+    "n": 26,
+    "entrada": 52.7,
+    "salida": 130.2,
+    "pEntrada": 41.4,
+    "pSalida": 42.1,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 39.8
+     },
+     {
+      "n": 10,
+      "salida": 36.4
+     },
+     {
+      "n": 10,
+      "salida": 49.1
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 26,
+    "entrada": 52.6,
+    "salida": 135.1,
+    "pEntrada": 47.7,
+    "pSalida": 43.1,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 32.1
+     },
+     {
+      "n": 9,
+      "salida": 39.0
+     },
+     {
+      "n": 6,
+      "salida": 60.0
+     },
+     {
+      "n": 5,
+      "salida": 43.5
+     }
+    ]
+   },
+   "ing": {
+    "n": 26,
+    "entrada": 50.3,
+    "salida": 136.2,
+    "pEntrada": 40.4,
+    "pSalida": 32.0,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 22.3
+     },
+     {
+      "n": 10,
+      "salida": 34.3
+     },
+     {
+      "n": 9,
+      "salida": 37.0
+     },
+     null
+    ]
+   }
+  },
+  "Enfermería · Cúcuta": {
+   "programa": "Enfermería",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 45,
+    "entrada": 258.9,
+    "salida": 133.4,
+    "pEntrada": 36.2,
+    "pSalida": 35.0,
+    "cuartos": [
+     {
+      "n": 17,
+      "salida": 19.6
+     },
+     {
+      "n": 14,
+      "salida": 42.6
+     },
+     {
+      "n": 13,
+      "salida": 43.5
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 52,
+    "entrada": 53.2,
+    "salida": 138.5,
+    "pEntrada": 38.3,
+    "pSalida": 35.8,
+    "cuartos": [
+     {
+      "n": 20,
+      "salida": 30.8
+     },
+     {
+      "n": 14,
+      "salida": 30.7
+     },
+     {
+      "n": 11,
+      "salida": 35.1
+     },
+     {
+      "n": 7,
+      "salida": 61.0
+     }
+    ]
+   },
+   "rc": {
+    "n": 53,
+    "entrada": 52.9,
+    "salida": 129.0,
+    "pEntrada": 41.4,
+    "pSalida": 41.1,
+    "cuartos": [
+     {
+      "n": 12,
+      "salida": 30.2
+     },
+     {
+      "n": 20,
+      "salida": 40.5
+     },
+     {
+      "n": 18,
+      "salida": 46.2
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 51,
+    "entrada": 46.3,
+    "salida": 128.7,
+    "pEntrada": 30.8,
+    "pSalida": 38.2,
+    "cuartos": [
+     {
+      "n": 25,
+      "salida": 25.7
+     },
+     {
+      "n": 12,
+      "salida": 41.4
+     },
+     {
+      "n": 11,
+      "salida": 54.4
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 51,
+    "entrada": 49.5,
+    "salida": 138.6,
+    "pEntrada": 36.8,
+    "pSalida": 35.5,
+    "cuartos": [
+     {
+      "n": 19,
+      "salida": 27.0
+     },
+     {
+      "n": 20,
+      "salida": 34.7
+     },
+     {
+      "n": 8,
+      "salida": 38.4
+     },
+     null
+    ]
+   }
+  },
+  "Fisioterapia · Bucaramanga": {
+   "programa": "Fisioterapia",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 36,
+    "entrada": 276.9,
+    "salida": 145.8,
+    "pEntrada": 50.8,
+    "pSalida": 48.1,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 24.7
+     },
+     {
+      "n": 12,
+      "salida": 37.8
+     },
+     {
+      "n": 10,
+      "salida": 50.2
+     },
+     {
+      "n": 8,
+      "salida": 78.4
+     }
+    ]
+   },
+   "lc": {
+    "n": 37,
+    "entrada": 57.4,
+    "salida": 149.7,
+    "pEntrada": 53.9,
+    "pSalida": 48.0,
+    "cuartos": [
+     {
+      "n": 8,
+      "salida": 29.0
+     },
+     {
+      "n": 6,
+      "salida": 55.2
+     },
+     {
+      "n": 13,
+      "salida": 45.8
+     },
+     {
+      "n": 10,
+      "salida": 62.0
+     }
+    ]
+   },
+   "rc": {
+    "n": 37,
+    "entrada": 56.0,
+    "salida": 136.4,
+    "pEntrada": 53.1,
+    "pSalida": 51.1,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 30.5
+     },
+     {
+      "n": 8,
+      "salida": 42.6
+     },
+     {
+      "n": 12,
+      "salida": 54.4
+     },
+     {
+      "n": 10,
+      "salida": 68.3
+     }
+    ]
+   },
+   "cc": {
+    "n": 37,
+    "entrada": 53.6,
+    "salida": 137.7,
+    "pEntrada": 50.6,
+    "pSalida": 45.7,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 25.8
+     },
+     {
+      "n": 12,
+      "salida": 43.2
+     },
+     {
+      "n": 11,
+      "salida": 50.5
+     },
+     {
+      "n": 8,
+      "salida": 58.1
+     }
+    ]
+   },
+   "ing": {
+    "n": 37,
+    "entrada": 53.6,
+    "salida": 150.1,
+    "pEntrada": 47.4,
+    "pSalida": 46.9,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 30.7
+     },
+     {
+      "n": 12,
+      "salida": 41.8
+     },
+     {
+      "n": 10,
+      "salida": 46.5
+     },
+     {
+      "n": 6,
+      "salida": 82.0
+     }
+    ]
+   }
+  },
+  "Fisioterapia · Cúcuta": {
+   "programa": "Fisioterapia",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 54,
+    "entrada": 275.8,
+    "salida": 149.6,
+    "pEntrada": 48.1,
+    "pSalida": 52.6,
+    "cuartos": [
+     {
+      "n": 10,
+      "salida": 33.2
+     },
+     {
+      "n": 21,
+      "salida": 40.9
+     },
+     {
+      "n": 13,
+      "salida": 64.2
+     },
+     {
+      "n": 10,
+      "salida": 81.7
+     }
+    ]
+   },
+   "lc": {
+    "n": 54,
+    "entrada": 55.9,
+    "salida": 151.5,
+    "pEntrada": 48.0,
+    "pSalida": 50.5,
+    "cuartos": [
+     {
+      "n": 12,
+      "salida": 35.5
+     },
+     {
+      "n": 16,
+      "salida": 43.1
+     },
+     {
+      "n": 14,
+      "salida": 58.0
+     },
+     {
+      "n": 12,
+      "salida": 66.8
+     }
+    ]
+   },
+   "rc": {
+    "n": 54,
+    "entrada": 56.4,
+    "salida": 136.3,
+    "pEntrada": 49.8,
+    "pSalida": 48.6,
+    "cuartos": [
+     {
+      "n": 10,
+      "salida": 28.1
+     },
+     {
+      "n": 19,
+      "salida": 33.3
+     },
+     {
+      "n": 12,
+      "salida": 62.1
+     },
+     {
+      "n": 13,
+      "salida": 74.3
+     }
+    ]
+   },
+   "cc": {
+    "n": 54,
+    "entrada": 53.7,
+    "salida": 145.4,
+    "pEntrada": 50.5,
+    "pSalida": 53.1,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 37.4
+     },
+     {
+      "n": 19,
+      "salida": 50.7
+     },
+     {
+      "n": 14,
+      "salida": 49.5
+     },
+     {
+      "n": 12,
+      "salida": 73.1
+     }
+    ]
+   },
+   "ing": {
+    "n": 54,
+    "entrada": 54.0,
+    "salida": 154.5,
+    "pEntrada": 50.8,
+    "pSalida": 52.3,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 31.0
+     },
+     {
+      "n": 16,
+      "salida": 43.0
+     },
+     {
+      "n": 16,
+      "salida": 60.3
+     },
+     {
+      "n": 11,
+      "salida": 75.6
+     }
+    ]
+   }
+  },
+  "Fisioterapia · Valledupar": {
+   "programa": "Fisioterapia",
+   "sede": "Valledupar",
+   "global": {
+    "n": 48,
+    "entrada": 259.0,
+    "salida": 140.0,
+    "pEntrada": 36.9,
+    "pSalida": 38.4,
+    "cuartos": [
+     {
+      "n": 18,
+      "salida": 18.9
+     },
+     {
+      "n": 15,
+      "salida": 39.2
+     },
+     {
+      "n": 11,
+      "salida": 55.6
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 48,
+    "entrada": 54.7,
+    "salida": 150.2,
+    "pEntrada": 43.8,
+    "pSalida": 48.2,
+    "cuartos": [
+     {
+      "n": 14,
+      "salida": 33.7
+     },
+     {
+      "n": 15,
+      "salida": 53.5
+     },
+     {
+      "n": 11,
+      "salida": 46.3
+     },
+     {
+      "n": 8,
+      "salida": 66.2
+     }
+    ]
+   },
+   "rc": {
+    "n": 48,
+    "entrada": 52.1,
+    "salida": 125.2,
+    "pEntrada": 39.3,
+    "pSalida": 37.3,
+    "cuartos": [
+     {
+      "n": 15,
+      "salida": 23.7
+     },
+     {
+      "n": 15,
+      "salida": 35.4
+     },
+     {
+      "n": 14,
+      "salida": 46.9
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 48,
+    "entrada": 49.1,
+    "salida": 134.6,
+    "pEntrada": 38.7,
+    "pSalida": 43.2,
+    "cuartos": [
+     {
+      "n": 20,
+      "salida": 33.6
+     },
+     {
+      "n": 13,
+      "salida": 35.8
+     },
+     {
+      "n": 8,
+      "salida": 45.6
+     },
+     {
+      "n": 7,
+      "salida": 81.6
+     }
+    ]
+   },
+   "ing": {
+    "n": 48,
+    "entrada": 49.6,
+    "salida": 144.8,
+    "pEntrada": 38.6,
+    "pSalida": 41.6,
+    "cuartos": [
+     {
+      "n": 17,
+      "salida": 24.3
+     },
+     {
+      "n": 14,
+      "salida": 39.2
+     },
+     {
+      "n": 12,
+      "salida": 54.0
+     },
+     {
+      "n": 5,
+      "salida": 77.3
+     }
+    ]
+   }
+  },
+  "Fonoaudiología · Bucaramanga": {
+   "programa": "Fonoaudiología",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 33,
+    "entrada": 254.4,
+    "salida": 138.9,
+    "pEntrada": 34.4,
+    "pSalida": 39.0,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 14.8
+     },
+     {
+      "n": 12,
+      "salida": 38.6
+     },
+     {
+      "n": 9,
+      "salida": 64.5
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 33,
+    "entrada": 53.3,
+    "salida": 148.2,
+    "pEntrada": 39.0,
+    "pSalida": 45.2,
+    "cuartos": [
+     {
+      "n": 10,
+      "salida": 25.8
+     },
+     {
+      "n": 12,
+      "salida": 44.8
+     },
+     {
+      "n": 8,
+      "salida": 61.4
+     },
+     null
+    ]
+   },
+   "rc": {
+    "n": 33,
+    "entrada": 51.7,
+    "salida": 125.8,
+    "pEntrada": 38.2,
+    "pSalida": 38.1,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 18.7
+     },
+     {
+      "n": 10,
+      "salida": 36.7
+     },
+     {
+      "n": 9,
+      "salida": 52.2
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 33,
+    "entrada": 49.4,
+    "salida": 132.2,
+    "pEntrada": 37.9,
+    "pSalida": 40.5,
+    "cuartos": [
+     {
+      "n": 10,
+      "salida": 15.5
+     },
+     {
+      "n": 11,
+      "salida": 47.9
+     },
+     {
+      "n": 11,
+      "salida": 52.7
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 33,
+    "entrada": 47.8,
+    "salida": 142.2,
+    "pEntrada": 32.3,
+    "pSalida": 38.8,
+    "cuartos": [
+     {
+      "n": 16,
+      "salida": 24.8
+     },
+     {
+      "n": 10,
+      "salida": 47.9
+     },
+     {
+      "n": 6,
+      "salida": 53.3
+     },
+     null
+    ]
+   }
+  },
+  "Geología · Bucaramanga": {
+   "programa": "Geología",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 16,
+    "entrada": 299.6,
+    "salida": 149.9,
+    "pEntrada": 68.7,
+    "pSalida": 56.0,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 9,
+      "salida": 73.8
+     }
+    ]
+   },
+   "lc": {
+    "n": 16,
+    "entrada": 59.9,
+    "salida": 156.4,
+    "pEntrada": 62.7,
+    "pSalida": 55.7,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 8,
+      "salida": 55.5
+     },
+     {
+      "n": 5,
+      "salida": 79.5
+     }
+    ]
+   },
+   "rc": {
+    "n": 16,
+    "entrada": 62.8,
+    "salida": 150.9,
+    "pEntrada": 72.1,
+    "pSalida": 65.1,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 9,
+      "salida": 82.9
+     }
+    ]
+   },
+   "cc": {
+    "n": 16,
+    "entrada": 58.5,
+    "salida": 132.4,
+    "pEntrada": 66.0,
+    "pSalida": 40.9,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 8,
+      "salida": 58.0
+     }
+    ]
+   },
+   "ing": {
+    "n": 16,
+    "entrada": 58.8,
+    "salida": 161.8,
+    "pEntrada": 64.3,
+    "pSalida": 60.1,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 55.3
+     },
+     {
+      "n": 6,
+      "salida": 52.9
+     },
+     {
+      "n": 5,
+      "salida": 73.6
+     }
+    ]
+   }
+  },
+  "Ingeniería Civil · Bucaramanga": {
+   "programa": "Ingeniería Civil",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 23,
+    "entrada": 289.0,
+    "salida": 153.3,
+    "pEntrada": 59.9,
+    "pSalida": 59.8,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 7,
+      "salida": 63.8
+     },
+     {
+      "n": 9,
+      "salida": 78.0
+     }
+    ]
+   },
+   "lc": {
+    "n": 25,
+    "entrada": 57.3,
+    "salida": 144.8,
+    "pEntrada": 52.8,
+    "pSalida": 45.5,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 4.4
+     },
+     {
+      "n": 6,
+      "salida": 44.9
+     },
+     {
+      "n": 7,
+      "salida": 61.7
+     },
+     {
+      "n": 7,
+      "salida": 59.3
+     }
+    ]
+   },
+   "rc": {
+    "n": 25,
+    "entrada": 59.7,
+    "salida": 165.4,
+    "pEntrada": 62.6,
+    "pSalida": 78.2,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 32.4
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 94.4
+     },
+     {
+      "n": 12,
+      "salida": 94.2
+     }
+    ]
+   },
+   "cc": {
+    "n": 25,
+    "entrada": 53.8,
+    "salida": 136.0,
+    "pEntrada": 51.8,
+    "pSalida": 45.7,
+    "cuartos": [
+     null,
+     {
+      "n": 8,
+      "salida": 35.2
+     },
+     {
+      "n": 6,
+      "salida": 46.9
+     },
+     {
+      "n": 7,
+      "salida": 67.1
+     }
+    ]
+   },
+   "ing": {
+    "n": 25,
+    "entrada": 54.8,
+    "salida": 155.7,
+    "pEntrada": 51.5,
+    "pSalida": 53.9,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 30.9
+     },
+     {
+      "n": 6,
+      "salida": 52.4
+     },
+     {
+      "n": 8,
+      "salida": 48.6
+     },
+     {
+      "n": 6,
+      "salida": 81.6
+     }
+    ]
+   }
+  },
+  "Ingeniería Industrial · Bucaramanga": {
+   "programa": "Ingeniería Industrial",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 10,
+    "entrada": 302.4,
+    "salida": 160.1,
+    "pEntrada": 70.9,
+    "pSalida": 66.1,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 85.0
+     }
+    ]
+   },
+   "lc": {
+    "n": 11,
+    "entrada": 57.2,
+    "salida": 138.7,
+    "pEntrada": 52.9,
+    "pSalida": 36.8,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 11,
+    "entrada": 61.8,
+    "salida": 155.4,
+    "pEntrada": 69.3,
+    "pSalida": 68.5,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 86.6
+     }
+    ]
+   },
+   "cc": {
+    "n": 11,
+    "entrada": 57.9,
+    "salida": 153.1,
+    "pEntrada": 63.1,
+    "pSalida": 60.6,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "ing": {
+    "n": 11,
+    "entrada": 63.5,
+    "salida": 188.0,
+    "pEntrada": 74.5,
+    "pSalida": 77.8,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 84.8
+     }
+    ]
+   }
+  },
+  "Ingeniería Industrial · Cúcuta": {
+   "programa": "Ingeniería Industrial",
+   "sede": "Cúcuta",
+   "lc": {
+    "n": 10,
+    "entrada": 54.3,
+    "salida": 148.9,
+    "pEntrada": 41.5,
+    "pSalida": 46.7,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 10,
+    "entrada": 54.4,
+    "salida": 141.1,
+    "pEntrada": 46.1,
+    "pSalida": 53.7,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "cc": {
+    "n": 10,
+    "entrada": 51.0,
+    "salida": 123.6,
+    "pEntrada": 42.5,
+    "pSalida": 29.5,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "ing": {
+    "n": 10,
+    "entrada": 49.4,
+    "salida": 149.2,
+    "pEntrada": 37.0,
+    "pSalida": 47.4,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  },
+  "Ingeniería Industrial · Valledupar": {
+   "programa": "Ingeniería Industrial",
+   "sede": "Valledupar",
+   "global": {
+    "n": 25,
+    "entrada": 278.6,
+    "salida": 152.0,
+    "pEntrada": 51.3,
+    "pSalida": 57.6,
+    "cuartos": [
+     null,
+     {
+      "n": 8,
+      "salida": 42.5
+     },
+     {
+      "n": 8,
+      "salida": 69.0
+     },
+     {
+      "n": 5,
+      "salida": 93.0
+     }
+    ]
+   },
+   "lc": {
+    "n": 25,
+    "entrada": 57.3,
+    "salida": 152.6,
+    "pEntrada": 51.7,
+    "pSalida": 51.8,
+    "cuartos": [
+     null,
+     {
+      "n": 7,
+      "salida": 42.4
+     },
+     {
+      "n": 9,
+      "salida": 50.6
+     },
+     {
+      "n": 5,
+      "salida": 81.0
+     }
+    ]
+   },
+   "rc": {
+    "n": 25,
+    "entrada": 59.1,
+    "salida": 150.2,
+    "pEntrada": 60.5,
+    "pSalida": 64.1,
+    "cuartos": [
+     null,
+     {
+      "n": 7,
+      "salida": 45.0
+     },
+     {
+      "n": 9,
+      "salida": 55.5
+     },
+     {
+      "n": 9,
+      "salida": 87.6
+     }
+    ]
+   },
+   "cc": {
+    "n": 25,
+    "entrada": 52.5,
+    "salida": 143.9,
+    "pEntrada": 48.5,
+    "pSalida": 52.1,
+    "cuartos": [
+     null,
+     {
+      "n": 9,
+      "salida": 33.9
+     },
+     {
+      "n": 10,
+      "salida": 71.4
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 25,
+    "entrada": 54.4,
+    "salida": 159.0,
+    "pEntrada": 48.1,
+    "pSalida": 55.0,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 25.3
+     },
+     {
+      "n": 6,
+      "salida": 50.4
+     },
+     {
+      "n": 5,
+      "salida": 75.5
+     },
+     {
+      "n": 5,
+      "salida": 93.3
+     }
+    ]
+   }
+  },
+  "Ingeniería de Software · Bucaramanga": {
+   "programa": "Ingeniería de Software",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 10,
+    "entrada": 295.1,
+    "salida": 148.5,
+    "pEntrada": 66.2,
+    "pSalida": 54.8,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 50.9
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 10,
+    "entrada": 60.3,
+    "salida": 146.5,
+    "pEntrada": 64.7,
+    "pSalida": 47.1,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 61.9
+     }
+    ]
+   },
+   "rc": {
+    "n": 10,
+    "entrada": 61.9,
+    "salida": 144.4,
+    "pEntrada": 71.1,
+    "pSalida": 60.3,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 86.0
+     }
+    ]
+   },
+   "cc": {
+    "n": 10,
+    "entrada": 56.3,
+    "salida": 149.7,
+    "pEntrada": 58.4,
+    "pSalida": 58.1,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 64.0
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 10,
+    "entrada": 60.0,
+    "salida": 179.5,
+    "pEntrada": 68.8,
+    "pSalida": 80.1,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 88.1
+     }
+    ]
+   }
+  },
+  "Ingeniería de Software · Cúcuta": {
+   "programa": "Ingeniería de Software",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 12,
+    "entrada": 280.8,
+    "salida": 153.3,
+    "pEntrada": 52.8,
+    "pSalida": 58.1,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "lc": {
+    "n": 12,
+    "entrada": 56.9,
+    "salida": 150.2,
+    "pEntrada": 48.8,
+    "pSalida": 51.8,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 12,
+    "entrada": 58.6,
+    "salida": 149.9,
+    "pEntrada": 59.4,
+    "pSalida": 64.7,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "cc": {
+    "n": 12,
+    "entrada": 53.7,
+    "salida": 145.6,
+    "pEntrada": 53.7,
+    "pSalida": 53.8,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 73.5
+     }
+    ]
+   },
+   "ing": {
+    "n": 12,
+    "entrada": 59.5,
+    "salida": 168.1,
+    "pEntrada": 65.8,
+    "pSalida": 65.7,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 82.6
+     }
+    ]
+   }
+  },
+  "Instrumentación Quirúrgica · Bogotá": {
+   "programa": "Instrumentación Quirúrgica",
+   "sede": "Bogotá",
+   "global": {
+    "n": 16,
+    "entrada": 267.4,
+    "salida": 149.4,
+    "pEntrada": 43.7,
+    "pSalida": 55.0,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 24.5
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 70.4
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 20,
+    "entrada": 52.1,
+    "salida": 151.0,
+    "pEntrada": 36.5,
+    "pSalida": 50.1,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 34.8
+     },
+     null,
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 20,
+    "entrada": 52.4,
+    "salida": 138.9,
+    "pEntrada": 41.8,
+    "pSalida": 51.2,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 37.6
+     },
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 72.9
+     }
+    ]
+   },
+   "cc": {
+    "n": 20,
+    "entrada": 52.5,
+    "salida": 150.4,
+    "pEntrada": 46.6,
+    "pSalida": 58.8,
+    "cuartos": [
+     null,
+     {
+      "n": 7,
+      "salida": 54.5
+     },
+     {
+      "n": 6,
+      "salida": 68.8
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 20,
+    "entrada": 49.6,
+    "salida": 150.7,
+    "pEntrada": 38.5,
+    "pSalida": 47.9,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 29.0
+     },
+     {
+      "n": 8,
+      "salida": 45.9
+     },
+     {
+      "n": 5,
+      "salida": 64.0
+     },
+     null
+    ]
+   }
+  },
+  "Instrumentación Quirúrgica · Bucaramanga": {
+   "programa": "Instrumentación Quirúrgica",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 49,
+    "entrada": 267.0,
+    "salida": 142.8,
+    "pEntrada": 43.0,
+    "pSalida": 43.8,
+    "cuartos": [
+     {
+      "n": 14,
+      "salida": 22.5
+     },
+     {
+      "n": 17,
+      "salida": 35.2
+     },
+     {
+      "n": 11,
+      "salida": 63.7
+     },
+     {
+      "n": 7,
+      "salida": 76.3
+     }
+    ]
+   },
+   "lc": {
+    "n": 52,
+    "entrada": 55.5,
+    "salida": 148.6,
+    "pEntrada": 46.6,
+    "pSalida": 45.9,
+    "cuartos": [
+     {
+      "n": 14,
+      "salida": 29.7
+     },
+     {
+      "n": 15,
+      "salida": 43.0
+     },
+     {
+      "n": 12,
+      "salida": 46.6
+     },
+     {
+      "n": 11,
+      "salida": 69.8
+     }
+    ]
+   },
+   "rc": {
+    "n": 52,
+    "entrada": 53.3,
+    "salida": 132.4,
+    "pEntrada": 43.5,
+    "pSalida": 44.7,
+    "cuartos": [
+     {
+      "n": 14,
+      "salida": 28.9
+     },
+     {
+      "n": 17,
+      "salida": 34.8
+     },
+     {
+      "n": 14,
+      "salida": 57.4
+     },
+     {
+      "n": 7,
+      "salida": 75.0
+     }
+    ]
+   },
+   "cc": {
+    "n": 52,
+    "entrada": 51.0,
+    "salida": 135.8,
+    "pEntrada": 42.7,
+    "pSalida": 45.5,
+    "cuartos": [
+     {
+      "n": 13,
+      "salida": 24.8
+     },
+     {
+      "n": 22,
+      "salida": 39.0
+     },
+     {
+      "n": 9,
+      "salida": 57.1
+     },
+     {
+      "n": 8,
+      "salida": 83.9
+     }
+    ]
+   },
+   "ing": {
+    "n": 52,
+    "entrada": 53.3,
+    "salida": 151.1,
+    "pEntrada": 49.2,
+    "pSalida": 49.3,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 33.6
+     },
+     {
+      "n": 15,
+      "salida": 44.0
+     },
+     {
+      "n": 16,
+      "salida": 49.4
+     },
+     {
+      "n": 10,
+      "salida": 74.2
+     }
+    ]
+   }
+  },
+  "Medicina Veterinaria · Bucaramanga": {
+   "programa": "Medicina Veterinaria",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 43,
+    "entrada": 301.0,
+    "salida": 157.9,
+    "pEntrada": 68.3,
+    "pSalida": 66.2,
+    "cuartos": [
+     null,
+     {
+      "n": 7,
+      "salida": 31.1
+     },
+     {
+      "n": 11,
+      "salida": 60.0
+     },
+     {
+      "n": 23,
+      "salida": 81.6
+     }
+    ]
+   },
+   "lc": {
+    "n": 45,
+    "entrada": 61.5,
+    "salida": 161.8,
+    "pEntrada": 67.9,
+    "pSalida": 62.9,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 63.4
+     },
+     {
+      "n": 15,
+      "salida": 54.1
+     },
+     {
+      "n": 21,
+      "salida": 77.5
+     }
+    ]
+   },
+   "rc": {
+    "n": 45,
+    "entrada": 60.7,
+    "salida": 149.7,
+    "pEntrada": 65.9,
+    "pSalida": 64.0,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 37.7
+     },
+     {
+      "n": 7,
+      "salida": 36.9
+     },
+     {
+      "n": 9,
+      "salida": 63.7
+     },
+     {
+      "n": 24,
+      "salida": 77.4
+     }
+    ]
+   },
+   "cc": {
+    "n": 45,
+    "entrada": 58.0,
+    "salida": 155.8,
+    "pEntrada": 63.4,
+    "pSalida": 64.6,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 35.2
+     },
+     {
+      "n": 8,
+      "salida": 45.5
+     },
+     {
+      "n": 13,
+      "salida": 64.5
+     },
+     {
+      "n": 19,
+      "salida": 80.6
+     }
+    ]
+   },
+   "ing": {
+    "n": 45,
+    "entrada": 61.2,
+    "salida": 171.4,
+    "pEntrada": 65.7,
+    "pSalida": 68.5,
+    "cuartos": [
+     null,
+     {
+      "n": 11,
+      "salida": 61.5
+     },
+     {
+      "n": 9,
+      "salida": 47.6
+     },
+     {
+      "n": 21,
+      "salida": 91.7
+     }
+    ]
+   }
+  },
+  "Medicina Veterinaria · Valledupar": {
+   "programa": "Medicina Veterinaria",
+   "sede": "Valledupar",
+   "global": {
+    "n": 12,
+    "entrada": 278.5,
+    "salida": 150.1,
+    "pEntrada": 52.6,
+    "pSalida": 54.7,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "lc": {
+    "n": 13,
+    "entrada": 56.5,
+    "salida": 154.5,
+    "pEntrada": 48.3,
+    "pSalida": 54.4,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 53.9
+     },
+     null,
+     null
+    ]
+   },
+   "rc": {
+    "n": 13,
+    "entrada": 55.8,
+    "salida": 135.2,
+    "pEntrada": 49.6,
+    "pSalida": 47.6,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 40.4
+     },
+     null,
+     null
+    ]
+   },
+   "cc": {
+    "n": 13,
+    "entrada": 52.4,
+    "salida": 134.6,
+    "pEntrada": 47.1,
+    "pSalida": 41.5,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "ing": {
+    "n": 13,
+    "entrada": 54.0,
+    "salida": 160.2,
+    "pEntrada": 48.5,
+    "pSalida": 58.6,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  },
+  "Medicina · Bucaramanga": {
+   "programa": "Medicina",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 90,
+    "entrada": 321.4,
+    "salida": 161.8,
+    "pEntrada": 81.8,
+    "pSalida": 71.4,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 21,
+      "salida": 61.7
+     },
+     {
+      "n": 64,
+      "salida": 77.1
+     }
+    ]
+   },
+   "lc": {
+    "n": 92,
+    "entrada": 64.4,
+    "salida": 169.3,
+    "pEntrada": 76.7,
+    "pSalida": 70.1,
+    "cuartos": [
+     null,
+     {
+      "n": 9,
+      "salida": 60.9
+     },
+     {
+      "n": 21,
+      "salida": 59.5
+     },
+     {
+      "n": 60,
+      "salida": 75.3
+     }
+    ]
+   },
+   "rc": {
+    "n": 92,
+    "entrada": 65.0,
+    "salida": 158.6,
+    "pEntrada": 77.1,
+    "pSalida": 74.2,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 40.3
+     },
+     {
+      "n": 29,
+      "salida": 66.8
+     },
+     {
+      "n": 55,
+      "salida": 82.7
+     }
+    ]
+   },
+   "cc": {
+    "n": 92,
+    "entrada": 62.9,
+    "salida": 159.4,
+    "pEntrada": 77.3,
+    "pSalida": 66.1,
+    "cuartos": [
+     null,
+     {
+      "n": 10,
+      "salida": 48.3
+     },
+     {
+      "n": 22,
+      "salida": 65.7
+     },
+     {
+      "n": 59,
+      "salida": 68.9
+     }
+    ]
+   },
+   "ing": {
+    "n": 92,
+    "entrada": 63.6,
+    "salida": 168.4,
+    "pEntrada": 74.5,
+    "pSalida": 67.0,
+    "cuartos": [
+     null,
+     {
+      "n": 13,
+      "salida": 43.0
+     },
+     {
+      "n": 24,
+      "salida": 59.2
+     },
+     {
+      "n": 52,
+      "salida": 80.3
+     }
+    ]
+   }
+  },
+  "Medicina · Cúcuta": {
+   "programa": "Medicina",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 46,
+    "entrada": 306.0,
+    "salida": 161.4,
+    "pEntrada": 73.1,
+    "pSalida": 70.8,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 58.1
+     },
+     {
+      "n": 16,
+      "salida": 63.2
+     },
+     {
+      "n": 24,
+      "salida": 79.4
+     }
+    ]
+   },
+   "lc": {
+    "n": 46,
+    "entrada": 61.2,
+    "salida": 163.6,
+    "pEntrada": 67.1,
+    "pSalida": 63.9,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 51.5
+     },
+     {
+      "n": 14,
+      "salida": 55.6
+     },
+     {
+      "n": 22,
+      "salida": 75.2
+     }
+    ]
+   },
+   "rc": {
+    "n": 46,
+    "entrada": 62.2,
+    "salida": 152.2,
+    "pEntrada": 70.5,
+    "pSalida": 66.6,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 37.1
+     },
+     {
+      "n": 17,
+      "salida": 63.0
+     },
+     {
+      "n": 21,
+      "salida": 79.0
+     }
+    ]
+   },
+   "cc": {
+    "n": 46,
+    "entrada": 60.3,
+    "salida": 158.0,
+    "pEntrada": 70.5,
+    "pSalida": 66.0,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 58.8
+     },
+     {
+      "n": 16,
+      "salida": 58.2
+     },
+     {
+      "n": 23,
+      "salida": 76.4
+     }
+    ]
+   },
+   "ing": {
+    "n": 46,
+    "entrada": 62.8,
+    "salida": 170.5,
+    "pEntrada": 74.7,
+    "pSalida": 69.5,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 16,
+      "salida": 56.2
+     },
+     {
+      "n": 27,
+      "salida": 81.0
+     }
+    ]
+   }
+  },
+  "Medicina · Valledupar": {
+   "programa": "Medicina",
+   "sede": "Valledupar",
+   "global": {
+    "n": 33,
+    "entrada": 289.6,
+    "salida": 153.7,
+    "pEntrada": 60.6,
+    "pSalida": 60.0,
+    "cuartos": [
+     null,
+     {
+      "n": 13,
+      "salida": 48.7
+     },
+     {
+      "n": 12,
+      "salida": 65.2
+     },
+     {
+      "n": 8,
+      "salida": 70.5
+     }
+    ]
+   },
+   "lc": {
+    "n": 36,
+    "entrada": 56.9,
+    "salida": 160.2,
+    "pEntrada": 51.1,
+    "pSalida": 60.2,
+    "cuartos": [
+     null,
+     {
+      "n": 14,
+      "salida": 60.4
+     },
+     {
+      "n": 13,
+      "salida": 52.1
+     },
+     {
+      "n": 6,
+      "salida": 79.3
+     }
+    ]
+   },
+   "rc": {
+    "n": 36,
+    "entrada": 57.7,
+    "salida": 139.7,
+    "pEntrada": 56.4,
+    "pSalida": 54.4,
+    "cuartos": [
+     null,
+     {
+      "n": 12,
+      "salida": 57.4
+     },
+     {
+      "n": 9,
+      "salida": 43.8
+     },
+     {
+      "n": 11,
+      "salida": 67.4
+     }
+    ]
+   },
+   "cc": {
+    "n": 36,
+    "entrada": 57.2,
+    "salida": 147.6,
+    "pEntrada": 61.6,
+    "pSalida": 56.4,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 61.9
+     },
+     {
+      "n": 19,
+      "salida": 51.0
+     },
+     {
+      "n": 9,
+      "salida": 63.3
+     }
+    ]
+   },
+   "ing": {
+    "n": 36,
+    "entrada": 57.2,
+    "salida": 154.4,
+    "pEntrada": 59.4,
+    "pSalida": 51.4,
+    "cuartos": [
+     null,
+     {
+      "n": 9,
+      "salida": 39.3
+     },
+     {
+      "n": 13,
+      "salida": 43.7
+     },
+     {
+      "n": 11,
+      "salida": 75.5
+     }
+    ]
+   }
+  },
+  "Mercadeo · Bucaramanga": {
+   "programa": "Mercadeo",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 29,
+    "entrada": 278.2,
+    "salida": 145.1,
+    "pEntrada": 50.4,
+    "pSalida": 47.1,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 24.9
+     },
+     {
+      "n": 7,
+      "salida": 42.4
+     },
+     {
+      "n": 10,
+      "salida": 48.8
+     },
+     {
+      "n": 6,
+      "salida": 72.0
+     }
+    ]
+   },
+   "lc": {
+    "n": 29,
+    "entrada": 57.8,
+    "salida": 146.6,
+    "pEntrada": 56.9,
+    "pSalida": 44.8,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 48.8
+     },
+     {
+      "n": 9,
+      "salida": 41.0
+     },
+     {
+      "n": 10,
+      "salida": 51.7
+     }
+    ]
+   },
+   "rc": {
+    "n": 29,
+    "entrada": 55.7,
+    "salida": 132.7,
+    "pEntrada": 47.7,
+    "pSalida": 44.6,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 29.1
+     },
+     null,
+     {
+      "n": 12,
+      "salida": 41.7
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 29,
+    "entrada": 54.3,
+    "salida": 135.8,
+    "pEntrada": 52.5,
+    "pSalida": 44.6,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 29.1
+     },
+     {
+      "n": 8,
+      "salida": 27.0
+     },
+     {
+      "n": 7,
+      "salida": 54.2
+     },
+     {
+      "n": 8,
+      "salida": 65.3
+     }
+    ]
+   },
+   "ing": {
+    "n": 29,
+    "entrada": 57.4,
+    "salida": 156.2,
+    "pEntrada": 59.4,
+    "pSalida": 55.3,
+    "cuartos": [
+     null,
+     {
+      "n": 8,
+      "salida": 24.7
+     },
+     {
+      "n": 9,
+      "salida": 63.5
+     },
+     {
+      "n": 9,
+      "salida": 78.5
+     }
+    ]
+   }
+  },
+  "Mercadeo · Cúcuta": {
+   "programa": "Mercadeo",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 20,
+    "entrada": 285.1,
+    "salida": 140.6,
+    "pEntrada": 57.3,
+    "pSalida": 40.5,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 26.1
+     },
+     {
+      "n": 6,
+      "salida": 53.1
+     },
+     {
+      "n": 6,
+      "salida": 50.9
+     }
+    ]
+   },
+   "lc": {
+    "n": 20,
+    "entrada": 57.2,
+    "salida": 146.1,
+    "pEntrada": 53.4,
+    "pSalida": 45.3,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 52.0
+     },
+     {
+      "n": 7,
+      "salida": 45.3
+     },
+     null
+    ]
+   },
+   "rc": {
+    "n": 20,
+    "entrada": 56.9,
+    "salida": 121.5,
+    "pEntrada": 53.0,
+    "pSalida": 37.4,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 37.7
+     },
+     {
+      "n": 9,
+      "salida": 32.1
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 20,
+    "entrada": 56.0,
+    "salida": 130.7,
+    "pEntrada": 58.6,
+    "pSalida": 38.7,
+    "cuartos": [
+     null,
+     {
+      "n": 6,
+      "salida": 38.7
+     },
+     {
+      "n": 6,
+      "salida": 36.2
+     },
+     {
+      "n": 6,
+      "salida": 51.5
+     }
+    ]
+   },
+   "ing": {
+    "n": 20,
+    "entrada": 60.2,
+    "salida": 167.5,
+    "pEntrada": 67.7,
+    "pSalida": 67.2,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 9,
+      "salida": 67.7
+     },
+     {
+      "n": 7,
+      "salida": 83.1
+     }
+    ]
+   }
+  },
+  "Microbiología Industrial · Bucaramanga": {
+   "programa": "Microbiología Industrial",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 15,
+    "entrada": 305.5,
+    "salida": 162.3,
+    "pEntrada": 72.0,
+    "pSalida": 73.8,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 75.1
+     },
+     {
+      "n": 8,
+      "salida": 81.1
+     }
+    ]
+   },
+   "lc": {
+    "n": 15,
+    "entrada": 61.5,
+    "salida": 168.7,
+    "pEntrada": 67.1,
+    "pSalida": 70.2,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 70.5
+     },
+     {
+      "n": 6,
+      "salida": 77.7
+     }
+    ]
+   },
+   "rc": {
+    "n": 15,
+    "entrada": 61.8,
+    "salida": 158.7,
+    "pEntrada": 67.4,
+    "pSalida": 73.0,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 8,
+      "salida": 87.3
+     }
+    ]
+   },
+   "cc": {
+    "n": 15,
+    "entrada": 62.3,
+    "salida": 157.3,
+    "pEntrada": 76.8,
+    "pSalida": 64.7,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 59.7
+     },
+     {
+      "n": 9,
+      "salida": 70.4
+     }
+    ]
+   },
+   "ing": {
+    "n": 15,
+    "entrada": 57.5,
+    "salida": 167.4,
+    "pEntrada": 60.7,
+    "pSalida": 68.6,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 55.8
+     },
+     {
+      "n": 5,
+      "salida": 72.4
+     },
+     {
+      "n": 5,
+      "salida": 77.6
+     }
+    ]
+   }
+  },
+  "Psicología · Bucaramanga": {
+   "programa": "Psicología",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 35,
+    "entrada": 285.5,
+    "salida": 152.9,
+    "pEntrada": 55.6,
+    "pSalida": 58.4,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 26.2
+     },
+     {
+      "n": 12,
+      "salida": 45.4
+     },
+     {
+      "n": 5,
+      "salida": 73.7
+     },
+     {
+      "n": 12,
+      "salida": 81.1
+     }
+    ]
+   },
+   "lc": {
+    "n": 35,
+    "entrada": 60.0,
+    "salida": 163.2,
+    "pEntrada": 60.7,
+    "pSalida": 63.3,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 45.3
+     },
+     {
+      "n": 8,
+      "salida": 52.9
+     },
+     {
+      "n": 8,
+      "salida": 63.6
+     },
+     {
+      "n": 14,
+      "salida": 75.6
+     }
+    ]
+   },
+   "rc": {
+    "n": 35,
+    "entrada": 57.4,
+    "salida": 134.5,
+    "pEntrada": 54.9,
+    "pSalida": 48.5,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 16.4
+     },
+     {
+      "n": 11,
+      "salida": 37.4
+     },
+     {
+      "n": 11,
+      "salida": 54.2
+     },
+     {
+      "n": 8,
+      "salida": 76.1
+     }
+    ]
+   },
+   "cc": {
+    "n": 34,
+    "entrada": 57.6,
+    "salida": 152.0,
+    "pEntrada": 60.7,
+    "pSalida": 59.4,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 39.9
+     },
+     {
+      "n": 7,
+      "salida": 49.0
+     },
+     {
+      "n": 8,
+      "salida": 47.7
+     },
+     {
+      "n": 14,
+      "salida": 78.2
+     }
+    ]
+   },
+   "ing": {
+    "n": 35,
+    "entrada": 56.1,
+    "salida": 160.3,
+    "pEntrada": 54.2,
+    "pSalida": 57.2,
+    "cuartos": [
+     {
+      "n": 7,
+      "salida": 21.4
+     },
+     {
+      "n": 9,
+      "salida": 40.6
+     },
+     {
+      "n": 7,
+      "salida": 65.8
+     },
+     {
+      "n": 12,
+      "salida": 85.4
+     }
+    ]
+   }
+  },
+  "Psicología · Cúcuta": {
+   "programa": "Psicología",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 24,
+    "entrada": 259.4,
+    "salida": 148.5,
+    "pEntrada": 39.8,
+    "pSalida": 50.1,
+    "cuartos": [
+     {
+      "n": 11,
+      "salida": 23.9
+     },
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 93.0
+     }
+    ]
+   },
+   "lc": {
+    "n": 24,
+    "entrada": 55.5,
+    "salida": 150.2,
+    "pEntrada": 46.3,
+    "pSalida": 51.5,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 27.8
+     },
+     {
+      "n": 5,
+      "salida": 38.7
+     },
+     null,
+     {
+      "n": 7,
+      "salida": 86.1
+     }
+    ]
+   },
+   "rc": {
+    "n": 24,
+    "entrada": 51.3,
+    "salida": 128.3,
+    "pEntrada": 41.6,
+    "pSalida": 41.5,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 14.9
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 50.9
+     },
+     {
+      "n": 6,
+      "salida": 71.4
+     }
+    ]
+   },
+   "cc": {
+    "n": 24,
+    "entrada": 49.5,
+    "salida": 137.0,
+    "pEntrada": 42.0,
+    "pSalida": 44.4,
+    "cuartos": [
+     {
+      "n": 9,
+      "salida": 22.5
+     },
+     {
+      "n": 5,
+      "salida": 36.7
+     },
+     null,
+     {
+      "n": 6,
+      "salida": 76.7
+     }
+    ]
+   },
+   "ing": {
+    "n": 24,
+    "entrada": 55.3,
+    "salida": 161.9,
+    "pEntrada": 50.6,
+    "pSalida": 53.2,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 37.9
+     },
+     {
+      "n": 7,
+      "salida": 30.3
+     },
+     {
+      "n": 5,
+      "salida": 51.1
+     },
+     {
+      "n": 6,
+      "salida": 97.0
+     }
+    ]
+   }
+  },
+  "Psicología · Valledupar": {
+   "programa": "Psicología",
+   "sede": "Valledupar",
+   "global": {
+    "n": 68,
+    "entrada": 236.5,
+    "salida": 132.2,
+    "pEntrada": 23.4,
+    "pSalida": 30.6,
+    "cuartos": [
+     {
+      "n": 45,
+      "salida": 20.1
+     },
+     {
+      "n": 13,
+      "salida": 42.1
+     },
+     {
+      "n": 8,
+      "salida": 58.3
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 68,
+    "entrada": 51.0,
+    "salida": 139.7,
+    "pEntrada": 32.9,
+    "pSalida": 37.8,
+    "cuartos": [
+     {
+      "n": 32,
+      "salida": 24.7
+     },
+     {
+      "n": 19,
+      "salida": 31.9
+     },
+     {
+      "n": 9,
+      "salida": 57.9
+     },
+     {
+      "n": 8,
+      "salida": 81.7
+     }
+    ]
+   },
+   "rc": {
+    "n": 68,
+    "entrada": 46.7,
+    "salida": 114.1,
+    "pEntrada": 24.8,
+    "pSalida": 27.2,
+    "cuartos": [
+     {
+      "n": 43,
+      "salida": 19.3
+     },
+     {
+      "n": 15,
+      "salida": 30.8
+     },
+     {
+      "n": 7,
+      "salida": 54.3
+     },
+     null
+    ]
+   },
+   "cc": {
+    "n": 68,
+    "entrada": 44.6,
+    "salida": 127.5,
+    "pEntrada": 27.3,
+    "pSalida": 36.6,
+    "cuartos": [
+     {
+      "n": 34,
+      "salida": 24.2
+     },
+     {
+      "n": 22,
+      "salida": 39.8
+     },
+     {
+      "n": 9,
+      "salida": 64.3
+     },
+     null
+    ]
+   },
+   "ing": {
+    "n": 68,
+    "entrada": 46.1,
+    "salida": 132.7,
+    "pEntrada": 27.6,
+    "pSalida": 28.9,
+    "cuartos": [
+     {
+      "n": 38,
+      "salida": 21.1
+     },
+     {
+      "n": 19,
+      "salida": 27.3
+     },
+     {
+      "n": 9,
+      "salida": 51.6
+     },
+     null
+    ]
+   }
+  },
+  "Terapia · Bucaramanga": {
+   "programa": "Terapia",
+   "sede": "Bucaramanga",
+   "global": {
+    "n": 14,
+    "entrada": 280.1,
+    "salida": 144.1,
+    "pEntrada": 53.4,
+    "pSalida": 46.8,
+    "cuartos": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "lc": {
+    "n": 16,
+    "entrada": 57.0,
+    "salida": 156.7,
+    "pEntrada": 54.1,
+    "pSalida": 57.8,
+    "cuartos": [
+     null,
+     null,
+     {
+      "n": 6,
+      "salida": 47.1
+     },
+     null
+    ]
+   },
+   "rc": {
+    "n": 16,
+    "entrada": 54.9,
+    "salida": 125.8,
+    "pEntrada": 47.5,
+    "pSalida": 41.8,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 24.3
+     },
+     {
+      "n": 5,
+      "salida": 39.8
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 63.7
+     }
+    ]
+   },
+   "cc": {
+    "n": 16,
+    "entrada": 53.9,
+    "salida": 154.8,
+    "pEntrada": 53.2,
+    "pSalida": 60.0,
+    "cuartos": [
+     null,
+     null,
+     null,
+     {
+      "n": 5,
+      "salida": 82.7
+     }
+    ]
+   },
+   "ing": {
+    "n": 15,
+    "entrada": 51.0,
+    "salida": 145.1,
+    "pEntrada": 41.1,
+    "pSalida": 40.7,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 17.1
+     },
+     null,
+     null,
+     null
+    ]
+   }
+  },
+  "Terapia · Cúcuta": {
+   "programa": "Terapia",
+   "sede": "Cúcuta",
+   "global": {
+    "n": 20,
+    "entrada": 277.1,
+    "salida": 150.9,
+    "pEntrada": 51.0,
+    "pSalida": 54.1,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 31.3
+     },
+     null,
+     {
+      "n": 8,
+      "salida": 55.2
+     },
+     null
+    ]
+   },
+   "lc": {
+    "n": 20,
+    "entrada": 56.5,
+    "salida": 149.8,
+    "pEntrada": 50.8,
+    "pSalida": 48.7,
+    "cuartos": [
+     {
+      "n": 5,
+      "salida": 39.0
+     },
+     {
+      "n": 5,
+      "salida": 46.7
+     },
+     {
+      "n": 5,
+      "salida": 47.0
+     },
+     {
+      "n": 5,
+      "salida": 62.1
+     }
+    ]
+   },
+   "rc": {
+    "n": 20,
+    "entrada": 56.6,
+    "salida": 136.6,
+    "pEntrada": 54.9,
+    "pSalida": 50.7,
+    "cuartos": [
+     null,
+     {
+      "n": 5,
+      "salida": 49.0
+     },
+     {
+      "n": 7,
+      "salida": 47.9
+     },
+     {
+      "n": 5,
+      "salida": 77.7
+     }
+    ]
+   },
+   "cc": {
+    "n": 20,
+    "entrada": 53.0,
+    "salida": 146.9,
+    "pEntrada": 48.2,
+    "pSalida": 53.2,
+    "cuartos": [
+     {
+      "n": 6,
+      "salida": 33.0
+     },
+     null,
+     {
+      "n": 5,
+      "salida": 50.8
+     },
+     {
+      "n": 5,
+      "salida": 92.1
+     }
+    ]
+   },
+   "ing": {
+    "n": 20,
+    "entrada": 55.4,
+    "salida": 152.2,
+    "pEntrada": 53.4,
+    "pSalida": 48.2,
+    "cuartos": [
+     null,
+     {
+      "n": 7,
+      "salida": 35.7
+     },
+     {
+      "n": 6,
+      "salida": 50.2
+     },
+     null
+    ]
+   }
+  }
+ },
+ "total": {
+  "global": {
+   "n": 1280
+  },
+  "lc": {
+   "n": 1353
+  },
+  "rc": {
+   "n": 1354
+  },
+  "cc": {
+   "n": 1351
+  },
+  "ing": {
+   "n": 1349
+  }
+ }
+}

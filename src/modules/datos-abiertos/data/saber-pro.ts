@@ -281,6 +281,218 @@ export function saberLevelTone(index: number, scale: SaberLevelScale): string {
   return `pos-${Math.min(2, index - scale.high + 1)}`;
 }
 
+/* --- Frente al país: UDES y promedio nacional sobre el mismo eje de puntos ------------ */
+
+export type SaberPanoKind = "ok" | "few" | "nonat" | "empty";
+
+/** Un año de un ámbito en una competencia. Un vacío es `null`, nunca cero. */
+export interface SaberPanoPoint {
+  year: number;
+  value: number | null;
+  national: number | null;
+  /** UDES (o campus) menos el promedio nacional; `null` si falta cualquiera de los dos. */
+  gap: number | null;
+  evaluated: number | null;
+  /** Promedio oficial del ICFES (toda la UDES): no depende de cuántos evaluados haya. */
+  official: boolean;
+  /** "few": menos de SABER_FEW_MEAN evaluados; "nonat": sin promedio nacional; "empty": sin dato. */
+  kind: SaberPanoKind;
+  /** Menos de SABER_FEW_LEVELS evaluados (incluye a los "few"). */
+  low: boolean;
+}
+
+export type SaberPanoReading = "acerca" | "mantiene" | "aleja" | "sube" | "baja" | "unico";
+
+export const SABER_PANO_READING: Record<SaberPanoReading, string> = {
+  acerca: "Se acerca al país",
+  mantiene: "Se mantiene",
+  aleja: "Se aleja del país",
+  sube: "Pasa a estar sobre el país",
+  baja: "Pasa a estar bajo el país",
+  unico: "Un solo año con dato",
+};
+
+export interface SaberPanoVariation {
+  first: SaberPanoPoint;
+  last: SaberPanoPoint;
+  /** Cambio de la brecha entre el primer y el último año con dato. */
+  delta: number;
+  best: { gap: number; year: number };
+  worst: { gap: number; year: number };
+  /** Años seguidos, hasta el último con dato, en el mismo lado del país. */
+  streak: number;
+  /** Lado del último año: 1 sobre, -1 bajo, 0 igual. */
+  sign: -1 | 0 | 1;
+  reading: SaberPanoReading;
+  label: string;
+  /** Años con brecha. */
+  count: number;
+  /** Menos de 10 evaluados en un extremo: la variación no se compara. */
+  few: boolean;
+  /** Algún año con menos de 30 evaluados. */
+  low: boolean;
+}
+
+export interface SaberPanoScope {
+  key: string;
+  label: string;
+  kind: "udes" | "sede";
+  filter: SaberFilter;
+}
+
+export interface SaberPanoRow {
+  key: string;
+  scope: SaberPanoScope;
+  competency: SaberCompetency;
+  /** El punto del año pedido. */
+  point: SaberPanoPoint;
+  /** Todos los años del conjunto, en orden. */
+  serie: SaberPanoPoint[];
+  variacion: SaberPanoVariation | null;
+}
+
+export interface SaberPanorama {
+  year: number;
+  years: number[];
+  scopes: SaberPanoScope[];
+  /** Promedio nacional del año, en el orden de SABER_COMPETENCIES. */
+  national: { competency: SaberCompetency; value: number | null }[];
+  /** Un registro por ámbito y competencia (ámbitos en su orden, competencias en el de SABER_COMPETENCIES). */
+  rows: SaberPanoRow[];
+  domain: { points: [number, number]; gap: [number, number] };
+}
+
+const gapSign = (gap: number): -1 | 0 | 1 => {
+  const r = Math.round(gap);
+  return r > 0 ? 1 : r < 0 ? -1 : 0;
+};
+
+/** Variación de la brecha entre el primer y el último año con dato. No interpola los huecos. */
+export function saberPanoVariation(serie: SaberPanoPoint[]): SaberPanoVariation | null {
+  const pts = serie.filter((p): p is SaberPanoPoint & { gap: number } => p.gap !== null);
+  if (pts.length === 0) return null;
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  let best = pts[0];
+  let worst = pts[0];
+  for (const p of pts) {
+    if (p.gap >= best.gap) best = p;
+    if (p.gap <= worst.gap) worst = p;
+  }
+  const sign = gapSign(last.gap);
+  let streak = 0;
+  for (let i = serie.length - 1; i >= 0; i -= 1) {
+    const p = serie[i];
+    if (p.year > last.year) continue;
+    if (p.gap === null || gapSign(p.gap) !== sign) break;
+    streak += 1;
+  }
+  const distance = Math.abs(last.gap) - Math.abs(first.gap);
+  const crossed = gapSign(first.gap) !== 0 && sign !== 0 && gapSign(first.gap) !== sign;
+  const reading: SaberPanoReading =
+    pts.length < 2 ? "unico" : crossed ? (sign > 0 ? "sube" : "baja") : distance <= -3 ? "acerca" : distance >= 3 ? "aleja" : "mantiene";
+  return {
+    first,
+    last,
+    delta: last.gap - first.gap,
+    best: { gap: best.gap, year: best.year },
+    worst: { gap: worst.gap, year: worst.year },
+    streak,
+    sign,
+    reading,
+    label: SABER_PANO_READING[reading],
+    count: pts.length,
+    few: first.kind === "few" || last.kind === "few",
+    low: pts.some((p) => p.low),
+  };
+}
+
+/** Eje vertical de las series de brecha: se ajusta al ámbito enfocado y a las series con 30 evaluados o más. */
+export function saberPanoGapDomain(rows: SaberPanoRow[], focusKey?: string): [number, number] {
+  let min = 0;
+  let max = 0;
+  for (const row of rows) {
+    for (const p of row.serie) {
+      if (p.gap === null) continue;
+      if (row.scope.key !== focusKey && p.low) continue;
+      min = Math.min(min, p.gap);
+      max = Math.max(max, p.gap);
+    }
+  }
+  let lo = Math.floor((min - 1) / 5) * 5;
+  let hi = Math.ceil((max + 1) / 5) * 5;
+  if (hi - lo < 15) {
+    lo = Math.min(lo, -10);
+    hi = Math.max(hi, 5);
+  }
+  return [lo, hi];
+}
+
+/**
+ * Las dos bandas de «Frente al país» y la serie de la brecha, desde `SaberProData`.
+ * Sin filtro: toda la UDES (promedio oficial) y cada campus. Con sede: solo esa
+ * sede; con facultad o programa, el corte de cada sede que tenga datos.
+ */
+export function saberPanorama(data: SaberProData, year: number, filter: SaberFilter = {}): SaberPanorama {
+  const years = saberYears(data);
+  const catalog = saberCatalog(data);
+  const scopes: SaberPanoScope[] = [];
+  if (isAll(filter)) scopes.push({ key: "udes", label: "Toda la UDES", kind: "udes", filter: {} });
+  for (const campus of catalog.campuses) {
+    if (filter.campus && filter.campus !== campus) continue;
+    const suffix = filter.program ? ` · ${filter.program}` : filter.faculty ? ` · ${filter.faculty}` : "";
+    scopes.push({ key: campus, label: `${campus}${suffix}`, kind: "sede", filter: { campus, faculty: filter.faculty, program: filter.program } });
+  }
+
+  const nationalOf = (competency: SaberCompetency, y: number): number | null =>
+    data.results.find((r) => r.scope === "nacional" && r.year === y && r.competency === competency)?.mean ?? null;
+
+  const pointOf = (competency: SaberCompetency, y: number, scope: SaberPanoScope): SaberPanoPoint => {
+    const figure = saberFigure(data, competency, y, scope.filter);
+    const national = nationalOf(competency, y);
+    const value = figure?.shown ?? null;
+    const official = Boolean(figure && figure.official !== null);
+    const evaluated = figure && figure.evaluated > 0 ? figure.evaluated : null;
+    const few = value !== null && !official && evaluated !== null && evaluated < SABER_FEW_MEAN;
+    const kind: SaberPanoKind = value === null ? "empty" : few ? "few" : national === null ? "nonat" : "ok";
+    return {
+      year: y,
+      value,
+      national,
+      gap: value !== null && national !== null ? value - national : null,
+      evaluated,
+      official,
+      kind,
+      low: value !== null && !official && evaluated !== null && evaluated < SABER_FEW_LEVELS,
+    };
+  };
+
+  const all: SaberPanoRow[] = [];
+  for (const scope of scopes) {
+    for (const { key: competency } of SABER_COMPETENCIES) {
+      const serie = years.map((y) => pointOf(competency, y, scope));
+      const point = serie.find((p) => p.year === year) ?? pointOf(competency, year, scope);
+      all.push({ key: `${scope.key}|${competency}`, scope, competency, point, serie, variacion: saberPanoVariation(serie) });
+    }
+  }
+  // Un campus sin nada en ningún año no es una fila: no hay qué comparar.
+  const alive = new Set(all.filter((r) => r.serie.some((p) => p.value !== null)).map((r) => r.scope.key));
+  const rows = all.filter((r) => alive.has(r.scope.key));
+
+  const nationals = SABER_COMPETENCIES.flatMap(({ key }) => years.map((y) => nationalOf(key, y)));
+  const values = [...rows.flatMap((r) => r.serie.map((p) => p.value)), ...nationals].filter((v): v is number => v !== null);
+  const lo = values.length ? Math.floor((Math.min(...values) - 2) / 10) * 10 : 110;
+  const hi = values.length ? Math.ceil((Math.max(...values) + 2) / 10) * 10 : 170;
+  return {
+    year,
+    years,
+    scopes: scopes.filter((s) => alive.has(s.key)),
+    national: SABER_COMPETENCIES.map(({ key }) => ({ competency: key, value: nationalOf(key, year) })),
+    rows,
+    domain: { points: [lo, Math.max(hi, lo + 10)], gap: saberPanoGapDomain(rows) },
+  };
+}
+
 /* --- Importación desde los resultados individuales ----------------------------- */
 
 /** Un evaluado tal como viene del ICFES, ya leído del Excel. Nunca sale del navegador. */

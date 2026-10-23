@@ -38,11 +38,14 @@ import {
   medalBoardToTable,
   modelToTable,
   pipelineToTable,
+  aporteCoeficientesToTable,
+  aporteCuadrantesToTable,
+  aporteToTable,
+  aporteVarianzaToTable,
   rankingToTable,
+  saberEvolucionToTable,
+  saberPanoramaToTable,
   saberProToTable,
-  saberTytCurvesToTable,
-  saberTytModelsToTable,
-  saberTytResultsToTable,
   tableToTable,
 } from "./csv-export";
 import type { CsvFile, CsvTable } from "./csv-export";
@@ -415,15 +418,15 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
       case "saber_tyt": {
         if (inSection) break;
         const shown = saberTytOf(report, block);
-        if (!shown || shown.results.length === 0) break;
+        if (!shown) break;
         add(
           block,
           { id: `saber_tyt:${shown.id}`, kind: "saber_tyt", label: shown.title, detail: shown.source || undefined, group: EXPORT_GROUPS.saber },
+          // El bloque de Saber TyT muestra el aporte de los programas (data/saber-aporte.ts).
           () => [
-            file("saber-tyt-resultados", shown.id, () => saberTytResultsToTable(shown)),
-            // Sin curvas o sin modelos cargados, ese archivo saldría solo con su encabezado.
-            ...(Object.keys(shown.benchmarks ?? {}).length > 0 ? [file("saber-tyt-curvas", shown.id, () => saberTytCurvesToTable(shown))] : []),
-            ...(Object.keys(shown.alpha?.modelos ?? {}).length > 0 ? [file("saber-tyt-modelos", shown.id, () => saberTytModelsToTable(shown))] : []),
+            file("aporte-saber-tyt", shown.id, () => aporteToTable("tyt")),
+            file("aporte-saber-tyt-variacion", shown.id, () => aporteVarianzaToTable("tyt")),
+            file("aporte-saber-tyt-coeficientes", shown.id, () => aporteCoeficientesToTable("tyt")),
           ],
         );
         break;
@@ -435,7 +438,20 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
         add(
           block,
           { id: `saber_pro:${shown.id}`, kind: "saber_pro", label: shown.title, detail: shown.source || undefined, group: EXPORT_GROUPS.saber },
-          () => [file("saber-pro", shown.id, () => saberProToTable(shown))],
+          () => [
+            file("saber-pro", shown.id, () => saberProToTable(shown)),
+            // Derivados de «Frente al país»: solo si hay promedio nacional con qué comparar.
+            ...(shown.results.some((r) => r.scope === "nacional")
+              ? [
+                  file("saber-pro-frente-al-pais", shown.id, () => saberPanoramaToTable(shown)),
+                  file("saber-pro-evolucion-brecha", shown.id, () => saberEvolucionToTable(shown)),
+                ]
+              : []),
+            file("aporte-saber-pro", shown.id, () => aporteToTable("pro")),
+            file("aporte-saber-pro-variacion", shown.id, () => aporteVarianzaToTable("pro")),
+            file("aporte-saber-pro-cuadrantes", shown.id, () => aporteCuadrantesToTable()),
+            file("aporte-saber-pro-coeficientes", shown.id, () => aporteCoeficientesToTable("pro")),
+          ],
         );
         break;
       }

@@ -22,7 +22,7 @@ import { SABER_COMPETENCIES } from "../datos-abiertos/data/saber-pro";
 import { saberRef } from "../datos-abiertos/data/groups";
 import { freeRef, freeRefs, freeTitle } from "../datos-abiertos/data/free-sets";
 import { isCustomView } from "../datos-abiertos/data/custom-table";
-import { tytRefs } from "./tyt";
+import { aporteRefs } from "./aporte";
 import { deiRefs } from "./dei";
 import { modelRefs } from "./model-sheets";
 import { normalizeAnalysis } from "./analysis";
@@ -288,9 +288,11 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
   report.saberPro?.forEach((sp) => {
     if (!sp.results.length) return;
     SABER_COMPETENCIES.forEach((c) => add(saberRef(sp.id, c.key), `Saber PRO · ${c.label}`));
+    // «Frente al país»: un resumen y una hoja por competencia, solo si hay promedio nacional.
+    if (sp.results.some((r) => r.scope === "nacional")) add(saberRef(sp.id, "pais"), "Saber PRO · Frente al país");
   });
-  // Motor Beta: una hoja por competencia con pareja de pruebas.
-  tytRefs(report).forEach(({ ref, title }) => add(ref, title));
+  // Aporte de los programas: una entrada por competencia con modelo y una de método, por prueba.
+  aporteRefs(report).forEach(({ ref, title }) => add(ref, title));
   // Conjuntos libres: una hoja por vista publicable.
   freeRefs(report.freeSets).forEach(({ ref, title }) => add(ref, title));
   // La tabla personalizada se selecciona como contenido propio del boletín.

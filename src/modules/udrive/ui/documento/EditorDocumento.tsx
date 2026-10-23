@@ -46,7 +46,9 @@ import { fechaLarga } from "../piezas";
 import type { AccionesBloque } from "./Bloques";
 import { Comentarios } from "./Comentarios";
 import { Escalado } from "./Escalado";
+import { contextoParaPilo } from "../../datosPilo";
 import { Herramientas } from "./Herramientas";
+import { ImportarInforme } from "./ImportarInforme";
 import type { Estilo } from "./Herramientas";
 import { Hoja } from "./Hoja";
 import type { Estimado } from "./Hoja";
@@ -248,7 +250,7 @@ function Lienzo(p: LienzoProps) {
   const [zoom, setZoom] = useState(0.8);
   const [estimado, setEstimado] = useState<Estimado>({ total: 1, porBloque: new Map() });
   const [selector, setSelector] = useState<DialogoSelector | null>(null);
-  const [dialogo, setDialogo] = useState<null | "versiones" | "aprobar" | "turno">(p.rolPuedeEditar && !aprobado && soloLectura && p.turno && !p.turno.tengo ? "turno" : null);
+  const [dialogo, setDialogo] = useState<null | "versiones" | "aprobar" | "turno" | "importar">(p.rolPuedeEditar && !aprobado && soloLectura && p.turno && !p.turno.tengo ? "turno" : null);
   const [previa, setPrevia] = useState<null | { imprimir: boolean; word?: boolean; doc?: Documento; datos?: Record<string, unknown>; rotulo?: string }>(null);
   const [menuEstado, setMenuEstado] = useState<{ x: number; y: number } | null>(null);
   const [snack, setSnack] = useState<string | null>(null);
@@ -336,6 +338,10 @@ function Lienzo(p: LienzoProps) {
       avisarBorrado();
     },
     insertar: (tipo, despuesDe) => insertar(tipo, despuesDe),
+    insertarConContenido: (nuevo, despuesDe) => {
+      poner((d) => ({ ...d, bloques: insertarBloque(d.bloques, nuevo, despuesDe) }));
+      setSeleccion(nuevo.id);
+    },
     mover: (bid, despuesDe) =>
       poner((d) => {
         const sin = d.bloques.filter((b) => b.id !== bid);
@@ -361,6 +367,7 @@ function Lienzo(p: LienzoProps) {
       duplicar: (b) => hacer.current.duplicar(b),
       borrar: (b) => hacer.current.borrar(b),
       insertar: (t, d) => hacer.current.insertar(t, d),
+      insertarConContenido: (b, d) => hacer.current.insertarConContenido(b, d),
       mover: (b, d) => hacer.current.mover(b, d),
       comentarios: (b) => hacer.current.comentarios(b),
       activarTexto: (a) => hacer.current.activarTexto(a),
@@ -558,6 +565,7 @@ function Lienzo(p: LienzoProps) {
               Comentarios{totalSinResolver ? <span className="es-est" data-e="borrador" style={{ marginLeft: 2 }}>{totalSinResolver}</span> : null}
             </button>
             <button type="button" className="es-btn" onClick={() => setPrevia({ imprimir: false })}>Vista previa del PDF</button>
+            {!soloLectura && !aprobado ? <button type="button" className="es-btn" onClick={() => setDialogo("importar")}>Importar Word o PDF</button> : null}
             <button type="button" className="es-btn" onClick={() => setDialogo("versiones")}>Versiones</button>
             <button type="button" className="es-btn" onClick={() => setPrevia({ imprimir: false, word: true })}>Exportar Word</button>
             <button type="button" className="es-btn es-btn--pri" onClick={() => setPrevia({ imprimir: true })}>Exportar PDF</button>
@@ -641,6 +649,7 @@ function Lienzo(p: LienzoProps) {
                 onPestana={setPestana}
                 acc={acc}
                 cambiarDoc={poner}
+                contextoPilo={(bid) => contextoParaPilo(doc, bid, { informe: nombre, claves: entrada.claves, cifra: entrada.cifra, figuras: entrada.figuras, texto: entrada.texto })}
                 elegirArchivo={(b) => (b.tipo === "tabla" || b.tipo === "grafica" || b.tipo === "imagen") && setSelector({ modo: "cambiar", bloque: b.id, tipo: b.tipo })}
                 elegirPortada={() => setSelector({ modo: "portada" })}
                 abrirArchivo={(tipo, archivo) => void (soloLectura ? Promise.resolve(true) : vaciar()).then(() => navigate(`/admin/udrive/${tipo}/${archivo}`))}
@@ -719,6 +728,21 @@ function Lienzo(p: LienzoProps) {
             <p>Para que nadie pise el trabajo de otra persona, el informe se edita por turnos. Puede mirarlo en solo lectura o pedir el turno: quien lo tiene recibirá el aviso. Si deja de editar, el turno se libera solo en unos minutos.</p>
           </div>
         </Ventana>
+      ) : null}
+
+      {dialogo === "importar" ? (
+        <ImportarInforme
+          modo="agregar"
+          carpeta={p.carpetaId}
+          nombreInforme={nombre}
+          plantillaDoc={doc}
+          decir={decir}
+          onCerrar={() => setDialogo(null)}
+          onAgregar={(bloques) => {
+            poner((d) => ({ ...d, bloques: [...d.bloques, ...bloques] }));
+            setSeleccion(bloques[0]?.id ?? null);
+          }}
+        />
       ) : null}
 
       {previa ? (

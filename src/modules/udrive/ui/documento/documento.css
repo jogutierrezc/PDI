@@ -473,3 +473,105 @@
 @media print {
   body.ud-imprimiendo #ud-pdf-raiz .ud-pv { position: static !important; display: block !important; inset: auto !important; background: #fff !important; }
 }
+
+/* ---- Pilo redactor (fase 3) ---- */
+.ud-pilo {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--es-line);
+}
+.ud-pilo-t {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ud-pilo-prop {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--es-line);
+  border-left: 3px solid var(--es-accent);
+  border-radius: var(--radius-sm);
+  background: var(--es-panel-3);
+  color: var(--es-ink);
+}
+.ud-pilo-prop p,
+.ud-pilo-prop ul {
+  margin: 0;
+}
+.ud-pilo-prop ul {
+  padding-left: 18px;
+}
+.ud-pilo-prop-t {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--es-ink-2);
+}
+.ud-pilo-acc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---- Importar Word o PDF (fase 3) ---- */
+.ud-imp-barra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ud-imp-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(46vh, 420px);
+  overflow: auto;
+  border: 1px solid var(--es-line);
+  border-radius: var(--radius-sm);
+}
+.ud-imp-lista li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--es-line-2);
+  font-size: var(--text-xs);
+}
+.ud-imp-lista li:last-child {
+  border-bottom: 0;
+}
+.ud-imp-lista li[data-off="true"] {
+  opacity: 0.5;
+}
+.ud-imp-lista li[data-t="titulo"] .ud-imp-txt {
+  font-weight: 600;
+}
+.ud-imp-ck {
+  display: inline-flex;
+}
+.ud-imp-tipo {
+  flex: none;
+  min-width: 92px;
+  color: var(--es-ink-3);
+}
+.ud-imp-nivel {
+  flex: none;
+  width: auto;
+  padding-block: 2px;
+}
+.ud-imp-nivel[data-dudoso="true"] {
+  border-color: var(--es-warn);
+}
+.ud-imp-txt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--es-ink);
+}
+.ud-imp-dudoso {
+  flex: none;
+  color: var(--es-warn);
+}

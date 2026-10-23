@@ -165,12 +165,12 @@ export async function contarCorpus(admin: DB): Promise<number> {
 
 export const FUENTE_BITACORA = "Pilo redacta informes de gestión";
 
-export async function bitacora(admin: DB, b: { inicio: number; llamadas: number; guardados: number; fallidos: number; error: string | null }) {
+export async function bitacora(admin: DB, b: { inicio: number; llamadas: number; guardados: number; fallidos: number; error: string | null; fuente?: string }) {
   if (!b.llamadas) return;
   await admin.from("news_runs").insert({
     started_at: new Date(b.inicio).toISOString(),
     finished_at: new Date().toISOString(),
-    source: FUENTE_BITACORA,
+    source: b.fuente ?? FUENTE_BITACORA,
     seen: b.llamadas,
     saved: b.guardados,
     skipped: b.fallidos,

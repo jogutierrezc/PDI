@@ -26,6 +26,8 @@ export interface AccionesBloque {
   duplicar(id: string): void;
   borrar(id: string): void;
   insertar(tipo: TipoBloque, despuesDe: string | null): void;
+  /** Inserta un bloque ya armado (con su texto) justo después de `despuesDe`; lo deja elegido. */
+  insertarConContenido(bloque: Bloque, despuesDe: string | null): void;
   /** Mueve el bloque justo después de `despuesDe` (nulo = al principio). */
   mover(id: string, despuesDe: string | null): void;
   comentarios(id: string): void;

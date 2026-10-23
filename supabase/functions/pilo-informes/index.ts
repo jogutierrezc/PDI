@@ -21,6 +21,9 @@
      ingerir  { anio, plantilla?, archivos:[{ nombre, unidad?, secciones:[{ titulo, texto }] }] }
                                                    → { ok, nuevos, duplicados, descartados:[{ archivo, titulo, motivo }] }
      corpus   {}                                   → { ok, total, por_origen, por_plantilla, por_tipo, perfiles }
+     udrive_redactar    { modo, tipo, texto?, instruccion?, contexto }   → { ok, texto?, items?, avisos }
+     udrive_estructurar { tarea, items, archivo? }                       → { ok, niveles? | textos? | tablas? }
+                         (UDrive, fase 3: ver udrive.ts; acceso por drive_entra, migración 0187)
 
    Reglas:
      · Solo con sesión. Planeación o la administración, todo; «aprender» e
@@ -48,6 +51,7 @@ import { elegirProveedor, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts"
 import { contarPalabras, elegirEjemplos, hashTexto, leerIngesta, MIN_PALABRAS, prepararIngesta, resumenCorpus, tokensAMarcadores, type FilaEjemplo } from "./corpus.ts";
 import * as datos from "./datos.ts";
 import { AltoProveedor, crearIA } from "./ia.ts";
+import { atenderUdrive, esAccionUdrive } from "./udrive.ts";
 import { esPlantilla, seccionDe, seccionesDe } from "./plantillas.ts";
 import {
   ACCIONES,
@@ -92,14 +96,19 @@ Deno.serve(async (request: Request) => {
   } catch {
     return json({ error: "Cuerpo inválido." }, 400);
   }
+  const accionUdrive = esAccionUdrive(cuerpo.action) ? cuerpo.action : null;
   const accion = (ACCIONES as string[]).includes(String(cuerpo.action)) ? (String(cuerpo.action) as Accion) : null;
-  if (!accion) return json({ error: "Acción desconocida." }, 400);
+  if (!accion && !accionUdrive) return json({ error: "Acción desconocida." }, 400);
 
   // Quién llama ---------------------------------------------------------------------
   const authorization = request.headers.get("Authorization") ?? "";
   if (!authorization.startsWith("Bearer ") || authorization.slice(7) === anonKey) return json({ error: "Falta la sesión." }, 401);
   const who = await admin.auth.getUser(authorization.slice(7));
   if (who.error || !who.data.user) return json({ error: "Sesión inválida." }, 401);
+
+  // Pilo en UDrive (udrive.ts): redactar y estructurar; su acceso es el de UDrive, no el de Informes.
+  if (accionUdrive) return await atenderUdrive({ accion: accionUdrive, cuerpo, admin, url, anonKey, authorization, json });
+  if (!accion) return json({ error: "Acción desconocida." }, 400);
   const { perfil, rolesUnidad } = await datos.leerPerfil(admin, who.data.user.id);
 
   const fallo = (e: unknown) => {

@@ -18,6 +18,9 @@ import type { Recursos } from "../../salida/recursos";
 import type { Figura } from "../../lib/numeracion";
 import type { AccionesBloque } from "./Bloques";
 import { PanelMapa } from "./PanelMapa";
+import { PanelPilo } from "./PanelPilo";
+import { esBloqueDeTexto } from "../../datosPilo";
+import type { ContextoPilo } from "../../datosPilo";
 
 interface Props {
   doc: Documento;
@@ -31,6 +34,8 @@ interface Props {
   onPestana(p: "bloque" | "documento"): void;
   acc: AccionesBloque;
   cambiarDoc(fn: (d: Documento) => Documento, clave?: string): void;
+  /** Lo que Pilo puede usar del informe para escribir en este bloque (cifras, fuentes, figuras). */
+  contextoPilo(bloqueId: string): ContextoPilo;
   elegirArchivo(bloque: Bloque): void;
   elegirPortada(): void;
   abrirArchivo(tipo: "tabla" | "grafica", id: string): void;
@@ -66,7 +71,7 @@ const ANCHOS: { id: AnchoFigura; texto: string }[] = [
   { id: "pequeno", texto: "La mitad" },
 ];
 
-function PanelBloque({ doc, bloque: b, recursos, figura, editable, acc, elegirArchivo, abrirArchivo }: Props & { bloque: Bloque }) {
+function PanelBloque({ doc, bloque: b, recursos, figura, editable, acc, elegirArchivo, abrirArchivo, contextoPilo }: Props & { bloque: Bloque }) {
   const poner = (cambio: Partial<Bloque>, clave?: string) => acc.cambiar({ ...b, ...cambio } as Bloque, clave ?? `p:${b.id}:${Object.keys(cambio).join(",")}`);
   const nombreArchivo = "archivoId" in b && b.archivoId ? (recursos.nombres.get(b.archivoId) ?? "Archivo que no veo") : "";
   return (
@@ -102,6 +107,8 @@ function PanelBloque({ doc, bloque: b, recursos, figura, editable, acc, elegirAr
           <input type="checkbox" checked={b.ordenada} disabled={!editable} onChange={(e) => poner({ ordenada: e.target.checked })} /> Lista numerada
         </label>
       ) : null}
+
+      {editable && esBloqueDeTexto(b) ? <PanelPilo key={b.id} bloque={b} contexto={() => contextoPilo(b.id)} acc={acc} /> : null}
 
       {b.tipo === "tabla" || b.tipo === "grafica" || b.tipo === "imagen" ? (
         <>

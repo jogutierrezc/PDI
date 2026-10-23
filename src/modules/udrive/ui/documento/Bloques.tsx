@@ -13,7 +13,7 @@ import type { DragEvent } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import { NOMBRE_BLOQUE } from "../../lib/documento";
 import type { BCapitulo, BDestacado, BLista, BNota, BParrafo, Bloque, TipoBloque } from "../../lib/documento";
-import { CapituloVista, FiguraGrafica, FiguraImagen, FiguraTabla, FuenteVista, TituloReferencias, useRender } from "../../salida/Piezas";
+import { CapituloVista, FiguraGrafica, FiguraImagen, FiguraMapa, FiguraTabla, FuenteVista, TituloReferencias, useRender } from "../../salida/Piezas";
 import { MenuInsertar } from "./MenuInsertar";
 import { TextoRico } from "./TextoRico";
 import type { ApiTexto } from "./TextoRico";
@@ -185,6 +185,8 @@ function ContenidoBloque({ b, editable, sangria, acc }: { b: Bloque; editable: b
       return <FiguraGrafica b={b} />;
     case "imagen":
       return <FiguraImagen b={b} />;
+    case "mapa":
+      return <FiguraMapa b={b} />;
     case "destacado":
       return <DestacadoEditable b={b} editable={editable} acc={acc} />;
     case "nota":

@@ -39,6 +39,7 @@ export function resumenDeBloque(b: Bloque): string {
     case "tabla":
     case "grafica":
     case "imagen":
+    case "mapa":
       return recorte(b.titulo || "(sin título propio)");
     case "referencias":
       return b.titulo;

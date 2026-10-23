@@ -12,6 +12,8 @@
    el editor para deshacer y rehacer.
    ========================================================================== */
 
+import { CENTRO_INICIAL, LAT_MAX, ZOOM_MAX, ZOOM_MIN } from "./mapa";
+
 export type PlantillaId = "lineamientos" | "blanco";
 export type NivelCapitulo = 1 | 2 | 3;
 export type AnchoFigura = "completo" | "medio" | "pequeno";
@@ -28,6 +30,7 @@ export const LIMITES = {
   fuentes: 500,
   id: 60,
   portada: 300,
+  marcadores: 50,
 } as const;
 
 /** Una fuente para citar en APA 7. Los campos que no apliquen al tipo quedan vacíos. */
@@ -106,6 +109,26 @@ export interface BImagen extends Base {
   enIndice: boolean;
   ancho: AnchoFigura;
 }
+/** Un punto marcado en el mapa, con su rótulo. */
+export interface Marcador {
+  id: string;
+  lat: number;
+  lng: number;
+  etiqueta: string;
+}
+export interface BMapa extends Base {
+  tipo: "mapa";
+  /** Centro y zoom del mapa (OpenStreetMap). */
+  lat: number;
+  lng: number;
+  zoom: number;
+  marcadores: Marcador[];
+  titulo: string;
+  nota: string;
+  alt: string;
+  enIndice: boolean;
+  ancho: AnchoFigura;
+}
 export interface BDestacado extends Base {
   tipo: "destacado";
   texto: string;
@@ -122,7 +145,7 @@ export interface BReferencias extends Base {
   titulo: string;
 }
 
-export type Bloque = BCapitulo | BParrafo | BLista | BTabla | BGrafica | BImagen | BDestacado | BNota | BSalto | BReferencias;
+export type Bloque = BCapitulo | BParrafo | BLista | BTabla | BGrafica | BImagen | BMapa | BDestacado | BNota | BSalto | BReferencias;
 export type TipoBloque = Bloque["tipo"];
 
 /** Una cifra viva con el valor que tenía al aprobar el documento. */
@@ -152,6 +175,7 @@ export const NOMBRE_BLOQUE: Record<TipoBloque, string> = {
   tabla: "Tabla",
   grafica: "Gráfica",
   imagen: "Imagen",
+  mapa: "Mapa",
   destacado: "Cuadro destacado",
   nota: "Nota o fuente",
   salto: "Salto de página",
@@ -181,6 +205,8 @@ export function bloqueNuevo(tipo: TipoBloque, id: string = nuevoIdBloque()): Blo
       return { id, tipo, archivoId: "", titulo: "", nota: "", enIndice: true, ancho: "completo" };
     case "imagen":
       return { id, tipo, archivoId: "", titulo: "", nota: "", alt: "", enIndice: true, ancho: "completo" };
+    case "mapa":
+      return { id, tipo, lat: CENTRO_INICIAL.lat, lng: CENTRO_INICIAL.lng, zoom: CENTRO_INICIAL.zoom, marcadores: [], titulo: "", nota: "", alt: "", enIndice: true, ancho: "completo" };
     case "destacado":
       return { id, tipo, texto: "" };
     case "nota":
@@ -209,6 +235,7 @@ export const documentoVacio = (plantilla: PlantillaId = "blanco"): Documento => 
 const cadena = (v: unknown, max: number): string => (typeof v === "string" ? v.replace(/\u0000/g, "").slice(0, max) : "");
 const logico = (v: unknown, def: boolean): boolean => (typeof v === "boolean" ? v : def);
 const objeto = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const numero = (v: unknown, min: number, max: number, def: number): number => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def);
 const ancho = (v: unknown): AnchoFigura => (v === "medio" || v === "pequeno" ? v : "completo");
 
 function normalizarBloque(crudo: unknown, usados: Set<string>): Bloque | null {
@@ -252,6 +279,29 @@ function normalizarBloque(crudo: unknown, usados: Set<string>): Bloque | null {
         enIndice: logico(b.enIndice, true),
         ancho: ancho(b.ancho),
       };
+    case "mapa": {
+      const ids = new Set<string>();
+      return {
+        id,
+        tipo: "mapa",
+        lat: numero(b.lat, -LAT_MAX, LAT_MAX, CENTRO_INICIAL.lat),
+        lng: numero(b.lng, -180, 180, CENTRO_INICIAL.lng),
+        zoom: Math.round(numero(b.zoom, ZOOM_MIN, ZOOM_MAX, CENTRO_INICIAL.zoom)),
+        marcadores: (Array.isArray(b.marcadores) ? b.marcadores : []).slice(0, LIMITES.marcadores).flatMap((m) => {
+          const o = objeto(m);
+          if (typeof o.lat !== "number" || typeof o.lng !== "number" || !Number.isFinite(o.lat) || !Number.isFinite(o.lng)) return [];
+          let mid = esId(o.id) ? o.id : nuevoIdBloque();
+          while (ids.has(mid)) mid = nuevoIdBloque();
+          ids.add(mid);
+          return [{ id: mid, lat: numero(o.lat, -LAT_MAX, LAT_MAX, 0), lng: numero(o.lng, -180, 180, 0), etiqueta: cadena(o.etiqueta, 80) }];
+        }),
+        titulo: cadena(b.titulo, LIMITES.titulo),
+        nota: cadena(b.nota, LIMITES.nota),
+        alt: cadena(b.alt, LIMITES.titulo),
+        enIndice: logico(b.enIndice, true),
+        ancho: ancho(b.ancho),
+      };
+    }
     case "destacado":
       return { id, tipo: "destacado", texto: cadena(b.texto, LIMITES.texto) };
     case "nota":
@@ -402,4 +452,4 @@ export function archivosUsados(doc: Documento): { tablas: string[]; graficas: st
 }
 
 /** ¿Es un bloque de los que llevan número y título propios (figura)? */
-export const esFigura = (b: Bloque): b is BTabla | BGrafica | BImagen => b.tipo === "tabla" || b.tipo === "grafica" || b.tipo === "imagen";
+export const esFigura = (b: Bloque): b is BTabla | BGrafica | BImagen | BMapa => b.tipo === "tabla" || b.tipo === "grafica" || b.tipo === "imagen" || b.tipo === "mapa";

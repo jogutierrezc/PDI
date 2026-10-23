@@ -249,7 +249,7 @@ function Lienzo(p: LienzoProps) {
   const [estimado, setEstimado] = useState<Estimado>({ total: 1, porBloque: new Map() });
   const [selector, setSelector] = useState<DialogoSelector | null>(null);
   const [dialogo, setDialogo] = useState<null | "versiones" | "aprobar" | "turno">(p.rolPuedeEditar && !aprobado && soloLectura && p.turno && !p.turno.tengo ? "turno" : null);
-  const [previa, setPrevia] = useState<null | { imprimir: boolean; doc?: Documento; datos?: Record<string, unknown>; rotulo?: string }>(null);
+  const [previa, setPrevia] = useState<null | { imprimir: boolean; word?: boolean; doc?: Documento; datos?: Record<string, unknown>; rotulo?: string }>(null);
   const [menuEstado, setMenuEstado] = useState<{ x: number; y: number } | null>(null);
   const [snack, setSnack] = useState<string | null>(null);
   const [hayTexto, setHayTexto] = useState(false);
@@ -559,6 +559,7 @@ function Lienzo(p: LienzoProps) {
             </button>
             <button type="button" className="es-btn" onClick={() => setPrevia({ imprimir: false })}>Vista previa del PDF</button>
             <button type="button" className="es-btn" onClick={() => setDialogo("versiones")}>Versiones</button>
+            <button type="button" className="es-btn" onClick={() => setPrevia({ imprimir: false, word: true })}>Exportar Word</button>
             <button type="button" className="es-btn es-btn--pri" onClick={() => setPrevia({ imprimir: true })}>Exportar PDF</button>
           </>
         }
@@ -729,6 +730,7 @@ function Lienzo(p: LienzoProps) {
           instantanea={previa.datos}
           rotulo={previa.rotulo}
           autoImprimir={previa.imprimir}
+          autoWord={previa.word}
           onCerrar={() => setPrevia(null)}
         />
       ) : null}

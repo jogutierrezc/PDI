@@ -26,7 +26,7 @@ export const TITULO_INDICE: Record<ClaveIndice, string> = {
   graficas: "Índice de gráficas",
 };
 
-const CLASE_DE: Record<"imagen" | "tabla" | "grafica", ClaseFigura> = { imagen: "Ilustración", tabla: "Tabla", grafica: "Gráfica" };
+const CLASE_DE: Record<"imagen" | "mapa" | "tabla" | "grafica", ClaseFigura> = { imagen: "Ilustración", mapa: "Ilustración", tabla: "Tabla", grafica: "Gráfica" };
 const INDICE_DE: Record<ClaseFigura, ClaveIndice> = { Ilustración: "ilustraciones", Tabla: "tablas", Gráfica: "graficas" };
 
 export interface Figura {

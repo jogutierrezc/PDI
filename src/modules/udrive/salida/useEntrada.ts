@@ -49,7 +49,7 @@ export function useEntrada(doc: Documento, o: OpcionesEntrada): EntradaConLectur
   const titulos = (b: Documento["bloques"][number]): string => {
     if (b.tipo === "tabla") return tituloTabla(b, recursos.tablas.get(b.archivoId));
     if (b.tipo === "grafica") return tituloGrafica(b, recursos.graficas.get(b.archivoId));
-    return b.tipo === "imagen" ? b.titulo : "";
+    return b.tipo === "imagen" || b.tipo === "mapa" ? b.titulo : "";
   };
   const firmaFiguras = doc.bloques.filter(esFigura).map((b) => `${b.id}|${b.tipo}|${b.enIndice ? 1 : 0}|${titulos(b)}`).join("¦");
   const figuras = useMemo(() => numerarFiguras(doc, titulos), [firmaFiguras]); // eslint-disable-line react-hooks/exhaustive-deps -- firmaFiguras resume lo que importa
@@ -84,6 +84,6 @@ export function textoDeFigura(doc: Documento, bloqueId: string, recursos: Entrad
     const g = recursos.graficas.get(b.archivoId);
     return { titulo: tituloGrafica(b, g), nota: notaGrafica(b, g) };
   }
-  if (b.tipo === "imagen") return { titulo: b.titulo, nota: b.nota };
+  if (b.tipo === "imagen" || b.tipo === "mapa") return { titulo: b.titulo, nota: b.nota };
   return { titulo: "", nota: "" };
 }

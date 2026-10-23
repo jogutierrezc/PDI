@@ -17,7 +17,7 @@ import { referenciaApa } from "../lib/apa";
 import { SIN_DATO } from "../lib/cifras";
 import type { CifraResuelta } from "../lib/cifras";
 import { colorDeTramo, describirTramos } from "../lib/calor";
-import type { BCapitulo, BDestacado, BGrafica, BImagen, BLista, BNota, BTabla, Documento, Fuente, Portada } from "../lib/documento";
+import type { BCapitulo, BDestacado, BGrafica, BImagen, BLista, BMapa, BNota, BTabla, Documento, Fuente, Portada } from "../lib/documento";
 import type { ContextoTexto } from "../lib/texto";
 import { enlaceSeguro, tramos } from "../lib/texto";
 import type { EntradaIndice, Figura } from "../lib/numeracion";
@@ -26,6 +26,7 @@ import type { ClaveIndice } from "../lib/numeracion";
 import { numeroDe, textoNumero } from "../lib/valores";
 import type { ColumnaUd, ContenidoTabla } from "../tipos";
 import { GraficaVista } from "../ui/GraficaVista";
+import { MapaOsm } from "./MapaOsm";
 import type { Recursos } from "./recursos";
 
 export type ModoRender = "editor" | "medida" | "pdf";
@@ -260,6 +261,20 @@ export function FiguraImagen({ b }: { b: BImagen }) {
       ) : (
         <p className="ud-pdf-vacio">{ctx.recursos.listo ? "No se pudo leer la imagen: ya no existe o no tiene permiso para verla." : "Cargando la imagen…"}</p>
       )}
+      <NotaDeFigura nota={b.nota} />
+    </div>
+  );
+}
+
+export function FiguraMapa({ b }: { b: BMapa }) {
+  const ctx = useRender();
+  const fig = ctx.figuras.get(b.id);
+  return (
+    <div className="ud-pdf-fig" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
+      <PieDeFigura fig={fig} titulo={b.titulo} />
+      <div style={{ width: PORCENTAJE_ANCHO[b.ancho], margin: "0 auto" }}>
+        <MapaOsm lat={b.lat} lng={b.lng} zoom={b.zoom} marcadores={b.marcadores} alt={b.alt.trim() || b.titulo.trim() || "Mapa"} />
+      </div>
       <NotaDeFigura nota={b.nota} />
     </div>
   );

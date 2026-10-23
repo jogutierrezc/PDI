@@ -33,3 +33,15 @@ Ruta `/admin/udrive/documento/:id`. Migración `supabase/migrations/0188_udrive_
 
 ## Para la fase 3
 Importar Word/PDF con Pilo, mapas OpenStreetMap, exportar a Word y Pilo redactor (los hooks están: «Que Pilo lo redacte» en el diseño aprobado).
+
+# UDrive · fase 3 (en construcción)
+
+## Exportar a Word (hecho)
+«Exportar Word» en el editor y en la vista previa. `salida/aWord.ts` arma un .docx con la librería `docx` (se carga solo al exportar) a partir de la misma `EntradaPdf` que el PDF: cifras, citas APA, numeración de figuras y datos de tablas y gráficas. Títulos 1–3 reales (el contenido es un campo de Word que se rellena al abrir), tablas de Word con mapa de calor, listas con numeración, fuentes APA con sangría francesa, encabezado con «BORRADOR» y número de página. Las gráficas salen como PNG (`salida/graficaAImagen.ts`: se dibuja el SVG fuera de pantalla, se copian los estilos calculados y se pasa por un canvas al doble de resolución). Los índices de ilustraciones, tablas y gráficas van sin número de página.
+
+## Bloque «mapa» (hecho)
+Insertar → «Mapa». Un mapa de OpenStreetMap con título, nota, texto alternativo, ancho y marcadores con rótulo; se numera como «Ilustración» (entra en ese índice si `enIndice`). Guarda en el JSON del documento solo centro (`lat`, `lng`), `zoom` y `marcadores` (hasta 50): no hay archivo ni tabla de por medio.
+- **Dibujo** (`lib/mapa.ts`, `salida/MapaOsm.tsx`): sin librería ni clave. Teselas estándar de `tile.openstreetmap.org` como `<img crossOrigin>` en una rejilla de porcentajes sobre un lienzo lógico de 640 × 360 (16:9) y marcadores encima; el ancho del bloque solo lo escala (los textos van en `cqw`). El paginado espera esas imágenes como cualquier otra. La atribución «© colaboradores de OpenStreetMap» va siempre visible. Solo se piden las teselas que se ven, zoom 2–18.
+- **Word** (`salida/mapaAImagen.ts`): vuelve a cargar las mismas teselas (con CORS) en un canvas al doble de resolución, dibuja marcadores y atribución y lo mete como PNG. Si no carga ninguna tesela, el Word lleva un aviso en lugar del mapa.
+- **Editor** (`ui/documento/PanelMapa.tsx`): buscar un lugar con Nominatim (una consulta al pulsar «Buscar», nunca al escribir; hasta 5 resultados con «Centrar aquí» / «Centrar y marcar»), clic en la vista para centrar, zoom con botones y deslizador, marcadores con rótulo. No hay arrastre del mapa.
+- Un mapa nuevo empieza en Bucaramanga, zoom 13.

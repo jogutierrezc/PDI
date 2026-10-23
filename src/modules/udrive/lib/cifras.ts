@@ -46,7 +46,7 @@ export function clavesDelDocumento(doc: Pick<Documento, "bloques">): string[] {
   for (const b of doc.bloques) {
     if (b.tipo === "parrafo" || b.tipo === "destacado" || b.tipo === "nota") textos.push(b.texto);
     else if (b.tipo === "lista") textos.push(...b.items);
-    else if (b.tipo === "grafica" || b.tipo === "tabla" || b.tipo === "imagen") textos.push(b.titulo, b.nota);
+    else if (b.tipo === "grafica" || b.tipo === "tabla" || b.tipo === "imagen" || b.tipo === "mapa") textos.push(b.titulo, b.nota);
   }
   return [...new Set(textos.flatMap((t) => [...clavesDeCifras(t), ...extraerTokens(t)]))];
 }

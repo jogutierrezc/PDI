@@ -17,6 +17,7 @@ import { notaGrafica, notaTabla, tituloGrafica, tituloTabla } from "../../salida
 import type { Recursos } from "../../salida/recursos";
 import type { Figura } from "../../lib/numeracion";
 import type { AccionesBloque } from "./Bloques";
+import { PanelMapa } from "./PanelMapa";
 
 interface Props {
   doc: Documento;
@@ -91,6 +92,8 @@ function PanelBloque({ doc, bloque: b, recursos, figura, editable, acc, elegirAr
           </label>
         </>
       ) : null}
+
+      {b.tipo === "mapa" ? <PanelMapa b={b} editable={editable} anchos={ANCHOS} poner={poner} /> : null}
 
       {b.tipo === "parrafo" || b.tipo === "destacado" || b.tipo === "nota" ? <ResumenTexto texto={b.texto} /> : null}
 
@@ -191,6 +194,7 @@ const AYUDA: Record<Bloque["tipo"], string> = {
   tabla: "Los datos salen de la tabla: si cambia, el documento también.",
   grafica: "Se alimenta de una tabla; si la tabla cambia, la gráfica también.",
   imagen: "Se numera como «Ilustración» y lleva el pie arriba.",
+  mapa: "Un mapa de OpenStreetMap. Se numera como «Ilustración» y lleva el pie arriba.",
   destacado: "Una idea clave en un cuadro aparte.",
   nota: "Una nota o fuente suelta.",
   salto: "Lo que sigue empieza en hoja nueva.",

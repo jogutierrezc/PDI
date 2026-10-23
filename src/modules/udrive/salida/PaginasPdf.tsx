@@ -27,7 +27,7 @@ import type { ItemPlan } from "../lib/plan";
 import { aPlano } from "../lib/texto";
 import type { ContextoTexto } from "../lib/texto";
 import type { CifraResuelta } from "../lib/cifras";
-import { CapituloVista, DestacadoVista, EntradaDeIndice, FiguraGrafica, FiguraImagen, FiguraTabla, FuenteVista, ListaVista, NotaSuelta, PortadaPdf, ProveedorRender, TextoVista, TituloIndice, TituloReferencias } from "./Piezas";
+import { CapituloVista, DestacadoVista, EntradaDeIndice, FiguraGrafica, FiguraImagen, FiguraMapa, FiguraTabla, FuenteVista, ListaVista, NotaSuelta, PortadaPdf, ProveedorRender, TextoVista, TituloIndice, TituloReferencias } from "./Piezas";
 import type { CtxRender } from "./Piezas";
 import type { Recursos } from "./recursos";
 import "./salida.css";
@@ -78,6 +78,8 @@ function Unidad({ item, t, paginas, sangria }: { item: ItemPlan; t?: Trozo; pagi
       return <FiguraGrafica b={b} />;
     case "imagen":
       return <FiguraImagen b={b} />;
+    case "mapa":
+      return <FiguraMapa b={b} />;
     case "destacado":
       return b.texto.trim() ? <DestacadoVista b={b} /> : null;
     case "nota":

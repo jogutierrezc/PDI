@@ -2,11 +2,12 @@
 
 import { Fragment, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CONJUNTOS, CORTES, GRUPOS, PERMANENTE, SEDES, SISTEMAS, agrupar, cargable, cargaPorArchivo, conjuntoPorId, pideSolo } from "./conjuntos";
+import { CONJUNTOS, CORTES, GRUPOS, MAX_SEDES_PESADAS, PERMANENTE, SEDES, SISTEMAS, agrupar, cargable, cargaPorArchivo, conjuntoPorId, esPesado, pideSolo } from "./conjuntos";
 import { reportePorId } from "./reportes";
 import type { Hoja } from "./motor";
 import {
   cargarDesdeServidor,
+  esCancelacion,
   guardarHoja,
   leerArchivoExcel,
   mensajeDe,
@@ -24,7 +25,33 @@ import type { Contexto } from "./Warehouse";
 const fecha = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
-type EstadoLote = { estado: "espera" | "en curso" | "ok" | "igual" | "error"; texto: string };
+type EstadoLote = {
+  estado: "espera" | "cola" | "en curso" | "ok" | "igual" | "error" | "cancelada";
+  /** Lo corto que cabe en la celda. */
+  texto: string;
+  /** El mensaje completo del error, para el detalle de abajo y el tooltip. */
+  detalle?: string;
+};
+
+/** Cupo para los reportes pesados: de a `max` a la vez entre todas las sedes. */
+function crearCupo(max: number) {
+  let libres = max;
+  const cola: (() => void)[] = [];
+  return {
+    async tomar() {
+      if (libres > 0) {
+        libres--;
+        return;
+      }
+      await new Promise<void>((r) => cola.push(r));
+    },
+    soltar() {
+      const siguiente = cola.shift();
+      if (siguiente) siguiente();
+      else libres++;
+    },
+  };
+}
 
 export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] }) {
   const cliente = useQueryClient();
@@ -45,6 +72,9 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
   const [avance, setAvance] = useState<{ texto: string; hecho: number; total: number } | null>(null);
   const [resultado, setResultado] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // Para cancelar lo que se está trayendo (la espera de una tarea o las celdas que faltan del lote).
+  const control = useRef<AbortController | null>(null);
+  const [cancelable, setCancelable] = useState(false);
   const [sonda, setSonda] = useState<Sonda | null>(null);
   // Cada celda del lote es «sede|conjunto»: el resultado de un conjunto en una sede no se mezcla con el de otra.
   const [lote, setLote] = useState<Record<string, EstadoLote>>({});
@@ -116,8 +146,14 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
     setOcupado(true);
     setResultado(null);
     setAvance({ texto: "Pidiendo el reporte a la plataforma", hecho: 0, total: 1 });
+    const ctl = new AbortController();
+    control.current = ctl;
+    setCancelable(true);
     try {
-      const r = await cargarDesdeServidor({ conjunto: conjunto.id, sede, periodo, corte: corteDeCarga, motivo });
+      const r = await cargarDesdeServidor(
+        { conjunto: conjunto.id, sede, periodo, corte: corteDeCarga, motivo },
+        { signal: ctl.signal, alAvance: (texto) => setAvance({ texto, hecho: 0, total: 1 }) },
+      );
       setResultado({
         tipo: "ok",
         texto: r.duplicada
@@ -127,8 +163,10 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
             }`,
       });
     } catch (e) {
-      setResultado({ tipo: "error", texto: mensajeDe(e) });
+      setResultado(esCancelacion(e) ? { tipo: "ok", texto: "Cancelado: no se guardó nada." } : { tipo: "error", texto: mensajeDe(e) });
     } finally {
+      control.current = null;
+      setCancelable(false);
       await refrescar();
       setOcupado(false);
       setAvance(null);
@@ -139,47 +177,104 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
     setOcupado(true);
     setResultado(null);
     setSonda(null);
+    const ctl = new AbortController();
+    control.current = ctl;
+    setCancelable(true);
     try {
-      const r = await sondearServidor({ conjunto: conjunto.id, sede, periodo, corte: corteDeCarga });
+      const r = await sondearServidor({ conjunto: conjunto.id, sede, periodo, corte: corteDeCarga }, { signal: ctl.signal, alAvance: (texto) => setAvance({ texto, hecho: 0, total: 1 }) });
       setSonda(r);
     } catch (e) {
-      setResultado({ tipo: "error", texto: mensajeDe(e) });
+      setResultado(esCancelacion(e) ? { tipo: "ok", texto: "Cancelado." } : { tipo: "error", texto: mensajeDe(e) });
     } finally {
+      control.current = null;
+      setCancelable(false);
       setOcupado(false);
+      setAvance(null);
     }
   };
 
   /**
-   * Trae lo elegido de las sedes marcadas. Dentro de una sede va uno tras otro (su plataforma no atiende bien varios
-   * reportes grandes a la vez); las sedes van en paralelo, cada una con su servidor y su inicio de sesión. Un fallo se anota
-   * en su celda y no detiene lo demás.
+   * Trae las celdas pedidas (sede × reporte). Dentro de una sede va una celda a la vez (su plataforma no atiende bien varios
+   * reportes grandes juntos); las sedes van en paralelo, cada una con su servidor y su inicio de sesión, pero los reportes
+   * pesados (conjuntos.ts) no los trae más de MAX_SEDES_PESADAS sedes a la vez: las demás esperan su turno con esa celda
+   * «En cola» y siguen con el resto cuando les toca. Cada celda corre aparte: un fallo (incluida una función caída) se
+   * anota en su celda y no detiene la siguiente ni deja el resto «En espera».
    */
-  const traerVarios = async () => {
+  const correrCeldas = async (celdas: { sede: string; id: string }[]) => {
+    if (celdas.length === 0) return;
     setOcupado(true);
     setResultado(null);
-    setLote(Object.fromEntries(sedesLote.flatMap((s) => elegidos.map((id) => [`${s}|${id}`, { estado: "espera", texto: "En espera" } as EstadoLote]))));
-    await Promise.all(
-      sedesLote.map(async (s) => {
-        for (const id of elegidos) {
-          const clave = `${s}|${id}`;
-          setLote((l) => ({ ...l, [clave]: { estado: "en curso", texto: "Pidiéndolo…" } }));
-          try {
-            const r = await cargarDesdeServidor({ conjunto: id, sede: s, periodo, corte: "", motivo: "" });
-            setLote((l) => ({
-              ...l,
-              [clave]: r.duplicada
-                ? { estado: "igual", texto: `Sin cambios (v${r.version})` }
-                : { estado: "ok", texto: `${r.filas.toLocaleString("es-CO")} filas · ${r.periodo} · v${r.version}${r.confirmado === false ? " · periodo sin confirmar" : ""}` },
-            }));
-          } catch (e) {
-            setLote((l) => ({ ...l, [clave]: { estado: "error", texto: mensajeDe(e) } }));
+    const ctl = new AbortController();
+    control.current = ctl;
+    setCancelable(true);
+    setLote((l) => ({ ...l, ...Object.fromEntries(celdas.map((c) => [`${c.sede}|${c.id}`, { estado: "espera", texto: "En espera" } as EstadoLote])) }));
+    const cupo = crearCupo(MAX_SEDES_PESADAS);
+    const porSede = new Map<string, string[]>();
+    for (const c of celdas) porSede.set(c.sede, [...(porSede.get(c.sede) ?? []), c.id]);
+    const poner = (clave: string, e: EstadoLote) => setLote((l) => ({ ...l, [clave]: e }));
+    try {
+      await Promise.all(
+        [...porSede].map(async ([s, ids]) => {
+          for (const id of ids) {
+            const clave = `${s}|${id}`;
+            const pesado = esPesado(id);
+            let tomado = false;
+            try {
+              if (ctl.signal.aborted) {
+                poner(clave, { estado: "cancelada", texto: "Cancelada" });
+                continue;
+              }
+              if (pesado) {
+                poner(clave, { estado: "cola", texto: "En cola (reporte pesado)" });
+                await cupo.tomar();
+                tomado = true;
+                if (ctl.signal.aborted) {
+                  poner(clave, { estado: "cancelada", texto: "Cancelada" });
+                  continue;
+                }
+              }
+              poner(clave, { estado: "en curso", texto: "Pidiéndolo…" });
+              const r = await cargarDesdeServidor(
+                { conjunto: id, sede: s, periodo, corte: "", motivo: "" },
+                { signal: ctl.signal, alAvance: (texto) => poner(clave, { estado: "en curso", texto }) },
+              );
+              poner(
+                clave,
+                r.duplicada
+                  ? { estado: "igual", texto: `Sin cambios (v${r.version})` }
+                  : { estado: "ok", texto: `${r.filas.toLocaleString("es-CO")} filas · ${r.periodo} · v${r.version}${r.confirmado === false ? " · periodo sin confirmar" : ""}` },
+              );
+            } catch (e) {
+              poner(clave, esCancelacion(e) ? { estado: "cancelada", texto: "Cancelada" } : { estado: "error", texto: "Error", detalle: mensajeDe(e) });
+            } finally {
+              if (tomado) cupo.soltar();
+            }
           }
-        }
-      }),
-    );
-    await refrescar();
-    setOcupado(false);
+        }),
+      );
+    } finally {
+      control.current = null;
+      setCancelable(false);
+      await refrescar();
+      setOcupado(false);
+    }
   };
+
+  const traerVarios = () => {
+    setLote({});
+    void correrCeldas(sedesLote.flatMap((s) => elegidos.map((id) => ({ sede: s, id }))));
+  };
+
+  // Lo que quedó mal o sin hacer del último lote (las sedes que ya no están marcadas no cuentan).
+  const pendientes = Object.entries(lote)
+    .filter(([clave, e]) => (e.estado === "error" || e.estado === "cancelada") && sedesLote.includes(clave.split("|")[0]))
+    .map(([clave]) => ({ sede: clave.split("|")[0], id: clave.split("|")[1] }));
+  const resumen = Object.values(lote).reduce(
+    (r, e) => ({ ...r, [e.estado]: (r[e.estado] ?? 0) + 1 }),
+    {} as Partial<Record<EstadoLote["estado"], number>>,
+  );
+  const hayLote = Object.keys(lote).length > 0;
+  const cancelar = () => control.current?.abort();
 
   const probar = async () => {
     setOcupado(true);
@@ -385,6 +480,11 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                   <button type="button" className="button-secondary" disabled={ocupado || !servidor.data?.configurado} onClick={() => void probar()}>
                     Probar la conexión
                   </button>
+                  {cancelable && (
+                    <button type="button" className="button-secondary" onClick={cancelar}>
+                      Cancelar
+                    </button>
+                  )}
                 </div>
                 {sonda && (
                   <div className="wh-capa">
@@ -426,8 +526,9 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
           <div>
             <h2 id="wh-lote">Traer varios reportes del periodo</h2>
             <p className="wh-muted">
-              De {periodo}, en las sedes marcadas. Dentro de cada sede van uno tras otro; las sedes van a la vez, cada una con su servidor, y un fallo no detiene lo demás. Los reportes que fija la plataforma
-              solo se traen si {periodo} es el periodo abierto de la sede (si no, la celda lo dice). El rendimiento por corte se trae aparte, un corte a la vez.
+              De {periodo}, en las sedes marcadas. Dentro de cada sede van uno tras otro; las sedes van a la vez, cada una con su servidor, pero los reportes pesados (marcados abajo) no los trae más de {MAX_SEDES_PESADAS} sedes al
+              mismo tiempo. Un fallo se anota en su celda y no detiene lo demás. Los reportes que fija la plataforma solo se traen si {periodo} es el periodo abierto de la sede (si no, la celda lo dice). El rendimiento por
+              corte se trae aparte, un corte a la vez.
             </p>
             <div className="wh-fila" role="group" aria-label="Sedes del lote">
               {SEDES.map((s) => (
@@ -446,9 +547,16 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
               </button>
             </div>
           </div>
-          <button type="button" className="button-primary" disabled={ocupado || elegidos.length === 0 || sedesLote.length === 0 || !servidor.data?.configurado} onClick={() => void traerVarios()}>
-            Traer {elegidos.length} en {sedesLote.length} {sedesLote.length === 1 ? "sede" : "sedes"}
-          </button>
+          <div className="wh-fila">
+            <button type="button" className="button-primary" disabled={ocupado || elegidos.length === 0 || sedesLote.length === 0 || !servidor.data?.configurado} onClick={traerVarios}>
+              Traer {elegidos.length} en {sedesLote.length} {sedesLote.length === 1 ? "sede" : "sedes"}
+            </button>
+            {cancelable && (
+              <button type="button" className="button-secondary" onClick={cancelar}>
+                Cancelar
+              </button>
+            )}
+          </div>
         </div>
         <div className="wh-tabla-envuelta">
           <table className="wh-tabla">
@@ -489,6 +597,7 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                           {c.nombre}
                           {!r.verificado && <small className="wh-muted"> · sin verificar</small>}
                           {!cargable(c) && <small className="wh-muted"> · falta política</small>}
+                          {esPesado(c.id) && <small className="wh-muted"> · pesado</small>}
                         </td>
                         <td>{SISTEMAS[c.sistema].nombre}</td>
                         {sedesLote.map((s) => {
@@ -496,7 +605,7 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                           return (
                             <td key={s}>
                               {e && (
-                                <span className="wh-etiqueta" data-t={e.estado === "ok" || e.estado === "igual" ? "ok" : e.estado === "error" ? "error" : undefined} title={e.texto}>
+                                <span className="wh-etiqueta" data-t={e.estado === "ok" || e.estado === "igual" ? "ok" : e.estado === "error" ? "error" : undefined} title={e.detalle ?? e.texto}>
                                   {e.texto}
                                 </span>
                               )}
@@ -511,6 +620,39 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
             </tbody>
           </table>
         </div>
+        {hayLote && !ocupado && (
+          <div className="wh-panel__cuerpo" style={{ display: "grid", gap: "var(--space-3)" }}>
+            <p className={pendientes.length ? "wh-aviso wh-aviso--ambar" : "wh-aviso wh-aviso--verde"} role="status">
+              Terminó: {resumen.ok ?? 0} bien, {resumen.igual ?? 0} sin cambios, {resumen.error ?? 0} con error
+              {resumen.cancelada ? `, ${resumen.cancelada} canceladas` : ""}.
+            </p>
+            {pendientes.length > 0 && (
+              <>
+                <div className="wh-fila">
+                  <button type="button" className="button-primary" disabled={!servidor.data?.configurado} onClick={() => void correrCeldas(pendientes)}>
+                    Reintentar solo las que fallaron ({pendientes.length})
+                  </button>
+                </div>
+                <details open>
+                  <summary>Qué pasó con cada una</summary>
+                  <ul style={{ display: "grid", gap: "var(--space-2)", margin: "var(--space-2) 0 0", paddingLeft: "var(--space-4)" }}>
+                    {pendientes.map((p) => {
+                      const e = lote[`${p.sede}|${p.id}`];
+                      return (
+                        <li key={`${p.sede}|${p.id}`} className="wh-nota-chica">
+                          <b>
+                            {SEDES.find((x) => x.id === p.sede)?.nombre} · {conjuntoPorId(p.id)?.nombre ?? p.id}:
+                          </b>{" "}
+                          {e?.detalle ?? e?.texto}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="wh-panel" aria-labelledby="wh-historial">

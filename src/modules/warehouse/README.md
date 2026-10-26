@@ -6,7 +6,7 @@ Guarda por periodo los reportes de Master, Galileo y Davinci para consultarlos s
 | Archivo | Qué es |
 | --- | --- |
 | `supabase/migrations/0155_warehouse_udes.sql` | tablas `wh_*`, políticas de privacidad, funciones de carga, vistas |
-| `supabase/functions/warehouse/` | `motor.ts` (lógica pura, la usan también el navegador y las pruebas) e `index.ts` (pide a Master con la cuenta de servicio) |
+| `supabase/functions/warehouse/` | `motor.ts` (lógica pura, la usan también el navegador y las pruebas), `flujo.ts` (lee el .xlsx por tramos, solo Deno), `reportes.ts` (cómo se pide cada reporte) e `index.ts` (pide a las plataformas con la cuenta de servicio) |
 | `conjuntos.ts` | catálogo de conjuntos (de los HAR de `har warehouse`) |
 | `reglas.ts` | alertas tempranas, lógica pura |
 | `store.ts` | lectura y carga contra Supabase |
@@ -60,12 +60,52 @@ Estado: **funciona** (coincide con un HAR), **corregido** (el HAR mostró otra c
 
 Los datos personales de los Excel nuevos nunca se guardan: cada conjunto tiene su política en `wh_politicas` (0193). Lo que conservan, el código real del estudiante, queda marcado como dato personal (0161).
 
+## Límites del servidor y cómo se cumplen
+El runtime de funciones de producción (`main/index.ts`) corta cada ejecución a **150 MB de memoria** (`memoryLimitMb`) y **60 s** (`workerTimeoutMs`). Cuando se pasa, la plataforma responde 500 sin cuerpo propio («falló al arrancar o se cayó»), que es lo que se vio en el lote de las cuatro sedes. El diseño actual:
+
+1. **Ninguna llamada pasa de ~52 s** (las de seguimiento de tareas, de ~38 s). Cada petición a la plataforma lleva como tope lo que queda del presupuesto; si no alcanza, el mensaje lo dice en vez de caerse.
+2. **El Excel no se descomprime entero.** `flujo.ts` recorre el zip con fflate `Unzip` en tramos de 16 KB comprimidos, abre solo la entrada que necesita (cadenas compartidas o la hoja; las demás ni se descomprimen) y corta el XML en `<row>` según llega (`FilasXml`, sin DOM ni matriz). Lo que queda en memoria es el .xlsx comprimido (2–3 MB), las cadenas compartidas y el tramo en curso.
+3. **El base64 no se duplica.** La respuesta se lee como texto, se corta la cadena «UEsDB…» (`separarBase64`) y el resto se parsea; el base64 se pasa a bytes por tramos de 64 KB. Antes, `respuesta.json()` + base64 + `atob` + bytes + `unzipSync` + texto del XML + matriz + filas + copias de `derivarColumnas` coexistían.
+4. **Dos pasadas por el archivo, una fila a la vez.** La base pide la huella ANTES de abrir la carga (`wh_abrir_carga`), así que la primera pasada cuenta las filas y calcula la huella de forma incremental (`HuellaIncremental`, SHA-256 propio por tramos; da exactamente la misma huella que `huellaContenido`, de modo que cargar a mano o desde el servidor sigue reconociendo «el mismo contenido»). Si la huella ya existe, la segunda pasada ni se hace. La segunda deriva columnas, recorta a lo que la política conserva (`recortador`) y envía lotes de 2000 filas a `wh_agregar_filas`, con dos lotes en vuelo como máximo: el siguiente no se lee hasta que haya sitio.
+5. **Sondear** cuenta recorriendo el archivo por tramos (sin guardar filas ni calcular huella) y devuelve solo nombres de columnas y el total.
+
+Presupuesto de memoria de una carga grande (23.600 filas × 30 columnas, 2 MB de Excel), sobre ~50 MB que cuesta el runtime con supabase-js y fflate:
+
+| Etapa | Pico estimado |
+| --- | --- |
+| Respuesta como texto (4 MB base64) y bytes del zip | ~7 MB, el texto se suelta |
+| Cadenas compartidas del libro | 10–25 MB |
+| Hoja por tramos y huella (una fila a la vez) | 1–3 MB |
+| Guardado: 2 lotes de 2000 filas (objetos + cuerpo JSON) | 16–24 MB |
+| **Total sobre el runtime** | **~35–60 MB (≈ 90–115 MB en todo)** |
+
+Medido en Node con los Excel de los HAR (sin el runtime): el reporte de deserciones (23.631 filas) se lee, calcula su huella y se recorre dos veces dentro de un heap de 24 MB; la lectura anterior no cabía en 48 MB (solo filas y matriz, sin las copias del texto ni los lotes).
+
+### Tareas largas en llamadas cortas
+Los reportes con entrega «tarea» (`dv_fin`, `ms_nom`, `ms_activos`) ya no se esperan dentro de la función (la nómina tarda ~70 s; el tope anterior era de 8 minutos). El navegador dirige:
+
+1. `cargar`/`sondear` con `fase: "iniciar"`: abre sesión, valida el periodo, inicia la tarea y devuelve `{ tarea: { id, pase, sistema, sede, conjunto, periodo, corte } }`. No espera.
+2. `estado_tarea` cada ~4,5 s (una consulta a `task_state/{id}/`, < 15 s): `{ estado: "ejecutando" | "listo" | "fallo", progreso?, nombre?, pase? }`.
+3. `finalizar { modo: "cargar" | "sondear", tarea: { id, pase }, motivo? }`: descarga el resultado, lo procesa como cualquier otro Excel (las dos pasadas) y cierra la sesión.
+4. `cancelar { tarea }` cierra la sesión (la plataforma no ofrece cancelar la tarea). El navegador espera como máximo 8 minutos (`ESPERA_TAREA_MS`), muestra un mensaje claro al agotarlo y permite cancelar.
+
+**Sesión de la tarea.** La tarea de Master y Davinci se consulta con una sesión viva. Los HAR (nómina y estudiantes activos) muestran el inicio y las consultas con la misma sesión, y ninguno muestra qué pasa con la tarea si se abre otra sesión, así que no se asume que sobreviva a un nuevo inicio de sesión. Por eso el `pase` lleva la sesión de la plataforma (token y llave) **cifrada con AES-GCM** con una clave derivada de la clave de servicio, atada a quien la pidió y con vigencia de 15 minutos: el navegador solo la guarda y la devuelve, el token no sale en claro, y cada consulta reutiliza la sesión sin volver a iniciar. Solo si una sesión **reutilizada** recibe 401 se abre otra y se reintenta una vez (con un aviso si la plataforma no reconoce entonces la tarea). El resto de las peticiones abren sesión nueva en cada llamada: un 401/403 con la sesión recién abierta significa que la cuenta de servicio no tiene permiso para ese reporte en esa sede, y el mensaje lo dice.
+
+### Errores de la plataforma
+Cada error lleva el código HTTP, el sistema, la sede, el reporte y un extracto de la respuesta de la plataforma, limpiado (`extractoSeguro`: sin etiquetas, correos, claves ni cadenas largas, sin números largos, máximo 200 caracteres). El 540 (no estándar) y los 5xx se explican como fallo interno del reporte; en Galileo, cualquier fallo de conexión, 401/403/404 o 5xx añade que el sistema puede no estar habilitado en esa sede. El catch final de la función devuelve un motivo corto de la excepción y escribe una línea JSON limpia con `console.error` (acción, reporte, sede, motivo) para los registros. En el navegador, un 5xx sin `{error}` propio (la función se cayó o se quedó sin tiempo o memoria) se muestra con su causa probable y qué hacer.
+
+### «Traer varios»
+Una celda a la vez por sede; sedes en paralelo; los reportes pesados (`REPORTES_PESADOS` en `conjuntos.ts`) no los trae más de `MAX_SEDES_PESADAS` (2) sedes a la vez (las demás celdas pesadas quedan «En cola»). Cada celda corre con su propio try/catch: un 500 se anota en su celda y la siguiente sigue. Al terminar hay un resumen (bien, sin cambios, con error, canceladas), el detalle de cada error y «Reintentar solo las que fallaron». Se puede cancelar.
+
+### Reportes que siguen siendo pesados
+`dv_notas` (~29.000 filas), `dv_global`, `dv_cred` (~17.500 filas, 2 MB), `dv_deser` (histórico, decenas de miles de filas × 25 periodos), `dv_matric` (ficha de 36 columnas) y `ms_nom` (tarea de ~70 s). Caben en 150 MB, pero el tiempo depende de la plataforma: la generación del Excel ocurre dentro de la misma llamada y, si una sede la tarda más de ~35 s, la llamada se corta con el mensaje «se acabó el tiempo» (la carga queda en error y lo anterior sigue vigente). La solución cuando pase es cargar ese Excel a mano. No se hizo una carga en dos fases (descargar a una tabla de paso y confirmar después) porque la ruta simple cumple los límites con las medidas de arriba, y porque dejar el Excel original en Storage rompe la decisión 3 (no se guarda el Excel). Otros puntos con riesgo: `ms_audit` (un pedido por edificio, juntados en la misma llamada: se detiene con un mensaje si se acaba el tiempo), `ms_doc` (catálogo JSON de ~19 MB: el JSON entero y sus filas viven en memoria) y los de varias hojas (`gl_uso`, `ms_asp`), que se leen enteros pero son pequeños.
+
 ## Multicampus (Bucaramanga, Cúcuta, Valledupar, Bogotá)
 - El servidor es `https://master-{sede}.udes.edu.co:81` (o `WAREHOUSE_MASTER_URL_{SEDE}`). Cada sede y cada plataforma inician sesión por separado; la función cierra la sesión al terminar. En Master se comprueba además `mod_auth/headquarter`: si el servidor de una sede responde como otra, la carga se detiene.
 - El título de cada petición lleva el código de la sede (BUC, VAL, CUC, BOG; el nombre completo en la evaluación docente). Rutas y cuerpos son los de Bucaramanga: ningún HAR de las otras tres.
 - La clave de cada carga incluye la sede (`wh_cargas`: conjunto, periodo, sede, corte): la huella y las versiones de una sede nunca reemplazan a las de otra. En la pantalla, la lista de periodos y los datos se piden por sede.
 - «Sondear» por sede compara las columnas del archivo con las que la política conserva (`faltan`, `otroReporte`), muestra el periodo que dice el archivo y avisa lo que puede ser propio de Bucaramanga (filtro `courses` de `dv_matric`, `dpt_ref` e `is_posgraduate` de `ms_posg`). Un 404 o 403 de la plataforma sale con su explicación.
-- «Traer varios reportes» permite marcar las cuatro sedes: sedes en paralelo, reportes uno tras otro dentro de cada sede, y un resultado por celda (guardado, sin cambios o error legible).
+- «Traer varios reportes» permite marcar las cuatro sedes: sedes en paralelo, reportes uno tras otro dentro de cada sede (con tope de 2 sedes a la vez en los pesados), y un resultado por celda (guardado, sin cambios o error legible), resumen final y reintento de las fallidas.
 
 ## Periodo
 Toda carga se guarda con un periodo (`2026b`) o con `permanente` (catálogos).
@@ -84,7 +124,7 @@ Lo que el estudio usa y estos datos NO tienen: Saber 11, tutorías asistidas, es
 
 ## Pendiente
 - Aplicar 0155, desplegar la función y definir `WAREHOUSE_MASTER_USER` / `WAREHOUSE_MASTER_PASSWORD` (cuenta de servicio, no la de una persona).
-- Aplicar **0193** (políticas de los conjuntos nuevos y columnas de la nómina) y volver a desplegar la función `warehouse` (`index.ts`, `motor.ts` y `reportes.ts`).
+- Aplicar **0193** (políticas de los conjuntos nuevos y columnas de la nómina) y volver a desplegar la función `warehouse` (`index.ts`, `flujo.ts`, `motor.ts` y `reportes.ts`; `flujo.ts` es nuevo y debe subirse). Los cambios de límites y tareas no necesitan migración.
 - `dv_fin`: sin política ni HAR completo.
 - Aplicar 0161 y **volver a cargar** los reportes de notas y matriculados: lo ya guardado conserva su seudónimo `x-…` (no se revierte) hasta que haya una versión nueva.
 - HAR de Cúcuta, Valledupar y Bogotá, y de los reportes de posgrado (`ms_asppos`, `dv_deserpos`).

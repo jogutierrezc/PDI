@@ -459,11 +459,29 @@ export interface EstadoServidor {
   reportes?: { id: string; sistema: string; verificado: boolean }[];
 }
 
+/**
+ * El texto para cuando la función «warehouse» responde 5xx sin un {error} propio: la plataforma de funciones la
+ * cortó (más de 150 MB de memoria o más de 60 s en una llamada) o no pudo arrancarla. Dice la causa probable y qué hacer.
+ */
+export function mensajeFuncionCaida(estado: number, detalle = ""): string {
+  const extra = detalle ? ` Respuesta: «${detalle.slice(0, 160)}».` : "";
+  return (
+    `La función «warehouse» se cayó o se quedó sin tiempo o memoria (HTTP ${estado}).${extra} ` +
+    "Causa probable: el reporte es muy grande para los límites del servidor (150 MB de memoria y 60 s por llamada), o la plataforma de la sede tardó demasiado. " +
+    "Qué hacer: reintente en un momento (solo esa celda, con «Reintentar las que fallaron»); si falla otra vez con el mismo reporte y sede, " +
+    "descargue el Excel en la plataforma y cárguelo a mano en «Cargar un reporte». Si fallan todos, revise que estén subidos index.ts, flujo.ts, motor.ts y reportes.ts."
+  );
+}
+
 async function invocar<T>(body: Record<string, unknown>): Promise<T> {
   const r = await supabase.functions.invoke("warehouse", { body });
   if (r.error) {
     const contexto = (r.error as { context?: Response }).context;
-    if (!contexto) throw new Error("No se pudo llegar a la función «warehouse»: ¿está desplegada?");
+    if (!contexto) {
+      throw new Error(
+        "No se pudo llegar a la función «warehouse»: ¿está desplegada? También pasa cuando la función se cae por memoria o tiempo (el navegador no alcanza a ver la respuesta): reintente solo ese reporte o cárguelo a mano con el Excel.",
+      );
+    }
     // Lo que la función dijo; si no es de la forma {error}, lo que haya en el cuerpo y el código HTTP, para saber qué falló.
     const detalle = await readFunctionError(r.error);
     if (detalle) throw new Error(detalle);
@@ -479,12 +497,8 @@ async function invocar<T>(body: Record<string, unknown>): Promise<T> {
     } catch {
       /* no era JSON */
     }
-    const pista =
-      contexto.status === 401 || contexto.status === 403
-        ? " (la sesión o el permiso no pasó; si dice «Invalid JWT», cierre sesión y vuelva a entrar)"
-        : contexto.status >= 500
-          ? " (la función falló al arrancar o se cayó: revise los registros de la función «warehouse» y que estén subidos index.ts, motor.ts y reportes.ts)"
-          : "";
+    if (contexto.status >= 500) throw new Error(mensajeFuncionCaida(contexto.status, texto));
+    const pista = contexto.status === 401 || contexto.status === 403 ? " (la sesión o el permiso no pasó; si dice «Invalid JWT», cierre sesión y vuelva a entrar)" : "";
     throw new Error(`La función respondió ${contexto.status}${texto ? `: ${texto}` : ""}${pista}.`);
   }
   const data = r.data as T & { ok?: boolean; error?: string };
@@ -502,7 +516,107 @@ export interface PedidoServidor {
   corte: string;
   motivo: string;
 }
-export const cargarDesdeServidor = (p: PedidoServidor) => invocar<ResultadoCarga & { ok: boolean }>({ action: "cargar", ...p });
+/* --- Tareas largas, partidas en llamadas cortas --------------------------------------------------------
+   La función tiene 60 s por llamada. Los reportes de «tarea» (nómina, estudiantes activos, reporte financiero) los
+   genera la plataforma aparte y pueden tardar minutos: la función solo los INICIA y el navegador pregunta cada
+   unos segundos (`estado_tarea`, una consulta breve). Al terminar, `finalizar` descarga, procesa y guarda. */
+
+/** La tarea que la función inició en la plataforma; el `pase` es su sesión, cifrada: solo se devuelve tal cual. */
+export interface TareaServidor {
+  id: string;
+  pase: string;
+  sistema: string;
+  sede: string;
+  conjunto: string;
+  periodo: string;
+  corte: string;
+}
+
+/** Cada cuánto se pregunta por la tarea. */
+export const PAUSA_TAREA_MS = 4_500;
+/** Hasta cuándo se espera una tarea antes de rendirse con un mensaje claro. */
+export const ESPERA_TAREA_MS = 8 * 60_000;
+
+export interface OpcionesPedido {
+  /** Texto de avance (por ejemplo, «La plataforma está generando el reporte… 40 s»). */
+  alAvance?: (texto: string) => void;
+  /** Para cancelar: la espera se detiene y la sesión de la tarea se cierra. */
+  signal?: AbortSignal;
+}
+
+/** Fin de una tarea que no se reintenta (la plataforma dijo que falló, se agotó la espera o se canceló). */
+class FinDeTarea extends Error {
+  constructor(
+    mensaje: string,
+    readonly cancelada = false,
+  ) {
+    super(mensaje);
+  }
+}
+
+/** ¿La persona canceló? Distingue una cancelación de un fallo. */
+export const esCancelacion = (e: unknown) => e instanceof FinDeTarea && e.cancelada;
+
+const dormir = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolver) => {
+    const t = setTimeout(resolver, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        resolver();
+      },
+      { once: true },
+    );
+  });
+
+/** Pregunta por la tarea hasta que termina. Devuelve la tarea con el pase vigente (puede cambiar si la sesión se renovó). */
+async function esperarTarea(tarea: TareaServidor, op: OpcionesPedido): Promise<TareaServidor> {
+  const inicio = Date.now();
+  let actual = tarea;
+  let fallos = 0;
+  const soltar = () => invocar({ action: "cancelar", tarea: { id: actual.id, pase: actual.pase } }).catch(() => undefined);
+  for (;;) {
+    if (op.signal?.aborted) {
+      await soltar();
+      throw new FinDeTarea("Cancelado.", true);
+    }
+    if (Date.now() - inicio > ESPERA_TAREA_MS) {
+      await soltar();
+      throw new FinDeTarea(
+        `La plataforma lleva más de ${Math.round(ESPERA_TAREA_MS / 60_000)} minutos generando «${actual.conjunto}» y se dejó de esperar. Intente de nuevo más tarde (suele pasar con el servidor ocupado) o descargue el Excel en la plataforma y cárguelo a mano.`,
+      );
+    }
+    await dormir(PAUSA_TAREA_MS, op.signal);
+    if (op.signal?.aborted) continue;
+    try {
+      const e = await invocar<{ estado: "ejecutando" | "listo" | "fallo"; progreso?: number; pase?: string }>({ action: "estado_tarea", tarea: { id: actual.id, pase: actual.pase } });
+      fallos = 0;
+      if (e.pase) actual = { ...actual, pase: e.pase };
+      if (e.estado === "fallo") throw new FinDeTarea(`La plataforma no pudo generar «${actual.conjunto}» en esta sede (la tarea terminó con error). Reintente en unos minutos.`);
+      if (e.estado === "listo") return actual;
+      const segundos = Math.round((Date.now() - inicio) / 1000);
+      op.alAvance?.(`La plataforma está generando el reporte… ${segundos} s${typeof e.progreso === "number" ? ` (${Math.round(e.progreso)} %)` : ""}`);
+    } catch (err) {
+      if (err instanceof FinDeTarea) throw err;
+      // Un fallo suelto de red o de la función no pierde la tarea: se reintenta; tres seguidos sí cortan.
+      if (++fallos >= 3) throw err;
+    }
+  }
+}
+
+/**
+ * Pide un reporte a la plataforma. Los de entrega directa vuelven en una sola llamada; los de tarea se inician,
+ * se siguen desde aquí y se finalizan (descargar, procesar y guardar).
+ */
+export async function cargarDesdeServidor(p: PedidoServidor, op: OpcionesPedido = {}): Promise<ResultadoCarga & { ok: boolean }> {
+  op.alAvance?.("Pidiendo el reporte a la plataforma");
+  const r = await invocar<ResultadoCarga & { ok: boolean; tarea?: TareaServidor }>({ action: "cargar", fase: "iniciar", ...p });
+  if (!r.tarea) return r;
+  const lista = await esperarTarea(r.tarea, op);
+  op.alAvance?.("Descargando y guardando el reporte");
+  return invocar<ResultadoCarga & { ok: boolean }>({ action: "finalizar", modo: "cargar", tarea: { id: lista.id, pase: lista.pase }, motivo: p.motivo });
+}
 /** Pide el reporte y devuelve solo los nombres de sus columnas: no guarda nada ni muestra filas. */
 export interface Sonda {
   ok: boolean;
@@ -522,7 +636,14 @@ export interface Sonda {
   otroReporte?: boolean;
   avisos?: string[];
 }
-export const sondearServidor = (p: Omit<PedidoServidor, "motivo">) => invocar<Sonda>({ action: "sondear", ...p });
+export async function sondearServidor(p: Omit<PedidoServidor, "motivo">, op: OpcionesPedido = {}): Promise<Sonda> {
+  op.alAvance?.("Pidiendo el reporte a la plataforma");
+  const r = await invocar<Sonda & { tarea?: TareaServidor }>({ action: "sondear", fase: "iniciar", ...p });
+  if (!r.tarea) return r;
+  const lista = await esperarTarea(r.tarea, op);
+  op.alAvance?.("Leyendo las columnas del reporte");
+  return invocar<Sonda>({ action: "finalizar", modo: "sondear", tarea: { id: lista.id, pase: lista.pase } });
+}
 
 export interface PeriodosPlataforma {
   ok: boolean;

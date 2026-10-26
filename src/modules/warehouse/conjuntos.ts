@@ -84,6 +84,16 @@ export const SEDES = [
 /** Periodo de los catálogos y de las instantáneas, que no dependen de uno. */
 export const PERMANENTE = "permanente";
 
+/**
+ * Los reportes pesados: decenas de miles de filas (2–3 MB de Excel) o una tarea que la plataforma tarda más de un
+ * minuto en generar. La función tiene 150 MB y 60 s por llamada; varias sedes pidiendo estos a la vez, además de
+ * cargar al servidor de la universidad, son lo que más veces la ha tumbado. «Traer varios» no deja que más de
+ * `MAX_SEDES_PESADAS` sedes estén trayendo uno al mismo tiempo (los demás reportes no esperan).
+ */
+export const REPORTES_PESADOS: readonly string[] = ["dv_notas", "dv_global", "dv_cred", "dv_deser", "dv_matric", "ms_nom"];
+export const MAX_SEDES_PESADAS = 2;
+export const esPesado = (id: string) => REPORTES_PESADOS.includes(id);
+
 const catalogo = (id: string, sistema: Sistema, nombre: string, ruta: string, cuerpo: string): Conjunto => ({
   id,
   sistema,

@@ -36,6 +36,13 @@
    otras (informe_level none · editor · jefe, y su alcance en
    access_role_informe_units). La base lo une a la pertenencia en informe_actor().
 
+   La GESTIÓN de Informes (tablero del ciclo, revisión, consolidador,
+   capacitación de Pilo, el informe de cualquier unidad) ya no sale de la
+   capacidad (0192): la concede access_roles.informe_gestion, que se escribe
+   cuando el nivel ELEGIDO en Informes de gestión es Editar. «Ver» no gestiona
+   aunque otro módulo suba la capacidad del rol; por eso effectiveLevel no
+   eleva Informes. La decide informe_gestiona() en la base.
+
    El rol va en el perfil de la persona. Lo que hace en cada unidad donde
    trabaja —Gestor, Contribuyente o Consulta— no es un rol de acceso: es su
    función en esa pertenencia (unit_members.role).
@@ -177,8 +184,14 @@ export const MODULES: ModuleDef[] = [
     label: "Informes de gestión",
     screens: [{ id: "informes", label: "Informes Institucionales", note: "quien pertenece a una unidad escribe el de su unidad; el rol puede darle además el de otras (0169)" }],
     levels: {
-      ver: { hint: "Abre la pantalla; escribe el informe de su unidad si pertenece a una.", needs: "consulta" },
-      editar: { hint: "Abre, revisa y consolida los informes de todas las unidades.", needs: "planeacion" },
+      ver: {
+        hint: "Solo Mi informe y la Vista del informe: el de su unidad y el de las unidades que se le asignen aquí abajo. No ve el tablero, la revisión, el consolidador ni la capacitación de Pilo.",
+        needs: "consulta",
+      },
+      editar: {
+        hint: "Gestiona los informes de todas las unidades: tablero del ciclo, revisión (aprobar o devolver), consolidador y capacitación de Pilo. Pide capacidad de Planeación.",
+        needs: "planeacion",
+      },
     },
   },
   {
@@ -349,6 +362,8 @@ export interface RoleColumns {
   informe_level: InformeLevel;
   all_informe_units: boolean;
   informe_units: string[];
+  /** Gestiona los informes de todas las unidades (0192): el nivel elegido en Informes es Editar o más. */
+  informe_gestion: boolean;
 }
 
 const emptyImpact = (): ImpactScope => ({ allUnits: false, units: [] });
@@ -394,6 +409,8 @@ export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
   // tampoco, pero su nivel sí es el que se eligió (lo traduce impact_level).
   if (id === "tableros") return "ver";
   if (id === "impacto") return choice.level;
+  // Informes de gestión tampoco: la gestión no sale de la capacidad sino del nivel elegido (0192).
+  if (id === "informes") return choice.level;
   const capacity = capacityOf(matrix);
   const module = moduleOf(id);
   if (module.seenFrom && RANK[capacity] < RANK[module.seenFrom]) return "none";
@@ -428,7 +445,9 @@ export function compile(matrix: Matrix): RoleColumns {
   const impactChoice = matrix.modules.impacto;
   const impactLevel = impactChoice.screens.length > 0 ? impactLevelOf(impactChoice.level) : "none";
   const informeOn = matrix.modules.informes.level !== "none" && matrix.modules.informes.screens.length > 0;
-  const informeLevel: InformeLevel = informeOn ? matrix.informe.level : "none";
+  // Con «Editar» el rol gestiona todos los informes: el papel por unidad sobra y se guarda vacío.
+  const informeGestion = informeOn && LEVEL_RANK[matrix.modules.informes.level] >= LEVEL_RANK.editar;
+  const informeLevel: InformeLevel = informeOn && !informeGestion ? matrix.informe.level : "none";
   return {
     base_role: capacityOf(matrix),
     screens: screens.length === ALL_SCREENS.length ? [] : screens,
@@ -441,13 +460,14 @@ export function compile(matrix: Matrix): RoleColumns {
     informe_level: informeLevel,
     all_informe_units: informeLevel !== "none" && matrix.informe.allUnits,
     informe_units: informeLevel !== "none" && !matrix.informe.allUnits ? [...matrix.informe.units].sort() : [],
+    informe_gestion: informeGestion,
   };
 }
 
 /** Columnas de un rol guardado → matriz, para editarlo. */
 export function decompile(
   role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports"> &
-    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units">>,
+    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion">>,
   reports: string[],
   units: string[] = [],
   informeUnits: string[] = [],
@@ -470,7 +490,7 @@ export function decompile(
   // esa capacidad le permite. Es lo que la base hace cumplir.
   const capacity = role.base_role;
   for (const module of MODULES) {
-    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto") continue;
+    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto" || module.id === "informes") continue;
     let best: Level = "ver";
     for (const [level, def] of Object.entries(module.levels) as [Exclude<Level, "none">, { needs: AppRole }][]) {
       if (module.id === "cifras" && level === "administrar" && !role.all_reports) continue;
@@ -481,6 +501,10 @@ export function decompile(
   }
   // Impacto no sigue a la capacidad: su nivel es el que guarda impact_level.
   if (modules.impacto.screens.length > 0) modules.impacto.level = levelOfImpact(role.impact_level);
+  // Informes tampoco: gestiona solo si el rol lo guarda (informe_gestion, 0192) y tiene capacidad para ello.
+  if (modules.informes.screens.length > 0) {
+    modules.informes.level = role.informe_gestion && RANK[capacity] >= RANK.planeacion ? "editar" : "ver";
+  }
   return draft;
 }
 
@@ -542,6 +566,7 @@ const sameColumns = (a: RoleColumns, b: RoleColumns) =>
   a.impact_level === b.impact_level &&
   a.all_impact_units === b.all_impact_units &&
   a.informe_level === b.informe_level &&
+  a.informe_gestion === b.informe_gestion &&
   a.all_informe_units === b.all_informe_units &&
   [...a.informe_units].sort().join() === [...b.informe_units].sort().join() &&
   [...a.screens].sort().join() === [...b.screens].sort().join() &&
@@ -598,7 +623,12 @@ export function describe(
     else if (names.length > 0) lines.push(`Además, por el alcance que ya traía el rol, actúa sobre: ${list(names)}.`);
   }
   const informes = effectiveLevel(matrix, "informes");
-  if (informes !== "none" && matrix.informe.level !== "none") {
+  if (informes === "editar" || informes === "administrar") {
+    lines.push("En Informes de gestión gestiona los de todas las unidades: tablero del ciclo, revisión, consolidador y capacitación de Pilo.");
+  } else if (informes === "ver") {
+    lines.push("En Informes de gestión solo tiene Mi informe y la Vista del informe, del de su unidad y de las unidades que se le asignen.");
+  }
+  if (informes === "ver" && matrix.informe.level !== "none") {
     const does = matrix.informe.level === "jefe" ? "escribe y envía" : "escribe";
     const names = matrix.informe.units.map((id) => unitNames.get(id) ?? "una unidad retirada");
     lines.push(

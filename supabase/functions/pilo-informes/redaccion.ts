@@ -37,14 +37,22 @@ export type Accion = "estado" | "redactar" | "mejorar" | "aprender" | "ingerir" 
 export const ACCIONES: Accion[] = ["estado", "redactar", "mejorar", "aprender", "ingerir", "corpus"];
 
 /**
- * Planeación y la administración, todo. «aprender» e «ingerir», solo ellas.
- * «redactar»: Gestor (jefe) o Contribuyente (editor) de la unidad de la
- * instancia. Lo demás: quien sea Gestor o Contribuyente de alguna unidad.
+ * Quien gestiona los informes (informe_gestiona(), 0192: la administración, o
+ * Planeación cuyo rol de acceso concede la gestión), todo. La capacidad sola
+ * (profiles.role) ya no basta. «aprender», «ingerir», «corpus» y «estado»,
+ * solo la gestión. «redactar»: Gestor (jefe) o Contribuyente (editor) de la
+ * unidad de la instancia. «mejorar»: quien sea Gestor o Contribuyente de alguna
+ * unidad. Todo lo que no es gestión exige además que el rol de acceso marque la
+ * pantalla «informes» (pantalla, has_screen).
  */
-export function puedeUsar(accion: Accion, p: { perfil: { role?: string | null; is_active?: boolean | null } | null; rolEnUnidad?: string | null; rolesUnidad: string[] }): boolean {
+export function puedeUsar(
+  accion: Accion,
+  p: { perfil: { is_active?: boolean | null } | null; gestiona: boolean; pantalla: boolean; rolEnUnidad?: string | null; rolesUnidad: string[] },
+): boolean {
   if (!p.perfil?.is_active) return false;
-  if (["planeacion", "admin"].includes(String(p.perfil.role))) return true;
-  if (accion === "aprender" || accion === "ingerir") return false;
+  if (p.gestiona) return true;
+  if (accion === "aprender" || accion === "ingerir" || accion === "corpus" || accion === "estado") return false;
+  if (!p.pantalla) return false;
   const diligencia = (r: string | null | undefined) => r === "jefe" || r === "editor";
   if (accion === "redactar") return diligencia(p.rolEnUnidad);
   return p.rolesUnidad.some(diligencia);

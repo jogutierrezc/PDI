@@ -43,6 +43,22 @@ export async function leerPerfil(admin: DB, userId: string) {
 }
 
 /**
+ * ¿Gestiona los informes? informe_gestiona() (0192), con SU sesión: la administración, o Planeación
+ * cuyo rol de acceso concede la gestión. Sin la migración 0192 la función no existe y nadie gestiona
+ * (cerrado por defecto: la capacidad de Planeación sola ya no basta).
+ */
+export async function gestionaInformes(comoUsuario: DB): Promise<boolean> {
+  const { data, error } = await comoUsuario.rpc("informe_gestiona");
+  return !error && data === true;
+}
+
+/** ¿Su rol de acceso (si lo tiene) marca la pantalla «informes»? has_screen, con SU sesión. */
+export async function veLaPantallaInformes(comoUsuario: DB): Promise<boolean> {
+  const { data, error } = await comoUsuario.rpc("has_screen", { screen: "informes" });
+  return !error && data === true;
+}
+
+/**
  * El papel de quien llama en una unidad, con SU sesión: su pertenencia con la herencia del árbol
  * (unit_role_at) y lo que le da su rol de acceso (informe_actor, 0169). Sin 0169, solo lo primero.
  */

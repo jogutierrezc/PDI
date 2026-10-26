@@ -10,7 +10,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { enlaceDeArchivo, useCompartir, useCrearCarpeta, usePermisos, useQuitarPermiso } from "../datos";
 import { subarbol } from "../lib/arbol";
 import { limpiarNombre, nombreEnUso } from "../lib/nombres";
-import { ETIQUETA_ROL, puedeEditar } from "../lib/permisos";
+import { ETIQUETA_ROL, puedeMoverEn } from "../lib/permisos";
 import type { ArchivoRow, CarpetaRow, DuenoRow } from "../tipos";
 import { vistaPrevia } from "../lib/imagen";
 
@@ -92,6 +92,7 @@ export function MoverA({
   carpetas,
   roles,
   yo,
+  enUnidad,
   onMover,
   onCerrar,
 }: {
@@ -102,11 +103,13 @@ export function MoverA({
   carpetas: CarpetaRow[];
   roles: Map<string, DuenoRow>;
   yo: string;
+  /** Dentro de una unidad de trabajo: solo se puede mover donde se tiene el papel Crear. */
+  enUnidad?: boolean;
   onMover: (destino: string | null) => void;
   onCerrar: () => void;
 }) {
   const fuera = tipo === "carpeta" ? subarbol(carpetas, id) : new Set<string>();
-  const opciones = carpetas.filter((c) => !c.borrado_en && !fuera.has(c.id) && puedeEditar(roles.get(c.id)?.mi_rol));
+  const opciones = carpetas.filter((c) => !c.borrado_en && !fuera.has(c.id) && puedeMoverEn(roles.get(c.id)?.mi_rol, Boolean(enUnidad)));
   const nombres = new Map(carpetas.map((c) => [c.id, c.nombre] as const));
   const ruta = (c: CarpetaRow): string => {
     const partes: string[] = [];

@@ -64,6 +64,13 @@ export function rutaStorage(persona: string, archivo: string, nombre: string): s
   return `${persona}/${archivo}/${nombreSeguroStorage(nombre)}`;
 }
 
+/** La ruta de un archivo de una unidad de trabajo: «unidades/<unidad>/<archivo>/<nombre seguro>» (0191). */
+export function rutaStorageUnidad(unidad: string, archivo: string, nombre: string): string {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  if (!uuid.test(unidad) || !uuid.test(archivo)) throw new Error("Identificador no válido para la ruta.");
+  return `unidades/${unidad}/${archivo}/${nombreSeguroStorage(nombre)}`;
+}
+
 /** Lo que está mal en un archivo antes de subirlo, en español; «» si se puede subir. */
 export function errorDeSubida(archivo: { name: string; size: number }): string {
   if (!limpiarNombre(archivo.name)) return "El archivo no tiene un nombre válido.";

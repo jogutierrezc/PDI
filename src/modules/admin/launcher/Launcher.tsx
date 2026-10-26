@@ -82,7 +82,7 @@ export function wallSpans(n: number): { col: number; rows: number; md: number }[
 }
 
 export function Launcher() {
-  const { profile, hasRole, canSee, canSeeReport, impactoSide, signOut } = useAuth();
+  const { profile, hasRole, canSee, canSeeReport, impactoSide, signOut, puedeGestionarInformes } = useAuth();
   const { start, isDone, active } = useTour();
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,7 +120,7 @@ export function Launcher() {
 
   // Cada módulo con su portal; los que tienen algo pendiente hoy van primero.
   const modules = useMemo<WallModule[]>(() => {
-    const ctx = { hasRole, canSee, impactoSide, reports, intDirector: intl.director };
+    const ctx = { hasRole, canSee, impactoSide, reports, intDirector: intl.director, puedeGestionarInformes };
     return groups
       .map((g) => {
         let sections = portalFor(g.id, ctx);
@@ -140,7 +140,7 @@ export function Launcher() {
         };
       })
       .sort((a, b) => Number(!a.live) - Number(!b.live) || a.rank - b.rank);
-  }, [groups, hasRole, canSee, impactoSide, reports, pending, intl.director]);
+  }, [groups, hasRole, canSee, impactoSide, reports, pending, intl.director, puedeGestionarInformes]);
 
   const compact = groups.length > 3;
   const spans = wallSpans(modules.length);

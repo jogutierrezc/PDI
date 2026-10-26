@@ -6,11 +6,12 @@
 
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../../lib/auth";
 import { useCrecer, useEntrada } from "../../rankings/movimiento";
 import { condicionDe, useAbrirInforme, useGuardarCiclo, useGuardarRequisito, useInstancias, useListas, useUnidades } from "../datos";
 import { DIMS, LETRAS, PLANTILLAS, cifraDef, dimsDe, plantillaSugerida } from "../plantillas";
 import type { CicloRow, Condicion, ConfigCiclo, EstadoCiclo, Plantilla, RequisitoRow } from "../types";
-import { Aviso, Barra, Cargando, EstadoPill, fmtFecha, mensajeDe } from "./comunes";
+import { Aviso, Barra, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { configDe } from "./modelo";
 
 const BASE = "/admin/informes-gestion";
@@ -25,7 +26,16 @@ const ESTADOS_CICLO: { id: EstadoCiclo; texto: string }[] = [
   { id: "cerrado", texto: "Cerrado" },
 ];
 
-export function Tablero({ ciclo, ciclos, requisitos, elegirAnio }: { ciclo: CicloRow | null; ciclos: CicloRow[]; requisitos: RequisitoRow[]; elegirAnio: (a: number) => void }) {
+type PropsTablero = { ciclo: CicloRow | null; ciclos: CicloRow[]; requisitos: RequisitoRow[]; elegirAnio: (a: number) => void };
+
+/** Defensa en profundidad (0192): quien no gestiona los informes no ve el tablero ni consulta nada; la base también lo niega. */
+export function Tablero(props: PropsTablero) {
+  const { puedeGestionarInformes } = useAuth();
+  if (!puedeGestionarInformes) return <Vacio>El tablero del ciclo es de quien gestiona los informes.</Vacio>;
+  return <TableroGestion {...props} />;
+}
+
+function TableroGestion({ ciclo, ciclos, requisitos, elegirAnio }: PropsTablero) {
   const raiz = useRef<HTMLDivElement>(null);
   useEntrada(raiz, ".inf-card", ciclo?.id ?? "nuevo");
   return (

@@ -89,6 +89,8 @@ export interface AccessRole {
   informe_level?: InformeLevel;
   /** Informes: el alcance es toda la estructura; si no, las unidades de access_role_informe_units. */
   all_informe_units?: boolean;
+  /** Informes Institucionales (0192): gestiona los informes de todas las unidades (tablero, revisión, consolidador, capacitación de Pilo). */
+  informe_gestion?: boolean;
   is_system: boolean;
   position: number;
   created_at?: string;

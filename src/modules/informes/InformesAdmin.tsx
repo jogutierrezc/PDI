@@ -2,11 +2,15 @@
    Informes Institucionales · la pantalla de la intranet (contrato en README.md).
 
    Una sola ruta: /admin/informes-gestion/:seccion?
-     (sin sección)   Planeación: el tablero del ciclo; las unidades: su informe
+     (sin sección)   quien gestiona (0192): el tablero del ciclo; el resto: su informe
      mi-informe      el editor (?unidad=<id>&s=<n>)
      revision        Planeación aprueba o devuelve (?informe=<id>)
      consolidador    próxima fase
      capacitacion    Planeación capacita a Pilo con los informes de 2025
+   Tablero, revisión, consolidador y capacitación son solo de quien gestiona (puedeGestionarInformes,
+   espejo de informe_gestiona()); quien no, solo tiene Mi informe y la Vista del informe.
+   El consolidador es de gestión por ahora: las rectorías (plantillas C y D) lo recibirán cuando se
+   construya, con su propia regla en la base.
      vista           Vista Carta y PDF (?unidad=<id>): el informe como saldrá en papel
    ?anio=<n> elige el ciclo (por defecto, el abierto o el más reciente).
    ========================================================================== */
@@ -27,7 +31,7 @@ import "./informes.css";
 
 const BASE = "/admin/informes-gestion";
 type Seccion = "tablero" | "mi-informe" | "revision" | "consolidador" | "capacitacion" | "vista";
-const SOLO_PLANEACION: Seccion[] = ["tablero", "revision", "capacitacion"];
+const SOLO_GESTION: Seccion[] = ["tablero", "revision", "consolidador", "capacitacion"];
 const SECCIONES: Seccion[] = ["tablero", "mi-informe", "revision", "consolidador", "capacitacion", "vista"];
 
 const TITULOS: Record<Seccion, [string, string]> = {
@@ -41,24 +45,24 @@ const TITULOS: Record<Seccion, [string, string]> = {
 
 export function InformesAdmin() {
   const { seccion: param } = useParams();
-  const { hasRole } = useAuth();
-  const planeacion = hasRole("planeacion");
+  const { puedeGestionarInformes } = useAuth();
+  const gestiona = puedeGestionarInformes;
   const [params, setParams] = useSearchParams();
   const ciclos = useCiclos();
 
-  const seccion = (param ?? (planeacion ? "tablero" : "mi-informe")) as Seccion;
+  const seccion = (param ?? (gestiona ? "tablero" : "mi-informe")) as Seccion;
   const anio = Number(params.get("anio")) || null;
   const lista = ciclos.data ?? [];
   const ciclo = lista.find((c) => c.anio === anio) ?? lista.find((c) => c.estado === "abierto") ?? lista[0] ?? null;
   const requisitos = useRequisitos(ciclo?.id);
-  const instancias = useInstancias(planeacion ? ciclo?.id : undefined);
+  const instancias = useInstancias(gestiona ? ciclo?.id : undefined);
 
-  if (!SECCIONES.includes(seccion) || (SOLO_PLANEACION.includes(seccion) && !planeacion)) return <Navigate to={`${BASE}/mi-informe`} replace />;
+  if (!SECCIONES.includes(seccion) || (SOLO_GESTION.includes(seccion) && !gestiona)) return <Navigate to={`${BASE}/mi-informe`} replace />;
 
   const porRevisar = instancias.data?.filter((i) => i.estado === "sent").length;
   const rail = (
     <AdminRail label="Secciones de Informes Institucionales">
-      {planeacion && (
+      {gestiona && (
         <AdminRailTab current={seccion === "tablero"} to={BASE}>
           Tablero del ciclo
         </AdminRailTab>
@@ -66,15 +70,17 @@ export function InformesAdmin() {
       <AdminRailTab current={seccion === "mi-informe"} to={`${BASE}/mi-informe`}>
         Mi informe
       </AdminRailTab>
-      {planeacion && (
+      {gestiona && (
         <AdminRailTab current={seccion === "revision"} to={`${BASE}/revision`} count={porRevisar}>
           Revisión
         </AdminRailTab>
       )}
-      <AdminRailTab current={seccion === "consolidador"} to={`${BASE}/consolidador`}>
-        Consolidador
-      </AdminRailTab>
-      {planeacion && (
+      {gestiona && (
+        <AdminRailTab current={seccion === "consolidador"} to={`${BASE}/consolidador`}>
+          Consolidador
+        </AdminRailTab>
+      )}
+      {gestiona && (
         <AdminRailTab current={seccion === "capacitacion"} to={`${BASE}/capacitacion`}>
           Capacitación de Pilo
         </AdminRailTab>

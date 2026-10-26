@@ -7,6 +7,7 @@
 
 import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "../../../lib/auth";
 import { useFundido } from "../../rankings/movimiento";
 import { useInstancias, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
 import { componerNota, leerNota } from "../estados";
@@ -27,7 +28,14 @@ const FILTROS: { id: Filtro; texto: string }[] = [
   { id: "todos", texto: "Todos" },
 ];
 
-export function Revision({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
+/** Defensa en profundidad (0192): quien no gestiona los informes no ve la revisión ni consulta nada; la base también lo niega. */
+export function Revision(props: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
+  const { puedeGestionarInformes } = useAuth();
+  if (!puedeGestionarInformes) return <Vacio>La revisión es de quien gestiona los informes.</Vacio>;
+  return <RevisionGestion {...props} />;
+}
+
+function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
   const instancias = useInstancias(ciclo.id);
   const unidades = useUnidades();
   const [params, setParams] = useSearchParams();

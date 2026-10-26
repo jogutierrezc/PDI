@@ -97,6 +97,8 @@ export interface AuthContextValue {
   impactoSide: ImpactoSide;
   /** ¿Pertenece a alguna unidad? */
   inAnyUnit: boolean;
+  /** ¿Gestiona Informes Institucionales (tablero, revisión, consolidador, capacitación de Pilo)? Espeja informe_gestiona() (0192). */
+  puedeGestionarInformes: boolean;
   /** ¿Trabaja en Internacionalización (int_miembros, 0151)? */
   inInternacionalizacion: boolean;
   /** ¿Es Director o Coordinador de un programa (pc_miembros, 0164)? */
@@ -111,6 +113,22 @@ export interface AuthContextValue {
  * o en ninguno. Decide si Impacto aparece y qué recorrido le toca.
  */
 export type ImpactoSide = "programa" | "funcion" | "ambos" | null;
+
+/**
+ * ¿Gestiona Informes Institucionales? Espejo de informe_gestiona() (0192): la
+ * administración siempre; Planeación sin rol de acceso, como siempre; con rol
+ * de acceso, solo si el rol marca la pantalla «informes» y lleva informe_gestion
+ * (se activa al elegir «Editar» en Informes de gestión). La capacidad sola ya no
+ * basta: un rol con «Ver» en Informes no gestiona aunque otro módulo suba su capacidad.
+ */
+export function puedeGestionarInformes(profile: Profile | null, access: AccessScope | null): boolean {
+  if (!profile?.is_active) return false;
+  if (RANK[profile.role] >= RANK.admin) return true;
+  if (RANK[profile.role] < RANK.planeacion) return false;
+  if (!access) return true;
+  const marcada = access.role.all_screens || access.role.screens.includes("informes");
+  return marcada && access.role.informe_gestion === true;
+}
 
 /**
  * ¿Ve esta pantalla de la intranet? Espejo de has_screen(), en una función
@@ -160,7 +178,7 @@ export function screenVisible(
   if (screen === "informes") {
     if (!listed) return false;
     const delRol = access ? (access.role.informe_level ?? "none") !== "none" : false;
-    return inAnyUnit || delRol || RANK[profile.role] >= RANK.planeacion;
+    return inAnyUnit || delRol || puedeGestionarInformes(profile, access);
   }
   // Mis Tableros se gana perteneciendo a una unidad, pero un rol que no lo marca lo cierra.
   if (screen === "tableros" && inAnyUnit) return listed;
@@ -441,15 +459,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // de la oficina, no el panel.
   const home = intranetHome(profile);
 
+  const gestionaInformes = useMemo(() => puedeGestionarInformes(profile, access), [profile, access]);
+
   const value = useMemo(
     () => ({
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
+      puedeGestionarInformes: gestionaInformes,
       inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad,
     }),
     [
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
-      access, canSee, reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
+      access, canSee, reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit, gestionaInformes,
       inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad,
     ],
   );

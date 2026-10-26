@@ -31,8 +31,9 @@ export interface Compartido {
   archivo_id?: string | null;
 }
 
-export const RANGO: Record<RolDrive, number> = { lector: 1, editor: 2, propietario: 3 };
-const DE_RANGO: (RolDrive | null)[] = [null, "lector", "editor", "propietario"];
+/** Cuatro niveles desde 0191: Solo ver 1, Editar 2, Crear 3, Propietario 4. «creador» solo existe dentro de una unidad de trabajo. */
+export const RANGO: Record<RolDrive, number> = { lector: 1, editor: 2, creador: 3, propietario: 4 };
+const DE_RANGO: (RolDrive | null)[] = [null, "lector", "editor", "creador", "propietario"];
 
 export const rangoDe = (rol: RolDrive | null | undefined): number => (rol ? RANGO[rol] : 0);
 
@@ -64,7 +65,15 @@ export function rolEnArchivo(carpetas: readonly CarpetaPermiso[], archivos: read
 
 export const puedeVer = (rol: RolDrive | null | undefined): boolean => rangoDe(rol) >= 1;
 export const puedeEditar = (rol: RolDrive | null | undefined): boolean => rangoDe(rol) >= 2;
-export const puedeCompartir = (rol: RolDrive | null | undefined): boolean => rangoDe(rol) >= 3;
+export const puedeCompartir = (rol: RolDrive | null | undefined): boolean => rangoDe(rol) >= 4;
+
+/** Crear o subir: fuera de una unidad basta poder editar; dentro, hace falta el papel Crear (0191). */
+export const puedeCrearEn = (rol: RolDrive | null | undefined, enUnidad: boolean): boolean => rangoDe(rol) >= (enUnidad ? 3 : 2);
+/** Mover un elemento: lo mismo que crear. */
+export const puedeMoverEn = puedeCrearEn;
+/** Mandar a la papelera o restaurar. En una unidad: quien administra, o quien crea si el elemento es suyo. */
+export const puedeBorrarEn = (rol: RolDrive | null | undefined, enUnidad: boolean, esPropio: boolean): boolean =>
+  enUnidad ? rangoDe(rol) >= 4 || (rangoDe(rol) >= 3 && esPropio) : rangoDe(rol) >= 2;
 export const puedeBorrarParaSiempre = puedeCompartir;
 
-export const ETIQUETA_ROL: Record<RolDrive, string> = { propietario: "Propietario", editor: "Puede editar", lector: "Solo puede ver" };
+export const ETIQUETA_ROL: Record<RolDrive, string> = { propietario: "Propietario", creador: "Puede crear", editor: "Puede editar", lector: "Solo puede ver" };

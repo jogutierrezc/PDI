@@ -346,7 +346,7 @@ function RoleEditor({
   );
   const summary = describe(matrix, reportNames, unitNames);
   const informeNeedsScope =
-    matrix.modules.informes.level !== "none" &&
+    matrix.modules.informes.level === "ver" &&
     matrix.informe.level !== "none" &&
     !matrix.informe.allUnits &&
     matrix.informe.units.length === 0;
@@ -422,6 +422,7 @@ function RoleEditor({
           all_impact_units: columns.all_impact_units,
           informe_level: columns.informe_level,
           all_informe_units: columns.all_informe_units,
+          informe_gestion: columns.informe_gestion,
         },
         reports: columns.reports,
         units: columns.units,
@@ -658,7 +659,13 @@ function RoleEditor({
                       )}
                     </div>
                   )}
-                  {module.id === "informes" && (
+                  {module.id === "informes" && choice.level === "editar" && (
+                    <small>
+                      Con «Editar» el rol ve y gestiona los informes de todas las unidades, por eso no se eligen unidades aquí. Para dar solo
+                      el informe de una o varias unidades, deje «Ver».
+                    </small>
+                  )}
+                  {module.id === "informes" && choice.level === "ver" && (
                     <InformeScopePicker
                       units={unitOptions.data ?? []}
                       loading={unitOptions.isPending}

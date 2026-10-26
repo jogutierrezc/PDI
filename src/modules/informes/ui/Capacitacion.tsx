@@ -8,6 +8,7 @@
 
 import { useRef, useState } from "react";
 import type { DragEvent } from "react";
+import { useAuth } from "../../../lib/auth";
 import { importFresh } from "../../../lib/stale-chunk";
 import { useEntrada } from "../../rankings/movimiento";
 import { dividirPorTitulos, plantillaDesdeNombre, unidadDesdeNombre } from "../capacitacion";
@@ -16,7 +17,7 @@ import { piloIngerir, useCorpus } from "../datos";
 import type { ArchivoParaPilo, RespuestaIngesta } from "../datos";
 import { LETRAS, PLANTILLAS } from "../plantillas";
 import type { Plantilla } from "../types";
-import { mensajeDe } from "./comunes";
+import { Vacio, mensajeDe } from "./comunes";
 
 interface Leido {
   id: string;
@@ -32,7 +33,14 @@ interface Leido {
 
 const ACEPTA = /\.(docx|pdf)$/i;
 
+/** Defensa en profundidad (0192): quien no gestiona los informes no ve la capacitación ni consulta el corpus; la función y la base también lo niegan. */
 export function Capacitacion() {
+  const { puedeGestionarInformes } = useAuth();
+  if (!puedeGestionarInformes) return <Vacio>La capacitación de Pilo es de quien gestiona los informes.</Vacio>;
+  return <CapacitacionGestion />;
+}
+
+function CapacitacionGestion() {
   const [anio, setAnio] = useState(2025);
   const [archivos, setArchivos] = useState<Leido[]>([]);
   const [encima, setEncima] = useState(false);

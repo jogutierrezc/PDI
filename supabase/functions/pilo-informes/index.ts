@@ -26,10 +26,13 @@
                          (UDrive, fase 3: ver udrive.ts; acceso por drive_entra, migración 0187)
 
    Reglas:
-     · Solo con sesión. Planeación o la administración, todo; «aprender» e
-       «ingerir», solo ellas. «redactar», también Gestor o Contribuyente de la
-       unidad de la instancia (unit_role_at, con herencia); «mejorar», «estado»
-       y «corpus», Gestor o Contribuyente de alguna unidad.
+     · Solo con sesión. Quien gestiona los informes (informe_gestiona(), 0192:
+       la administración, o Planeación cuyo rol de acceso lo concede), todo;
+       «aprender», «ingerir», «corpus» y «estado», solo ella. «redactar»,
+       también Gestor o Contribuyente de la unidad de la instancia
+       (informe_actor, con herencia y lo que da el rol); «mejorar», Gestor o
+       Contribuyente de alguna unidad. Quien no gestiona necesita además que su
+       rol marque la pantalla «informes».
      · Pilo nunca escribe una cifra: todo número es un token [[clave]] de una
        cifra incluida de esa instancia. Lo que no puede saber queda como
        «[La unidad debe completar: …]». Si no pasa la verificación, un
@@ -110,6 +113,9 @@ Deno.serve(async (request: Request) => {
   if (accionUdrive) return await atenderUdrive({ accion: accionUdrive, cuerpo, admin, url, anonKey, authorization, json });
   if (!accion) return json({ error: "Acción desconocida." }, 400);
   const { perfil, rolesUnidad } = await datos.leerPerfil(admin, who.data.user.id);
+  // Con SU sesión: la gestión y la pantalla las decide la base (0192), no la capacidad del perfil.
+  const comoUsuario = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
+  const [gestiona, pantalla] = await Promise.all([datos.gestionaInformes(comoUsuario), datos.veLaPantallaInformes(comoUsuario)]);
 
   const fallo = (e: unknown) => {
     const m = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e);
@@ -125,21 +131,20 @@ Deno.serve(async (request: Request) => {
     try {
       instancia = await datos.leerInstancia(admin, id);
       if (!instancia) return json({ error: "No existe ese informe." }, 404);
-      if (accion === "redactar" && !["planeacion", "admin"].includes(String(perfil?.role))) {
-        const comoUsuario = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
+      if (accion === "redactar" && !gestiona) {
         rolEnUnidad = await datos.rolEnUnidad(comoUsuario, instancia.unit_id);
       }
     } catch (e) {
       return fallo(e);
     }
   }
-  if (!puedeUsar(accion, { perfil, rolEnUnidad, rolesUnidad })) {
+  if (!puedeUsar(accion, { perfil, gestiona, pantalla, rolEnUnidad, rolesUnidad })) {
     const msg =
-      accion === "aprender" || accion === "ingerir"
-        ? "Solo Planeación o la administración."
+      accion === "aprender" || accion === "ingerir" || accion === "corpus" || accion === "estado"
+        ? "Solo quien gestiona los informes (Planeación con la gestión de Informes, o la administración)."
         : accion === "redactar"
-          ? "Solo Planeación o quien diligencia este informe (Gestor o Contribuyente de la unidad)."
-          : "Solo Planeación o quien diligencia un informe (Gestor o Contribuyente).";
+          ? "Solo quien gestiona los informes o quien diligencia este informe (Gestor o Contribuyente de la unidad)."
+          : "Solo quien gestiona los informes o quien diligencia un informe (Gestor o Contribuyente).";
     return json({ error: msg }, 403);
   }
 

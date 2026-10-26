@@ -22,10 +22,12 @@ import { Icon } from "../../../components/ui/Icon";
 import { CardSkeleton, ErrorBlock } from "../../../components/ui/QueryState";
 import { useAuth } from "../../../lib/auth";
 import { enlaceDeArchivo, esFaltaMigracion, useAPapelera, useArchivos, useCarpetas, useCrearItem, useDuenos, useEliminarDefinitivo, useMover, useRenombrar, useRestaurar, useVaciarVencidos } from "../datos";
-import { contenidoDe, elementosDePapelera, puedeMoverArchivo, puedeMoverCarpeta, rutaDeCarpeta } from "../lib/arbol";
+import { contenidoDe, elementosDePapelera, puedeMoverArchivo, puedeMoverCarpeta, rutaDeCarpeta, subarbol } from "../lib/arbol";
 import { vistaPrevia } from "../lib/imagen";
 import { textoTamano } from "../lib/nombres";
-import { puedeEditar } from "../lib/permisos";
+import { puedeBorrarEn, puedeCrearEn, puedeEditar, puedeMoverEn } from "../lib/permisos";
+import { useUnidades } from "../unidades/datos";
+import { textoBytes as textoBytesUnidad } from "../unidades/lib";
 import { tablaDesdeMatriz } from "../lib/tabla";
 import { useCascada } from "../motion";
 import type { ArchivoRow, CarpetaRow } from "../tipos";
@@ -65,7 +67,18 @@ const ACCIONES: EntradaBuscador[] = [
   { id: "x:subir", titulo: "Subir archivos", icono: "upload", pista: "Acción" },
 ];
 
-export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: Seccion }) {
+/** Cuando el explorador se abre dentro de una unidad de trabajo (0191): su carpeta raíz, mi rango (1 a 4) y su espacio. */
+export interface UnidadEnExplorador {
+  id: string;
+  nombre: string;
+  raiz: string;
+  rango: number;
+  uso: number;
+  cuota: number;
+  archivada: boolean;
+}
+
+export function Explorador({ seccionInicial = "archivos", unidad }: { seccionInicial?: Seccion; unidad?: UnidadEnExplorador }) {
   const { profile } = useAuth();
   const yo = profile?.id;
   const navigate = useNavigate();
@@ -75,8 +88,19 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
   const archivosQ = useArchivos();
   const { aviso, decir } = useAviso();
 
-  const todasC = useMemo(() => carpetasQ.data ?? [], [carpetasQ.data]);
-  const todasA = useMemo(() => archivosQ.data ?? [], [archivosQ.data]);
+  const unidadesQ = useUnidades();
+  const enU = Boolean(unidad);
+  const base = unidad?.raiz ?? null;
+  // Lo que vive dentro de una unidad de trabajo no se mezcla con «Mis archivos»: en la unidad solo se ve lo suyo, y fuera de ella, nada de lo de las unidades.
+  const idsDeUnidades = useMemo(() => {
+    const crudas = carpetasQ.data ?? [];
+    if (unidad) return subarbol(crudas, unidad.raiz);
+    const s = new Set<string>();
+    for (const u of unidadesQ.data ?? []) for (const id of subarbol(crudas, u.carpeta_raiz)) s.add(id);
+    return s;
+  }, [carpetasQ.data, unidadesQ.data, unidad]);
+  const todasC = useMemo(() => (carpetasQ.data ?? []).filter((c) => (enU ? idsDeUnidades.has(c.id) : !idsDeUnidades.has(c.id))), [carpetasQ.data, idsDeUnidades, enU]);
+  const todasA = useMemo(() => (archivosQ.data ?? []).filter((a) => (enU ? a.carpeta_id !== null && idsDeUnidades.has(a.carpeta_id) : a.carpeta_id === null || !idsDeUnidades.has(a.carpeta_id))), [archivosQ.data, idsDeUnidades, enU]);
   const ids = useMemo(() => [...todasC.map((c) => c.id), ...todasA.map((a) => a.id)], [todasC, todasA]);
   const duenos = useDuenos(ids);
   const roles = useMemo(() => duenos.data ?? new Map(), [duenos.data]);
@@ -113,22 +137,27 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
     vaciar.mutate();
   }, [archivosQ.isSuccess, carpetasQ.isSuccess, vaciar]);
 
-  const carpetaActual = seccion === "archivos" && carpetaParam && todasC.some((c) => c.id === carpetaParam && !c.borrado_en) ? carpetaParam : null;
+  const carpetaActual = seccion === "archivos" && carpetaParam && todasC.some((c) => c.id === carpetaParam && !c.borrado_en) ? carpetaParam : base;
   const rolActual = carpetaActual ? roles.get(carpetaActual)?.mi_rol : "propietario";
-  const puedeCrear = seccion === "archivos" && puedeEditar(rolActual);
+  const puedeCrear = seccion === "archivos" && puedeCrearEn(rolActual, enU) && !unidad?.archivada;
+  const puedeBorrar = (tipo: "carpeta" | "archivo", id: string) => {
+    const f = tipo === "carpeta" ? todasC.find((c) => c.id === id) : todasA.find((a) => a.id === id);
+    return puedeBorrarEn(roles.get(id)?.mi_rol, enU, f?.creada_por === yo);
+  };
 
   const irA = useCallback(
     (c: string | null, s: Seccion = "archivos") => {
       setSeccion(s);
       setSel(null);
-      setParams(c ? { c } : {}, { replace: false });
+      // Dentro de una unidad la dirección conserva su sección (s=archivos); la carpeta raíz de la unidad es el inicio.
+      setParams({ ...(enU ? { s: "archivos" } : {}), ...(c && c !== base ? { c } : {}) }, { replace: false });
     },
-    [setParams],
+    [setParams, enU, base],
   );
 
   const nombresEn = useCallback((c: string | null) => [...todasC.filter((x) => x.padre_id === c && !x.borrado_en).map((x) => x.nombre), ...todasA.filter((x) => x.carpeta_id === c && !x.borrado_en).map((x) => x.nombre)], [todasC, todasA]);
 
-  const { cola, agregar, descartar } = useSubidas({ persona: yo, carpeta: carpetaActual, nombresEnCarpeta: () => nombresEn(carpetaActual), alTerminar: (id) => setSel({ tipo: "archivo", id }) });
+  const { cola, agregar, descartar } = useSubidas({ persona: yo, unidad: unidad?.id, carpeta: carpetaActual, nombresEnCarpeta: () => nombresEn(carpetaActual), alTerminar: (id) => setSel({ tipo: "archivo", id }) });
 
   /* ---- qué se muestra ---- */
   const visiblesC = useMemo(() => todasC.filter((c) => !c.borrado_en), [todasC]);
@@ -167,10 +196,11 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
 
   const migas = useMemo(() => {
     const ruta = rutaDeCarpeta(todasC, carpetaActual);
+    if (unidad) return [{ id: null as string | null, texto: unidad.nombre }, ...ruta.filter((c) => c.id !== unidad.raiz).map((c) => ({ id: c.id as string | null, texto: c.nombre }))];
     const propias = !ruta.length || todasC.find((c) => c.id === ruta[0].id)?.creada_por === yo;
     const raiz = seccion === "compartidos" ? "Compartidos conmigo" : seccion === "recientes" ? "Recientes" : seccion === "papelera" ? "Papelera" : seccion === "catalogo" ? "Catálogo" : propias ? "Mis archivos" : "Compartidos conmigo";
     return [{ id: null as string | null, texto: raiz }, ...ruta.map((c) => ({ id: c.id as string | null, texto: c.nombre }))];
-  }, [todasC, carpetaActual, seccion, yo]);
+  }, [todasC, carpetaActual, seccion, yo, unidad]);
 
   const bytes = useMemo(() => visiblesA.filter((a) => a.creada_por === yo).reduce((t, a) => t + (a.tamano ?? 0), 0), [visiblesA, yo]);
   const resumenCarpeta = contenidoDe(carpetaActual, todasC, todasA);
@@ -206,8 +236,9 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
   const moverA = (tipo: "carpeta" | "archivo", id: string, destino: string | null) => {
     const item = tipo === "carpeta" ? todasC.find((c) => c.id === id) : todasA.find((a) => a.id === id);
     if (!item) return;
-    if (!puedeEditar(roles.get(id)?.mi_rol)) return decir("No tiene permiso para mover eso.");
-    if (destino !== null && !puedeEditar(roles.get(destino)?.mi_rol)) return decir("No tiene permiso para soltar nada en esa carpeta.");
+    if (enU && destino === null) destino = base;
+    if (!puedeMoverEn(roles.get(id)?.mi_rol, enU)) return decir(enU ? "Mover cosas en una unidad pide el papel Crear." : "No tiene permiso para mover eso.");
+    if (destino !== null && !puedeMoverEn(roles.get(destino)?.mi_rol, enU)) return decir("No tiene permiso para soltar nada en esa carpeta.");
     const valido = tipo === "carpeta" ? puedeMoverCarpeta(todasC, id, destino) : puedeMoverArchivo(item as ArchivoRow, destino);
     if (!valido) return decir(tipo === "carpeta" ? "Una carpeta no se puede mover dentro de sí misma, ni a donde ya está." : "Ya está en esa carpeta.");
     mover.mutate({ tipo, id, destino }, { onSuccess: () => decir("Movido."), onError: (e) => decir(e.message) });
@@ -226,7 +257,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
     setSoltando(false);
     if (esArchivosExternos(e) && !arrastre.current) {
       if (destino === carpetaActual && puedeCrear) agregar(e.dataTransfer.files);
-      else if (destino !== null && puedeEditar(roles.get(destino)?.mi_rol)) decir("Abra la carpeta y suelte allí los archivos.");
+      else if (destino !== null && puedeCrearEn(roles.get(destino)?.mi_rol, enU)) decir("Abra la carpeta y suelte allí los archivos.");
       return;
     }
     const a = arrastre.current;
@@ -318,7 +349,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
     } else if (k === "a") {
       const a = todasA.find((x) => x.id === id);
       if (a) {
-        irA(a.carpeta_id && todasC.some((c) => c.id === a.carpeta_id) ? a.carpeta_id : null, a.creada_por === yo ? "archivos" : "compartidos");
+        irA(a.carpeta_id && todasC.some((c) => c.id === a.carpeta_id) ? a.carpeta_id : null, enU || a.creada_por === yo ? "archivos" : "compartidos");
         setSel({ tipo: "archivo", id });
       }
     } else if (e.id === "x:carpeta") setDialogo({ t: "carpeta" });
@@ -331,7 +362,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
     if (e.key === "Enter") {
       e.preventDefault();
       abrir(tipo, id);
-    } else if ((e.key === "Delete" || e.key === "Backspace") && seccion !== "papelera" && puedeEditar(roles.get(id)?.mi_rol)) {
+    } else if ((e.key === "Delete" || e.key === "Backspace") && seccion !== "papelera" && puedeBorrar(tipo, id)) {
       e.preventDefault();
       const fila = tipo === "carpeta" ? todasC.find((c) => c.id === id) : todasA.find((a) => a.id === id);
       if (fila) setDialogo({ t: "papelera", s: tipo === "carpeta" ? { tipo, fila: fila as CarpetaRow } : { tipo, fila: fila as ArchivoRow } });
@@ -342,7 +373,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
 
   /* ---- pantallas de espera ---- */
   const falla = carpetasQ.error ?? archivosQ.error;
-  if (carpetasQ.isPending || archivosQ.isPending) return <EstadoPantalla><CardSkeleton count={3} /></EstadoPantalla>;
+  if (carpetasQ.isPending || archivosQ.isPending || (!enU && unidadesQ.isPending)) return <EstadoPantalla><CardSkeleton count={3} /></EstadoPantalla>;
   if (falla) {
     return (
       <EstadoPantalla>
@@ -372,16 +403,28 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
       <BarraSuperior sigla="UD" marca="UDrive" buscar="Buscar carpetas, tablas y gráficas" onBuscar={() => setBuscando(true)} />
       <div className="pc-body">
         <Riel etiqueta="Secciones de UDrive">
-          <EntradaRiel icono="folder" actual={seccion === "archivos"} onClick={() => irA(null)}>Mis archivos</EntradaRiel>
-          <EntradaRiel icono="users" actual={seccion === "compartidos"} onClick={() => irA(null, "compartidos")}>Compartidos conmigo</EntradaRiel>
-          <EntradaRiel icono="clock" actual={seccion === "recientes"} onClick={() => irA(null, "recientes")}>Recientes</EntradaRiel>
+          {unidad ? (
+            <>
+              <EntradaRiel icono="arrow-left" actual={false} to={`/admin/udrive/unidad/${unidad.id}`}>Inicio de la unidad</EntradaRiel>
+              <TituloRiel>{unidad.nombre}</TituloRiel>
+              <EntradaRiel icono="folder" actual={seccion === "archivos"} onClick={() => irA(null)}>Archivos de la unidad</EntradaRiel>
+              <EntradaRiel icono="clock" actual={seccion === "recientes"} onClick={() => irA(null, "recientes")}>Recientes</EntradaRiel>
+            </>
+          ) : (
+            <>
+              <EntradaRiel icono="folder" actual={seccion === "archivos"} onClick={() => irA(null)}>Mis archivos</EntradaRiel>
+              <EntradaRiel icono="users" actual={seccion === "compartidos"} onClick={() => irA(null, "compartidos")}>Compartidos conmigo</EntradaRiel>
+              <EntradaRiel icono="clock" actual={seccion === "recientes"} onClick={() => irA(null, "recientes")}>Recientes</EntradaRiel>
+              {unidadesQ.isSuccess ? <EntradaRiel icono="library" actual={false} to="/admin/udrive/unidades" cuenta={unidadesQ.data.length || undefined}>Unidades de trabajo</EntradaRiel> : null}
+            </>
+          )}
           <hr />
           <TituloRiel>Para armar informes</TituloRiel>
           <EntradaRiel icono="chart" actual={seccion === "catalogo"} onClick={() => irA(null, "catalogo")}>Catálogo de gráficas</EntradaRiel>
           <hr />
           <EntradaRiel icono="trash" actual={seccion === "papelera"} onClick={() => irA(null, "papelera")} cuenta={elementosDePapelera(todasC, todasA).length || undefined}>Papelera</EntradaRiel>
           <div className="es-note" style={{ marginTop: "auto", padding: "10px" }}>
-            {bytes ? <>Sus archivos subidos ocupan <b className="es-num">{textoTamano(bytes)}</b>. </> : null}
+            {unidad ? <>La unidad ocupa <b className="es-num">{textoBytesUnidad(unidad.uso)}</b> de {textoBytesUnidad(unidad.cuota)}. </> : bytes ? <>Sus archivos subidos ocupan <b className="es-num">{textoTamano(bytes)}</b>. </> : null}
             Las imágenes se comprimen al subirlas. La papelera guarda 30 días.
           </div>
         </Riel>
@@ -449,7 +492,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
           </div>
 
           {seccion === "catalogo" ? (
-            <Galeria carpeta={null} decir={decir} onImportar={() => inputImportar.current?.click()} />
+            <Galeria carpeta={base} decir={decir} onImportar={() => inputImportar.current?.click()} />
           ) : (
             <div className="es-files" ref={zona} onClick={(e) => e.target === e.currentTarget && setSel(null)}>
               {seccion === "papelera" ? (
@@ -469,7 +512,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
                             key={c.id}
                             type="button"
                             className="es-tile es-folder ud-carpeta ud-tile"
-                            draggable={puedeEditar(roles.get(c.id)?.mi_rol)}
+                            draggable={puedeMoverEn(roles.get(c.id)?.mi_rol, enU)}
                             data-sobre={sobre === `c:${c.id}`}
                             data-arrastrando={arrastre.current?.id === c.id}
                             aria-pressed={sel?.id === c.id}
@@ -503,7 +546,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
                               type="button"
                               role="option"
                               className="es-tile ud-tile"
-                              draggable={puedeEditar(roles.get(a.id)?.mi_rol)}
+                              draggable={puedeMoverEn(roles.get(a.id)?.mi_rol, enU)}
                               data-arrastrando={arrastre.current?.id === a.id}
                               aria-selected={sel?.id === a.id}
                               onClick={() => setSel({ tipo: "archivo", id: a.id })}
@@ -525,7 +568,7 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
                           <thead><tr><th>Nombre</th><th>Tipo</th><th>Cambió</th><th>Tamaño</th></tr></thead>
                           <tbody>
                             {lista.archivos.map((a) => (
-                              <tr key={a.id} role="option" tabIndex={0} draggable={puedeEditar(roles.get(a.id)?.mi_rol)} aria-selected={sel?.id === a.id} onClick={() => setSel({ tipo: "archivo", id: a.id })} onDoubleClick={() => abrir("archivo", a.id)} onKeyDown={(e) => alTeclearItem(e, "archivo", a.id)} onDragStart={(e) => alArrastrar(e, "archivo", a.id)}>
+                              <tr key={a.id} role="option" tabIndex={0} draggable={puedeMoverEn(roles.get(a.id)?.mi_rol, enU)} aria-selected={sel?.id === a.id} onClick={() => setSel({ tipo: "archivo", id: a.id })} onDoubleClick={() => abrir("archivo", a.id)} onKeyDown={(e) => alTeclearItem(e, "archivo", a.id)} onDragStart={(e) => alArrastrar(e, "archivo", a.id)}>
                                 <td><span className="es-fn"><IconoItem tipo={a.tipo} />{a.nombre}</span></td>
                                 <td>{NOMBRE_TIPO[a.tipo]}</td>
                                 <td>{haceCuanto(a.updated_at)}</td>
@@ -557,6 +600,8 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
             dueno={seleccion ? roles.get(seleccion.fila.id) : undefined}
             hermanas={seleccion ? hermanasDe(seleccion) : []}
             dias={diasSel}
+            enUnidad={enU}
+            yo={yo}
             carpetaAbierta={{ nombre: migas[migas.length - 1].texto, carpetas: resumenCarpeta.carpetas, archivos: resumenCarpeta.archivos, bytes }}
             acciones={seleccion ? acciones(seleccion) : { abrir() {}, previa() {}, descargar() {}, renombrar() {}, mover() {}, compartir() {}, aPapelera() {}, restaurar() {}, eliminar() {} }}
           />
@@ -590,7 +635,8 @@ export function Explorador({ seccionInicial = "archivos" }: { seccionInicial?: S
           actual={dialogo.s.tipo === "carpeta" ? dialogo.s.fila.padre_id : dialogo.s.fila.carpeta_id}
           carpetas={todasC}
           roles={roles}
-          yo={yo ?? ""}
+          yo={enU ? "" : (yo ?? "")}
+          enUnidad={enU}
           onCerrar={() => setDialogo(null)}
           onMover={(d) => { const s = dialogo.s; setDialogo(null); moverA(s.tipo, s.fila.id, d); }}
         />

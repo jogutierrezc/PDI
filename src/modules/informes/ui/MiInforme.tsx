@@ -53,8 +53,9 @@ import { CampoTexto, resolverDe } from "./Texto";
 const BASE = "/admin/informes-gestion";
 
 export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
-  const { profile, hasRole } = useAuth();
-  const planeacion = hasRole("planeacion");
+  const { profile, puedeGestionarInformes } = useAuth();
+  // Solo quien gestiona los informes (0192) elige cualquier unidad; el resto, las suyas y las que su rol le da.
+  const planeacion = puedeGestionarInformes;
   const membresias = useMembresiasInforme(profile?.id);
   const unidades = useUnidades();
   const instancias = useInstancias(ciclo.id);
@@ -70,6 +71,10 @@ export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: 
     ? (instancias.data ?? []).map((i) => nombres.get(i.unit_id)).filter((u): u is UnidadRef => Boolean(u))
     : (membresias.data ?? []).map((m) => nombres.get(m.unidad) ?? { id: m.unidad, name: m.nombre, kind: "", code: null, parent_id: null });
   const elegida = params.get("unidad");
+  // Una unidad ajena en la dirección se rechaza: no se carga nada de ella (la base también lo niega).
+  if (!planeacion && elegida && !opciones.some((o) => o.id === elegida)) {
+    return <Vacio>Esa unidad no está entre las suyas. Elija una de las que tiene asignadas.</Vacio>;
+  }
   const unidad = opciones.find((o) => o.id === elegida) ?? opciones[0] ?? null;
 
   if (!unidad) {
@@ -77,7 +82,7 @@ export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: 
       <Vacio>
         {planeacion
           ? "Todavía no se ha abierto ningún informe en este ciclo. Ábralos desde el Tablero del ciclo."
-          : "Su usuario no pertenece a ninguna unidad. Pida a Planeación que lo agregue como Gestor, Contribuyente o Consulta."}
+          : "Su usuario no tiene ninguna unidad asignada. Pida a Planeación que lo agregue como Gestor, Contribuyente o Consulta, o que su rol le dé el informe de una."}
       </Vacio>
     );
   }

@@ -121,3 +121,40 @@ Los cuatro estilos de fábrica funcionan sin 0190. Guardar un estilo propio fall
 - Dos columnas: el último tramo no equilibra las columnas y el texto en columnas se mide con un mínimo de espacio (160 px) para empezar en una hoja con otro contenido arriba.
 - `@page` con nombre (hojas horizontales) lo respetan Chrome y Edge; Firefox y Safari hay que probarlos.
 - Source Serif 4 se carga de Google Fonts como las fuentes del boletín; sin red se usa Georgia.
+
+
+# Unidades de trabajo (0191)
+
+Espacios con nombre, identidad y personas con papel, dentro de UDrive. Rutas: `/admin/udrive/unidades` (índice), `/unidades/nueva` (formulario), `/unidades/capacidad` (administración general), `/unidad/:id` (una unidad; `?s=archivos|personas|personalizar|espacio`). Acceso desde el riel del explorador («Unidades de trabajo»). Migración `supabase/migrations/0191_udrive_unidades.sql` (requiere 0057, 0187 y 0188). Propuesta de diseño aprobada: `docs/udrive/propuesta-unidades-de-trabajo.html`. Código en `unidades/`.
+
+## Decisiones
+- **Papeles**: Solo ver (lector), Editar, Crear (nuevo, `creador`) y Administra (propietario de la unidad). `drive_rango` pasa a cuatro niveles (propietario 4, creador 3, editor 2, lector 1); las comprobaciones de «propietario» de 0187 (compartir, borrar para siempre) pasan de >= 3 a >= 4. `lib/permisos.ts` es el espejo (`puedeCrearEn`, `puedeMoverEn`, `puedeBorrarEn`).
+- **Dentro de una unidad el rango sale solo del papel** (`drive_unidad_miembros`); la autoría de una subcarpeta no da propiedad. Fuera de unidades todo sigue como en 0187. `drive_carpetas.unidad_id` y `drive_archivos.unidad_id` las pone un disparador (la unidad del padre); el cliente no las manda.
+- Crear y subir pide Crear; mover pide Crear y no cruza el límite de la unidad (un disparador lo impide); papelera: Administra, o Crear sobre lo propio; borrar para siempre y vaciar la papelera: Administra. La carpeta raíz de la unidad no se mueve, renombra ni borra. No se comparte por correo dentro de una unidad.
+- **Sin unidad sin dueño**: la creación exige un Administra (quien crea); un disparador impide degradar a la última persona que administra, `drive_unidad_miembro_quitar` impide quitarla y `drive_unidad_transferir` pasa la administración sin dejar el cargo vacío. Si la única persona que administra pierde su cuenta, la unidad queda `sin_admin` y la administración general la ve señalada.
+- **Administración general** = `app_role = 'admin'` (`has_role_at_least('admin')`); Planeación no tiene acceso especial. Ve y edita todas las unidades. Entrar a una unidad ajena escribe un evento `ingreso_admin` (una vez cada 30 minutos). `drive_unidad_eventos` solo admite inserts (disparador).
+- **Quién crea**: cualquiera con acceso a UDrive (`drive_entra()`), sin aprobación.
+- **Vínculo con la estructura (`unit_id`)**: opcional y de una vía. El formulario puede traer a la gente de una unidad de la estructura con papel sugerido (Gestor administra, Contribuyente crea, Consulta ve); no se sincroniza.
+- **Personas externas** (correo fuera de `drive_config.dominio_institucional`, por defecto udes.edu.co): vencimiento obligatorio, máximo 730 días, no pueden administrar. Pasada la fecha, `drive_unidad_rol` deja de darles papel: no depende del cliente. La lista muestra el vencimiento, avisa 14 días antes (a quien administra, en el inicio y en Personas) y deja renovarlo hasta el tope. Deben tener cuenta en la intranet.
+- **Cuota**: 5 GB por unidad (`drive_config.cuota_unidad_bytes`, editable) comprobada al subir en el disparador de `drive_archivos` (cuenta también la papelera); error `drive_unidad_cuota`. Barra con aviso al 80 % y al 100 %. Quien administra pide ampliación con un motivo (`drive_unidad_pedir_ampliacion`, una abierta por unidad); la administración general aprueba o rechaza, o fija la cuota (`drive_unidad_cuota_fijar`). La vista de capacidad muestra los 512 GB (`capacidad_servidor_bytes`), lo comprometido (suma de cuotas de unidades activas) y lo usado; no deja comprometer más que la capacidad al fijar o aprobar.
+- **Archivar**: la unidad queda de solo lectura (rango máximo 1 para todos) y sale del índice principal; se restaura desde Personas.
+- **Registro** (`drive_unidad_eventos`): creación, personas, papeles, vencimientos, identidad, cuota, ampliaciones, archivado, vaciado de papelera e ingresos de la administración general.
+
+## Storage
+- Bucket `udrive`: los archivos de una unidad van en `unidades/<unidad>/<archivo>/<nombre>`. Suben y reemplazan quienes tienen Crear; borra quien administra, o quien crea si el objeto ya no tiene fila.
+- Bucket nuevo `udrive-unidades` (privado, 5 MB): imagen de cabecera, `<unidad>/<archivo>`; la ven quienes tienen papel y la cambia quien administra. La imagen se sube después de crear la unidad (antes no existe su carpeta con permisos). Se comprime con `ui/navegador.ts` y se encuadra con `Encuadre` de `informes/vista/EditorPortada.tsx`.
+
+## Pantallas
+- Formulario en cuatro pasos (Datos, Identidad, Personas, Revisar) con la tarjeta en vivo; valores por defecto del nombre (monograma, acento, composición, icono); contraste de acento ≥ 4,5:1 comprobado en la pantalla y en la base.
+- Índice con búsqueda, filtros (todas, mías, compartidas conmigo, archivadas; sin ser miembro y sin quien las administre para administración general) y lista alterna. Inicio de la unidad con bloques en el orden elegido; Personas; Personalizar (color, composición, imagen, orden y anclas, con vista previa); Espacio.
+- El explorador (`ui/Explorador.tsx`) acepta `unidad`: muestra solo la unidad y, sin ella, oculta todo lo que vive en unidades de «Mis archivos» (se calcula con las carpetas raíz que devuelve `drive_unidades_listar`).
+- Movimiento (GSAP, `unidades/movimiento.ts`): fichas 140/220/380 ms, escalón 45 ms (máx. 8), curva power4.out; con movimiento reducido solo hay fundidos de 120 ms. Especificación completa en la propuesta.
+
+## Sin la migración
+Las lecturas de unidades fallan con «Falta aplicar la migración 0191 (unidades de trabajo de UDrive)» (`FaltaMigracion`); el resto de UDrive funciona igual y el riel del explorador no muestra «Unidades de trabajo».
+
+## Pendientes y riesgos
+- No hay «convertir una carpeta en unidad» ni mover entre una unidad y «Mis archivos» (se descarga y se sube).
+- El aviso de 14 días es dentro de la aplicación; no se envía correo.
+- `drive_rol_carpeta` hace una consulta más por llamada (busca la unidad de la carpeta): medirlo con un árbol grande.
+- La función `pilo-informes` usa `drive_entra`; no conoce las unidades.

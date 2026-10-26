@@ -11,8 +11,10 @@
      { unit_id }  → { facultad, decano, plan, acciones, actividades, seguimientos, traido_en }
 
    Reglas:
-     · Solo con sesión. Planeación o la administración, o quien tenga algún
-       papel en la unidad (unit_role_at, con herencia).
+     · Solo con sesión. Quien gestiona los informes (informe_gestiona(), 0192) o
+       quien tenga algún papel en la unidad (informe_actor: su pertenencia con
+       herencia, o lo que le da su rol de acceso, si el rol marca la pantalla
+       «informes»). La capacidad de Planeación sola ya no basta.
      · La unidad debe ser una facultad con plan en la API (FCS, FIT, FCMS, FCN,
        FCAV, FCEAC o CFTT); si no, 404. El portal usa sus propios códigos en
        units.code: se traducen con la tabla facultades_plan (0168) y, a falta
@@ -85,15 +87,14 @@ Deno.serve(async (request: Request) => {
   const who = await admin.auth.getUser(authorization.slice(7));
   if (who.error || !who.data.user) return json({ error: "Sesión inválida." }, 401);
 
-  const { data: perfil } = await admin.from("profiles").select("role").eq("id", who.data.user.id).maybeSingle();
-  if (!["planeacion", "admin"].includes(String(perfil?.role))) {
-    const comoUsuario = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
-    // Su pertenencia y lo que le da su rol de acceso (informe_actor, 0169); sin esa migración, solo la pertenencia.
-    let { data: rol, error: errRol } = await comoUsuario.rpc("informe_actor", { unidad: unitId });
-    if (errRol) ({ data: rol, error: errRol } = await comoUsuario.rpc("unit_role_at", { target: unitId }));
-    if (errRol) return json({ error: "No se pudo comprobar su papel en la unidad." }, 500);
-    if (!rol) return json({ error: "No tiene acceso a esta unidad." }, 403);
-  }
+  const { data: perfil } = await admin.from("profiles").select("is_active").eq("id", who.data.user.id).maybeSingle();
+  if (!perfil?.is_active) return json({ error: "Su usuario no está activo." }, 403);
+  // informe_actor decide con SU sesión: 'planeacion' para quien gestiona (0192), el papel por pertenencia o
+  // por rol de acceso para el resto, y nulo si no tiene ninguno o su rol no marca la pantalla «informes».
+  const comoUsuario = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
+  const { data: rol, error: errRol } = await comoUsuario.rpc("informe_actor", { unidad: unitId });
+  if (errRol) return json({ error: "No se pudo comprobar su papel en la unidad." }, 500);
+  if (!rol) return json({ error: "No tiene acceso a esta unidad." }, 403);
 
   // La unidad y su código en la API -------------------------------------------------
   const { data: unidad, error: errUnidad } = await admin.from("units").select("id, name, code, kind").eq("id", unitId).maybeSingle();

@@ -12,7 +12,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { enlaceDeArchivo } from "../datos";
 import { vistaPrevia } from "../lib/imagen";
 import { limpiarNombre, nombreEnUso, textoTamano } from "../lib/nombres";
-import { ETIQUETA_ROL, puedeCompartir, puedeEditar } from "../lib/permisos";
+import { ETIQUETA_ROL, puedeBorrarEn, puedeCompartir, puedeEditar, puedeMoverEn } from "../lib/permisos";
 import type { ArchivoRow, CarpetaRow, DuenoRow } from "../tipos";
 import { Estado, IconoItem, NOMBRE_TIPO, fechaLarga } from "./piezas";
 
@@ -37,6 +37,8 @@ export function Detalles({
   dias,
   carpetaAbierta,
   acciones,
+  enUnidad = false,
+  yo,
 }: {
   sel: Seleccion | null;
   dueno: DuenoRow | undefined;
@@ -46,6 +48,9 @@ export function Detalles({
   dias: number | null;
   carpetaAbierta: { nombre: string; carpetas: number; archivos: number; bytes: number };
   acciones: AccionesDetalle;
+  /** Dentro de una unidad de trabajo (0191): mover pide Crear; la papelera, Administra o Crear sobre lo propio; no se comparte por correo. */
+  enUnidad?: boolean;
+  yo?: string;
 }) {
   if (!sel) {
     return (
@@ -66,14 +71,16 @@ export function Detalles({
       </>
     );
   }
-  return <DetalleDe key={`${sel.tipo}:${sel.fila.id}`} sel={sel} dueno={dueno} hermanas={hermanas} dias={dias} acciones={acciones} />;
+  return <DetalleDe key={`${sel.tipo}:${sel.fila.id}`} sel={sel} dueno={dueno} hermanas={hermanas} dias={dias} acciones={acciones} enUnidad={enUnidad} yo={yo} />;
 }
 
-function DetalleDe({ sel, dueno, hermanas, dias, acciones }: { sel: Seleccion; dueno: DuenoRow | undefined; hermanas: string[]; dias: number | null; acciones: AccionesDetalle }) {
+function DetalleDe({ sel, dueno, hermanas, dias, acciones, enUnidad, yo }: { sel: Seleccion; dueno: DuenoRow | undefined; hermanas: string[]; dias: number | null; acciones: AccionesDetalle; enUnidad: boolean; yo?: string }) {
   const f = sel.fila;
   const rol = dueno?.mi_rol ?? null;
   const editar = puedeEditar(rol);
   const propietario = puedeCompartir(rol);
+  const puedeMover = puedeMoverEn(rol, enUnidad);
+  const puedeBorrar = puedeBorrarEn(rol, enUnidad, f.creada_por === yo);
   const enPapelera = Boolean(f.borrado_en);
   const archivo = sel.tipo === "archivo" ? sel.fila : null;
   const tipo = sel.tipo === "carpeta" ? "carpeta" : sel.fila.tipo;
@@ -116,16 +123,16 @@ function DetalleDe({ sel, dueno, hermanas, dias, acciones }: { sel: Seleccion; d
       <div className="es-act">
         {enPapelera ? (
           <>
-            {editar ? <button type="button" className="es-btn es-btn--pri" onClick={acciones.restaurar}><Icon name="undo" size={16} />Restaurar</button> : null}
+            {puedeBorrar ? <button type="button" className="es-btn es-btn--pri" onClick={acciones.restaurar}><Icon name="undo" size={16} />Restaurar</button> : null}
             {propietario ? <button type="button" className="es-btn" onClick={acciones.eliminar}><Icon name="trash" size={16} />Borrar para siempre</button> : null}
           </>
         ) : (
           <>
             <button type="button" className="es-btn es-btn--pri" onClick={clase ? acciones.previa : acciones.abrir}>{archivo?.tipo === "archivo" ? (clase ? "Ver" : "Descargar") : "Abrir"}</button>
             {archivo?.tipo === "archivo" && clase ? <button type="button" className="es-btn" onClick={acciones.descargar}><Icon name="download" size={16} />Descargar</button> : null}
-            {editar ? <button type="button" className="es-btn" onClick={acciones.mover}><Icon name="folder" size={16} />Mover a…</button> : null}
-            {propietario ? <button type="button" className="es-btn" onClick={acciones.compartir}><Icon name="share" size={16} />Compartir</button> : null}
-            {editar ? <button type="button" className="es-btn" onClick={acciones.aPapelera}><Icon name="trash" size={16} />A la papelera</button> : null}
+            {puedeMover ? <button type="button" className="es-btn" onClick={acciones.mover}><Icon name="folder" size={16} />Mover a…</button> : null}
+            {propietario && !enUnidad ? <button type="button" className="es-btn" onClick={acciones.compartir}><Icon name="share" size={16} />Compartir</button> : null}
+            {puedeBorrar ? <button type="button" className="es-btn" onClick={acciones.aPapelera}><Icon name="trash" size={16} />A la papelera</button> : null}
           </>
         )}
       </div>

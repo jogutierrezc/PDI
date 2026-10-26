@@ -12,6 +12,8 @@
      /admin/udrive/cruce/:id        el cruce de tablas
      /admin/udrive/documento/:id    el informe por bloques (fase 2, 0188)
      /admin/udrive/estilo/:id       el editor de un estilo de informe (0190)
+     /admin/udrive/unidades         las unidades de trabajo (0191); /nueva y /capacidad
+     /admin/udrive/unidad/:id       una unidad (?s=archivos|personas|personalizar|espacio)
 
    Quién entra lo decide la pantalla «udrive» del rol de acceso (has_screen) y
    la base (0187); qué ve y qué edita cada quien, las carpetas y sus permisos.
@@ -24,6 +26,9 @@ import { EditorEstilo } from "./estilos/EditorEstilo";
 import { EditorGrafica } from "./EditorGrafica";
 import { EditorTabla } from "./EditorTabla";
 import { Explorador } from "./Explorador";
+import { CapacidadAdmin } from "../unidades/Capacidad";
+import { NuevaUnidad, UnidadesIndice } from "../unidades/Indice";
+import { PaginaUnidad } from "../unidades/PaginaUnidad";
 
 export function UDrive() {
   const { vista, id } = useParams();
@@ -32,5 +37,7 @@ export function UDrive() {
   if (id && vista === "cruce") return <EditorCruce key={id} id={id} />;
   if (id && vista === "documento") return <EditorDocumento key={id} id={id} />;
   if (id && vista === "estilo") return <EditorEstilo key={id} id={id} />;
+  if (vista === "unidades") return id === "nueva" ? <NuevaUnidad /> : id === "capacidad" ? <CapacidadAdmin /> : <UnidadesIndice />;
+  if (id && vista === "unidad") return <PaginaUnidad key={id} id={id} />;
   return <Explorador key={vista ?? "explorador"} seccionInicial={vista === "galeria" ? "catalogo" : "archivos"} />;
 }

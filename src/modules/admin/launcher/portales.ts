@@ -25,6 +25,8 @@ export interface PortalContext {
   hasRole: (minimum: AppRole) => boolean;
   canSee: (screen: AdminScreen) => boolean;
   impactoSide: ImpactoSide;
+  /** ¿Gestiona Informes Institucionales (0192)? Sin esto, solo Mi informe. */
+  puedeGestionarInformes?: boolean;
   /** Informes del periodo vigente de UDES en Cifras, ya filtrados por canSeeReport. */
   reports?: { slug: string; name: string }[];
   /** Director de Internacionalización (int_yo), si se pudo leer. */
@@ -175,7 +177,7 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     rank: 5.5,
     sections: (ctx) => {
       const base = "/admin/informes-gestion";
-      const planeacion = ctx.hasRole("planeacion");
+      const planeacion = Boolean(ctx.puedeGestionarInformes);
       return [
         {
           title: "El informe",

@@ -26,11 +26,11 @@ export interface Subida {
 let contador = 0;
 
 /** La cola de subidas: `subir(archivos)` las procesa de a una, para no saturar la conexión. */
-export function useSubidas(opciones: { persona: string | undefined; carpeta: string | null; nombresEnCarpeta: () => string[]; alTerminar: (id: string) => void }) {
+export function useSubidas(opciones: { persona: string | undefined; unidad?: string; carpeta: string | null; nombresEnCarpeta: () => string[]; alTerminar: (id: string) => void }) {
   const [cola, setCola] = useState<Subida[]>([]);
   const subir = useSubirArchivo();
   const ocupado = useRef(false);
-  const pendientes = useRef<{ id: number; archivo: File; carpeta: string | null; persona: string }[]>([]);
+  const pendientes = useRef<{ id: number; archivo: File; carpeta: string | null; persona: string; unidad?: string }[]>([]);
   const reservados = useRef(new Set<string>());
   const op = useRef(opciones);
   op.current = opciones;
@@ -48,7 +48,7 @@ export function useSubidas(opciones: { persona: string | undefined; carpeta: str
         const nombre = nombreUnico(listo.name, existentes);
         reservados.current.add(nombre);
         poner(p.id, { estado: "subiendo", nombre, mensaje: listo === p.archivo ? "" : "Imagen reducida antes de subir" });
-        const id = await subir.mutateAsync({ archivo: listo, persona: p.persona, carpeta: p.carpeta, nombre, onProgreso: (f) => poner(p.id, { progreso: f }) });
+        const id = await subir.mutateAsync({ archivo: listo, persona: p.persona, unidad: p.unidad, carpeta: p.carpeta, nombre, onProgreso: (f) => poner(p.id, { progreso: f }) });
         reservados.current.delete(nombre);
         poner(p.id, { estado: "listo", progreso: 1, mensaje: "Listo" });
         op.current.alTerminar(id);
@@ -61,13 +61,13 @@ export function useSubidas(opciones: { persona: string | undefined; carpeta: str
 
   const agregar = useCallback(
     (archivos: FileList | File[]) => {
-      const { persona, carpeta } = op.current;
+      const { persona, carpeta, unidad } = op.current;
       const nuevas: Subida[] = [];
       for (const archivo of Array.from(archivos)) {
         const id = ++contador;
         const falla = !persona ? "Su sesión no está lista. Recargue la página." : errorDeSubida(archivo);
         nuevas.push({ id, nombre: limpiarNombre(archivo.name) || "Archivo", estado: falla ? "error" : "preparando", progreso: 0, mensaje: falla });
-        if (!falla && persona) pendientes.current.push({ id, archivo, carpeta, persona });
+        if (!falla && persona) pendientes.current.push({ id, archivo, carpeta, persona, unidad });
       }
       if (nuevas.length) setCola((c) => [...c, ...nuevas]);
       void procesar();

@@ -153,3 +153,22 @@ El informe como saldrá en papel: portada, contenido, una o más hojas por secci
 **Sin la migración** la vista funciona con los valores por defecto y se puede imprimir; un aviso dice que guardar la personalización requiere aplicar 0189 (patrón `FaltaMigracion`).
 
 **Pendiente.** Las acciones del Plan de Trabajo de la facultad no se imprimen todavía en la sección de metas; el contacto oficial no existe, por eso es opcional; Word queda para después.
+
+
+## Gestión de informes por rol (0192)
+
+**La regla.** Gestionar es tener el tablero del ciclo, abrir y ver el informe de cualquier unidad, revisar (aprobar o devolver), el consolidador, la capacitación de Pilo, y escribir ciclos, requisitos, fuentes, corpus y aprendizaje. Ya no sale de la capacidad global (`profiles.role`), sino de `informe_gestiona()` en la base y de `puedeGestionarInformes()` en `auth.tsx`, que son la misma regla:
+
+- la administración general siempre gestiona;
+- Planeación **sin rol de acceso** gestiona, como siempre;
+- Planeación **con rol de acceso** gestiona solo si el rol marca la pantalla `informes` y lleva `access_roles.informe_gestion = true`. La matriz del rol lo escribe cuando el nivel elegido en Informes de gestión es **Editar**. «Ver» no gestiona, aunque otro módulo suba la capacidad del rol.
+
+Quien no gestiona solo tiene **Mi informe** y la **Vista del informe**, del informe de su unidad (`unit_members`) y de las unidades que su rol le da (`informe_level` + `access_role_informe_units`, 0169). Si su rol no marca la pantalla `informes`, la base tampoco le abre nada por pertenecer a una unidad (`informe_actor` y `informe_mis_unidades` exigen la pantalla). Un `?unidad=` ajeno se rechaza sin cargar datos; `/revision`, `/capacitacion`, `/consolidador` y el tablero redirigen a Mi informe y, aunque se montaran, no consultan nada.
+
+**Qué cambia en la base.** `informe_actor`, `informe_can_view`, `informe_instancia_visible/abierta`, `informe_abrir`, `informe_reabrir_si_devuelto`, `informe_consolidado`, las políticas de ciclos, requisitos, fuentes, instancias, revisiones, ejemplos, aprendizaje y perfiles, y los buckets `informe-anexos` e `informe-portadas` usan `informe_gestiona()` donde decían `has_role_at_least('planeacion')`. Las funciones `pilo-informes` e `informe-plan` preguntan a la base con la sesión de la persona (`informe_gestiona`, `has_screen`, `informe_actor`). En `pilo-informes`, `aprender`, `ingerir`, `corpus` y `estado` son solo de gestión; `redactar` sigue siendo de quien diligencia el informe; `mejorar`, de quien diligencia alguno.
+
+**Consolidador.** Por ahora es solo de gestión: hoy es una pantalla de próxima fase. Cuando se construya, las rectorías (plantillas C y D) lo recibirán con su propia regla en la base, no con la capacidad.
+
+**Relleno de los roles existentes.** `informe_gestion` nace en falso. Solo se activó, una vez, en los roles de fábrica (`all_screens` y capacidad Planeación o Administración). Los roles **personalizados** que daban gestión por su capacidad la pierden hasta que el administrador abra el rol en Usuarios y roles, marque **Editar** en Informes de gestión y lo guarde. Al marcar Editar el rol se guarda sin papel por unidad (`informe_level` en `none`), porque gestionar ya incluye todas. Quien no tiene rol de acceso no cambia.
+
+**Después de aplicar.** Aplicar la migración 0192, redesplegar `pilo-informes` e `informe-plan` (`supabase functions deploy pilo-informes --no-verify-jwt`, igual con `informe-plan`) y volver a guardar los roles personalizados que deban gestionar.

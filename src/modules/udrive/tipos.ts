@@ -8,7 +8,7 @@
 
 export type TipoItem = "archivo" | "tabla" | "grafica" | "cruce" | "documento" | "estilo";
 export type EstadoItem = "borrador" | "listo";
-export type RolDrive = "propietario" | "editor" | "lector";
+export type RolDrive = "propietario" | "creador" | "editor" | "lector";
 
 export interface CarpetaRow {
   id: string;

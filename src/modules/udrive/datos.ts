@@ -15,7 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import { FaltaMigracion } from "../rankings/noticias";
-import { rutaStorage } from "./lib/nombres";
+import { rutaStorage, rutaStorageUnidad } from "./lib/nombres";
 import type { ArchivoRow, CarpetaRow, DuenoRow, EstadoItem, PermisoRow, RolDrive, TipoItem } from "./tipos";
 
 export { FaltaMigracion };
@@ -33,6 +33,12 @@ const noExiste = (e: ErrorBase) =>
 
 /** Error legible; si faltan las tablas o las funciones, el aviso de migración. */
 export function errorDe(e: ErrorBase): Error {
+  // Unidades de trabajo (0191): sus funciones y tablas todavía no existen.
+  if (/drive_unidad|drive_capacidad|drive_personas_|drive_estructura_|drive_registro_global|drive_config/.test(e.message ?? "") && (noExiste(e) || /could not find the function|schema cache/i.test(e.message ?? ""))) {
+    return new FaltaMigracion("Falta aplicar la migración 0191 (unidades de trabajo de UDrive).");
+  }
+  if (/drive_unidad_cuota/.test(e.message ?? "")) return new Error("La unidad llegó a su cuota de almacenamiento. Quien la administra puede pedir una ampliación.");
+  if (/drive_unidades_nombre_uq/.test(e.message ?? "")) return new Error("Ya hay una unidad de trabajo con ese nombre. Añada el campus o el año para distinguirla.");
   if (noExiste(e)) {
     const de0188 = /drive_(versiones|comentarios|doc_|cifras)|estado_doc|bloqueado_/.test(e.message ?? "");
     return new FaltaMigracion(de0188 ? "Falta aplicar la migración 0188 (documentos de UDrive)." : "Falta aplicar la migración 0187 (UDrive).");
@@ -40,7 +46,7 @@ export function errorDe(e: ErrorBase): Error {
   const m = e.message ?? "Error de la base de datos";
   // Sin 0190, el check de `tipo` rechaza los estilos de informe.
   if (/drive_archivos_tipo_check|drive_archivos_tipo_con_estilo/.test(m)) return new FaltaMigracion("Falta aplicar la migración 0190 (estilos de informe). Los estilos de fábrica funcionan sin ella.");
-  if (/drive_carpetas_nombre_uq|drive_archivos_nombre_uq/.test(m)) return new Error("Ya hay algo con ese nombre en esa carpeta.");
+  if (/drive_carpetas_nombre_uq|drive_carpetas_nombre_uq_unidad|drive_archivos_nombre_uq/.test(m)) return new Error("Ya hay algo con ese nombre en esa carpeta.");
   if (/row-level security/i.test(m)) return new Error("No tiene permiso para hacer eso en esa carpeta.");
   if (/permission denied/i.test(m)) return new Error("No tiene permiso para hacer eso.");
   if (/lock_not_available|Otra persona está editando/i.test(m)) return new Error("Otra persona está editando este documento en este momento.");
@@ -280,7 +286,7 @@ export function useGuardarContenido() {
 export function useCompartir() {
   const c = useQueryClient();
   return useMutation({
-    mutationFn: (a: { tipo: "carpeta" | "archivo"; id: string; correo: string; rol: Exclude<RolDrive, "propietario"> }) => rpc<string>("drive_compartir", { p_tipo: a.tipo, p_id: a.id, p_correo: a.correo, p_rol: a.rol }),
+    mutationFn: (a: { tipo: "carpeta" | "archivo"; id: string; correo: string; rol: Extract<RolDrive, "editor" | "lector"> }) => rpc<string>("drive_compartir", { p_tipo: a.tipo, p_id: a.id, p_correo: a.correo, p_rol: a.rol }),
     onSuccess: (_x, a) => void c.invalidateQueries({ queryKey: UD_CLAVES.permisos(a.tipo, a.id) }),
   });
 }
@@ -298,6 +304,8 @@ export function useQuitarPermiso() {
 export interface OpcionesSubida {
   archivo: File;
   persona: string;
+  /** Si se sube a una unidad de trabajo: su id (la ruta de Storage cuelga de «unidades/<id>», 0191). */
+  unidad?: string;
   carpeta: string | null;
   /** Nombre con que se guarda en UDrive (ya único en la carpeta). */
   nombre: string;
@@ -343,7 +351,7 @@ export function useSubirArchivo() {
       const sesion = (await supabase.auth.getSession()).data.session;
       if (!sesion) throw new Error("Su sesión venció. Inicie sesión de nuevo.");
       const id = crypto.randomUUID();
-      const ruta = rutaStorage(o.persona, id, o.nombre);
+      const ruta = o.unidad ? rutaStorageUnidad(o.unidad, id, o.nombre) : rutaStorage(o.persona, id, o.nombre);
       await subirConProgreso(ruta, o.archivo, sesion.access_token, o.onProgreso, o.signal);
       const r = await supabase.from("drive_archivos").insert({ id, carpeta_id: o.carpeta, tipo: "archivo", nombre: o.nombre, mime: o.archivo.type || null, tamano: o.archivo.size, ruta_storage: ruta }).select("id").single();
       if (r.error) {

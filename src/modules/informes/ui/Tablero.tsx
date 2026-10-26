@@ -366,6 +366,9 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
                     <Link className="inf-link" to={inst.estado === "sent" ? `${BASE}/revision?informe=${inst.id}` : `${BASE}/mi-informe?unidad=${u.id}`}>
                       {inst.estado === "sent" ? "Revisar" : "Ver"}
                     </Link>
+                    <Link className="inf-link" to={`${BASE}/vista?unidad=${u.id}`}>
+                      Vista del informe
+                    </Link>
                   </>
                 ) : (
                   <>

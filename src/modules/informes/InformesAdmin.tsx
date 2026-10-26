@@ -7,7 +7,7 @@
      revision        Planeación aprueba o devuelve (?informe=<id>)
      consolidador    próxima fase
      capacitacion    Planeación capacita a Pilo con los informes de 2025
-     vista           Vista A4 y PDF: próxima fase
+     vista           Vista Carta y PDF (?unidad=<id>): el informe como saldrá en papel
    ?anio=<n> elige el ciclo (por defecto, el abierto o el más reciente).
    ========================================================================== */
 
@@ -21,6 +21,7 @@ import { Aviso, Cargando, ProximaFase, Vacio } from "./ui/comunes";
 import { MiInforme } from "./ui/MiInforme";
 import { Revision } from "./ui/Revision";
 import { Tablero } from "./ui/Tablero";
+import { VistaInforme } from "./vista/VistaInforme";
 import "../rankings/layout.css";
 import "./informes.css";
 
@@ -35,7 +36,7 @@ const TITULOS: Record<Seccion, [string, string]> = {
   revision: ["Revisión", "Planeación aprueba o devuelve cada informe, con una nota por sección"],
   consolidador: ["Consolidador", "Cada nivel recibe lo aprobado del nivel de abajo y decide qué entra"],
   capacitacion: ["Capacitación de Pilo", "Los informes de 2025 le enseñan a Pilo cómo escribe cada unidad"],
-  vista: ["Vista A4 y PDF", "La vista del portal es la misma maqueta del PDF oficial"],
+  vista: ["Vista del informe", "El informe como saldrá en papel, en Carta o A4, con su portada y su PDF"],
 };
 
 export function InformesAdmin() {
@@ -79,7 +80,7 @@ export function InformesAdmin() {
         </AdminRailTab>
       )}
       <AdminRailTab current={seccion === "vista"} to={`${BASE}/vista`}>
-        Vista A4 y PDF
+        Vista del informe
       </AdminRailTab>
     </AdminRail>
   );
@@ -91,13 +92,6 @@ export function InformesAdmin() {
       <ProximaFase titulo="El consolidador llega en la próxima fase">
         Las rectorías de campus y la Rectoría General recibirán aquí las secciones aprobadas de las unidades que les entregan, por función sustantiva, y
         decidirán qué entra en su informe. El aporte se cita; no se copia el texto.
-      </ProximaFase>
-    );
-  } else if (seccion === "vista") {
-    cuerpo = (
-      <ProximaFase titulo="La vista A4 y el PDF oficial llegan en la próxima fase">
-        El informe se armará desde lo escrito en «Mi informe» con el motor del boletín: portada con la unidad y el periodo del registro, cifras con su
-        fuente y corte, y la matriz de indicadores como tabla legible. Word quedará como copia editable.
       </ProximaFase>
     );
   } else if (seccion === "capacitacion") {
@@ -123,6 +117,8 @@ export function InformesAdmin() {
     cuerpo = <Vacio>Planeación todavía no abre el ciclo del informe de gestión.</Vacio>;
   } else if (seccion === "revision") {
     cuerpo = <Revision ciclo={ciclo} requisitos={requisitos.data ?? []} />;
+  } else if (seccion === "vista") {
+    cuerpo = <VistaInforme ciclo={ciclo} requisitos={requisitos.data ?? []} />;
   } else {
     cuerpo = <MiInforme ciclo={ciclo} requisitos={requisitos.data ?? []} />;
   }

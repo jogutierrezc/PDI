@@ -17,6 +17,7 @@ import {
   usePlanUnidad,
   useAgregarEnlace,
   useAsegurarCifras,
+  useCatalogoIndicadores,
   useEnviar,
   useFuentes,
   useGuardarCifra,
@@ -26,18 +27,21 @@ import {
   usePilares,
   useQuitarAnexo,
   useQuitarCifra,
+  useSedesCifras,
   useSincronizarMetas,
   useSubirAnexo,
   useUnidades,
 } from "../datos";
 import type { DatosCifra } from "../datos";
 import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
+import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
 import { AYUDA_TIPO, clavesDe, cifraDef } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
 import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, RequisitoRow, RolActor, SeccionDef, UnidadRef } from "../types";
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas, TablaPilares } from "./Bloques";
-import { BloqueCifras } from "./Cifras";
+import { Dimensiones } from "./Dimensiones";
+import { ElementosDrive } from "./ElementosDrive";
 import { TablaMetasPrograma } from "./MetasPrograma";
 import { ResumenPlan, TablaPlan } from "./PlanFacultad";
 import type { NuevoPropio } from "./Cifras";
@@ -297,6 +301,9 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
         </div>
         <Barra valor={listas / secciones.length} etiqueta="Secciones listas" />
         <small className="inf-muted">{m.frio ? "Las cifras quedaron congeladas al enviar." : "Las cifras siguen en vivo hasta que envíe."}</small>
+        <Link className="inf-link" to={`${BASE}/vista?unidad=${unidad.id}`}>
+          Vista del informe en papel
+        </Link>
         {inst.estado === "back" && nota.general && (
           <div className="inf-nota" role="note">
             <b>Planeación lo devolvió</b>
@@ -393,6 +400,9 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
           quitarAnexo={(a) => quitarAnexo.mutate(a)}
           ocupado={subir.isPending || enlazar.isPending}
         />
+        {def.tipo !== "anexos" && def.tipo !== "evid" && (
+          <ElementosDrive elementos={c.drive ?? []} editable={editable} onChange={(drive) => cambiar(def, { ...c, drive })} />
+        )}
         {guardarCifra.error && (
           <p className="inf-error" role="alert">
             {mensajeDe(guardarCifra.error)}
@@ -441,6 +451,61 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
         </div>
       </aside>
     </div>
+  );
+}
+
+/* ---------- Resultados por dimensión: el catálogo de UDES en Cifras y las acciones de agregar o conectar ---------- */
+
+function DimensionesConectadas({
+  def,
+  m,
+  propias,
+  editable,
+  pilares,
+  guardar,
+  agregarPropio,
+  quitarPropio,
+}: {
+  def: SeccionDef;
+  m: ModeloInforme;
+  propias: ModeloInforme["propias"];
+  editable: boolean;
+  pilares: PilarRef[];
+  guardar: (clave: string, d: DatosCifra) => void;
+  agregarPropio: (p: NuevoPropio) => void;
+  quitarPropio: (clave: string) => void;
+}) {
+  const catalogo = useCatalogoIndicadores();
+  const sedes = useSedesCifras();
+  const nombreSede = (slug: string) => sedes.data?.find((x) => x.slug === slug)?.nombre ?? slug;
+  return (
+    <Dimensiones
+      dims={def.dims ?? []}
+      vista={m.vista}
+      agregadas={m.agregadas.filter((a) => a.fila.seccion_clave === def.clave)}
+      propias={propias}
+      editable={editable}
+      limite={m.config.limite_propios}
+      exigirFuente={m.config.exigir_fuente}
+      exigirPilar={m.config.exigir_pilar}
+      pilares={pilares}
+      catalogo={{ datos: catalogo.data ?? [], cargando: catalogo.isPending, error: catalogo.error instanceof Error ? catalogo.error : null }}
+      sedes={sedes.data ?? []}
+      guardar={guardar}
+      agregarIndicador={(dim, i, sede) =>
+        guardar(claveAgregada(i.clave, sede), {
+          etiqueta: sede ? `${i.nombre} · ${nombreSede(sede)}` : i.nombre,
+          seccion_clave: def.clave,
+          fuente_tipo: "auto",
+          consulta: consultaDe(i, sede, dim),
+          unidad: unidadDe(i.unidad),
+          incluida: true,
+        })
+      }
+      conectarIndicador={(clave, dim, i, sede) => guardar(clave, { fuente_tipo: "auto", consulta: consultaDe(i, sede, dim), unidad: unidadDe(i.unidad) })}
+      agregarPropio={agregarPropio}
+      quitarCifra={quitarPropio}
+    />
   );
 }
 
@@ -591,19 +656,7 @@ function CuerpoSeccion({
               <Tag auto />
               <span className="inf-src">{m.frio ? "Foto tomada al enviar" : "En vivo hasta que envíe"} · UDES en Cifras y PDI</span>
             </div>
-            <BloqueCifras
-              dims={def.dims ?? []}
-              vista={m.vista}
-              propias={propias}
-              editable={editable}
-              limite={m.config.limite_propios}
-              exigirFuente={m.config.exigir_fuente}
-              exigirPilar={m.config.exigir_pilar}
-              pilares={pilares}
-              guardar={guardar}
-              agregarPropio={agregarPropio}
-              quitarPropio={quitarPropio}
-            />
+            <DimensionesConectadas def={def} m={m} propias={propias} editable={editable} pilares={pilares} guardar={guardar} agregarPropio={agregarPropio} quitarPropio={quitarPropio} />
           </div>
           {esFacultad && (
             <div className="inf-blk">

@@ -1,7 +1,7 @@
 /* El informe armado para la pantalla: secciones, cifras (guardadas + vivas),
    anexos y el avance de cada sección. Lo usan el editor y la revisión. */
 
-import { congelado, vistaCifra } from "../cifras-vivas";
+import { congelado, esViva, vistaCifra } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
 import { condicionDe, useAnexos, useCifras, useCifrasVivas, useSecciones } from "../datos";
 import { esMetaDelPrograma, filasMetaPrograma } from "../metas-programa";
@@ -29,10 +29,16 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
     vistaCifra(clave, { fila: porClave.get(clave), viva: vivas.data?.[clave], estado: inst.estado, condicion: condicionDe(requisitos, inst.plantilla, clave) });
 
   const dePlantilla = new Set(clavesDe(inst.plantilla));
-  const propias = (filas.data ?? []).filter((f) => !dePlantilla.has(f.clave) && !esMetaDelPrograma(f.clave)).map((f) => ({ fila: f, vista: vista(f.clave) }));
+  const extras = (filas.data ?? []).filter((f) => !dePlantilla.has(f.clave) && !esMetaDelPrograma(f.clave));
+  /** Datos propios: la unidad los escribe (Excel, manual, URL). */
+  const propias = extras.filter((f) => !esViva(f.fuente_tipo)).map((f) => ({ fila: f, vista: vista(f.clave) }));
+  /** Indicadores que la unidad conectó a UDES en Cifras o al PDI además de los de la plantilla. */
+  const agregadas = extras.filter((f) => esViva(f.fuente_tipo)).map((f) => ({ fila: f, vista: vista(f.clave) }));
   const delInforme = [...dePlantilla].map(vista);
+  /** Una cifra de la plantilla sin indicador conectado no tiene qué mostrar: no entra a la matriz ni al texto. */
+  const conectada = (c: CifraVista) => c.valor !== null || c.propia;
   /** Las que entran al informe: se pueden citar en el texto y van a la matriz. */
-  const incluidas = [...delInforme.filter((c) => c.incluida), ...propias.map((p) => p.vista)];
+  const incluidas = [...delInforme.filter((c) => c.incluida && conectada(c)), ...agregadas.filter((a) => a.vista.incluida).map((a) => a.vista), ...propias.map((p) => p.vista)];
 
   /** Las metas que vienen de los indicadores del programa. */
   const metasPrograma = filasMetaPrograma(filas.data ?? [], vista);
@@ -40,7 +46,10 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   const contenidoGuardado = (clave: string): ContenidoSeccion => secciones.data?.find((s) => s.clave === clave)?.contenido ?? {};
 
   const contexto = (def: SeccionDef): ContextoSeccion => ({
-    cifras: (def.dims ?? []).flatMap((d) => DIMS[d].cifras).map(vista).filter((c) => c.condicion !== "no"),
+    cifras: [
+      ...(def.dims ?? []).flatMap((d) => DIMS[d].cifras).map(vista).filter((c) => c.condicion !== "no"),
+      ...agregadas.filter((a) => a.fila.seccion_clave === def.clave && a.vista.incluida).map((a) => a.vista),
+    ],
     propias: propias.filter((p) => p.fila.seccion_clave === def.clave).map((p) => p.vista),
     anexos: anexos.data?.length ?? 0,
     exigirFuente: config.exigir_fuente,
@@ -53,7 +62,7 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   const cargando = secciones.isPending || filas.isPending || anexos.isPending;
   const error = [secciones.error, filas.error, anexos.error, vivas.error].find((e): e is Error => e instanceof Error) ?? null;
 
-  return { plantilla, config, secciones, filas, vivas, anexos, frio, vista, propias, delInforme, incluidas, metasPrograma, contenidoGuardado, contexto, avance, cargando, error };
+  return { plantilla, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, contenidoGuardado, contexto, avance, cargando, error };
 }
 
 export type ModeloInforme = ReturnType<typeof useModeloInforme>;

@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "createdAt": "2026-10-26T15:06:40.810Z",
+        "reason": "Montserrat es la tipografía del boletín de UDES en Cifras; el usuario pidió explícitamente traer esa propuesta visual a la Vista A4/Carta (propuesta aprobada)"
+      }
+    ]
+  }
+}

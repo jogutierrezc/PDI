@@ -119,6 +119,15 @@ export interface Logro {
 }
 
 /** Lo que guarda `informe_secciones.contenido` según el tipo de la sección. */
+/** Una tabla o gráfica de UDrive que la unidad puso en una sección (referencia, no copia). */
+export interface ElementoDrive {
+  archivoId: string;
+  tipo: "tabla" | "grafica";
+  /** Vacío: el que trae el archivo en UDrive. */
+  titulo: string;
+  nota: string;
+}
+
 export interface ContenidoSeccion {
   texto?: string;
   /** Pilares del PDI con los que se articula (id del pilar). */
@@ -131,6 +140,8 @@ export interface ContenidoSeccion {
   logros?: Logro[];
   /** Último borrador de Pilo sin tocar: sirve para medir cuánto lo cambió la unidad. */
   borrador_pilo?: string | null;
+  /** Tablas y gráficas de UDrive de esta sección. */
+  drive?: ElementoDrive[];
 }
 
 export interface SeccionRow {

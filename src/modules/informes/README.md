@@ -36,7 +36,7 @@ Solo con sesión. Acciones: `estado`, `redactar {instancia_id, seccion_clave, in
 A Decanatura (10 secciones), B Vicerrectoría u oficina (9), C Rectoría de campus (8), D Rectoría General (8). Tipos de sección: `narr`, `pdi`, `metas`, `dim`, `matriz`, `filas`, `logros`, `evid`, `anexos`. Las secciones y sus claves salen de la maqueta (`TPL`).
 
 ## Pantallas (`InformesAdmin`)
-Tablero del ciclo (Planeación) · Mi informe (editor) · Revisión (Planeación) · Consolidador (campus y rectoría) · Capacitación de Pilo (Planeación) · Vista A4 y exportación.
+Tablero del ciclo (Planeación) · Mi informe (editor) · Revisión (Planeación) · Consolidador (campus y rectoría) · Capacitación de Pilo (Planeación) · Vista del informe (Carta, A4 y PDF).
 
 ## Reglas de trabajo
 Sin commit. No se aplican migraciones ni se despliegan funciones (lo hace el usuario). Todo DELETE lleva WHERE (safeupdate, 0095). Solo tema claro. Textos en español. Pruebas con Vitest.
@@ -119,7 +119,7 @@ Ejemplos de catálogo: `('matric','Matrícula total','auto','{"indicador":"matri
 - `listo` de cada sección lo calcula `validacion.ts` y el editor lo sincroniza aunque nadie escriba (p. ej. «Anexos» o una sección sin cifras que justificar).
 - La nota de devolución va en `nota_revision` con una línea por sección («§s3 · Título: nota», `estados.ts`) y, además, una fila por sección en `informe_revisiones`.
 - Datos propios: clave `propio_<seccion>_<base36>`, `fuente_tipo` `manual`.
-- Pendiente (próxima fase): Consolidador (`informe_consolidado`, editar `destino`), Vista A4/PDF, acción `mejorar` de Pilo.
+- Pendiente (próxima fase): Consolidador (`informe_consolidado`, editar `destino`), acción `mejorar` de Pilo.
 
 ## Roles que escriben informes (0169)
 
@@ -129,3 +129,27 @@ Antes solo escribía el informe de una unidad quien pertenecía a ella (`unit_me
 - `informe_actor(unidad)` une Planeación, la pertenencia (con la herencia del árbol) y lo que da el rol, y se queda con el papel más fuerte. Las funciones de 0153 (`informe_instancia_visible/abierta`, `informe_abrir`, el disparador y las políticas de `informe_instancias`) preguntan ahora a `informe_can_view/edit` y `informe_actor`. `unit_role_at` y `unit_can_*` no cambian: los siguen usando Mis Tableros y Rankings.
 - La interfaz usa `useMembresiasInforme` (pertenencias + `informe_mis_unidades()`); las funciones `pilo-informes` e `informe-plan` preguntan a `informe_actor` y, sin 0169, a `unit_role_at`.
 - El menú respeta el rol: quien lleva un rol que no marca «Informes» (ni Mis Tableros, Monitor o Impacto) no los ve aunque pertenezca a una unidad. Sin rol asignado, todo sigue como antes.
+
+## Vista Carta y PDF (0189)
+El informe como saldrá en papel: portada, contenido, una o más hojas por sección, cierre y contraportada. Ruta `/admin/informes-gestion/vista?unidad=<id>`; acceso desde Mi informe, Revisión y el Tablero. Código en `vista/`.
+
+**Papel.** Carta (215,9 × 279,4 mm) por defecto; el informe puede pasar a A4 (210 × 297 mm). El conmutador está en la vista y se guarda por informe. Márgenes de 16 mm, cabecera de 35,5 mm y pie de 18 mm, como el boletín.
+
+**PDF.** Motor del navegador, igual que el boletín y UDrive: «Descargar PDF» abre una previsualización (`VistaPrevia.tsx`) y de ahí el diálogo de impresión (`imprimir.ts`, `@page` con el tamaño elegido y el nombre del archivo como título). No hay PDF en el servidor.
+
+**Paginado.** De dos pasadas, con el repartidor de UDrive (`udrive/lib/paginado.ts`): las unidades del cuerpo (`armado.tsx`) se miden fuera de pantalla al ancho del cuerpo, con las fuentes y las imágenes ya cargadas (`Libro.tsx`), y se reparten con sus reglas (figura con su pie no se parte, título no queda solo, mínimo dos líneas arriba y abajo, tabla por filas con el encabezado repetido). El índice se imprime con las páginas reales. Cada sección abre hoja.
+
+**Contenido.** Sale del mismo modelo del editor (`ui/modelo.ts` → `vista/entrada.ts`): cifras en vivo si el informe es borrador (marca «Cifras en vivo»), foto si está enviado o aprobado (marca «Foto del <fecha>»). Incluye texto con sus cifras, pilares, metas, indicadores por dimensión con gráfica de avance, matriz, filas, logros, anexos y las tablas y gráficas de UDrive de cada sección.
+
+**Estados de una cifra** (`vista/estados.ts`): Superada (supera la meta), Cumplida (igual), Parcial (entre 70 % y la meta), Rezagada (menos de 70 %). Siempre con forma y palabra. Si el indicador debe bajar, la lógica se invierte. El semáforo del editor (`cifras-vivas.ts`) no cambia.
+
+**Personalización** (`vista/perfil.ts`, validada y sin lanzar nunca):
+- `PerfilOficina`, por unidad (`informe_perfiles`): monograma de 3 a 4 caracteres (por defecto, de las iniciales del nombre), color de acento, escudo opcional, contacto opcional (correo, teléfono, dirección, sitio web) y pie. Lo vacío no se imprime. Lo cambia el Gestor de la unidad o Planeación.
+- `DisenoInforme`, por informe (`informe_diseno`): papel, portada (cinco composiciones iguales para todas las oficinas, textos con límite, foto propia con encuadre arrastrable, zoom y alineación arriba/centro/abajo), cierre (mensaje, hasta tres firmas, créditos) y contraportada. Lo cambia quien puede editar el informe mientras está en borrador o devuelto; Planeación siempre.
+- El acento puede ser uno de tres sugeridos o libre. Se valida el contraste (texto blanco o marino ≥ 4,5:1; si el blanco no llega, se usa marino; si ninguno, se avisa) y se usa solo en marcos. Gráficas y estados llevan la paleta fija de datos.
+
+**Base de datos** (`0189_informe_diseno.sql`): tablas `informe_perfiles` e `informe_diseno` con RLS sobre `informe_actor`, `informe_can_view`, `informe_instancia_visible` e `informe_instancia_abierta` (0169); bucket privado `informe-portadas` (5 MB, JPG/PNG/WebP, ruta `<unit_id>/<archivo>`); sin DELETE. Acceso en `datos.ts`: `usePerfilUnidad`, `useGuardarPerfil`, `useDisenoInforme`, `useGuardarDiseno`, `useSubirImagenPortada` (comprime con `udrive/ui/navegador.ts`) y `useUrlImagen`.
+
+**Sin la migración** la vista funciona con los valores por defecto y se puede imprimir; un aviso dice que guardar la personalización requiere aplicar 0189 (patrón `FaltaMigracion`).
+
+**Pendiente.** Las acciones del Plan de Trabajo de la facultad no se imprimen todavía en la sección de metas; el contacto oficial no existe, por eso es opcional; Word queda para después.

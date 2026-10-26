@@ -13,6 +13,7 @@ import { supabase } from "../../lib/supabase";
 import { FaltaMigracion } from "../rankings/noticias";
 import { nombreSeguro } from "../rankings/reporte/datos";
 import { aNumero } from "./cifras-vivas";
+import type { IndicadorOd, SedeRef } from "./catalogo";
 import type { RespuestaPlan } from "./plan-decanatura";
 import type {
   AnexoRow,
@@ -97,6 +98,8 @@ export const CLAVES = {
   cifras: (inst: string) => ["informes", "cifras", inst] as const,
   vivas: (inst: string) => ["informes", "vivas", inst] as const,
   fuentes: ["informes", "fuentes"] as const,
+  catalogo: ["informes", "catalogo"] as const,
+  sedes: ["informes", "sedes"] as const,
   pilares: ["informes", "pilares"] as const,
   anexos: (inst: string) => ["informes", "anexos", inst] as const,
   corpus: ["informes", "corpus"] as const,
@@ -262,7 +265,7 @@ export function useCifras(instancia: string | undefined) {
 
 /** Lo que se puede cambiar de una cifra (p_datos de informe_guardar_cifra). */
 export type DatosCifra = Partial<
-  Pick<CifraRow, "etiqueta" | "seccion_clave" | "fuente_tipo" | "fuente_nombre" | "valor" | "unidad" | "meta" | "anterior" | "incluida" | "justificacion" | "pilar" | "visto">
+  Pick<CifraRow, "etiqueta" | "seccion_clave" | "fuente_tipo" | "fuente_nombre" | "valor" | "unidad" | "meta" | "anterior" | "incluida" | "justificacion" | "pilar" | "visto" | "consulta">
 >;
 
 export function useGuardarCifra(ciclo: string) {
@@ -342,6 +345,59 @@ export function useFuentes() {
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<FuenteRow[]> =>
       revisar<FuenteRow[] | null>(await supabase.from("informe_fuentes").select("clave, nombre, tipo, consulta, activa").eq("activa", true)) ?? [],
+  });
+}
+
+/**
+ * Los indicadores publicados de UDES en Cifras que una unidad puede conectar. Se leen de las
+ * tablas abiertas del portal (no hace falta función ni migración). Un mismo indicador puede estar
+ * en varios periodos: se deja uno por informe, el del periodo vigente o el más reciente.
+ */
+export function useCatalogoIndicadores() {
+  return useQuery({
+    queryKey: CLAVES.catalogo,
+    retry: false,
+    staleTime: 10 * 60_000,
+    queryFn: async (): Promise<IndicadorOd[]> => {
+      type Fila = {
+        key: string;
+        label: string;
+        unit: string | null;
+        direction: IndicadorOd["direccion"];
+        od_reports: { slug: string; name: string; status: string; od_periods: { is_current: boolean; end_year: number; status: string } };
+      };
+      const filas =
+        revisar<Fila[] | null>(
+          await supabase
+            .from("od_indicators")
+            .select("key, label, unit, direction, od_reports!inner(slug, name, status, od_periods!inner(is_current, end_year, status))")
+            .eq("od_reports.status", "publicado")
+            .eq("od_reports.od_periods.status", "publicado")
+            .limit(2000),
+        ) ?? [];
+      const mejor = new Map<string, { i: IndicadorOd; vigente: boolean; fin: number }>();
+      for (const f of filas) {
+        const r = f.od_reports;
+        const k = `${r.slug}|${f.key}`;
+        const vigente = r.od_periods.is_current;
+        const fin = r.od_periods.end_year;
+        const previo = mejor.get(k);
+        if (previo && (previo.vigente || (!vigente && previo.fin >= fin))) continue;
+        mejor.set(k, { i: { clave: f.key, nombre: f.label, unidad: f.unit ?? "", direccion: f.direction, informe: r.slug, informeNombre: r.name }, vigente, fin });
+      }
+      return [...mejor.values()].map((x) => x.i);
+    },
+  });
+}
+
+/** Las sedes, para pedir una cifra de una sola sede. */
+export function useSedesCifras() {
+  return useQuery({
+    queryKey: CLAVES.sedes,
+    retry: false,
+    staleTime: 30 * 60_000,
+    queryFn: async (): Promise<SedeRef[]> =>
+      (revisar<{ slug: string; name: string }[] | null>(await supabase.from("campuses").select("slug, name").order("position")) ?? []).map((c) => ({ slug: c.slug, nombre: c.name })),
   });
 }
 
@@ -585,5 +641,119 @@ export function useCorpus(activo: boolean) {
     retry: false,
     staleTime: 60_000,
     queryFn: () => pilo<Corpus>({ action: "corpus" }),
+  });
+}
+
+/* ---------- Vista Carta y PDF (migración 0189) ------------------------------------ */
+
+export const BUCKET_PORTADAS = "informe-portadas";
+export const MAX_PORTADA = 5 * 1024 * 1024;
+const TIPOS_PORTADA = ["image/jpeg", "image/png", "image/webp"];
+
+/** Sin las tablas de 0189 la vista sigue funcionando con valores por defecto; solo guardar exige aplicarla. */
+function errorVista(e: ErrorBase): Error {
+  return falta(e) ? new FaltaMigracion("Falta aplicar la migración 0189 (Vista Carta y PDF): sin ella la personalización no se puede guardar.") : new Error(e.message ?? "Error de la base de datos");
+}
+
+export const CLAVES_VISTA = {
+  perfil: (unidad: string) => ["informes", "vista", "perfil", unidad] as const,
+  diseno: (instancia: string) => ["informes", "vista", "diseno", instancia] as const,
+  imagen: (ruta: string) => ["informes", "vista", "imagen", ruta] as const,
+};
+
+/** Lo que devuelve la lectura: la fila cruda (o nada) y si faltan las tablas de 0189. */
+export interface LecturaVista {
+  fila: Record<string, unknown> | null;
+  falta: boolean;
+}
+
+export function usePerfilUnidad(unidad: string | undefined) {
+  return useQuery({
+    queryKey: CLAVES_VISTA.perfil(unidad ?? ""),
+    enabled: Boolean(unidad),
+    retry: false,
+    queryFn: async (): Promise<LecturaVista> => {
+      const r = await supabase.from("informe_perfiles").select("unit_id, monograma, acento, logo_ruta, contacto, pie").eq("unit_id", unidad ?? "").maybeSingle();
+      if (r.error) {
+        if (falta(r.error)) return { fila: null, falta: true };
+        throw errorVista(r.error);
+      }
+      return { fila: (r.data as Record<string, unknown> | null) ?? null, falta: false };
+    },
+  });
+}
+
+export function useGuardarPerfil() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { unidad: string; perfil: { monograma: string; acento: string; logo_ruta: string; contacto: Record<string, string>; pie: string } }) => {
+      const r = await supabase.from("informe_perfiles").upsert({ unit_id: p.unidad, ...p.perfil }, { onConflict: "unit_id" });
+      if (r.error) throw errorVista(r.error);
+    },
+    onSuccess: (_x, p) => void cliente.invalidateQueries({ queryKey: CLAVES_VISTA.perfil(p.unidad) }),
+  });
+}
+
+export function useDisenoInforme(instancia: string | undefined) {
+  return useQuery({
+    queryKey: CLAVES_VISTA.diseno(instancia ?? ""),
+    enabled: Boolean(instancia),
+    retry: false,
+    queryFn: async (): Promise<LecturaVista> => {
+      const r = await supabase.from("informe_diseno").select("instancia_id, papel, portada, cierre, contraportada").eq("instancia_id", instancia ?? "").maybeSingle();
+      if (r.error) {
+        if (falta(r.error)) return { fila: null, falta: true };
+        throw errorVista(r.error);
+      }
+      return { fila: (r.data as Record<string, unknown> | null) ?? null, falta: false };
+    },
+  });
+}
+
+export function useGuardarDiseno() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { instancia: string; diseno: { papel: string; portada: unknown; cierre: unknown; contraportada: unknown } }) => {
+      const r = await supabase.from("informe_diseno").upsert({ instancia_id: p.instancia, ...p.diseno }, { onConflict: "instancia_id" });
+      if (r.error) throw errorVista(r.error);
+    },
+    onSuccess: (_x, p) => void cliente.invalidateQueries({ queryKey: CLAVES_VISTA.diseno(p.instancia) }),
+  });
+}
+
+/**
+ * Sube una foto de portada o un escudo al bucket «informe-portadas»
+ * («<unidad>/<archivo>»). Se comprime antes (lado mayor 2000 px) y no puede
+ * pasar de 5 MB. Devuelve la ruta que se guarda en el diseño o en el perfil.
+ */
+export function useSubirImagenPortada() {
+  return useMutation({
+    mutationFn: async (p: { unidad: string; archivo: File }): Promise<string> => {
+      if (!TIPOS_PORTADA.includes(p.archivo.type)) throw new Error("La imagen debe ser JPG, PNG o WebP.");
+      const { comprimirImagen } = await import("../udrive/ui/navegador");
+      const archivo = await comprimirImagen(p.archivo);
+      if (archivo.size > MAX_PORTADA) throw new Error(`«${p.archivo.name}» pesa más de 5 MB incluso comprimida. Pruebe con una imagen más pequeña.`);
+      const ruta = `${p.unidad}/${Date.now()}-${nombreSeguro(archivo.name)}`;
+      const subida = await supabase.storage.from(BUCKET_PORTADAS).upload(ruta, archivo, { contentType: archivo.type || undefined, upsert: false });
+      if (subida.error) {
+        const sinBucket = /bucket not found/i.test(subida.error.message);
+        throw new Error(sinBucket ? "Falta el bucket «informe-portadas»: aplique la migración 0189 o créelo en Storage (privado, 5 MB)." : `No se pudo subir la imagen: ${subida.error.message}`);
+      }
+      return ruta;
+    },
+  });
+}
+
+/** Dirección temporal (una hora) de una imagen del bucket privado; una ruta que empieza por «/» es un archivo público del portal. */
+export function useUrlImagen(ruta: string | null | undefined) {
+  return useQuery({
+    queryKey: CLAVES_VISTA.imagen(ruta ?? ""),
+    enabled: Boolean(ruta) && !ruta?.startsWith("/"),
+    retry: false,
+    staleTime: 50 * 60_000,
+    queryFn: async (): Promise<string | null> => {
+      const r = await supabase.storage.from(BUCKET_PORTADAS).createSignedUrl(ruta ?? "", 3600);
+      return r.error || !r.data ? null : r.data.signedUrl;
+    },
   });
 }

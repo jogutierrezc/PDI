@@ -147,7 +147,7 @@ export function TileCifra({ c, editable, guardar }: { c: CifraVista; editable: b
   );
 }
 
-function TilePropia({ c, fila, pilares, editable, quitar }: { c: CifraVista; fila: CifraRow; pilares: PilarRef[]; editable: boolean; quitar: () => void }) {
+export function TilePropia({ c, fila, pilares, editable, quitar }: { c: CifraVista; fila: CifraRow; pilares: PilarRef[]; editable: boolean; quitar: () => void }) {
   const pilar = pilares.find((p) => p.id === fila.pilar);
   return (
     <div className="inf-tile is-own">
@@ -178,7 +178,7 @@ export interface NuevoPropio {
   pilar: string | null;
 }
 
-function FormPropio({ exigirFuente, exigirPilar, pilares, agregar, cancelar }: { exigirFuente: boolean; exigirPilar: boolean; pilares: PilarRef[]; agregar: (p: NuevoPropio) => void; cancelar: () => void }) {
+export function FormPropio({ exigirFuente, exigirPilar, pilares, agregar, cancelar }: { exigirFuente: boolean; exigirPilar: boolean; pilares: PilarRef[]; agregar: (p: NuevoPropio) => void; cancelar: () => void }) {
   const [f, setF] = useState({ etiqueta: "", valor: "", fuente: "", pilar: "" });
   const [error, setError] = useState("");
   const enviar = () => {

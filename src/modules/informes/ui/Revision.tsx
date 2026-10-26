@@ -6,7 +6,7 @@
    ========================================================================== */
 
 import { useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useFundido } from "../../rankings/movimiento";
 import { useInstancias, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
 import { componerNota, leerNota } from "../estados";
@@ -17,6 +17,7 @@ import { TablaMetasPrograma } from "./MetasPrograma";
 import { useModeloInforme } from "./modelo";
 import type { ModeloInforme } from "./modelo";
 import { LecturaTexto, resolverDe } from "./Texto";
+import { ElementosDriveLectura } from "./ElementosDrive";
 
 type Filtro = "sent" | "back" | "ok" | "todos";
 const FILTROS: { id: Filtro; texto: string }[] = [
@@ -142,6 +143,11 @@ function Detalle({ inst, ciclo, requisitos, unidad, esFacultad }: { inst: Instan
         {m.frio ? "Las cifras son la foto tomada al enviar." : "Las cifras se leen en vivo: el informe no está enviado."}
         {inst.enviado_en ? ` Enviado el ${fmtFecha(inst.enviado_en)}.` : ""}
       </p>
+      <p className="inf-hint">
+        <Link className="inf-link" to={`/admin/informes-gestion/vista?unidad=${inst.unit_id}`}>
+          Ver el informe como saldrá en papel (Carta, A4 y PDF)
+        </Link>
+      </p>
       {inst.estado === "back" && previa.general && (
         <div className="inf-nota" role="note">
           <b>Nota con la que se devolvió</b>
@@ -202,7 +208,7 @@ function Detalle({ inst, ciclo, requisitos, unidad, esFacultad }: { inst: Instan
 }
 
 /** Una sección como se leerá, sin controles de edición. */
-export function LecturaSeccion({ def, c, m, pilares, resolver }: { def: SeccionDef; c: ContenidoSeccion; m: ModeloInforme; pilares: PilarRef[]; resolver: ReturnType<typeof resolverDe> }) {
+function LecturaBase({ def, c, m, pilares, resolver }: { def: SeccionDef; c: ContenidoSeccion; m: ModeloInforme; pilares: PilarRef[]; resolver: ReturnType<typeof resolverDe> }) {
   const texto = c.texto?.trim() ? (
     <div className="inf-pv">
       <LecturaTexto texto={c.texto} resolver={resolver} />
@@ -238,7 +244,7 @@ export function LecturaSeccion({ def, c, m, pilares, resolver }: { def: SeccionD
     }
     case "dim": {
       const ctx = m.contexto(def);
-      const cifras = [...ctx.cifras.filter((x) => x.incluida), ...ctx.propias];
+      const cifras = [...ctx.cifras.filter((x) => x.incluida && m.conectada(x)), ...ctx.propias];
       const justificadas = cifras.filter((x) => x.justificacion.trim());
       return (
         <>
@@ -291,4 +297,14 @@ export function LecturaSeccion({ def, c, m, pilares, resolver }: { def: SeccionD
     case "anexos":
       return <TablaAnexos anexos={m.anexos.data ?? []} />;
   }
+}
+
+/** Una sección como se leerá: su contenido y, debajo, las tablas y gráficas de UDrive que puso la unidad. */
+export function LecturaSeccion(p: Parameters<typeof LecturaBase>[0]) {
+  return (
+    <>
+      <LecturaBase {...p} />
+      <ElementosDriveLectura elementos={p.c.drive ?? []} />
+    </>
+  );
 }

@@ -109,7 +109,7 @@ export function vistaCifra(
     clave,
     etiqueta: fila?.etiqueta || def?.etiqueta || clave,
     unidad: fila?.unidad ?? def?.unidad ?? "",
-    mayorMejor: def?.mayorMejor ?? true,
+    mayorMejor: def?.mayorMejor ?? fila?.consulta?.baja !== true,
     valor,
     anterior: fila?.anterior ?? null,
     meta: fila?.meta ?? null,

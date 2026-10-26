@@ -12,6 +12,7 @@
    cuelgan de ellos quedarían con otra cosa sin que nadie se lo haya pedido.
    ========================================================================== */
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -21,6 +22,7 @@ import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { useAccessRoles, useOdReportOptions } from "../../../data/queries";
 import { useDeleteAccessRole, useSaveAccessRole } from "../../../data/mutations";
 import { roleLabels } from "../../../lib/auth";
+import { supabase } from "../../../lib/supabase";
 import type { AccessRole, AdminScreen, InformeLevel, Profile } from "../../../types/database";
 import { UNIT_KIND, type UnitKind } from "../../tableros/model";
 import { PLANTILLAS, plantillaSugerida } from "../../informes/plantillas";
@@ -164,6 +166,69 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+/** Las funciones de aprobación de Gestión Master (0194). Sin la migración, la lista queda vacía. */
+function useGmFunciones() {
+  return useQuery({
+    queryKey: ["gm-funciones"],
+    retry: false,
+    queryFn: async () => {
+      const result = await supabase.from("gm_funciones").select("codigo, nombre, activa").order("orden");
+      if (result.error) return [] as { codigo: string; nombre: string; activa: boolean }[];
+      return (result.data ?? []) as { codigo: string; nombre: string; activa: boolean }[];
+    },
+  });
+}
+
+/**
+ * Gestión Master: el papel del rol y la función que firma. Con «Editar» el rol solicita o revisa; con «Administrar»
+ * gestiona (y puede llevar también una función, p. ej. Planeación, para firmar su paso del flujo).
+ */
+function GmPicker({
+  level,
+  scope,
+  onChange,
+}: {
+  level: Level;
+  scope: { papel: "solicitante" | "revisor"; funcion: string };
+  onChange: (change: (scope: { papel: "solicitante" | "revisor"; funcion: string }) => void) => void;
+}) {
+  const funciones = useGmFunciones();
+  const lista = (funciones.data ?? []).filter((f) => f.activa);
+  const pideFuncion = level === "administrar" || scope.papel === "revisor";
+  return (
+    <div className="us-reports" role="group" aria-label="Papel en Gestión Master">
+      <strong>Papel en Gestión Master</strong>
+      {level === "editar" && (
+        <div className="us-screens">
+          <label className="oda-check" title="Crea solicitudes y ve las propias y las de sus unidades. Es el directivo o el vicerrector.">
+            <input type="radio" name="papel-gm" checked={scope.papel === "solicitante"} onChange={() => onChange((s) => { s.papel = "solicitante"; })} />
+            Solicita (directivo o vicerrector)
+          </label>
+          <label className="oda-check" title="Decide el paso del flujo que le toca por la función del rol, con una nota.">
+            <input type="radio" name="papel-gm" checked={scope.papel === "revisor"} onChange={() => onChange((s) => { s.papel = "revisor"; })} />
+            Revisa y decide un paso
+          </label>
+        </div>
+      )}
+      {pideFuncion && (
+        <label className="admin-field">
+          <span>{level === "administrar" ? "Función que firma (opcional)" : "Función que firma"}</span>
+          <select value={scope.funcion} onChange={(event) => onChange((s) => { s.funcion = event.target.value; })}>
+            <option value="">{level === "administrar" ? "Ninguna" : "Elija una función"}</option>
+            {lista.map((f) => (
+              <option key={f.codigo} value={f.codigo}>
+                {f.nombre}
+              </option>
+            ))}
+          </select>
+          {lista.length === 0 && <small>No se pudo leer la lista de funciones: ¿falta aplicar la migración 0194?</small>}
+        </label>
+      )}
+      <small>El acceso sale de este papel y no de la capacidad del rol. Una función se firma en el paso del flujo que la pida; Planeación añade funciones y pasos en Gestión Master › Flujos.</small>
     </div>
   );
 }
@@ -350,6 +415,7 @@ function RoleEditor({
     matrix.informe.level !== "none" &&
     !matrix.informe.allUnits &&
     matrix.informe.units.length === 0;
+  const gmNeedsFuncion = matrix.modules["gestion-master"].level === "editar" && matrix.gm.papel === "revisor" && !matrix.gm.funcion;
   const capacityChanged = system && role && capacity !== role.base_role;
 
   const update = (change: (draft: Matrix) => void) =>
@@ -406,6 +472,10 @@ function RoleEditor({
       );
       return;
     }
+    if (gmNeedsFuncion) {
+      setError("En Gestión Master, quien revisa necesita una función (por ejemplo, Vicerrectoría Administrativa y Financiera): elíjala, o deje el papel en «Solicita».");
+      return;
+    }
     const columns = compile(matrix);
     try {
       const saved = await save.mutateAsync({
@@ -423,6 +493,8 @@ function RoleEditor({
           informe_level: columns.informe_level,
           all_informe_units: columns.all_informe_units,
           informe_gestion: columns.informe_gestion,
+          gm_nivel: columns.gm_nivel,
+          gm_funcion: columns.gm_funcion,
         },
         reports: columns.reports,
         units: columns.units,
@@ -664,6 +736,9 @@ function RoleEditor({
                       Con «Editar» el rol ve y gestiona los informes de todas las unidades, por eso no se eligen unidades aquí. Para dar solo
                       el informe de una o varias unidades, deje «Ver».
                     </small>
+                  )}
+                  {module.id === "gestion-master" && (choice.level === "editar" || choice.level === "administrar") && (
+                    <GmPicker level={choice.level} scope={matrix.gm} onChange={(change) => update((draft) => change(draft.gm))} />
                   )}
                   {module.id === "informes" && choice.level === "ver" && (
                     <InformeScopePicker

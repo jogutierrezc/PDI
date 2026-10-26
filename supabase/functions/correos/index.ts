@@ -1616,6 +1616,68 @@ async function avisoDeSoporte(request: Request, body: Record<string, unknown>, u
   return json({ ok: true });
 }
 
+/* --- Un aviso de Gestión Master (0194): solicitud nueva, turno, devolución, decisión final -------- */
+
+/** El texto de respaldo si la plantilla c-gm-* no está en la base (sin la migración 0194, o borrada). */
+const PLANTILLA_GM_RESPALDO: Plantilla = {
+  clave: "c-gm-respaldo",
+  identidad: "plan",
+  tipo: "aviso",
+  html: null,
+  alcance: "cuerpo",
+  grupo: "Gestión Master",
+  nombre: "Aviso de Gestión Master",
+  cuando: "Solicitudes de actividades del Master",
+  asunto: "Gestión Master: {{titulo_aviso}}",
+  previa: "",
+  titulo: "{{titulo_aviso}}",
+  saludo: "Hola, {{nombre}}:",
+  mensaje: "{{detalle}}",
+  boton: "Abrir en el portal",
+  nota: "Este aviso lo envía el portal de Planeación.",
+  roles: null,
+};
+
+async function avisoDeGestionMaster(request: Request, body: Record<string, unknown>, url: string, serviceKey: string): Promise<Response> {
+  // Solo la función `gestion-master`, con la clave de servicio: ella arma los valores desde la base, nunca la persona.
+  if ((request.headers.get("Authorization") ?? "") !== `Bearer ${serviceKey}`) return json({ error: "Falta la sesión.", code: "sesion" }, 401);
+  const para = typeof body.to === "string" ? body.to.trim().toLowerCase().slice(0, 254) : "";
+  if (!correoValido(para)) return json({ ok: false, code: "datos", error: "Falta el correo." }, 400);
+  const clave = typeof body.clave === "string" && /^c-gm-[a-z0-9-]{1,30}$/.test(body.clave) ? body.clave : "";
+  if (!clave) return json({ ok: false, code: "datos", error: "Falta la plantilla." }, 400);
+  // Un texto de la persona (la nota de una decisión, el nombre de una actividad) no puede traer marcadores {{…}}.
+  const limpio = (v: unknown, max: number): string => texto(v, max).replace(/\{\{|\}\}/g, "");
+  const v = (body.valores && typeof body.valores === "object" ? body.valores : {}) as Record<string, unknown>;
+  const valores: Record<string, string> = {
+    folio: limpio(v.folio, 40),
+    titulo_aviso: limpio(v.titulo_aviso, 160),
+    detalle: limpio(v.detalle, 1200).replace(/\s+/g, " ").trim(),
+    modulo: "Gestión Master",
+  };
+  const enlace = typeof body.enlace === "string" && /^https:\/\//.test(body.enlace) ? body.enlace.slice(0, 500) : "";
+  const admin = cliente(url, serviceKey);
+  const hash = await huella(para, ENV("SEND_EMAIL_HOOK_SECRET") || serviceKey);
+  const ctx = await contextoDe(admin, hash, "");
+  const plantilla = plantillaDeFila(ctx?.templates?.[clave], clave) ?? PLANTILLA_GM_RESPALDO;
+  const sitio = basePublica(typeof body.sitio === "string" ? body.sitio : "", ENV("CORREOS_URL_PUBLICA"), "");
+  const salida = await enviar(admin, ctx, {
+    tipo: "aviso",
+    plantilla,
+    persona: personaDe({ correo: para, nombre: limpio(body.nombre, 120), sede: "", rol: "" }),
+    rol: "administrativo",
+    para,
+    hash,
+    enlace: enlace || sitio || "https://planeacion.udes.edu.co",
+    valores,
+    sitio,
+    accion: "gm",
+    hook: "",
+    topeMs: SMTP_TOTAL_GANCHO_MS,
+  });
+  if (!salida.ok) return json({ ok: false, code: salida.code, error: salida.message }, salida.http);
+  return json({ ok: true });
+}
+
 /* --- La intranet: probar la conexión y enviar una prueba --------------------------------------- */
 
 async function panel(request: Request, crudo: string, url: string, anonKey: string, serviceKey: string): Promise<Response> {
@@ -1629,6 +1691,7 @@ async function panel(request: Request, crudo: string, url: string, anonKey: stri
   const action = String(body.action ?? "");
   if (action === "codigo") return await codigoDePilo(request, body, url, serviceKey);
   if (action === "soporte") return await avisoDeSoporte(request, body, url, serviceKey);
+  if (action === "gm") return await avisoDeGestionMaster(request, body, url, serviceKey);
   if (action !== "probar" && action !== "prueba") return json({ error: "Acción desconocida.", code: "datos" }, 400);
 
   // Solo la administración, con su sesión.

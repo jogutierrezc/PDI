@@ -48,13 +48,13 @@
    función en esa pertenencia (unit_members.role).
    ========================================================================== */
 
-import type { AccessRole, AdminScreen, AppRole, ImpactLevel, InformeLevel } from "../../../types/database";
+import type { AccessRole, AdminScreen, AppRole, GmNivel, ImpactLevel, InformeLevel } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type ModuleId =
   | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
-  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "udrive" | "pilo" | "sistema";
+  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "udrive" | "gestion-master" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -206,6 +206,16 @@ export const MODULES: ModuleDef[] = [
     },
   },
   {
+    id: "gestion-master",
+    label: "Gestión Master",
+    screens: [{ id: "gestion_master", label: "Gestión de Actividades", note: "el acceso lo da el nivel del rol, no la capacidad; quien aprueba lo hace por la función del rol" }],
+    levels: {
+      ver: { hint: "Aparece en el menú, pero sin acceso al módulo: elija Editar o Administrar para dar un papel en Gestión Master.", needs: "consulta" },
+      editar: { hint: "Solicita actividades (directivo o vicerrector) o revisa y decide el paso que le toca por su función, según el papel que elija abajo.", needs: "consulta" },
+      administrar: { hint: "Además configura flujos y funciones, aplica los cambios en el Master, concilia con el Warehouse, cierra el corte e importa Rua.", needs: "consulta" },
+    },
+  },
+  {
     id: "rankings",
     label: "Rankings (THE, GreenMetric)",
     seenFrom: "planeacion",
@@ -338,6 +348,12 @@ export interface InformeScope {
   units: string[];
 }
 
+/** Gestión Master con «Editar»: el papel (solicita o revisa) y, si revisa, la función que firma (gm_funciones). */
+export interface GmScope {
+  papel: "solicitante" | "revisor";
+  funcion: string;
+}
+
 export interface Matrix {
   modules: Record<ModuleId, ModuleChoice>;
   /** UDES en Cifras: todos los informes o estos. */
@@ -347,6 +363,8 @@ export interface Matrix {
   impact: ImpactScope;
   /** Informes de gestión: las unidades cuyo informe escribe el rol. */
   informe: InformeScope;
+  /** Gestión Master (0194). */
+  gm: GmScope;
 }
 
 /** Lo que se guarda en access_roles (más las listas de informes y de unidades). */
@@ -364,10 +382,18 @@ export interface RoleColumns {
   informe_units: string[];
   /** Gestiona los informes de todas las unidades (0192): el nivel elegido en Informes es Editar o más. */
   informe_gestion: boolean;
+  /** Gestión Master (0194): none con «Ver»; solicitante o revisor con «Editar»; gestor con «Administrar». */
+  gm_nivel: GmNivel;
+  /** La función que firma (vaf, planeacion…); solo si el nivel es revisor o gestor. */
+  gm_funcion: string | null;
 }
 
 const emptyImpact = (): ImpactScope => ({ allUnits: false, units: [] });
 const emptyInforme = (): InformeScope => ({ level: "none", allUnits: false, units: [] });
+const emptyGm = (): GmScope => ({ papel: "solicitante", funcion: "" });
+
+/** Nivel de la matriz → gm_nivel. «Ver» no da acceso (como Impacto): el permiso es explícito. */
+const gmNivelOf = (level: Level, gm: GmScope): GmNivel => (level === "editar" ? gm.papel : level === "administrar" ? "gestor" : "none");
 
 /** Nivel de la matriz → columna de la base. Solo Editar y Administrar dan actuar sobre unidades. */
 export const impactLevelOf = (level: Level): ImpactLevel =>
@@ -411,6 +437,8 @@ export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
   if (id === "impacto") return choice.level;
   // Informes de gestión tampoco: la gestión no sale de la capacidad sino del nivel elegido (0192).
   if (id === "informes") return choice.level;
+  // Gestión Master: el nivel es el elegido (gm_nivel), nunca la capacidad (0194).
+  if (id === "gestion-master") return choice.level;
   const capacity = capacityOf(matrix);
   const module = moduleOf(id);
   if (module.seenFrom && RANK[capacity] < RANK[module.seenFrom]) return "none";
@@ -448,6 +476,8 @@ export function compile(matrix: Matrix): RoleColumns {
   // Con «Editar» el rol gestiona todos los informes: el papel por unidad sobra y se guarda vacío.
   const informeGestion = informeOn && LEVEL_RANK[matrix.modules.informes.level] >= LEVEL_RANK.editar;
   const informeLevel: InformeLevel = informeOn && !informeGestion ? matrix.informe.level : "none";
+  const gmOn = matrix.modules["gestion-master"].level !== "none" && matrix.modules["gestion-master"].screens.length > 0;
+  const gmNivel: GmNivel = gmOn ? gmNivelOf(matrix.modules["gestion-master"].level, matrix.gm) : "none";
   return {
     base_role: capacityOf(matrix),
     screens: screens.length === ALL_SCREENS.length ? [] : screens,
@@ -461,13 +491,15 @@ export function compile(matrix: Matrix): RoleColumns {
     all_informe_units: informeLevel !== "none" && matrix.informe.allUnits,
     informe_units: informeLevel !== "none" && !matrix.informe.allUnits ? [...matrix.informe.units].sort() : [],
     informe_gestion: informeGestion,
+    gm_nivel: gmNivel,
+    gm_funcion: (gmNivel === "revisor" || gmNivel === "gestor") && matrix.gm.funcion ? matrix.gm.funcion : null,
   };
 }
 
 /** Columnas de un rol guardado → matriz, para editarlo. */
 export function decompile(
   role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports"> &
-    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion">>,
+    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion" | "gm_nivel" | "gm_funcion">>,
   reports: string[],
   units: string[] = [],
   informeUnits: string[] = [],
@@ -480,6 +512,7 @@ export function decompile(
     reports: [...reports],
     impact: { allUnits: role.all_impact_units ?? false, units: [...units] },
     informe: { level: role.informe_level ?? "none", allUnits: role.all_informe_units ?? false, units: [...informeUnits] },
+    gm: { papel: role.gm_nivel === "revisor" ? "revisor" : "solicitante", funcion: role.gm_funcion ?? "" },
   };
   for (const module of MODULES) {
     const screens = module.screens.map((screen) => screen.id).filter((screen) => seen.includes(screen));
@@ -490,7 +523,7 @@ export function decompile(
   // esa capacidad le permite. Es lo que la base hace cumplir.
   const capacity = role.base_role;
   for (const module of MODULES) {
-    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto" || module.id === "informes") continue;
+    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto" || module.id === "informes" || module.id === "gestion-master") continue;
     let best: Level = "ver";
     for (const [level, def] of Object.entries(module.levels) as [Exclude<Level, "none">, { needs: AppRole }][]) {
       if (module.id === "cifras" && level === "administrar" && !role.all_reports) continue;
@@ -504,6 +537,10 @@ export function decompile(
   // Informes tampoco: gestiona solo si el rol lo guarda (informe_gestion, 0192) y tiene capacidad para ello.
   if (modules.informes.screens.length > 0) {
     modules.informes.level = role.informe_gestion && RANK[capacity] >= RANK.planeacion ? "editar" : "ver";
+  }
+  // Gestión Master tampoco sigue a la capacidad: su nivel es el que guarda gm_nivel. Con la pantalla marcada y sin nivel, queda en «Ver» (sin acceso).
+  if (modules["gestion-master"].screens.length > 0) {
+    modules["gestion-master"].level = role.gm_nivel === "gestor" ? "administrar" : role.gm_nivel === "solicitante" || role.gm_nivel === "revisor" ? "editar" : "ver";
   }
   return draft;
 }
@@ -523,7 +560,7 @@ function full(id: ModuleId, level: Level): ModuleChoice {
 /** La matriz de una plantilla. */
 export function templateMatrix(template: Exclude<TemplateId, "personalizada">): Matrix {
   const modules = emptyModules();
-  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme() };
+  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme(), gm: emptyGm() };
   if (template === "consulta") {
     for (const module of MODULES) modules[module.id] = full(module.id, "ver");
     return base;
@@ -554,7 +591,7 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     const levels = Object.keys(module.levels) as Level[];
     // Impacto se queda en «ver»: sus unidades se asignan en la ficha de cada
     // persona, y una plantilla no puede adivinarlas.
-    modules[module.id] = full(module.id, module.id === "impacto" ? "ver" : levels[levels.length - 1]);
+    modules[module.id] = full(module.id, module.id === "impacto" || module.id === "gestion-master" ? "ver" : levels[levels.length - 1]);
   }
   return base;
 }
@@ -567,6 +604,8 @@ const sameColumns = (a: RoleColumns, b: RoleColumns) =>
   a.all_impact_units === b.all_impact_units &&
   a.informe_level === b.informe_level &&
   a.informe_gestion === b.informe_gestion &&
+  a.gm_nivel === b.gm_nivel &&
+  (a.gm_funcion ?? "") === (b.gm_funcion ?? "") &&
   a.all_informe_units === b.all_informe_units &&
   [...a.informe_units].sort().join() === [...b.informe_units].sort().join() &&
   [...a.screens].sort().join() === [...b.screens].sort().join() &&
@@ -638,6 +677,18 @@ export function describe(
           ? `En Informes de gestión ${does} el informe de: ${list(names)}.`
           : "En Informes de gestión no tiene unidades asignadas: solo escribe el de su unidad, si pertenece a una.",
     );
+  }
+  const gm = effectiveLevel(matrix, "gestion-master");
+  if (gm === "editar") {
+    lines.push(
+      matrix.gm.papel === "revisor"
+        ? `En Gestión Master revisa y decide el paso que le toca por su función${matrix.gm.funcion ? ` («${matrix.gm.funcion}»)` : ""}.`
+        : "En Gestión Master solicita actividades del Master y sigue sus solicitudes.",
+    );
+  } else if (gm === "administrar") {
+    lines.push("En Gestión Master gestiona: configura flujos y funciones, aplica en el Master, concilia con el Warehouse y cierra el corte.");
+  } else if (gm === "ver") {
+    lines.push("En Gestión Master la pantalla aparece, pero sin acceso al módulo (falta elegir un papel).");
   }
   return lines;
 }

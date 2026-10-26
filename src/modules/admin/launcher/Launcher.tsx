@@ -36,7 +36,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { PiloAvatar } from "../../../components/pilo/PiloAvatar";
 import { useTour } from "../../../components/tour/TourProvider";
 import { intranetTourFor, tourById } from "../../../components/tour/tours";
-import { useAuth } from "../../../lib/auth";
+import { gmNivelDe, useAuth } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabase";
 import { navigation, type NavGroup } from "../components/AdminShell";
 import { pendientesDe } from "../../internacionalizacion/ui/logica";
@@ -82,7 +82,7 @@ export function wallSpans(n: number): { col: number; rows: number; md: number }[
 }
 
 export function Launcher() {
-  const { profile, hasRole, canSee, canSeeReport, impactoSide, signOut, puedeGestionarInformes } = useAuth();
+  const { profile, access, hasRole, canSee, canSeeReport, impactoSide, signOut, puedeGestionarInformes } = useAuth();
   const { start, isDone, active } = useTour();
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,7 +120,7 @@ export function Launcher() {
 
   // Cada módulo con su portal; los que tienen algo pendiente hoy van primero.
   const modules = useMemo<WallModule[]>(() => {
-    const ctx = { hasRole, canSee, impactoSide, reports, intDirector: intl.director, puedeGestionarInformes };
+    const ctx = { hasRole, canSee, impactoSide, reports, intDirector: intl.director, puedeGestionarInformes, gmNivel: gmNivelDe(profile, access) };
     return groups
       .map((g) => {
         let sections = portalFor(g.id, ctx);

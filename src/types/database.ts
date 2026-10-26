@@ -69,6 +69,7 @@ export type AdminScreen =
   | "datos-sostenibilidad"
   | "encuestas"
   | "udrive"
+  | "gestion_master"
   | "cms";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
@@ -91,6 +92,10 @@ export interface AccessRole {
   all_informe_units?: boolean;
   /** Informes Institucionales (0192): gestiona los informes de todas las unidades (tablero, revisión, consolidador, capacitación de Pilo). */
   informe_gestion?: boolean;
+  /** Gestión Master (0194): none · solicitante · revisor · gestor. Exige la pantalla «gestion_master». */
+  gm_nivel?: GmNivel;
+  /** Gestión Master (0194): la función de aprobación del rol (vaf, planeacion, academica…). */
+  gm_funcion?: string | null;
   is_system: boolean;
   position: number;
   created_at?: string;
@@ -99,6 +104,8 @@ export interface AccessRole {
 
 export type ImpactLevel = "none" | "editor" | "admin";
 export type InformeLevel = "none" | "editor" | "jefe";
+/** Gestión Master (0194): none · solicitante (crea) · revisor (decide su paso) · gestor (configura, aplica y cierra el corte). */
+export type GmNivel = "none" | "solicitante" | "revisor" | "gestor";
 
 export interface AccessRoleReport {
   access_role_id: string;

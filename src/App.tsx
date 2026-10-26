@@ -212,6 +212,7 @@ const PaginaPublica = lazy(() =>
 const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
 const UDrive = lazy(() => import("./modules/udrive/ui/UDrive").then((m) => ({ default: m.UDrive })));
+const GestionMaster = lazy(() => import("./modules/gestion-master/GestionMaster").then((m) => ({ default: m.GestionMaster })));
 const ProgramasEnCifras = lazy(() => import("./modules/programas-en-cifras/ui/ProgramasEnCifras").then((m) => ({ default: m.ProgramasEnCifras })));
 const Encuestas = lazy(() => import("./modules/encuestas/ui/Encuestas").then((m) => ({ default: m.Encuestas })));
 const EncuestaPublica = lazy(() => import("./modules/encuestas/publico/EncuestaPublica").then((m) => ({ default: m.EncuestaPublica })));
@@ -490,6 +491,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="udrive">
                 <UDrive />
+              </RequireRole>
+            }
+          />
+          {/* Gestión Master: solicitudes de actividades del Master y su aprobación (0194). El acceso es el nivel del rol (gm_nivel), no la capacidad. */}
+          <Route
+            path="/admin/gestion-master/:seccion?/:id?"
+            element={
+              <RequireRole minimum="consulta" screen="gestion_master">
+                <GestionMaster />
               </RequireRole>
             }
           />

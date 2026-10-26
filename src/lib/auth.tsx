@@ -15,7 +15,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import type { AccessRole, AdminScreen, AppRole, Profile } from "../types/database";
+import type { AccessRole, AdminScreen, AppRole, GmNivel, Profile } from "../types/database";
 
 const RANK: Record<AppRole, number> = {
   consulta: 1,
@@ -67,6 +67,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   "datos-sostenibilidad": "/admin/datos-sostenibilidad",
   encuestas: "/admin/encuestas",
   udrive: "/admin/udrive",
+  gestion_master: "/admin/gestion-master",
   cms: "/admin/cms",
 };
 
@@ -131,6 +132,19 @@ export function puedeGestionarInformes(profile: Profile | null, access: AccessSc
 }
 
 /**
+ * ¿Entra a Gestión Master? Espejo de gm_nivel_actual() (0194): la administración general siempre; los demás, solo si su
+ * rol de acceso marca la pantalla «gestion_master» y lleva un nivel (solicitante, revisor o gestor). La capacidad
+ * global (Planeación) NO basta: es la regla que Informes tuvo que corregir en 0192.
+ */
+export function gmNivelDe(profile: Profile | null, access: AccessScope | null): GmNivel {
+  if (!profile?.is_active) return "none";
+  if (RANK[profile.role] >= RANK.admin) return "gestor";
+  if (!access) return "none";
+  const marcada = access.role.all_screens || access.role.screens.includes("gestion_master");
+  return marcada ? (access.role.gm_nivel ?? "none") : "none";
+}
+
+/**
  * ¿Ve esta pantalla de la intranet? Espejo de has_screen(), en una función
  * pura para que el menú, el lanzador y las pruebas usen la misma regla.
  */
@@ -153,6 +167,8 @@ export function screenVisible(
   if (screen === "correos") return RANK[profile.role] >= RANK.planeacion && listed;
   // Rutas del bus: solo por el rol, como en la base (0139).
   if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion && listed;
+  // Gestión Master: el permiso es el nivel del rol de acceso (gm_nivel), nunca la capacidad (0194).
+  if (screen === "gestion_master") return gmNivelDe(profile, access) !== "none";
   // Warehouse UDES: datos de las plataformas institucionales; solo por el rol, como en la base (0155).
   if (screen === "warehouse") return RANK[profile.role] >= RANK.planeacion && listed;
   // Monitor de alertas tempranas: quien pertenece a una facultad o programa ve lo suyo; Planeación, todo. La base (0160) lo exige también.

@@ -135,7 +135,7 @@ const SEDES: Record<string, { variable: string; porDefecto: string; nombre: stri
 const NOMBRE_SISTEMA: Record<SistemaApi, string> = { master: "Master", galileo: "Galileo", davinci: "Davinci" };
 const CORTES = ["1", "2", "3", "f"];
 const SISTEMAS: SistemaApi[] = ["master", "galileo", "davinci"];
-const ACCIONES = ["estado", "probar", "periodos", "sondear", "cargar", "estado_tarea", "finalizar", "cancelar"];
+const ACCIONES = ["estado", "probar", "periodos", "sondear", "cargar", "estado_tarea", "finalizar", "cancelar", "docentes"];
 
 /** Tope de una petición a la plataforma (además de lo que quede del presupuesto de la llamada). */
 const TIEMPO_PETICION_MS = 45_000;
@@ -682,6 +682,89 @@ async function guardarFilas(db: any, carga: string, fuente: Fuente, derivar: (f:
   return enviadas;
 }
 
+/* --- Nombres de los docentes de un código, en vivo (Gestión Master, 0194) ---------------------------- */
+
+/** La primera lista de objetos que haya en la respuesta de la plataforma. */
+function listaDeObjetos(msg: unknown, nivel = 0): Record<string, unknown>[] {
+  if (Array.isArray(msg)) return msg.filter((x) => x && typeof x === "object" && !Array.isArray(x)) as Record<string, unknown>[];
+  if (msg && typeof msg === "object" && nivel < 3) {
+    for (const v of Object.values(msg as Record<string, unknown>)) {
+      const l = listaDeObjetos(v, nivel + 1);
+      if (l.length) return l;
+    }
+  }
+  return [];
+}
+
+const identificacionDe = (o: Record<string, unknown>): string => {
+  const v = o.identification ?? o.identificacion ?? o.document ?? o.id_number;
+  return v === null || v === undefined ? "" : String(v).trim();
+};
+
+/**
+ * El nombre de un docente a partir de los campos de texto que parecen nombre o apellido. Los campos exactos de
+ * «prepare_professors» no se conocen (la política del Warehouse los descarta y no hay un HAR de ellos): por eso se buscan
+ * por el nombre de la clave, sin repetir palabras. Si no hay ninguno, la pantalla lo dice.
+ */
+function nombreDe(o: Record<string, unknown>): string {
+  const claves = Object.keys(o).filter(
+    (k) => /name|nombre|apellid|surname/i.test(k) && !/user_?name|file|contract|equip|nick|company|institution|title/i.test(k) && typeof o[k] === "string" && String(o[k]).trim() !== "",
+  );
+  const apellido = (k: string) => (/last|surname|apellid/i.test(k) ? 1 : 0);
+  const palabras: string[] = [];
+  for (const k of claves.sort((a, b) => apellido(a) - apellido(b))) {
+    for (const p of String(o[k]).trim().split(/\s+/)) if (!palabras.some((x) => x.toLowerCase() === p.toLowerCase())) palabras.push(p);
+  }
+  return palabras.join(" ").slice(0, 120);
+}
+
+/**
+ * Los nombres de los docentes cuyos seudónimos pide Gestión Master, leídos del Master en este momento. NO se guardan:
+ * ni en wh_filas ni en ninguna tabla; la respuesta va al navegador de quien los pidió y ahí se queda. Antes de leer, la
+ * base comprueba que quien llama tiene acceso a Gestión Master y anota la consulta (quién, qué código, cuántos).
+ * El seudónimo se calcula con la misma sal y la misma fórmula que usa el Warehouse al guardar (gm_seudonimos_de).
+ */
+// deno-lint-ignore no-explicit-any
+async function docentesDeCodigo(db: any, admin: any, cuerpo: Record<string, unknown>, limite: number): Promise<Response> {
+  const sede = String(cuerpo.sede ?? "");
+  const periodo = String(cuerpo.periodo ?? "");
+  const codigo = String(cuerpo.codigo ?? "").trim().slice(0, 32);
+  const pedidos = (Array.isArray(cuerpo.seudonimos) ? cuerpo.seudonimos : []).filter((x): x is string => typeof x === "string" && /^x-[0-9a-f]{10}$/.test(x)).slice(0, 80);
+  if (!SEDES[sede] || !periodoValido(periodo) || !codigo || pedidos.length === 0) return json({ error: "Faltan la sede, el periodo, el código o los profesores." }, 400);
+
+  const registro = await db.rpc("gm_registrar_consulta_nombres", { p_periodo: periodo, p_sede: sede, p_codigo: codigo, p_cantidad: pedidos.length });
+  if (registro.error) {
+    const falta = registro.error.code === "PGRST202" || /gm_registrar_consulta_nombres/.test(registro.error.message);
+    return json({ error: falta ? "Falta aplicar la migración 0194 (Gestión Master)." : "No se pudo registrar la consulta." }, 500);
+  }
+  if (registro.data !== true) return json({ error: "Los nombres de los docentes son solo para quien tiene acceso a Gestión Master." }, 403);
+
+  const reporte = reportePorId("ms_doc");
+  if (!reporte) return json({ error: "El reporte de docentes no está en el catálogo." }, 500);
+  const sesion = await iniciarSesion(sede, "master", limite, "ms_doc");
+  const nombres: Record<string, string> = {};
+  let total = 0;
+  try {
+    const ctx: Contexto = { sede, periodo, abierto: sesion.periodo, corte: "", usuario: ENV("WAREHOUSE_MASTER_USER") };
+    const respuesta = await pedirJson(sesion, reporte.armar(ctx), sesion);
+    let docentes = listaDeObjetos(respuesta.msg);
+    total = docentes.length;
+    const ids = docentes.map(identificacionDe);
+    const seudonimos = await admin.rpc("gm_seudonimos_de", { p_ids: ids.filter((x: string) => x) });
+    if (seudonimos.error) throw new ErrorPlataforma("No se pudieron calcular los seudónimos (¿falta la migración 0194?).");
+    const deId = new Map<string, string>((seudonimos.data as { id: string; seudonimo: string }[]).map((r) => [r.id, r.seudonimo]));
+    const quiero = new Set(pedidos);
+    docentes.forEach((d, i) => {
+      const s = deId.get(ids[i]);
+      if (s && quiero.has(s) && !nombres[s]) nombres[s] = nombreDe(d);
+    });
+    docentes = [];
+  } finally {
+    await cerrarSesion(sesion);
+  }
+  return json({ ok: true, nombres, total, encontrados: Object.keys(nombres).length });
+}
+
 /* --- Entrada ---------------------------------------------------------------------------------------- */
 
 Deno.serve(async (request: Request) => {
@@ -714,6 +797,14 @@ Deno.serve(async (request: Request) => {
 
   // Todo lo que se escribe va con la sesión de quien llama: la base decide.
   const db = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
+  // Los nombres de Gestión Master no piden ser de Planeación: la base comprueba gm_puede('nombres') y anota la consulta.
+  if (accion === "docentes") {
+    try {
+      return await docentesDeCodigo(db, admin, cuerpo, largo);
+    } catch (e) {
+      return respuestaDeError(e, accion, "ms_doc", String(cuerpo.sede ?? ""));
+    }
+  }
   const permiso = await db.rpc("wh_autorizado");
   if (permiso.error) {
     const falta = permiso.error.code === "PGRST202" || /wh_autorizado/.test(permiso.error.message);

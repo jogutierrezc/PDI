@@ -61,6 +61,7 @@ export type AdminSection =
   | "datos-sostenibilidad"
   | "encuestas"
   | "udrive"
+  | "gestion_master"
   | "cms";
 
 export interface NavItem {
@@ -73,7 +74,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "encuestas" | "udrive" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "encuestas" | "udrive" | "gestion-master" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -212,6 +213,17 @@ export const navigation: NavGroup[] = [
     label: "UDrive",
     items: [
       { id: "udrive", label: "UDrive", icon: "folder", to: "/admin/udrive", minimum: "consulta" },
+    ],
+  },
+  {
+    // Las solicitudes de actividades del Master (nuevas, mejorar o mantener, eliminar) y su flujo de aprobación (0194).
+    // Lo ve quien tenga un nivel de Gestión Master en su rol de acceso; la capacidad global no basta.
+    id: "gestion-master",
+    icon: "clipboard",
+    short: "Gestión Master",
+    label: "Gestión Master",
+    items: [
+      { id: "gestion_master", label: "Gestión de Actividades", icon: "clipboard", to: "/admin/gestion-master", minimum: "consulta" },
     ],
   },
   {

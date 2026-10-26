@@ -52,6 +52,21 @@ export type ModoMarca = "ninguna" | "texto" | "imagen" | "clasica";
 export type TipoCabecera = "dos" | "simple" | "ninguna" | "clasica";
 export type PosFolio = "exterior" | "centro" | "derecha";
 
+/** La foto de portada de un estilo: la imagen de UDrive y cómo se encuadra. Un informe puede poner la suya y manda sobre esta. */
+export interface FotoEstilo {
+  /** Imagen de UDrive; vacío usa la foto institucional. */
+  imagenId: string;
+  /** Punto de anclaje en % (0 a 100) y zoom de 1 a 3. */
+  x: number;
+  y: number;
+  zoom: number;
+  ajuste: "cubrir" | "contener";
+  /** Velo blanco sobre la foto, de 0 a 60 %. */
+  velo: number;
+}
+
+export const FOTO_BASE: FotoEstilo = { imagenId: "", x: 50, y: 0, zoom: 1, ajuste: "cubrir", velo: 0 };
+
 export interface Estilo {
   version: 1;
   nombre: string;
@@ -73,6 +88,7 @@ export interface Estilo {
       propioId: string;
     };
     tono: TonoContraportada;
+    foto: FotoEstilo;
   };
   texto: {
     fb: Familia;
@@ -154,7 +170,7 @@ const BASE: Estilo = {
   version: 1,
   nombre: "Institucional",
   descripcion: "El del boletín UDES en Cifras: cabecera de dos niveles, Montserrat, capítulos con sello y tablas con encabezado marino.",
-  portada: { comp: 1, fondo: "foto", alinea: "izq", tam: 1, acento: "#1f5fbf", mono: "UDS", logos: { udes: true, mono: false, propioId: "" }, tono: "marino" },
+  portada: { comp: 1, fondo: "foto", alinea: "izq", tam: 1, acento: "#1f5fbf", mono: "UDS", logos: { udes: true, mono: false, propioId: "" }, tono: "marino", foto: { ...FOTO_BASE } },
   texto: { fb: "Montserrat", ft: "Montserrat", fs: 10, lh: 1.5, just: true, cols: 1, mx: 20, num: true, cap: "sello", dest: "caja", tcol: "marino", sang: false },
   tablas: { enc: "marino", cebra: false, bordes: "horiz", calor: true, dens: "normal", capPos: "abajo", capEstilo: "fuerte", nota: "caja" },
   cabpie: { cab: "dos", edif: true, folio: "exterior", filetePie: true, pieTexto: true, marca: { modo: "ninguna", texto: "", imagenId: "", opacidad: 8, tam: "m" }, borradorAuto: false },
@@ -243,6 +259,7 @@ export function normalizarEstilo(crudo: unknown, base: Estilo = BASE): Estilo {
   const o = objeto(crudo);
   const p = objeto(o.portada);
   const lg = objeto(p.logos);
+  const ft = objeto(p.foto);
   const t = objeto(o.texto);
   const tb = objeto(o.tablas);
   const cp = objeto(o.cabpie);
@@ -271,6 +288,14 @@ export function normalizarEstilo(crudo: unknown, base: Estilo = BASE): Estilo {
       mono,
       logos: { udes: true, mono: si(lg.mono, d.portada.logos.mono), propioId: idImagen(lg.propioId) },
       tono: uno<TonoContraportada>(p.tono as TonoContraportada, ["marino", "acento", "foto"], d.portada.tono),
+      foto: {
+        imagenId: idImagen(ft.imagenId),
+        x: Math.round(entre(ft.x, [0, 100], d.portada.foto.x) * 10) / 10,
+        y: Math.round(entre(ft.y, [0, 100], d.portada.foto.y) * 10) / 10,
+        zoom: Math.round(entre(ft.zoom, [1, 3], d.portada.foto.zoom) * 100) / 100,
+        ajuste: ft.ajuste === "contener" ? "contener" : "cubrir",
+        velo: Math.round(entre(ft.velo, [0, 60], d.portada.foto.velo)),
+      },
     },
     texto: {
       fb: uno<Familia>(t.fb as Familia, FAMILIAS, d.texto.fb),

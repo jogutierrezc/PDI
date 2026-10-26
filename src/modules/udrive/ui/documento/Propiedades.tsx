@@ -242,7 +242,7 @@ function PanelDocumento({ doc, editable, cambiarDoc, elegirPortada, recursos, ca
   return (
     <>
       <EstiloDelInforme doc={doc} editable={editable} cambiarDoc={cambiarDoc} carpetaId={carpetaId} decir={decir} abrirEstilo={abrirEstilo} recursos={recursos} />
-      <PortadaDelInforme doc={doc} editable={editable} cambiarDoc={cambiarDoc} elegirPortada={elegirPortada} recursos={recursos} />
+      <PortadaDelInforme doc={doc} editable={editable} cambiarDoc={cambiarDoc} carpetaId={carpetaId} recursos={recursos} />
       <CierreDelInforme doc={doc} editable={editable} cambiarDoc={cambiarDoc} />
 
       <div className="ud-doc-tarjeta">

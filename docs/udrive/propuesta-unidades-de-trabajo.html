@@ -1,0 +1,1417 @@
+<title>Unidades de trabajo en UDrive</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<style>
+/* Concepto: un taller de planos. Cada unidad de trabajo es una carpeta con rótulo propio (monograma, color, composición)
+   dentro de la misma familia del boletín y de UDrive. El documento es una sola columna larga con una guía lateral;
+   las maquetas son ventanas de UDrive que se pueden usar. Tema claro único. */
+:root {
+  --navy: #072b58;
+  --band: #4078b9;
+  --signal: #e8892b;
+  --ink: #16243a;
+  --ink-2: #4a5a70;
+  --ink-3: #5d6c80;
+  --rule: #d6dee8;
+  --paper: #eef3f9;
+  --desk: #f4f7fb;
+  --white: #ffffff;
+  --good: #12833a;
+  --warn: #8a5d00;
+  --warn-bg: #fbf2e0;
+  --bad: #b32d2d;
+  --bad-bg: #fbeaea;
+  --ui: "Open Sans", system-ui, "Segoe UI", sans-serif;
+  --disp: "Montserrat", "Open Sans", system-ui, sans-serif;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --d-fast: 140ms;
+  --d-base: 220ms;
+  --d-slow: 380ms;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--desk); color: var(--ink); font: 400 15px/1.55 var(--ui); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: var(--navy); }
+h1, h2, h3, h4 { font-family: var(--disp); color: var(--navy); margin: 0; text-wrap: balance; letter-spacing: -0.012em; }
+h1 { font-size: clamp(1.7rem, 1.2rem + 2vw, 2.6rem); font-weight: 800; line-height: 1.08; }
+h2 { font-size: clamp(1.3rem, 1.1rem + 0.9vw, 1.7rem); font-weight: 800; line-height: 1.15; }
+h3 { font-size: 1.05rem; font-weight: 700; line-height: 1.25; }
+h4 { font-size: 0.92rem; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--navy); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--band); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.kicker { font: 700 11px/1 var(--disp); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+.muted { color: var(--ink-2); }
+small, .small { font-size: 12.5px; color: var(--ink-3); }
+.skip { position: absolute; left: -999px; top: 8px; background: var(--navy); color: #fff; padding: 8px 12px; z-index: 70; }
+.skip:focus { left: 8px; }
+
+/* Estructura de la página */
+.shell { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 0 40px; }
+.guide { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; padding-block: 28px; font-size: 13.5px; }
+.guide ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; }
+.guide a { display: block; text-decoration: none; color: var(--ink-2); padding: 6px 10px; border-radius: 3px; transition: background-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease); }
+.guide a[aria-current="true"] { background: var(--navy); color: #fff; }
+@media (hover: hover) and (pointer: fine) { .guide a:hover:not([aria-current="true"]) { background: var(--paper); color: var(--navy); } }
+main { min-width: 0; padding-block: 28px 80px; }
+.top { display: grid; gap: 14px; padding-bottom: 28px; border-bottom: 1px solid var(--rule); }
+.top .lead { max-width: 68ch; font-size: 16px; color: var(--ink-2); }
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 28px; margin-top: 8px; }
+.decisions div { border-top: 2px solid var(--navy); padding-top: 8px; font-size: 13.5px; color: var(--ink-2); }
+.decisions strong { display: block; font: 700 13px/1.3 var(--disp); color: var(--navy); margin-bottom: 2px; }
+section.sec { padding-top: 56px; scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+section.sec > header { display: grid; gap: 8px; margin-bottom: 20px; }
+section.sec > header p { max-width: 70ch; color: var(--ink-2); }
+.sample { display: inline-block; font: 600 11px/1 var(--ui); color: var(--warn); background: var(--warn-bg); padding: 4px 7px; border-radius: 2px; }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .guide { position: static; padding-block: 16px 0; }
+  .guide ol { display: flex; flex-wrap: wrap; gap: 4px; }
+  .guide a { border: 1px solid var(--rule); background: #fff; }
+}
+
+/* Controles comunes */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 7px 14px; border-radius: 3px; border: 1px solid var(--navy); background: var(--navy); color: #fff; font: 700 13.5px/1.2 var(--disp); transition: transform var(--d-fast) var(--ease), background-color var(--d-fast) var(--ease); }
+.btn:active { transform: scale(0.97); }
+.btn.sec2 { background: #fff; color: var(--navy); }
+.btn.quiet { background: transparent; border-color: transparent; color: var(--navy); text-decoration: underline; text-underline-offset: 3px; }
+.btn.danger { background: #fff; color: var(--bad); border-color: var(--bad); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.btn[disabled]:active { transform: none; }
+@media (hover: hover) and (pointer: fine) { .btn:not([disabled]):hover { background: var(--band); border-color: var(--band); color: #fff; } .btn.sec2:not([disabled]):hover { background: var(--paper); color: var(--navy); border-color: var(--navy); } .btn.danger:not([disabled]):hover { background: var(--bad-bg); color: var(--bad); } }
+.fld { display: grid; gap: 5px; min-width: 0; }
+.fld > label, legend, .lbl { font: 700 12.5px/1.3 var(--disp); color: var(--navy); }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 6px; }
+input[type=text], input[type=email], select, textarea { border: 1px solid #98a8bc; border-radius: 3px; background: #fff; padding: 8px 10px; min-height: 38px; width: 100%; min-width: 0; transition: border-color var(--d-fast) var(--ease); }
+textarea { resize: vertical; line-height: 1.45; }
+input[type=text]:hover, select:hover, textarea:hover { border-color: var(--navy); }
+input[aria-invalid="true"] { border-color: var(--bad); background: var(--bad-bg); }
+.err { color: var(--bad); font-size: 12.5px; min-height: 0; }
+.hint { color: var(--ink-3); font-size: 12.5px; }
+.ok { color: var(--good); }
+.row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.chip { display: inline-block; font: 700 11px/1 var(--disp); padding: 4px 7px; border-radius: 2px; background: var(--paper); color: var(--navy); letter-spacing: 0.02em; }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.nav { background: var(--navy); color: #fff; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid #98a8bc; border-radius: 3px; overflow: hidden; background: #fff; }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: block; padding: 6px 11px; min-height: 36px; line-height: 24px; font-size: 13px; font-weight: 600; color: var(--ink-2); transition: background-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease); }
+.seg label + label span { border-left: 1px solid #98a8bc; }
+.seg input:checked + span { background: var(--navy); color: #fff; }
+.seg input:focus-visible + span { outline: 3px solid var(--band); outline-offset: -3px; }
+.panel { background: #fff; border: 1px solid var(--rule); border-radius: 4px; }
+
+/* Modelo mental */
+.model { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.25fr) auto minmax(0, 1fr); gap: 0; align-items: stretch; }
+.node { background: #fff; border: 1px solid var(--rule); padding: 16px; display: grid; gap: 6px; align-content: start; transition: border-color var(--d-base) var(--ease), background-color var(--d-base) var(--ease); }
+.node h3 { font-size: 0.95rem; }
+.node p { font-size: 13px; color: var(--ink-2); }
+.node.core { background: var(--navy); border-color: var(--navy); }
+.node.core h3, .node.core p, .node.core .kicker { color: #fff; }
+.node.core ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: #dbe6f5; }
+.node.is-lit { border-color: var(--signal); background: #fff8ee; }
+.node.core.is-lit { background: var(--navy); border-color: var(--signal); }
+.link { display: grid; place-items: center; padding: 0 6px; min-width: 74px; text-align: center; font-size: 11.5px; color: var(--ink-3); position: relative; }
+.link::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed #98a8bc; }
+.link span { position: relative; background: var(--desk); padding: 2px 4px; }
+.link.solid::before { border-top-style: solid; border-color: var(--navy); }
+.lenses { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; align-items: center; }
+.lens-out { margin-top: 12px; padding: 14px 16px; background: #fff; border: 1px solid var(--rule); max-width: 78ch; min-height: 74px; }
+.lens-out strong { font-family: var(--disp); color: var(--navy); }
+.lens-out ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; }
+@media (max-width: 760px) { .model { grid-template-columns: minmax(0, 1fr); } .link { min-height: 44px; } .link::before { inset: 0 auto 0 50%; border-top: 0; border-left: 2px dashed #98a8bc; } .link.solid::before { border-left: 2px solid var(--navy); } }
+
+/* Ventana de maqueta */
+.win { background: var(--paper); border: 1px solid #aab7c8; border-radius: 4px; overflow: hidden; }
+.win-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; background: var(--navy); color: #fff; padding: 8px 14px; }
+.win-bar .crumb { font: 600 12.5px/1.3 var(--disp); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.win-bar .crumb button { background: none; border: 0; color: #cfe0f6; padding: 2px 0; text-decoration: underline; text-underline-offset: 3px; font: inherit; }
+.win-bar .crumb b { color: #fff; }
+.sim { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #cfe0f6; }
+.sim .seg { border-color: #6f93c4; background: transparent; }
+.sim .seg span { color: #dbe6f5; min-height: 30px; line-height: 18px; font-size: 12px; }
+.sim .seg label + label span { border-left-color: #6f93c4; }
+.sim .seg input:checked + span { background: #fff; color: var(--navy); }
+.win-body { padding: 18px; min-height: 420px; }
+.adminbar { background: var(--signal); color: #1d1402; padding: 8px 14px; font-size: 13px; font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; }
+.adminbar a, .adminbar button { color: #1d1402; background: none; border: 0; text-decoration: underline; font: inherit; font-weight: 700; padding: 0; }
+
+/* Monograma y portadas */
+.mono { display: inline-grid; place-items: center; min-width: 44px; height: 44px; padding: 0 8px; background: var(--ac, var(--navy)); color: #fff; font: 800 15px/1 var(--disp); letter-spacing: 0.04em; border-radius: 2px; flex: none; }
+.mono.sm { min-width: 34px; height: 34px; font-size: 12px; }
+.mono.ghost { background: rgba(255, 255, 255, 0.16); }
+.cv { position: absolute; inset: 0; overflow: hidden; }
+.cv svg, .cv img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hero { --ac: #0b3a78; position: relative; background: #fff; }
+.hero h2, .hero h3, .hero .ht { font-family: var(--disp); font-weight: 800; color: var(--navy); line-height: 1.12; margin: 0; }
+.hero .hd { color: var(--ink-2); font-size: 13.5px; margin-top: 4px; max-width: 60ch; }
+/* A banda */
+.kA .band { position: relative; height: var(--hh, 120px); background: var(--ac); }
+.kA .hb { display: flex; gap: 14px; align-items: center; padding: 14px 16px; }
+/* B lateral */
+.kB { display: grid; grid-template-columns: minmax(0, 0.42fr) minmax(0, 1fr); min-height: var(--hh, 160px); }
+.kB .hl { position: relative; background: var(--ac); display: grid; place-items: center; }
+.kB .hl .mono { position: relative; background: #fff; color: var(--ac); min-width: 60px; height: 60px; font-size: 18px; }
+.kB .hb { padding: 16px; display: grid; align-content: center; }
+/* C rótulo */
+.kC { border-bottom: 5px solid var(--ac); padding: 16px 16px 14px; display: grid; gap: 4px; min-height: var(--hh, 150px); align-content: end; background: var(--paper); }
+.kC .giant { font: 800 clamp(2.6rem, 2rem + 4vw, var(--gs, 4.4rem))/0.9 var(--disp); color: var(--ac); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+/* D mosaico */
+.kD { min-height: var(--hh, 190px); display: grid; align-content: end; background: var(--ac); }
+.kD .plate { position: relative; background: var(--ac); display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
+.kD h2, .kD h3, .kD .ht { color: #fff; }
+.kD .hd { color: #e8eef7; }
+.kD .vis { position: absolute; inset: 0 0 var(--plate, 74px) 0; }
+.hero .glyph { width: 20px; height: 20px; flex: none; }
+.hero.page { --hh: 190px; --gs: 6.2rem; }
+.hero.page.kA { --hh: 150px; }
+.hero.page.kD { --hh: 270px; }
+.hero.page.kB { --hh: 200px; }
+.hero.page.kC { --hh: 190px; }
+
+/* Tarjetas del índice */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; align-items: stretch; }
+.ucard { display: grid; grid-template-rows: 1fr auto; text-align: left; padding: 0; background: #fff; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; min-width: 0; transition: border-color var(--d-fast) var(--ease), transform var(--d-fast) var(--ease); }
+.ucard:active { transform: scale(0.985); }
+@media (hover: hover) and (pointer: fine) { .ucard:hover { border-color: var(--navy); } }
+.ucard.wide { grid-column: span 2; }
+@media (max-width: 640px) { .ucard.wide { grid-column: auto; } }
+.ucard .hero { --hh: 120px; border: 0; }
+.ucard .hero.kD { --hh: 150px; }
+.ucard .hero.kC { --hh: 120px; --gs: 3.4rem; }
+.ucard .hero.kB { --hh: 120px; }
+.ucard .hero .hd { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ucard .hero.kA .hb { padding: 10px 14px 12px; }
+.ucard .meta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink-2); }
+.ucard .meta .chip { margin-left: auto; }
+.ulist { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid var(--rule); }
+.ulist li + li { border-top: 1px solid var(--rule); }
+.ulist button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: center; width: 100%; text-align: left; background: none; border: 0; padding: 10px 14px; }
+.ulist .t { font: 700 14px/1.3 var(--disp); color: var(--navy); }
+.ulist .s { font-size: 12.5px; color: var(--ink-2); }
+.ulist .r { font-size: 12.5px; color: var(--ink-2); text-align: right; }
+@media (hover: hover) and (pointer: fine) { .ulist button:hover { background: var(--desk); } }
+@media (max-width: 560px) { .ulist button { grid-template-columns: auto minmax(0, 1fr); } .ulist .r { grid-column: 2; text-align: left; } }
+.tools { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; margin-bottom: 16px; }
+.tools .fld { flex: 1 1 220px; max-width: 360px; }
+.empty { padding: 28px; text-align: center; background: #fff; border: 1px dashed #98a8bc; color: var(--ink-2); }
+.empty strong { display: block; font-family: var(--disp); color: var(--navy); margin-bottom: 4px; }
+
+/* Inicio de la unidad */
+.unav { display: flex; flex-wrap: wrap; gap: 4px 22px; align-items: center; border-bottom: 1px solid var(--rule); background: #fff; padding: 0 16px; }
+.unav button { background: none; border: 0; padding: 12px 0 9px; border-bottom: 3px solid transparent; font: 700 13px/1.2 var(--disp); color: var(--ink-2); }
+.unav button[aria-current="page"] { color: var(--navy); border-bottom-color: var(--signal); }
+.unav .grow { flex: 1; }
+.unit { background: #fff; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+.blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 28px; padding: 20px 18px 24px; background: var(--paper); }
+.blk { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.blk.wide { grid-column: 1 / -1; }
+.blk > h4 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-bottom: 2px solid var(--ac, var(--navy)); padding-bottom: 5px; }
+.blk > h4 .btn { min-height: 0; padding: 0; }
+@media (max-width: 760px) { .blocks { grid-template-columns: minmax(0, 1fr); } }
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.fold { display: grid; gap: 2px; text-align: left; padding: 10px 12px; background: #fff; border: 1px solid var(--rule); border-radius: 3px; transition: border-color var(--d-fast) var(--ease); }
+.fold b { font: 700 13px/1.25 var(--disp); color: var(--navy); }
+.fold span { font-size: 12px; color: var(--ink-3); }
+.fold svg { width: 22px; height: 22px; color: var(--ac, var(--navy)); margin-bottom: 4px; }
+@media (hover: hover) and (pointer: fine) { .fold:hover { border-color: var(--ac, var(--navy)); } }
+.lst { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid var(--rule); }
+.lst li { padding: 8px 12px; display: grid; gap: 1px; font-size: 13.5px; }
+.lst li + li { border-top: 1px solid var(--rule); }
+.lst small { color: var(--ink-3); }
+.prog { height: 6px; background: var(--paper); border-radius: 1px; overflow: hidden; margin-top: 5px; }
+.prog i { display: block; height: 100%; background: var(--ac, var(--navy)); transform-origin: left; }
+.avs { display: flex; flex-wrap: wrap; gap: 0; }
+.av { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #fff; font: 700 11.5px/1 var(--disp); border: 2px solid #fff; flex: none; }
+.avs .av + .av { margin-left: -8px; }
+.roles-sum { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+
+/* Tabla de papeles */
+.matrix-wrap { overflow-x: auto; background: #fff; border: 1px solid var(--rule); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 700 12px/1.3 var(--disp); color: var(--navy); background: var(--desk); }
+td.c, th.c { text-align: center; }
+.yes { color: var(--good); font-weight: 700; }
+.no { color: #98a8bc; }
+
+/* Formulario */
+.formgrid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; }
+@media (max-width: 980px) { .formgrid { grid-template-columns: minmax(0, 1fr); } .pv { order: -1; position: static !important; } }
+.pv { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; gap: 8px; }
+.pv .ucard { cursor: default; pointer-events: none; }
+.stepper { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0 0 16px; padding: 0; }
+.stepper li { border-top: 4px solid var(--rule); padding-top: 6px; font: 700 12px/1.3 var(--disp); color: var(--ink-3); }
+.stepper li[aria-current="step"] { border-color: var(--navy); color: var(--navy); }
+.stepper li.done { border-color: var(--good); color: var(--good); }
+.stepper small { display: block; font: 400 11.5px/1.3 var(--ui); color: var(--ink-3); }
+@media (max-width: 520px) { .stepper small { display: none; } }
+.fpanel { padding: 18px; display: grid; gap: 18px; }
+.fpanel[hidden] { display: none; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 560px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.sw { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw button { width: 32px; height: 32px; border-radius: 2px; border: 2px solid #fff; box-shadow: 0 0 0 1px #98a8bc; transition: transform var(--d-fast) var(--ease); }
+.sw button:active { transform: scale(0.94); }
+.sw button[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--navy); }
+.contrast { font-size: 12.5px; padding: 6px 9px; border-radius: 2px; background: var(--paper); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.contrast.bad { background: var(--bad-bg); color: var(--bad); }
+.contrast.good b { color: var(--good); }
+.icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.icons button, .opts button { border: 1px solid #98a8bc; background: #fff; border-radius: 3px; min-height: 44px; display: grid; place-items: center; color: var(--ink-2); transition: border-color var(--d-fast) var(--ease), background-color var(--d-fast) var(--ease); }
+.icons button svg { width: 22px; height: 22px; }
+.icons button[aria-checked="true"], .opts button[aria-checked="true"] { border-color: var(--navy); background: var(--navy); color: #fff; }
+.opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.opts button { padding: 6px; gap: 4px; font-size: 12px; font-weight: 600; text-align: center; align-content: start; }
+.opts .th { width: 100%; height: 44px; background: var(--paper); position: relative; overflow: hidden; border-radius: 2px; }
+.opts button[aria-checked="true"] .th { outline: 2px solid #fff; }
+.tpl { display: grid; gap: 8px; }
+.tpl label { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 10px 12px; border: 1px solid #98a8bc; border-radius: 3px; background: #fff; cursor: pointer; }
+.tpl label:has(input:checked) { border-color: var(--navy); background: #f2f7fe; box-shadow: inset 0 0 0 1px var(--navy); }
+.tpl label:has(input:focus-visible) { outline: 3px solid var(--band); outline-offset: 2px; }
+.tpl input { grid-row: span 2; margin-top: 3px; }
+.tpl span { font-weight: 700; font-family: var(--disp); font-size: 13.5px; color: var(--navy); }
+.tpl small { grid-column: 2; }
+.fnav { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; padding: 12px 18px; border-top: 1px solid var(--rule); background: var(--desk); }
+
+/* Personas */
+.ppl { display: grid; gap: 14px; }
+.ppl-add { display: grid; gap: 12px; }
+.combo { position: relative; }
+.lb { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 0; list-style: none; background: #fff; border: 1px solid var(--navy); border-radius: 3px; max-height: 270px; overflow: auto; }
+.lb li { padding: 8px 10px; display: flex; gap: 10px; align-items: center; cursor: pointer; }
+.lb li[aria-selected="true"] { background: var(--navy); color: #fff; }
+.lb li[aria-selected="true"] small { color: #cfe0f6; }
+.lb li.none { cursor: default; color: var(--ink-2); display: block; font-size: 13px; }
+.more { border: 1px solid var(--rule); background: #fff; border-radius: 3px; }
+.more summary { padding: 9px 12px; font: 700 12.5px/1.3 var(--disp); color: var(--navy); cursor: pointer; }
+.more > div { padding: 4px 12px 14px; display: grid; gap: 14px; }
+.ppl-warn { display: grid; gap: 6px; }
+.note { padding: 8px 11px; font-size: 13px; border-radius: 2px; }
+.note.warn { background: var(--warn-bg); color: #5f4100; }
+.note.bad { background: var(--bad-bg); color: var(--bad); }
+.note.info { background: #eaf1fd; color: var(--navy); }
+.bulk { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; background: var(--desk); border: 1px solid var(--rule); border-bottom: 0; font-size: 13px; }
+.bulk select { width: auto; min-height: 32px; padding: 3px 8px; }
+.plist { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid var(--rule); }
+.prow { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 8px 12px; align-items: center; padding: 8px 12px; overflow: hidden; }
+.prow + .prow { border-top: 1px solid var(--rule); }
+.prow .pn { min-width: 0; display: grid; }
+.prow .pn strong { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.prow .pn small { overflow-wrap: anywhere; }
+.prow select { width: 138px; min-height: 34px; padding: 3px 8px; }
+.prow .rm { background: none; border: 0; color: var(--bad); text-decoration: underline; text-underline-offset: 3px; padding: 6px 4px; font-size: 13px; min-height: 34px; }
+.prow input[type=checkbox], .bulk input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--navy); }
+.plist .empty-row { padding: 22px; text-align: center; color: var(--ink-2); font-size: 13.5px; }
+@media (max-width: 560px) { .prow { grid-template-columns: auto auto minmax(0, 1fr); } .prow select { grid-column: 2 / -1; width: 100%; } .prow .rm { grid-column: 2 / -1; justify-self: start; } }
+
+/* Revisar */
+.sum { display: grid; gap: 0; margin: 0; }
+.sum div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+.sum dt { color: var(--ink-3); font-weight: 600; }
+.sum dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .sum div { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+.done-box { padding: 28px 18px; display: grid; gap: 14px; justify-items: start; }
+.done-box ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 14px; }
+.done-box li::before { content: "Listo · "; color: var(--good); font-weight: 700; }
+
+/* Personalizar */
+.custom { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; padding: 18px; background: var(--paper); align-items: start; }
+.custom .ctl { background: #fff; border: 1px solid var(--rule); padding: 14px; display: grid; gap: 16px; }
+@media (max-width: 900px) { .custom { grid-template-columns: minmax(0, 1fr); } }
+.ord { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ord li { display: flex; gap: 6px; align-items: center; justify-content: space-between; border: 1px solid var(--rule); padding: 4px 4px 4px 10px; font-size: 13px; background: #fff; }
+.ord button { width: 32px; height: 32px; border: 1px solid #98a8bc; background: #fff; border-radius: 2px; }
+.ord button[disabled] { opacity: 0.35; cursor: not-allowed; }
+.chk { display: grid; gap: 4px; }
+.chk label { display: flex; gap: 8px; align-items: center; font-size: 13px; min-height: 28px; }
+.chk input { width: 18px; height: 18px; accent-color: var(--navy); }
+
+/* Registro */
+.audit { margin-top: 20px; }
+.audit h3 { margin-bottom: 8px; }
+.audit .tb { overflow-x: auto; background: #fff; border: 1px solid var(--rule); }
+
+/* Movimiento, técnica */
+.codeblock { background: #0f2240; color: #dbe6f5; padding: 14px 16px; overflow-x: auto; font: 12.5px/1.6 ui-monospace, Consolas, monospace; border-radius: 3px; white-space: pre; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px 32px; }
+.cols > div { display: grid; gap: 8px; align-content: start; }
+.cols h3 { border-top: 2px solid var(--navy); padding-top: 8px; }
+.cols ul, .plain { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; display: grid; gap: 4px; }
+.phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.phase { background: #fff; border: 1px solid var(--rule); padding: 14px; display: grid; gap: 6px; align-content: start; }
+.phase ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-2); display: grid; gap: 3px; }
+.ac { padding-top: 8px; }
+
+/* Aviso y anuncios */
+#toast { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: min(440px, calc(100vw - 32px)); background: var(--navy); color: #fff; padding: 11px 14px; border-radius: 3px; font-size: 13.5px; z-index: 80; }
+</style>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+<div class="shell">
+  <nav class="guide" aria-label="Secciones de la propuesta">
+    <div class="kicker">Propuesta de diseño</div>
+    <ol id="guide">
+      <li><a href="#modelo">Modelo</a></li>
+      <li><a href="#formulario">Formulario</a></li>
+      <li><a href="#unidades">Cómo se muestran</a></li>
+      <li><a href="#personalizar">Personalizar</a></li>
+      <li><a href="#movimiento">Movimiento</a></li>
+      <li><a href="#accesibilidad">Accesibilidad</a></li>
+      <li><a href="#tecnica">Técnica</a></li>
+      <li><a href="#dudas">Dudas</a></li>
+    </ol>
+  </nav>
+
+  <main id="contenido">
+    <div class="top">
+      <div class="kicker">UDrive · Planeación Institucional · 26 de octubre de 2026</div>
+      <h1>Unidades de trabajo</h1>
+      <p class="lead">Un espacio con nombre, identidad y personas con papel, dentro de UDrive. Cada oficina lo arma una vez y deja de compartir carpeta por carpeta. Esta es una maqueta que se puede usar: crea una unidad en el formulario y aparece en el índice.</p>
+      <div class="decisions">
+        <div><strong>Formulario en cuatro pasos cortos</strong>Datos, identidad, personas y revisión. La tarjeta de la unidad se arma a la vista todo el tiempo.</div>
+        <div><strong>Cuatro papeles</strong>Solo ver, Editar, Crear y Administra. Los tres primeros son los que pediste; el cuarto evita unidades sin dueño.</div>
+        <div><strong>Vinculada a la estructura, sin atarse</strong>Se puede partir de una unidad de la universidad para traer a su gente, pero los papeles de UDrive son propios.</div>
+        <div><strong>Identidad con límites</strong>Color libre con contraste mínimo, cuatro composiciones, doce iconos. Cada unidad se ve distinta y todas parecen de la misma casa.</div>
+      </div>
+    </div>
+
+    <!-- 1. MODELO -->
+    <section class="sec" id="modelo" aria-labelledby="h-modelo">
+      <header>
+        <div class="kicker">Modelo mental</div>
+        <h2 id="h-modelo">Una unidad es un espacio con dueño colectivo</h2>
+        <p>Hoy cada carpeta pertenece a quien la creó y se comparte por correo, una por una. La unidad cambia el punto de partida: el espacio es del grupo y las personas entran con un papel.</p>
+      </header>
+      <div class="model" id="model" role="group" aria-label="Relación entre carpetas personales, unidad de trabajo y estructura de la universidad">
+        <div class="node" data-n="personal"><div class="kicker">Hoy</div><h3>Mi unidad personal</h3><p>Carpetas y archivos que creo yo. Son míos y los comparto cuando quiero.</p></div>
+        <div class="link solid"><span>mover o copiar</span></div>
+        <div class="node core" data-n="unidad"><div class="kicker">Nuevo</div><h3>Unidad de trabajo</h3><p>Espacio con nombre propio que pertenece al grupo.</p><ul><li>Identidad: monograma, color, portada</li><li>Personas con papel: ver, editar, crear, administrar</li><li>Carpetas y archivos propios, con papelera</li></ul></div>
+        <div class="link"><span>vínculo opcional</span></div>
+        <div class="node" data-n="estructura"><div class="kicker">Ya existe</div><h3>Estructura de la universidad</h3><p>Unidades con su Gestor, Contribuyentes y Consulta. Sirve para traer a la gente, no para decidir qué ve en UDrive.</p></div>
+      </div>
+      <div class="lenses" role="group" aria-label="Ver la relación con">
+        <span class="lbl">Ver qué pasa con</span>
+        <div class="seg"><label><input type="radio" name="lens" value="personal" checked><span>Carpetas personales</span></label><label><input type="radio" name="lens" value="estructura"><span>Estructura</span></label><label><input type="radio" name="lens" value="correo"><span>Compartir por correo</span></label></div>
+      </div>
+      <div class="lens-out" id="lens-out" aria-live="polite"></div>
+    </section>
+
+    <!-- 2. FORMULARIO -->
+    <section class="sec" id="formulario" aria-labelledby="h-form">
+      <header>
+        <div class="kicker">Formulario de creación</div>
+        <h2 id="h-form">Cuatro pasos, una tarjeta que se arma sola</h2>
+        <p>Decidí pasos y no una página única por una razón: el paso de personas es el más largo y el que más errores trae, y merece pantalla propia. Los otros son cortos y todos tienen valores por defecto, así que se puede crear una unidad con solo nombre y personas. La tarjeta de la derecha cambia mientras se escribe. <span class="sample">Personas y datos de ejemplo</span></p>
+      </header>
+      <div class="formgrid">
+        <div class="panel" id="formbox">
+          <div style="padding:18px 18px 0">
+            <ol class="stepper" id="stepper" aria-label="Pasos">
+              <li data-s="1"><span>Datos</span><small>Nombre y plantilla</small></li>
+              <li data-s="2"><span>Identidad</span><small>Cómo se ve</small></li>
+              <li data-s="3"><span>Personas</span><small>Quién y con qué papel</small></li>
+              <li data-s="4"><span>Revisar</span><small>Y crear</small></li>
+            </ol>
+          </div>
+          <form id="f" novalidate>
+            <div class="fpanel" data-p="1">
+              <div class="fld"><label for="f-name">Nombre de la unidad</label>
+                <input type="text" id="f-name" maxlength="60" autocomplete="off" aria-describedby="f-name-h f-name-e" placeholder="Por ejemplo, Planeación Institucional">
+                <span class="hint" id="f-name-h">Es el que verá todo el equipo. Entre 3 y 60 caracteres.</span><span class="err" id="f-name-e" aria-live="polite"></span></div>
+              <div class="fld"><label for="f-desc">Descripción corta <span class="hint">(opcional)</span></label>
+                <textarea id="f-desc" rows="2" maxlength="140" aria-describedby="f-desc-c" placeholder="Para qué sirve esta unidad"></textarea>
+                <span class="hint" id="f-desc-c">0 de 140</span></div>
+              <fieldset class="tpl"><legend>Carpetas con las que empieza</legend>
+                <label><input type="radio" name="tpl" value="informes" checked><span>Informes y datos</span><small>Informes, Datos, Documentos de apoyo</small></label>
+                <label><input type="radio" name="tpl" value="seguimiento"><span>Seguimiento</span><small>Plan de trabajo, Actas, Evidencias</small></label>
+                <label><input type="radio" name="tpl" value="blanco"><span>En blanco</span><small>Sin carpetas. Las crea quien tenga papel de Crear.</small></label>
+              </fieldset>
+              <div class="fld"><label for="f-link">Partir de una unidad de la estructura <span class="hint">(opcional)</span></label>
+                <select id="f-link"></select>
+                <span class="hint">Solo sirve para traer a su gente en el paso 3. No sincroniza después.</span></div>
+            </div>
+
+            <div class="fpanel" data-p="2" hidden>
+              <p class="hint" style="margin-top:-6px">Todo esto tiene un valor por defecto elegido a partir del nombre. Cámbialo si quieres que la unidad se reconozca de un vistazo.</p>
+              <div class="two">
+                <div class="fld"><label for="f-mono">Monograma</label>
+                  <input type="text" id="f-mono" maxlength="4" autocomplete="off" aria-describedby="f-mono-h f-mono-e" style="text-transform:uppercase;letter-spacing:.08em;font-weight:700">
+                  <span class="hint" id="f-mono-h">De 2 a 4 letras o números.</span><span class="err" id="f-mono-e" aria-live="polite"></span></div>
+                <div class="fld"><label for="f-hex">Color de acento</label>
+                  <input type="text" id="f-hex" maxlength="7" autocomplete="off" aria-describedby="f-ct" spellcheck="false">
+                  <div class="sw" id="f-sw" role="group" aria-label="Colores sugeridos"></div></div>
+              </div>
+              <div class="contrast" id="f-ct" aria-live="polite"></div>
+              <fieldset><legend>Icono</legend><div class="icons" id="f-icons" role="radiogroup" aria-label="Icono de la unidad"></div></fieldset>
+              <fieldset><legend>Imagen de cabecera <span class="hint">(opcional)</span></legend>
+                <div class="opts" id="f-cover" role="radiogroup" aria-label="Imagen de cabecera"></div>
+                <div class="fld" style="margin-top:10px"><label for="f-file">O sube una imagen propia (JPG, PNG o WebP)</label><input type="file" id="f-file" accept="image/png,image/jpeg,image/webp"><span class="err" id="f-file-e" aria-live="polite"></span></div>
+                <div class="two" style="margin-top:10px">
+                  <div class="fld"><label for="f-cx">Encuadre horizontal</label><input type="range" id="f-cx" min="0" max="100" value="50"></div>
+                  <div class="fld"><label for="f-cy">Encuadre vertical</label><input type="range" id="f-cy" min="0" max="100" value="50"></div>
+                  <div class="fld"><label for="f-zoom">Ampliación</label><input type="range" id="f-zoom" min="100" max="220" value="100"></div>
+                </div>
+                <span class="hint" id="f-fit-h">El encuadre se activa con una imagen propia.</span>
+              </fieldset>
+              <fieldset><legend>Composición de la portada</legend><div class="opts" id="f-comp" role="radiogroup" aria-label="Composición de la portada"></div></fieldset>
+            </div>
+
+            <div class="fpanel" data-p="3" hidden>
+              <div class="note info">Tú entras como quien administra. Quien se añade empieza con el papel que elijas abajo; lo más seguro es Solo ver y subir el papel a quien lo necesite.</div>
+              <div id="f-people"></div>
+              <div>
+                <h4 style="margin-bottom:6px">Qué puede hacer cada papel</h4>
+                <div class="matrix-wrap"><table id="matrix"></table></div>
+              </div>
+            </div>
+
+            <div class="fpanel" data-p="4" hidden>
+              <dl class="sum" id="f-sum"></dl>
+              <div id="f-issues" class="ppl-warn" aria-live="polite"></div>
+              <label class="row" style="font-size:13px;color:var(--ink-2)"><input type="checkbox" id="f-fail" style="width:18px;height:18px"> Probar el error de red al crear (solo en la maqueta)</label>
+              <div id="f-err" class="note bad" role="alert" hidden></div>
+            </div>
+            <div class="fpanel done-box" data-p="5" hidden id="f-done"></div>
+
+            <div class="fnav" id="fnav">
+              <button type="button" class="btn sec2" id="f-back">Atrás</button>
+              <span class="small" id="f-step-t"></span>
+              <button type="button" class="btn" id="f-next">Siguiente</button>
+            </div>
+          </form>
+        </div>
+        <aside class="pv" aria-label="Vista previa de la tarjeta">
+          <div class="kicker">Así se verá en el índice</div>
+          <div id="f-card"></div>
+          <p class="small">La tarjeta cambia con cada letra. La portada de dentro usa la misma composición.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 3. UNIDADES -->
+    <section class="sec" id="unidades" aria-labelledby="h-un">
+      <header>
+        <div class="kicker">Cómo se muestran</div>
+        <h2 id="h-un">Índice, inicio de la unidad, personas y administración</h2>
+        <p>Una sola ventana de UDrive con todo lo que sigue. Abre una unidad con clic o con Intro. Cambia la sesión arriba a la derecha para ver el mismo espacio como miembro con papeles distintos (Camila, en Decanatura solo edita; en Investigaciones solo ve) o como administración general (Jorge). <span class="sample">Nombres y cifras de ejemplo</span></p>
+      </header>
+      <div class="win" id="win">
+        <div class="win-bar">
+          <div class="crumb" id="crumb"></div>
+          <div class="sim"><span id="sim-l">Simular sesión</span>
+            <div class="seg" role="radiogroup" aria-labelledby="sim-l"><label><input type="radio" name="ses" value="miembro" checked><span>Camila, miembro</span></label><label><input type="radio" name="ses" value="admin"><span>Jorge, administración general</span></label></div>
+          </div>
+        </div>
+        <div id="adminbar" class="adminbar" hidden></div>
+        <div class="win-body" id="stage" tabindex="-1"></div>
+      </div>
+    </section>
+
+    <!-- 4. PERSONALIZAR -->
+    <section class="sec" id="personalizar" aria-labelledby="h-per">
+      <header>
+        <div class="kicker">Diseños dinámicos y personalizados</div>
+        <h2 id="h-per">Misma familia, cuatro composiciones</h2>
+        <p>La personalización cabe en cuatro decisiones: color, composición de la cabecera, orden de las secciones y carpetas ancladas. Nada más, a propósito. Quien administra la unidad las cambia en el panel «Personalizar» de la ventana de arriba, con la vista previa al lado.</p>
+      </header>
+      <div class="phases" id="comp-demo"></div>
+      <p style="margin-top:14px"><button class="btn" type="button" id="go-custom">Abrir Personalizar en Planeación Institucional</button></p>
+    </section>
+
+    <!-- 5. MOVIMIENTO -->
+    <section class="sec" id="movimiento" aria-labelledby="h-mov">
+      <header>
+        <div class="kicker">Movimiento</div>
+        <h2 id="h-mov">Especificación de movimiento</h2>
+        <p>GSAP 3.12.5. Solo se anima <code>transform</code> y <code>opacity</code>, salvo el colapso de una fila al quitar a una persona. Con «reducir movimiento» activo, todo se convierte en un fundido de 120 ms. Lo que se usa cientos de veces al día (búsqueda, filtros, teclado) no se anima.</p>
+      </header>
+      <div class="cols" style="margin-bottom:18px">
+        <div><h3>Fichas de tiempo</h3><ul><li>Rápido 140 ms: pulsaciones y cambios de color.</li><li>Base 220 ms: entradas y salidas de elementos.</li><li>Lento 380 ms: tarjeta a página y confirmación.</li><li>Escalón entre hermanos: 45 ms, máximo 8 elementos.</li></ul></div>
+        <div><h3>Curvas</h3><ul><li>Salida y entrada: <code>power4.out</code>, equivale a cubic-bezier(0.23, 1, 0.32, 1).</li><li>Movimiento en pantalla: <code>power3.inOut</code>.</li><li>Sin ease-in. Sin rebote. Sin <code>scale(0)</code>: se parte de 0,96.</li></ul></div>
+        <div><h3>Reglas</h3><ul><li>Salir es más rápido que entrar.</li><li>Toda animación se puede interrumpir: se mata con <code>overwrite</code> y no se acumula.</li><li>El hover se limita a punteros finos.</li></ul></div>
+      </div>
+      <div class="matrix-wrap"><table id="mov"></table></div>
+      <p style="margin-top:12px"><button class="btn sec2" type="button" id="replay">Repetir la entrada de tarjetas</button> <span class="small">Mira el índice de arriba mientras se repite.</span></p>
+    </section>
+
+    <!-- 6. ACCESIBILIDAD -->
+    <section class="sec" id="accesibilidad" aria-labelledby="h-acc">
+      <header><div class="kicker">Accesibilidad y pantallas pequeñas</div><h2 id="h-acc">Lo que ya cumple la maqueta</h2></header>
+      <div class="cols">
+        <div><h3>Teclado y foco</h3><ul class="plain"><li>Todo se maneja con Tab, Intro, Espacio y flechas. El buscador de personas es un combobox: flechas, Intro y Escape.</li><li>El foco se ve siempre (contorno de 3 px). Tras un paso del formulario, el foco pasa al título del paso.</li><li>Cambiar de papel es un <code>select</code> nativo: funciona igual en teclado, lector y teléfono.</li></ul></div>
+        <div><h3>Lectores de pantalla</h3><ul class="plain"><li>Agregar, quitar y cambiar de papel se anuncian en una región educada («Sofía quedó con papel Crear. 4 personas»).</li><li>Cada control tiene etiqueta. Los errores se enlazan al campo con <code>aria-describedby</code>.</li><li>El estado de un paso se dice con <code>aria-current="step"</code>.</li></ul></div>
+        <div><h3>Contraste y color</h3><ul class="plain"><li>El color de acento se rechaza si no llega a 4,5:1 contra blanco; hay un botón que lo oscurece hasta cumplir.</li><li>El papel nunca se comunica solo con color: siempre va el texto.</li><li>El texto nunca va sobre la imagen de cabecera, sino sobre una placa de color sólido.</li></ul></div>
+        <div><h3>Pantalla de 360 px</h3><ul class="plain"><li>La vista previa pasa arriba del formulario. Las filas de personas apilan el papel debajo del nombre.</li><li>Las tablas anchas se desplazan dentro de su caja, la página no.</li><li>Los objetivos táctiles miden al menos 34 px.</li></ul></div>
+      </div>
+    </section>
+
+    <!-- 7. TECNICA -->
+    <section class="sec" id="tecnica" aria-labelledby="h-tec">
+      <header><div class="kicker">Recomendación técnica</div><h2 id="h-tec">Cómo se construye sobre 0187</h2><p>Lo que sigue sale de leer <code>0187_udrive.sql</code>, <code>lib/permisos.ts</code>, la migración 0057 de estructura y la sección 0169 de Informes. No se escribió código.</p></header>
+      <div class="cols">
+        <div><h3>Lo que existe hoy</h3><ul>
+          <li><code>drive_carpetas</code>, <code>drive_archivos</code> y <code>drive_permisos</code> (carpeta o archivo, usuario, rol propietario, editor o lector). Compartir va por <code>drive_compartir</code>, por correo.</li>
+          <li><code>drive_rol_carpeta</code> sube por el árbol y toma el rol mayor: quien <em>creó</em> la carpeta o una superior es propietario; si no, el rol compartido más alto.</li>
+          <li><code>drive_rango</code> tiene tres niveles (1, 2, 3). Editor puede crear y editar a la vez; no existe «Crear» separado de «Editar».</li>
+          <li>La estructura (<code>units</code>, <code>unit_members</code>) usa visor, editor y jefe, que la interfaz llama Consulta, Contribuyente y Gestor. Informes sumó el rol de acceso (0169) con <code>informe_actor</code>.</li>
+          <li>Administración general es <code>app_role = 'admin'</code> (<code>has_role_at_least('admin')</code>). Planeación es un nivel debajo.</li>
+        </ul></div>
+        <div><h3>Dónde hay conflicto</h3><ul>
+          <li><strong>Propiedad por autoría.</strong> Con la regla actual, quien crea una subcarpeta dentro de la unidad queda propietario y podría compartirla hacia fuera o borrarla. En el árbol de una unidad la autoría no debe dar rango; el rango sale solo del papel en la unidad.</li>
+          <li><strong>Tres niveles contra cuatro.</strong> Hay que ampliar <code>drive_rango</code> y las comprobaciones de <code>drive_puede_editar_*</code> con un nivel «crear» entre editar y propietario.</li>
+          <li><strong>Dos sistemas de roles.</strong> Mezclar los papeles de UDrive con <code>unit_members</code> cambiaría quién ve Informes y Tableros. Por eso el vínculo es opcional y de una sola vía.</li>
+        </ul></div>
+      </div>
+      <h3 style="margin:26px 0 8px">Tablas nuevas (esbozo)</h3>
+      <div class="codeblock" tabindex="0" role="region" aria-label="Esbozo de tablas">drive_unidades
+  id uuid pk, nombre text, descripcion text, monograma text(2..4), acento text (#rrggbb, contraste &gt;= 4.5 validado en función),
+  icono text (lista cerrada), composicion text (A|B|C|D), portada text, portada_ruta text null (bucket udrive),
+  encuadre jsonb, orden_secciones text[], ancladas uuid[], unit_id uuid null references units,
+  carpeta_raiz uuid not null references drive_carpetas, archivada_en timestamptz null, creada_por, created_at
+
+drive_unidad_miembros
+  unidad_id, usuario_id, rol text check (rol in ('lector','editor','creador','admin')),
+  otorgado_por, created_at, primary key (unidad_id, usuario_id)
+
+drive_unidad_eventos          -- auditoría, solo insert
+  id, unidad_id, actor_id, como text ('miembro'|'admin_general'), accion text, detalle jsonb, created_at
+
+drive_carpetas.unidad_id uuid null   -- toda la subárbol de la unidad apunta a su unidad</div>
+      <div class="cols" style="margin-top:22px">
+        <div><h3>Integración con permisos</h3><ul>
+          <li>Cada unidad tiene una carpeta raíz. <code>drive_rol_carpeta</code> añade una rama: si la carpeta pertenece a una unidad, devuelve el papel de <code>drive_unidad_miembros</code> y <em>no</em> aplica la regla de autoría. Los archivos heredan igual.</li>
+          <li>Los permisos por correo de <code>drive_permisos</code> siguen valiendo dentro de una unidad solo para quien administra y marcados como «invitación puntual».</li>
+          <li>RLS: leer una unidad exige ser miembro o admin general; escribir miembros, solo administra o admin general; <code>drive_unidad_eventos</code> sin update ni delete. Funciones <code>security definer</code> con <code>search_path</code> fijo, como en 0187.</li>
+          <li>Auditoría: todo cambio de miembros, papel, identidad, archivo o restauración escribe un evento. El ingreso del admin general sin ser miembro escribe uno por sesión y unidad.</li>
+        </ul></div>
+        <div><h3>Papeles</h3><ul>
+          <li>Solo ver = lector. Editar = editor. Crear = nuevo nivel (creador). Administra = propietario de la unidad.</li>
+          <li>Recomiendo el cuarto papel: sin él, nadie gestiona personas y toda baja pasa por soporte. Se exige al menos uno por unidad con un disparador, no con el cliente.</li>
+          <li>Crear puede enviar a la papelera lo que creó; borrar para siempre y vaciar es de Administra.</li>
+        </ul></div>
+        <div><h3>Migración y cuotas</h3><ul>
+          <li>Las carpetas personales no se tocan. «Convertir en unidad» (fase 2) crea la unidad y mueve la carpeta; los permisos de correo existentes se proponen como miembros, nunca se aplican solos.</li>
+          <li>Cuota por unidad en <code>drive_unidades.cuota_mb</code> (por defecto 5 GB, a definir) sumada desde <code>drive_archivos_resumen</code>; aviso al 80 %.</li>
+          <li>Autoría: <code>creada_por</code> se conserva para mostrar quién subió cada cosa, aunque ya no dé permisos.</li>
+        </ul></div>
+      </div>
+      <h3 style="margin:26px 0 10px">Fases</h3>
+      <div class="phases">
+        <div class="phase"><span class="chip nav">Fase 1</span><h3>Crear y listar</h3><ul><li>Migración con tablas, rango de cuatro niveles y la rama de unidad en los roles.</li><li>Formulario de cuatro pasos y vista previa.</li><li>Índice con búsqueda, filtros y lista.</li><li>Carpeta raíz y plantilla inicial.</li></ul></div>
+        <div class="phase"><span class="chip nav">Fase 2</span><h3>Inicio y personas</h3><ul><li>Página de inicio con bloques fijos.</li><li>Gestión de miembros, invitar, transferir.</li><li>Convertir una carpeta en unidad.</li><li>Cuotas y avisos.</li></ul></div>
+        <div class="phase"><span class="chip nav">Fase 3</span><h3>Personalizar y administrar</h3><ul><li>Panel Personalizar y portada con imagen.</li><li>Vista de administración general y registro.</li><li>Archivar, restaurar y reasignar.</li><li>Atajos a informes en construcción.</li></ul></div>
+      </div>
+      <h3 style="margin:26px 0 8px">Riesgos</h3>
+      <ul class="plain">
+        <li>La rama nueva de <code>drive_rol_carpeta</code> corre en cada consulta de lectura. Hay que medirla con un árbol grande y, si pesa, guardar <code>unidad_id</code> en carpetas y archivos para evitar la subida recursiva.</li>
+        <li>Mover archivos entre una carpeta personal y una unidad cambia quién los ve. La pantalla debe decirlo antes de confirmar.</li>
+        <li>Personas externas al dominio: sin Microsoft/UDES no hay cuenta. Si se permiten, solo por invitación de quien administra y con aviso permanente.</li>
+        <li>Sacar a una persona no borra lo que creó; queda en la unidad.</li>
+      </ul>
+    </section>
+
+    <!-- 8. DUDAS -->
+    <section class="sec" id="dudas" aria-labelledby="h-d">
+      <header><div class="kicker">Para decidir contigo</div><h2 id="h-d">Dudas antes de construir</h2></header>
+      <ol class="plain" style="gap:8px;font-size:14.5px">
+        <li><strong>Vínculo con la estructura.</strong> Propongo opcional y de una vía (trae a la gente, no sincroniza). ¿Prefieres que cada unidad de la estructura tenga su unidad de trabajo automática?</li>
+        <li><strong>Cuarto papel.</strong> ¿Aceptas «Administra» además de Ver, Editar y Crear?</li>
+        <li><strong>Quién ve todo.</strong> Propongo solo el rol <code>admin</code>. Planeación ya ve toda la estructura en otros módulos; ¿también todas las unidades de trabajo?</li>
+        <li><strong>Quién crea unidades.</strong> ¿Cualquier cuenta de UDES, solo Gestores y Planeación, o con aprobación? Cambia la cuota total y el orden en el índice.</li>
+        <li><strong>Personas externas.</strong> ¿Se permiten? Si sí, ¿con fecha de vencimiento?</li>
+        <li><strong>Imagen de cabecera.</strong> ¿Solo patrones de la casa o también imagen propia? La maqueta ofrece ambas.</li>
+        <li><strong>Cuota.</strong> ¿Cuántos GB por unidad al comenzar?</li>
+      </ol>
+      <p class="small" style="margin-top:24px">Maqueta hecha con datos inventados. El índice, el formulario, los papeles, el registro y la animación funcionan en esta página; nada se guarda ni se envía.</p>
+    </section>
+  </main>
+</div>
+<div id="toast" role="status" hidden></div>
+<div id="live" class="sr" aria-live="polite" aria-atomic="true"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var G = window.gsap || null;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var norm = function (s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); };
+  var rm = function () { return !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches); };
+  var M = { fast: 0.14, base: 0.22, slow: 0.38, step: 0.045, out: "power4.out", io: "power3.inOut" };
+
+  /* ---------- Movimiento ---------- */
+  function enter(els, from, opts) {
+    if (!G || !els || (els.length === 0)) return;
+    opts = opts || {};
+    if (rm()) { G.fromTo(els, { opacity: 0 }, { opacity: 1, duration: 0.12, overwrite: "auto", clearProps: "opacity" }); return; }
+    var to = { opacity: 1, x: 0, y: 0, scale: 1, duration: opts.d || M.base, ease: opts.ease || M.out, stagger: opts.stagger || 0, delay: opts.delay || 0, overwrite: "auto", clearProps: "transform,opacity" };
+    G.fromTo(els, from, to);
+  }
+  function leave(el, done, opts) {
+    opts = opts || {};
+    if (!G) { done(); return; }
+    if (rm()) { G.to(el, { opacity: 0, duration: 0.12, onComplete: done }); return; }
+    G.to(el, { opacity: 0, x: opts.x || 0, y: opts.y || 0, duration: opts.d || M.fast, ease: "power2.out", onComplete: done });
+  }
+  function flash(el) {
+    if (!G || !el) return;
+    G.fromTo(el, { backgroundColor: "#fdecc8" }, { backgroundColor: "#ffffff", duration: rm() ? 0.12 : 0.6, ease: "power1.out", clearProps: "backgroundColor" });
+  }
+
+  /* ---------- Avisos ---------- */
+  var toastT = 0;
+  function say(msg) { var l = $("#live"); l.textContent = ""; setTimeout(function () { l.textContent = msg; }, 30); }
+  function toast(msg) {
+    var t = $("#toast"); t.textContent = msg; t.hidden = false; say(msg);
+    if (G && !rm()) G.fromTo(t, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: M.base, ease: M.out, overwrite: "auto" });
+    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 3800);
+  }
+
+  /* ---------- Datos de ejemplo ---------- */
+  var DOM = "udes.edu.co";
+  var P = [
+    ["p01", "Camila Reyes Duarte", "creyes"], ["p02", "Marcela Pardo Ortiz", "mpardo"], ["p03", "Iván Cadena Mora", "icadena"], ["p04", "Lucía Barrios Vega", "lbarrios"],
+    ["p05", "Sergio Quintero Ruiz", "squintero"], ["p06", "Paula Almeida Roa", "palmeida"], ["p07", "Hernán Delgado Salas", "hdelgado"], ["p08", "Natalia Fuentes Gil", "nfuentes"],
+    ["p09", "Andrés Mejía Lozano", "amejia"], ["p10", "Diana Carvajal Pinto", "dcarvajal"], ["p11", "Julián Ospina Prada", "jospina"], ["p12", "Rosa Elena Castillo", "recastillo"],
+    ["p13", "Mauricio Téllez Blanco", "mtellez"], ["p14", "Sandra Villamizar Neira", "svillamizar"], ["p15", "Felipe Arenas Ríos", "farenas"], ["p16", "Gloria Peñaranda Suárez", "gpenaranda"],
+    ["p17", "Óscar Navas Cely", "onavas"], ["p18", "Tatiana Rueda Amaya", "trueda"], ["p19", "Camilo Beltrán Mora", "cbeltran"], ["p20", "Jorge Salcedo Prieto", "jsalcedo"],
+    ["p21", "Yolanda Becerra Díaz", "ybecerra"], ["p22", "Ricardo Orduz León", "rorduz"], ["p23", "Claudia Mantilla Soto", "cmantilla"], ["p24", "Daniel Acevedo Uribe", "dacevedo"]
+  ].map(function (a) { return { id: a[0], name: a[1], email: a[2] + "@" + DOM }; });
+  var PBY = {}; P.forEach(function (p) { PBY[p.id] = p; });
+  var EXT = {}; // personas externas: clave "x:correo"
+  function person(k) { return PBY[k] || EXT[k] || { id: k, name: k, email: k }; }
+  var STRUCT = [
+    { id: "s1", name: "Planeación Institucional", m: [["p01", "Gestor"], ["p02", "Contribuyente"], ["p03", "Contribuyente"], ["p04", "Contribuyente"], ["p05", "Consulta"], ["p06", "Consulta"]] },
+    { id: "s2", name: "Facultad de Ingenierías", m: [["p08", "Gestor"], ["p09", "Contribuyente"], ["p10", "Contribuyente"], ["p11", "Consulta"]] },
+    { id: "s3", name: "Vicerrectoría de Investigaciones", m: [["p12", "Gestor"], ["p13", "Contribuyente"], ["p14", "Contribuyente"], ["p15", "Consulta"], ["p16", "Consulta"]] },
+    { id: "s4", name: "Bienestar Universitario", m: [["p17", "Gestor"], ["p18", "Contribuyente"], ["p19", "Consulta"]] },
+    { id: "s5", name: "Rectoría Cúcuta", m: [["p21", "Gestor"], ["p22", "Contribuyente"], ["p23", "Contribuyente"], ["p24", "Consulta"]] }
+  ];
+  var SMAP = { Gestor: "admin", Contribuyente: "crear", Consulta: "ver" };
+  var ROLES = [
+    { k: "ver", n: "Solo ver", d: "Abre, descarga y comenta." },
+    { k: "editar", n: "Editar", d: "Lo anterior, más cambiar archivos que ya existen." },
+    { k: "crear", n: "Crear", d: "Lo anterior, más subir archivos y crear carpetas." },
+    { k: "admin", n: "Administra", d: "Lo anterior, más gestionar personas, borrar y archivar." }
+  ];
+  var RK = { ver: 1, editar: 2, crear: 3, admin: 4 };
+  var RN = {}; ROLES.forEach(function (r) { RN[r.k] = r.n; });
+  var CAPS = [
+    ["Abrir y descargar", 1], ["Comentar", 1], ["Editar archivos que ya existen", 2], ["Subir archivos y crear carpetas", 3],
+    ["Enviar a la papelera lo que creó", 3], ["Borrar para siempre y vaciar la papelera", 4], ["Añadir, quitar y cambiar el papel de personas", 4], ["Cambiar la identidad y archivar la unidad", 4]
+  ];
+  var TPL = { informes: ["Informes", "Datos", "Documentos de apoyo"], seguimiento: ["Plan de trabajo", "Actas", "Evidencias"], blanco: [] };
+  var ACCENTS = ["#0b3a78", "#00717e", "#6b3fa0", "#2e6b2f", "#a4471f", "#ad2f58", "#43536b", "#1a6b5a", "#7a4a2b", "#7f6200"];
+  var ICONS = {
+    chart: "M4 20V10M10 20V4M16 20v-8M22 20H2", book: "M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M9 7h6",
+    flask: "M9 3h6M10 3v6L5 19a1 1 0 0 0 1 1.5h12a1 1 0 0 0 1-1.5L14 9V3M8 14h8", heart: "M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z",
+    building: "M4 21V8l8-5 8 5v13M9 21v-6h6v6M8 11h2M14 11h2", globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18",
+    people: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 11a2.5 2.5 0 1 0 0-5M17 14c2.5 0 4.5 2.2 4.5 5",
+    compass: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM15.5 8.5l-2 5-5 2 2-5z", leaf: "M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19l7-7",
+    scale: "M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z", cap: "M2 9l10-5 10 5-10 5zM6 11v5c3 2.5 9 2.5 12 0v-5",
+    gear: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"
+  };
+  var ICON_N = { chart: "Gráfica", book: "Libro", flask: "Laboratorio", heart: "Bienestar", building: "Edificio", globe: "Mundo", people: "Personas", compass: "Brújula", leaf: "Hoja", scale: "Balanza", cap: "Birrete", gear: "Engranaje" };
+  var COVERS = { ninguna: "Sin imagen", lineas: "Líneas", curvas: "Curvas", puntos: "Puntos", bloques: "Bloques", trama: "Trama" };
+  var COMPS = { A: "Banda", B: "Lateral", C: "Rótulo", D: "Mosaico" };
+  var ORDER = ["carpetas", "recientes", "informes", "miembros", "actividad"];
+  var ORDER_N = { carpetas: "Carpetas ancladas", recientes: "Recientes", informes: "Informes en construcción", miembros: "Personas y papeles", actividad: "Actividad" };
+  var ME = { miembro: "p01", admin: "p20" };
+
+  function mk(o) { return Object.assign({ archived: false, cx: 50, cy: 50, zoom: 1, upload: null, link: null, order: ORDER.slice(), recents: [], informes: [], activity: [] }, o); }
+  var U = [
+    mk({ id: "u1", name: "Planeación Institucional", desc: "Plan de Desarrollo, indicadores, informes de gestión y rankings.", mono: "PLAN", accent: "#0b3a78", icon: "chart", comp: "A", cover: "curvas", link: "s1",
+      members: { p01: "admin", p02: "crear", p03: "crear", p04: "editar", p05: "editar", p06: "ver", p07: "ver" },
+      folders: [["Informes de gestión", 24], ["Datos del PDI", 58], ["Rankings", 17], ["Documentos de apoyo", 31], ["Actas", 12]], pinned: [0, 1, 2, 3],
+      recents: [["Informe de gestión 2026 · Derecho", "Informe", "Marcela Pardo", "hace 12 min"], ["Matrícula por programa 2020-2026", "Tabla", "Camila Reyes", "hace 1 h"], ["Avance del PDI por eje", "Gráfica", "Iván Cadena", "ayer"]],
+      informes: [["Informe de gestión 2026", 72, "Borrador"], ["Informe THE Impact ODS 4", 35, "En revisión"]],
+      activity: ["Marcela Pardo subió Matrícula_2026.xlsx", "Camila Reyes creó la carpeta Rankings", "Iván Cadena comentó en Avance del PDI"] }),
+    mk({ id: "u2", name: "Decanatura de Ingenierías", desc: "Seguimiento de programas, planes de mejoramiento y acreditación de la facultad.", mono: "DING", accent: "#00717e", icon: "gear", comp: "B", cover: "trama", link: "s2",
+      members: { p08: "admin", p09: "crear", p10: "crear", p11: "ver", p01: "editar" },
+      folders: [["Planes de mejoramiento", 14], ["Programas", 40], ["Evidencias", 66]], pinned: [0, 1, 2],
+      recents: [["Plan de mejoramiento Sistemas", "Documento", "Andrés Mejía", "hace 3 h"], ["Deserción por semestre", "Gráfica", "Diana Carvajal", "hace 2 d"]],
+      informes: [["Informe de gestión 2026 · Ingenierías", 48, "Borrador"]], activity: ["Andrés Mejía editó Plan de mejoramiento Sistemas", "Natalia Fuentes añadió a Camila Reyes con papel Editar"] }),
+    mk({ id: "u3", name: "Investigaciones", desc: "Grupos, semilleros, convocatorias y producción científica.", mono: "INV", accent: "#6b3fa0", icon: "flask", comp: "C", cover: "ninguna", link: "s3",
+      members: { p12: "admin", p13: "crear", p14: "crear", p15: "editar", p16: "ver", p01: "ver" },
+      folders: [["Convocatorias", 9], ["Grupos de investigación", 22], ["Producción 2026", 37]], pinned: [0, 1, 2],
+      recents: [["Convocatoria interna 2026-2", "Documento", "Rosa Elena Castillo", "hace 5 h"], ["Productos por grupo", "Tabla", "Mauricio Téllez", "ayer"]],
+      informes: [["Informe de investigación 2026", 61, "En revisión"]], activity: ["Rosa Elena Castillo archivó la carpeta Convocatorias 2025"] }),
+    mk({ id: "u4", name: "Bienestar Universitario", desc: "Programas de permanencia, deporte, cultura y salud.", mono: "BIEN", accent: "#2e6b2f", icon: "heart", comp: "D", cover: "puntos", link: "s4",
+      members: { p17: "admin", p18: "crear", p19: "ver", p01: "crear" },
+      folders: [["Permanencia", 18], ["Deporte y cultura", 25], ["Salud", 11]], pinned: [0, 1, 2],
+      recents: [["Participación en actividades 2026", "Tabla", "Tatiana Rueda", "hace 2 h"]], informes: [["Informe de gestión 2026 · Bienestar", 20, "Borrador"]], activity: ["Tatiana Rueda subió Asistencia_agosto.xlsx"] }),
+    mk({ id: "u5", name: "Rectoría Cúcuta", desc: "Gestión del campus: actas, seguimiento y relación con la comunidad.", mono: "RCUC", accent: "#a4471f", icon: "building", comp: "A", cover: "lineas", link: "s5",
+      members: { p21: "admin", p01: "admin", p22: "crear", p23: "editar", p24: "ver" },
+      folders: [["Actas de consejo", 33], ["Seguimiento del campus", 27], ["Comunidad", 8]], pinned: [0, 1, 2],
+      recents: [["Acta de consejo 14", "Documento", "Yolanda Becerra", "hace 1 d"]], informes: [["Informe del campus 2026", 55, "Borrador"]], activity: ["Yolanda Becerra añadió a Camila Reyes como administradora"] }),
+    mk({ id: "u6", name: "Acreditación institucional 2027", desc: "Proyecto transversal: evidencias, factores y cronograma entre oficinas.", mono: "ACR", accent: "#ad2f58", icon: "compass", comp: "B", cover: "bloques", link: null,
+      members: { p01: "admin", p02: "crear", p08: "crear", p12: "editar", p17: "editar", p21: "ver", p03: "ver" },
+      folders: [["Factor 1 · Misión", 19], ["Factor 2 · Estudiantes", 44], ["Factor 3 · Profesores", 38], ["Cronograma", 6]], pinned: [0, 1, 3],
+      recents: [["Matriz de evidencias", "Tabla", "Marcela Pardo", "hace 40 min"], ["Cronograma 2026-2027", "Documento", "Camila Reyes", "hace 3 d"]],
+      informes: [["Autoevaluación institucional", 28, "Borrador"]], activity: ["Marcela Pardo actualizó Matriz de evidencias", "Camila Reyes creó la carpeta Cronograma"] }),
+    mk({ id: "u7", name: "Autoevaluación 2024", desc: "Cierre del ciclo anterior. Solo lectura.", mono: "AE24", accent: "#43536b", icon: "book", comp: "C", cover: "ninguna", archived: true,
+      members: { p01: "admin", p02: "editar" }, folders: [["Informe final", 7], ["Anexos", 52]], pinned: [0, 1], recents: [["Informe final de autoevaluación", "Informe", "Camila Reyes", "hace 8 meses"]], informes: [], activity: ["Camila Reyes archivó la unidad"] }),
+    mk({ id: "u8", name: "Biblioteca y Recursos", desc: "Colecciones, bases de datos y servicios de información.", mono: "BIB", accent: "#1a6b5a", icon: "book", comp: "D", cover: "curvas",
+      members: { p12: "admin", p13: "crear", p15: "ver" }, folders: [["Colecciones", 15], ["Bases de datos", 9]], pinned: [0, 1], recents: [["Uso de bases de datos 2026", "Tabla", "Mauricio Téllez", "hace 2 d"]], informes: [], activity: ["Mauricio Téllez subió Uso_bases.xlsx"] }),
+    mk({ id: "u9", name: "Oficina Jurídica", desc: "Conceptos, contratos y normativa interna.", mono: "JUR", accent: "#7a4a2b", icon: "scale", comp: "A", cover: "trama",
+      members: { p14: "admin", p16: "crear" }, folders: [["Conceptos", 21], ["Contratos", 47]], pinned: [0, 1], recents: [["Concepto 2026-031", "Documento", "Sandra Villamizar", "hace 4 d"]], informes: [], activity: ["Sandra Villamizar subió Concepto_031.pdf"] })
+  ];
+  var AUDIT = [
+    { t: "hace 2 d", who: "Yolanda Becerra", how: "miembro", what: "Añadió a Camila Reyes como administradora", unit: "Rectoría Cúcuta" },
+    { t: "hace 5 d", who: "Natalia Fuentes", how: "miembro", what: "Cambió el papel de Camila Reyes a Editar", unit: "Decanatura de Ingenierías" },
+    { t: "hace 1 sem", who: "Jorge Salcedo", how: "admin general", what: "Restauró la unidad", unit: "Autoevaluación 2024" }
+  ];
+  var S = { session: "miembro", view: "index", id: null, tab: "inicio", filter: "todas", q: "", mode: "grid", draft: null, logged: {}, first: true };
+
+  /* ---------- Utilidades de color ---------- */
+  function lum(h) { var c = [1, 3, 5].map(function (i) { var v = parseInt(h.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+  function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function fmt(n) { return n.toFixed(1).replace(".", ","); }
+  function hexOk(h) { return /^#[0-9a-f]{6}$/i.test(h); }
+  function parseHex(v) { v = String(v).trim().replace(/^#?/, "#").toLowerCase(); if (/^#[0-9a-f]{3}$/.test(v)) v = "#" + v[1] + v[1] + v[2] + v[2] + v[3] + v[3]; return hexOk(v) ? v : null; }
+  function darken(h) { var n = h, g = 0; while (ratio(n, "#ffffff") < 4.5 && g++ < 40) { n = "#" + [1, 3, 5].map(function (i) { return ("0" + Math.round(parseInt(n.slice(i, i + 2), 16) * 0.93).toString(16)).slice(-2); }).join(""); } return n; }
+  function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+  var AVC = ["#0b3a78", "#00717e", "#6b3fa0", "#2e6b2f", "#a4471f", "#ad2f58", "#43536b", "#1a6b5a"];
+  function initials(n) { var w = n.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean); return ((w[0] || "?")[0] + (w[1] ? w[1][0] : "")).toUpperCase(); }
+  function avatar(k) { var p = person(k); return '<span class="av" style="background:' + AVC[hash(k) % AVC.length] + '" aria-hidden="true">' + esc(initials(p.name)) + "</span>"; }
+  function autoMono(name) {
+    var stop = { de: 1, del: 1, la: 1, las: 1, los: 1, el: 1, y: 1, e: 1, para: 1, en: 1 };
+    var w = norm(name).split(/[^a-z0-9]+/).filter(function (x) { return x && !stop[x]; });
+    if (!w.length) return "";
+    if (w.length === 1) return w[0].slice(0, 4).toUpperCase();
+    return w.map(function (x) { return x[0]; }).join("").slice(0, 4).toUpperCase();
+  }
+
+  /* ---------- Portadas ---------- */
+  function pattern(kind) {
+    var s = "", i;
+    if (kind === "lineas") for (i = -4; i < 14; i++) s += '<path d="M' + (i * 40) + ' 220L' + (i * 40 + 220) + ' -20"/>';
+    else if (kind === "curvas") for (i = 0; i < 8; i++) s += '<path d="M-10 ' + (20 + i * 26) + ' C 90 ' + (i * 26 - 20) + ', 160 ' + (60 + i * 26) + ', 260 ' + (20 + i * 26) + ' S 380 ' + (i * 26) + ', 420 ' + (30 + i * 26) + '"/>';
+    else if (kind === "puntos") { for (var y = 0; y < 9; y++) for (var x = 0; x < 18; x++) s += '<circle cx="' + (x * 24 + 8) + '" cy="' + (y * 24 + 8) + '" r="' + (1.6 + ((x + y) % 4) * 0.6) + '" fill="#fff" stroke="none"/>'; }
+    else if (kind === "bloques") { var b = [[20, 110, 70, 90], [100, 70, 60, 130], [170, 130, 80, 70], [260, 40, 50, 160], [320, 90, 70, 110]]; b.forEach(function (r) { s += '<rect x="' + r[0] + '" y="' + r[1] + '" width="' + r[2] + '" height="' + r[3] + '" fill="#fff" stroke="none" opacity="0.5"/>'; }); }
+    else if (kind === "trama") { for (i = 0; i < 14; i++) s += '<path d="M' + (i * 32) + ' 0V200"/>'; for (i = 0; i < 8; i++) s += '<path d="M0 ' + (i * 30) + 'H400"/>'; }
+    return s;
+  }
+  function cover(u) {
+    if (u.upload) return '<div class="cv" aria-hidden="true"><img src="' + u.upload + '" alt="" style="object-position:' + u.cx + '% ' + u.cy + '%;transform:scale(' + u.zoom + ');transform-origin:' + u.cx + '% ' + u.cy + '%"></div>';
+    return '<div class="cv" aria-hidden="true"><svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="400" height="200" fill="' + u.accent + '"/><g stroke="#fff" stroke-opacity="0.2" stroke-width="2" fill="none">' + pattern(u.cover) + "</g></svg></div>";
+  }
+  function glyph(name) { return '<svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="' + (ICONS[name] || ICONS.chart) + '"/></svg>'; }
+  function hero(u, size, tag) {
+    var h = tag || "div", cls = h === "div" ? "ht" : "";
+    var ttl = "<" + h + ' class="' + cls + '">' + esc(u.name) + "</" + h + ">", d = u.desc ? '<p class="hd">' + esc(u.desc) + "</p>" : "";
+    var mono = '<span class="mono" aria-hidden="true">' + esc(u.mono || "?") + "</span>";
+    var st = ' style="--ac:' + u.accent + '"', sz = size === "page" ? " page" : "";
+    if (u.comp === "B") return '<div class="hero kB' + sz + '"' + st + '><div class="hl">' + cover(u) + mono + '</div><div class="hb">' + ttl + d + "</div></div>";
+    if (u.comp === "C") return '<div class="hero kC' + sz + '"' + st + '><span class="giant" aria-hidden="true">' + esc(u.mono || "?") + "</span><div>" + ttl + d + "</div></div>";
+    if (u.comp === "D") return '<div class="hero kD' + sz + '"' + st + '><div class="vis">' + cover(u) + '</div><div class="plate"><span class="mono ghost" aria-hidden="true">' + esc(u.mono || "?") + "</span><div>" + ttl + d + "</div></div></div>";
+    return '<div class="hero kA' + sz + '"' + st + '><div class="band">' + cover(u) + '</div><div class="hb">' + mono + "<div>" + ttl + d + "</div></div></div>";
+  }
+  function rankIn(u) { var r = u.members[ME[S.session]]; return r ? RK[r] : (S.session === "admin" ? 4 : 0); }
+  function isMember(u) { return !!u.members[ME[S.session]]; }
+  function roleLabel(u) { var r = u.members[ME[S.session]]; return r ? RN[r] : "Administración general"; }
+  function card(u, opts) {
+    opts = opts || {};
+    var n = Object.keys(u.members).length, wide = u.comp === "D" && !opts.preview ? " wide" : "";
+    var tag = opts.preview ? "div" : "button";
+    var inner = hero(u, "card") + '<div class="meta"><span>' + n + (n === 1 ? " persona" : " personas") + '</span><span>' + u.folders.length + (u.folders.length === 1 ? " carpeta" : " carpetas") + "</span>" +
+      (opts.preview ? '<span class="chip">Tú · Administra</span>' : '<span class="chip' + (isMember(u) ? "" : " nav") + '">' + esc(roleLabel(u)) + "</span>") + "</div>";
+    if (opts.preview) return '<div class="ucard">' + inner + "</div>";
+    return "<" + tag + ' type="button" class="ucard' + wide + '" data-open="' + u.id + '" aria-label="Abrir ' + esc(u.name) + ". " + (isMember(u) ? "Tu papel: " + esc(roleLabel(u)) : "Sin ser miembro") + '">' + inner + "</" + tag + ">";
+  }
+
+  /* ---------- Componente de personas ---------- */
+  var MATRIX = function () {
+    var h = "<thead><tr><th scope='col'>Acción</th>" + ROLES.map(function (r) { return "<th class='c' scope='col'>" + r.n + "</th>"; }).join("") + "</tr></thead><tbody>";
+    CAPS.forEach(function (c) { h += "<tr><th scope='row' style='background:#fff;font-weight:600;font-family:var(--ui);color:var(--ink)'>" + c[0] + "</th>" + ROLES.map(function (r) { return RK[r.k] >= c[1] ? "<td class='c yes'><span aria-hidden='true'>Sí</span><span class='sr'>Sí puede</span></td>" : "<td class='c no'><span aria-hidden='true'>No</span><span class='sr'>No puede</span></td>"; }).join("") + "</tr>"; });
+    return h + "</tbody>";
+  };
+  function rolOpts(sel) { return ROLES.map(function (r) { return '<option value="' + r.k + '"' + (r.k === sel ? " selected" : "") + ">" + r.n + "</option>"; }).join(""); }
+  function peopleHTML(p) {
+    return '<div class="ppl" id="' + p + '-ppl"><div class="ppl-add">' +
+      '<div class="fld"><label for="' + p + '-q">Buscar a una persona</label><div class="combo"><input type="text" id="' + p + '-q" role="combobox" aria-expanded="false" aria-controls="' + p + '-lb" aria-autocomplete="list" autocomplete="off" placeholder="Nombre o correo institucional"><ul id="' + p + '-lb" class="lb" role="listbox" aria-label="Resultados" hidden></ul></div><span class="hint">Con las flechas eliges y con Intro añades. Un correo completo de fuera de UDES se añade como externo.</span></div>' +
+      '<fieldset><legend>Papel al añadir</legend><div class="seg">' + ROLES.slice(0, 3).map(function (r, i) { return '<label><input type="radio" name="' + p + '-dr" value="' + r.k + '"' + (i === 0 ? " checked" : "") + "><span>" + r.n + "</span></label>"; }).join("") + "</div></fieldset>" +
+      '<details class="more"><summary>Añadir varias personas a la vez</summary><div>' +
+      '<div class="fld"><label for="' + p + '-su">Toda una unidad de la estructura</label><div class="row"><select id="' + p + '-su" style="flex:1 1 220px;width:auto">' + STRUCT.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + " (" + s.m.length + ")</option>"; }).join("") + '</select><button type="button" class="btn sec2" id="' + p + '-sub">Añadir a su gente</button></div>' +
+      '<label class="row" style="font-size:13px"><input type="checkbox" id="' + p + '-sm" checked style="width:18px;height:18px"> Respetar el papel de la estructura (Gestor administra, Contribuyente crea, Consulta solo ve)</label></div>' +
+      '<div class="fld"><label for="' + p + '-pa">Pegar correos</label><textarea id="' + p + '-pa" rows="3" placeholder="uno por línea, o separados por coma"></textarea><div><button type="button" class="btn sec2" id="' + p + '-pab">Añadir correos</button></div></div>' +
+      "</div></details><p class='small' id='" + p + "-msg' aria-live='polite'></p></div>" +
+      '<div class="ppl-warn" id="' + p + '-warn"></div><div id="' + p + '-list"></div></div>';
+  }
+  function mountPeople(p, store) {
+    var q = $("#" + p + "-q"), lb = $("#" + p + "-lb"), list = $("#" + p + "-list"), warn = $("#" + p + "-warn"), msg = $("#" + p + "-msg");
+    var sel = new Set(), res = [], act = -1, root = $("#" + p + "-ppl");
+    var defRole = function () { var c = $('input[name="' + p + '-dr"]:checked', root); return c ? c.value : "ver"; };
+    var canEdit = function () { return store.canEdit(); };
+    function info(t) { msg.textContent = t; say(t); }
+    function count() { return Object.keys(store.map()).length; }
+    function closeLb() { lb.hidden = true; q.setAttribute("aria-expanded", "false"); q.removeAttribute("aria-activedescendant"); act = -1; }
+    function showRes() {
+      var t = norm(q.value.trim());
+      if (!t) { closeLb(); return; }
+      var m = store.map();
+      res = P.filter(function (x) { return !m[x.id] && (norm(x.name).indexOf(t) >= 0 || norm(x.email).indexOf(t) >= 0); }).slice(0, 6);
+      var h = res.map(function (x, i) { return '<li role="option" id="' + p + "-o" + i + '" data-i="' + i + '" aria-selected="false">' + avatar(x.id) + '<span><strong style="font-weight:600">' + esc(x.name) + "</strong><br><small>" + esc(x.email) + "</small></span></li>"; }).join("");
+      if (!res.length) {
+        var em = q.value.trim().toLowerCase();
+        h = '<li class="none" role="option" aria-disabled="true" aria-selected="false">' + (/^\S+@\S+\.\S+$/.test(em) ? (em.slice(-DOM.length - 1) === "@" + DOM ? "No encontré esa cuenta de UDES. Revisa el correo." : "Pulsa Intro para añadir a " + esc(em) + " como persona externa.") : "Nadie coincide con «" + esc(q.value.trim()) + "». Prueba con otro apellido o el correo completo.") + "</li>";
+      }
+      lb.innerHTML = h; lb.hidden = false; q.setAttribute("aria-expanded", "true"); act = res.length ? 0 : -1; paintAct();
+    }
+    function paintAct() { $$("li[role=option]", lb).forEach(function (li, i) { li.setAttribute("aria-selected", i === act ? "true" : "false"); }); if (act >= 0) q.setAttribute("aria-activedescendant", p + "-o" + act); else q.removeAttribute("aria-activedescendant"); }
+    function add(k, role, quiet) {
+      if (!canEdit()) return false;
+      if (store.map()[k]) return false;
+      store.map()[k] = role; sel.delete(k);
+      if (!quiet) info(person(k).name + " se añadió con papel " + RN[role] + ". " + count() + (count() === 1 ? " persona." : " personas."));
+      return true;
+    }
+    function addAndRender(keys, role) { render(keys); store.change("add", keys); }
+    q.addEventListener("input", showRes);
+    q.addEventListener("blur", function () { setTimeout(closeLb, 120); });
+    q.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); if (lb.hidden) showRes(); else if (res.length) { act = (act + 1) % res.length; paintAct(); } }
+      else if (e.key === "ArrowUp") { e.preventDefault(); if (res.length) { act = (act - 1 + res.length) % res.length; paintAct(); } }
+      else if (e.key === "Escape") { closeLb(); }
+      else if (e.key === "Enter") {
+        e.preventDefault();
+        if (!lb.hidden && act >= 0 && res[act]) { var k = res[act].id; if (add(k, defRole())) { q.value = ""; closeLb(); addAndRender([k]); } }
+        else {
+          var em = q.value.trim().toLowerCase();
+          if (/^\S+@\S+\.\S+$/.test(em)) {
+            if (em.slice(-DOM.length - 1) === "@" + DOM) { var f = P.filter(function (x) { return x.email === em; })[0]; if (f && add(f.id, defRole())) { q.value = ""; closeLb(); addAndRender([f.id]); } else if (!f) info("No encontré esa cuenta de UDES."); }
+            else { var xk = "x:" + em; EXT[xk] = { id: xk, name: em.split("@")[0], email: em, ext: true }; if (add(xk, defRole())) { q.value = ""; closeLb(); addAndRender([xk]); } }
+          }
+        }
+      }
+    });
+    lb.addEventListener("mousedown", function (e) { e.preventDefault(); var li = e.target.closest("li[data-i]"); if (!li) return; var x = res[+li.dataset.i]; if (x && add(x.id, defRole())) { q.value = ""; closeLb(); addAndRender([x.id]); q.focus(); } });
+    $("#" + p + "-sub").addEventListener("click", function () {
+      var s = STRUCT.filter(function (x) { return x.id === $("#" + p + "-su").value; })[0], keep = $("#" + p + "-sm").checked, added = [];
+      s.m.forEach(function (r) { if (add(r[0], keep ? SMAP[r[1]] : defRole(), true)) added.push(r[0]); });
+      if (!added.length) { info("Todas las personas de " + s.name + " ya están en la lista."); return; }
+      info("Se añadieron " + added.length + " personas de " + s.name + "."); addAndRender(added);
+    });
+    $("#" + p + "-pab").addEventListener("click", function () {
+      var tx = $("#" + p + "-pa").value, parts = tx.split(/[\s,;]+/).map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean), added = [], miss = [], bad = [], ext = 0, dup = 0;
+      parts.forEach(function (em) {
+        if (!/^\S+@\S+\.\S+$/.test(em)) { bad.push(em); return; }
+        if (em.slice(-DOM.length - 1) === "@" + DOM) { var f = P.filter(function (x) { return x.email === em; })[0]; if (!f) { miss.push(em); return; } if (add(f.id, defRole(), true)) added.push(f.id); else dup++; }
+        else { var xk = "x:" + em; EXT[xk] = { id: xk, name: em.split("@")[0], email: em, ext: true }; if (add(xk, defRole(), true)) { added.push(xk); ext++; } else dup++; }
+      });
+      var t = added.length + " añadidas"; if (ext) t += " (" + ext + " externas)"; if (dup) t += ", " + dup + " ya estaban"; if (miss.length) t += ". Sin cuenta en UDES: " + miss.join(", "); if (bad.length) t += ". No parecen correos: " + bad.join(", ");
+      info(t + "."); if (added.length) { $("#" + p + "-pa").value = ""; addAndRender(added); }
+    });
+
+    function warns() {
+      var m = store.map(), keys = Object.keys(m), h = "";
+      var admins = keys.filter(function (k) { return m[k] === "admin"; }).length, ext = keys.filter(function (k) { return k.indexOf("x:") === 0; });
+      if (!admins) h += '<div class="note bad">La unidad necesita al menos una persona con papel Administra. Sin eso nadie podría cambiar a las demás.</div>';
+      if (ext.length) h += '<div class="note warn">' + ext.length + (ext.length === 1 ? " persona externa" : " personas externas") + " al dominio " + DOM + " tendrá acceso a lo que haya en la unidad: " + esc(ext.map(function (k) { return person(k).email; }).join(", ")) + ".</div>";
+      warn.innerHTML = h;
+    }
+    function render(newKeys) {
+      var m = store.map(), keys = Object.keys(m), ed = canEdit();
+      var order = keys.slice().sort(function (a, b) { return RK[m[b]] - RK[m[a]] || person(a).name.localeCompare(person(b).name, "es"); });
+      var all = order.length && order.every(function (k) { return sel.has(k); });
+      var h = "";
+      if (ed && order.length) {
+        h += '<div class="bulk"><label class="row" style="gap:6px"><input type="checkbox" id="' + p + '-all"' + (all ? " checked" : "") + '> <span>Seleccionar todas</span></label><span aria-live="polite">' + (sel.size ? sel.size + " seleccionadas" : "") + "</span>" +
+          '<label class="sr" for="' + p + '-bulkr">Cambiar el papel de las seleccionadas</label><select id="' + p + '-bulkr"' + (sel.size ? "" : " disabled") + '><option value="">Cambiar papel a…</option>' + ROLES.map(function (r) { return '<option value="' + r.k + '">' + r.n + "</option>"; }).join("") + '</select><button type="button" class="btn danger" id="' + p + '-bulkx"' + (sel.size ? "" : " disabled") + ' style="min-height:32px;padding:4px 10px">Quitar seleccionadas</button></div>';
+      }
+      h += '<ul class="plist" aria-label="Personas de la unidad">' + (order.length ? "" : '<li class="empty-row">Aún no hay nadie. Busca a una persona arriba o añade a toda una unidad de la estructura.</li>');
+      order.forEach(function (k) {
+        var pe = person(k), me = k === ME[S.session];
+        h += '<li class="prow" data-k="' + esc(k) + '"' + (newKeys && newKeys.indexOf(k) >= 0 ? ' data-new="1"' : "") + ">" +
+          (ed ? '<input type="checkbox" class="pck" aria-label="Seleccionar a ' + esc(pe.name) + '"' + (sel.has(k) ? " checked" : "") + ">" : "<span></span>") + avatar(k) +
+          '<span class="pn"><strong>' + esc(pe.name) + (me ? ' <span class="chip">Tú</span>' : "") + (pe.ext ? ' <span class="chip warn">Externa</span>' : "") + "</strong><small>" + esc(pe.email) + "</small></span>" +
+          '<label class="sr" for="' + p + "-r-" + esc(k) + '">Papel de ' + esc(pe.name) + '</label><select class="rsel" id="' + p + "-r-" + esc(k) + '"' + (ed ? "" : " disabled") + ">" + rolOpts(m[k]) + "</select>" +
+          (ed ? '<button type="button" class="rm" aria-label="Quitar a ' + esc(pe.name) + '">Quitar</button>' : "<span></span>") + "</li>";
+      });
+      h += "</ul>";
+      list.innerHTML = h; warns();
+      if (newKeys && newKeys.length) { var rows = $$(".prow[data-new]", list); enter(rows, { opacity: 0, y: -8 }, { d: M.base, stagger: Math.min(M.step, 0.04) }); rows.forEach(function (r) { flash(r); }); }
+      var bar = $("#" + p + "-ppl .ppl-add"); $$("input,select,button,textarea,summary", bar).forEach(function (el) { if (el.tagName !== "SUMMARY") el.disabled = !ed; });
+      if (!ed) bar.hidden = true; else bar.hidden = false;
+    }
+    list.addEventListener("change", function (e) {
+      var t = e.target, row = t.closest(".prow");
+      if (t.id === p + "-all") { var m0 = store.map(); if (t.checked) Object.keys(m0).forEach(function (k) { sel.add(k); }); else sel.clear(); render(); return; }
+      if (t.id === p + "-bulkr") { if (!t.value) return; var m1 = store.map(), n = 0; sel.forEach(function (k) { if (m1[k] && store.guard(k, t.value)) { m1[k] = t.value; n++; } }); render(); store.change("role"); info(n + " personas pasaron a " + RN[t.value] + "."); $$(".prow", list).forEach(function (r) { if (sel.has(r.dataset.k)) flash(r); }); return; }
+      if (!row) return;
+      var k = row.dataset.k;
+      if (t.classList.contains("pck")) { if (t.checked) sel.add(k); else sel.delete(k); render(); var again = $('.prow[data-k="' + CSS.escape(k) + '"] .pck', list); if (again) again.focus(); return; }
+      if (t.classList.contains("rsel")) {
+        if (!store.guard(k, t.value)) { t.value = store.map()[k]; info("Cada unidad debe conservar al menos una persona que la administre."); return; }
+        store.map()[k] = t.value; store.change("role", [k]); warns(); flash(t); info(person(k).name + " quedó con papel " + RN[t.value] + ".");
+      }
+    });
+    list.addEventListener("click", function (e) {
+      var b = e.target.closest(".rm"), bx = e.target.closest("#" + p + "-bulkx");
+      if (bx) {
+        var ks = Array.from(sel).filter(function (k) { return store.guard(k, null); });
+        if (ks.length < sel.size) info("Se conservó a quien administra: la unidad necesita al menos una persona con ese papel.");
+        var rows = ks.map(function (k) { return $('.prow[data-k="' + CSS.escape(k) + '"]', list); }).filter(Boolean);
+        var fin = function () { ks.forEach(function (k) { delete store.map()[k]; sel.delete(k); }); render(); store.change("remove"); info(ks.length + " personas quitadas. Quedan " + count() + "."); };
+        if (!rows.length) return; if (G && !rm()) { G.to(rows, { opacity: 0, x: -12, duration: M.fast, ease: "power2.out", onComplete: fin }); } else fin();
+        return;
+      }
+      if (!b) return;
+      var row = b.closest(".prow"), k = row.dataset.k, name = person(k).name;
+      if (!store.guard(k, null)) { info("No se puede quitar a la única persona que administra. Pasa la administración a otra persona primero."); toast("Deja otra persona con papel Administra antes de quitar a " + name + "."); return; }
+      var next = row.nextElementSibling || row.previousElementSibling;
+      var fin2 = function () { delete store.map()[k]; sel.delete(k); render(); store.change("remove", [k]); info(name + " ya no está en la unidad. Quedan " + count() + "."); var f = next && next.dataset && next.dataset.k !== k ? $('.prow[data-k="' + CSS.escape(next.dataset.k) + '"] .rm', list) : null; (f || q).focus(); };
+      if (G && !rm()) { G.to(row, { opacity: 0, x: -14, duration: M.fast, ease: "power2.out", onComplete: function () { G.to(row, { height: 0, paddingTop: 0, paddingBottom: 0, duration: M.fast, ease: "power2.out", onComplete: fin2 }); } }); } else fin2();
+    });
+    render();
+    return { render: render };
+  }
+
+  /* ---------- Formulario ---------- */
+  var F = null;
+  function newForm() {
+    var m = {}; m[ME[S.session]] = "admin";
+    return { step: 1, name: "", desc: "", tpl: "informes", link: "", mono: "", monoTouched: false, accent: ACCENTS[0], accentTouched: false, icon: "chart", cover: "curvas", upload: null, cx: 50, cy: 50, zoom: 1, comp: "A", compTouched: false, members: m, touched: {} };
+  }
+  function previewUnit() {
+    return { id: "pv", name: F.name.trim() || "Nombre de la unidad", desc: F.desc.trim() || "Aquí va la descripción corta de la unidad.", mono: F.mono || autoMono(F.name) || "UT", accent: F.accent, icon: F.icon, comp: F.comp, cover: F.cover, upload: F.upload, cx: F.cx, cy: F.cy, zoom: F.zoom, members: F.members, folders: TPL[F.tpl].map(function (n) { return [n, 0]; }) };
+  }
+  function drawPreview() { $("#f-card").innerHTML = card(previewUnit(), { preview: true }); }
+  function nameError() {
+    var v = F.name.trim();
+    if (!v) return "Escribe un nombre para la unidad.";
+    if (v.length < 3) return "Usa al menos 3 caracteres.";
+    if (U.some(function (u) { return norm(u.name) === norm(v); })) return "Ya hay una unidad con ese nombre. Añade el campus o el año para distinguirla.";
+    return "";
+  }
+  function monoError() { var v = F.mono || autoMono(F.name); if (!/^[A-Z0-9]{2,4}$/.test(v)) return "Usa de 2 a 4 letras o números, sin espacios."; return ""; }
+  function drawContrast() {
+    var r = ratio(F.accent, "#ffffff"), el = $("#f-ct");
+    if (!hexOk(F.accent)) { el.className = "contrast bad"; el.textContent = "Escribe un color de seis cifras, como #0b3a78."; return; }
+    if (r >= 4.5) { el.className = "contrast good"; el.innerHTML = "<b>Cumple.</b> Contraste con blanco " + fmt(r) + ":1 (el mínimo es 4,5:1)."; }
+    else { el.className = "contrast bad"; el.innerHTML = "Contraste con blanco " + fmt(r) + ":1. Es muy claro: el texto blanco no se lee sobre este color. <button type='button' class='btn sec2' id='f-dk' style='min-height:30px;padding:3px 10px'>Oscurecer hasta cumplir</button>"; $("#f-dk").onclick = function () { setAccent(darken(F.accent), true); }; }
+  }
+  function setAccent(h, touched) { F.accent = h; if (touched) F.accentTouched = true; $("#f-hex").value = h; $$("#f-sw button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.c === h)); }); drawContrast(); drawPreview(); }
+  function buildOptions() {
+    $("#f-sw").innerHTML = ACCENTS.map(function (c) { return '<button type="button" data-c="' + c + '" style="background:' + c + '" aria-pressed="false" aria-label="Color ' + c + '"></button>'; }).join("");
+    $("#f-icons").innerHTML = Object.keys(ICONS).map(function (k) { return '<button type="button" role="radio" aria-checked="false" data-i="' + k + '" aria-label="' + ICON_N[k] + '" title="' + ICON_N[k] + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + ICONS[k] + '"/></svg></button>'; }).join("");
+    $("#f-cover").innerHTML = Object.keys(COVERS).map(function (k) { return '<button type="button" role="radio" aria-checked="false" data-c="' + k + '"><span class="th"><svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" width="100%" height="100%" aria-hidden="true"><rect width="400" height="200" fill="#4a5a70"/><g stroke="#fff" stroke-opacity="0.35" stroke-width="3" fill="none">' + pattern(k === "ninguna" ? "" : k) + "</g></svg></span>" + COVERS[k] + "</button>"; }).join("");
+    $("#f-comp").innerHTML = Object.keys(COMPS).map(function (k) {
+      var th = { A: '<rect width="100" height="22" fill="#4a5a70"/><rect x="6" y="28" width="16" height="12" fill="#4a5a70"/><rect x="28" y="30" width="50" height="4" fill="#98a8bc"/>', B: '<rect width="40" height="44" fill="#4a5a70"/><rect x="48" y="14" width="44" height="5" fill="#98a8bc"/><rect x="48" y="24" width="30" height="4" fill="#98a8bc"/>', C: '<rect width="100" height="44" fill="#eef3f9"/><rect x="6" y="10" width="46" height="18" fill="#4a5a70"/><rect y="40" width="100" height="4" fill="#4a5a70"/>', D: '<rect width="100" height="44" fill="#98a8bc"/><rect y="28" width="100" height="16" fill="#4a5a70"/>' }[k];
+      return '<button type="button" role="radio" aria-checked="false" data-k="' + k + '"><span class="th"><svg viewBox="0 0 100 44" width="100%" height="100%" aria-hidden="true">' + th + "</svg></span>" + COMPS[k] + "</button>";
+    }).join("");
+    $("#f-link").innerHTML = '<option value="">Ninguna, partir de cero</option>' + STRUCT.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + "</option>"; }).join("");
+    $("#matrix").innerHTML = MATRIX();
+  }
+  function syncControls() {
+    $$("#f-icons button").forEach(function (b) { b.setAttribute("aria-checked", String(b.dataset.i === F.icon)); b.tabIndex = b.dataset.i === F.icon ? 0 : -1; });
+    $$("#f-cover button").forEach(function (b) { b.setAttribute("aria-checked", String(b.dataset.c === F.cover && !F.upload)); b.tabIndex = (b.dataset.c === F.cover && !F.upload) || (F.upload && b.dataset.c === "ninguna") ? 0 : -1; });
+    $$("#f-comp button").forEach(function (b) { b.setAttribute("aria-checked", String(b.dataset.k === F.comp)); b.tabIndex = b.dataset.k === F.comp ? 0 : -1; });
+    ["f-cx", "f-cy", "f-zoom"].forEach(function (id) { $("#" + id).disabled = !F.upload; });
+    $("#f-fit-h").textContent = F.upload ? "Mueve los controles hasta que se vea lo que importa. El texto nunca va sobre la imagen." : "El encuadre se activa con una imagen propia.";
+  }
+  var stepNames = ["Datos", "Identidad", "Personas", "Revisar"];
+  function showStep(n, dir) {
+    var prev = $('#f .fpanel[data-p="' + F.step + '"]'), next = $('#f .fpanel[data-p="' + n + '"]');
+    F.step = n;
+    $$("#stepper li").forEach(function (li) { var s = +li.dataset.s; li.className = s < n ? "done" : ""; if (s === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current"); });
+    var swap = function () {
+      if (prev) prev.hidden = true; next.hidden = false;
+      enter(next, { opacity: 0, x: dir * 16 }, { d: M.base });
+      if (n === 3) { peopleApi.render(); }
+      if (n === 4) drawSummary();
+      var t = $("#f-step-t"); t.textContent = "Paso " + n + " de 4 · " + stepNames[n - 1];
+      $("#f-back").hidden = n === 1; $("#f-next").textContent = n === 4 ? "Crear unidad de trabajo" : "Siguiente"; $("#f-next").disabled = false;
+      var hd = next.querySelector("legend,label,h4"); if (hd && window.__fstarted) { hd.setAttribute("tabindex", "-1"); hd.focus({ preventScroll: true }); }
+      say("Paso " + n + " de 4: " + stepNames[n - 1]);
+    };
+    if (prev && prev !== next && G && !rm()) { G.to(prev, { opacity: 0, x: -dir * 12, duration: M.fast, ease: "power2.out", overwrite: "auto", onComplete: function () { G.set(prev, { clearProps: "transform,opacity" }); swap(); } }); } else swap();
+  }
+  function validateStep(n) {
+    if (n === 1) { var e = nameError(); F.touched.name = true; $("#f-name-e").textContent = e; $("#f-name").setAttribute("aria-invalid", String(!!e)); if (e) { $("#f-name").focus(); return false; } }
+    if (n === 2) { var e2 = monoError(); $("#f-mono-e").textContent = e2; $("#f-mono").setAttribute("aria-invalid", String(!!e2)); if (e2) { $("#f-mono").focus(); return false; } if (!hexOk(F.accent) || ratio(F.accent, "#ffffff") < 4.5) { $("#f-hex").focus(); return false; } }
+    return true;
+  }
+  function issues() {
+    var m = F.members, ks = Object.keys(m), out = [];
+    if (!ks.some(function (k) { return m[k] === "admin"; })) out.push(["bad", "Nadie tiene el papel Administra. Vuelve al paso 3 y asigna al menos a una persona."]);
+    var ext = ks.filter(function (k) { return k.indexOf("x:") === 0; });
+    if (ext.length) out.push(["warn", ext.length + " personas externas al dominio " + DOM + " tendrán acceso. Confírmalo para continuar."]);
+    if (ks.length === 1) out.push(["info", "Eres la única persona de la unidad. Puedes añadir a las demás después."]);
+    return out;
+  }
+  function drawSummary() {
+    var m = F.members, ks = Object.keys(m), by = {}; ks.forEach(function (k) { by[m[k]] = (by[m[k]] || 0) + 1; });
+    var link = STRUCT.filter(function (s) { return s.id === F.link; })[0];
+    $("#f-sum").innerHTML = [["Nombre", esc(F.name.trim())], ["Descripción", esc(F.desc.trim() || "Sin descripción")], ["Identidad", esc(F.mono || autoMono(F.name)) + " · " + F.accent + " · " + ICON_N[F.icon] + " · composición " + COMPS[F.comp] + " · " + (F.upload ? "imagen propia" : COVERS[F.cover])],
+      ["Carpetas iniciales", TPL[F.tpl].length ? esc(TPL[F.tpl].join(", ")) : "Ninguna (en blanco)"], ["Vínculo", link ? esc(link.name) : "Sin vínculo"],
+      ["Personas", ks.length + " · " + ROLES.slice().reverse().filter(function (r) { return by[r.k]; }).map(function (r) { return by[r.k] + " " + r.n.toLowerCase(); }).join(", ")]].map(function (r) { return "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>"; }).join("");
+    var is = issues(), h = is.map(function (i) { return '<div class="note ' + i[0] + '">' + i[1] + "</div>"; }).join("");
+    if (is.some(function (i) { return i[0] === "warn"; })) h += '<label class="row" style="font-size:13.5px"><input type="checkbox" id="f-okext" style="width:18px;height:18px"> Confirmo que las personas externas deben tener acceso.</label>';
+    $("#f-issues").innerHTML = h;
+    var ok = $("#f-okext"); var upd = function () { $("#f-next").disabled = is.some(function (i) { return i[0] === "bad"; }) || (ok && !ok.checked); }; upd(); if (ok) ok.addEventListener("change", upd);
+  }
+  var peopleApi = null;
+  function createUnit() {
+    var btn = $("#f-next");
+    if ($("#f-fail").checked) { var er = $("#f-err"); er.hidden = false; er.textContent = "No se pudo crear la unidad: la conexión se cortó. Nada de lo que escribiste se perdió. Reintenta o desmarca la prueba de error."; if (G && !rm()) G.fromTo(er, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: M.base, ease: M.out }); say(er.textContent); return; }
+    $("#f-err").hidden = true; btn.disabled = true; btn.textContent = "Creando…";
+    setTimeout(function () {
+      var u = mk({ id: "u" + (U.length + 1) + "n", name: F.name.trim(), desc: F.desc.trim(), mono: F.mono || autoMono(F.name), accent: F.accent, icon: F.icon, comp: F.comp, cover: F.cover, upload: F.upload, cx: F.cx, cy: F.cy, zoom: F.zoom, link: F.link || null, members: Object.assign({}, F.members), folders: TPL[F.tpl].map(function (n) { return [n, 0]; }), pinned: TPL[F.tpl].map(function (n, i) { return i; }) });
+      U.unshift(u); logEv("Creó la unidad con " + Object.keys(u.members).length + " personas", u.name);
+      var done = $("#f-done"), cur = $('#f .fpanel[data-p="' + F.step + '"]'); cur.hidden = true; done.hidden = false; $("#fnav").hidden = true; $("#stepper").style.visibility = "hidden";
+      done.innerHTML = hero(u, "card") + '<h3 tabindex="-1" id="f-done-h">La unidad «' + esc(u.name) + '» está lista</h3><ul>' + (u.folders.length ? "<li>" + u.folders.length + " carpetas iniciales creadas</li>" : "<li>Unidad en blanco, sin carpetas</li>") + "<li>" + Object.keys(u.members).length + " personas con acceso (en la versión real reciben un correo)</li><li>Registrada en el historial de la unidad</li></ul>" +
+        '<div class="row"><button type="button" class="btn" id="f-open">Abrir la unidad</button><button type="button" class="btn sec2" id="f-index">Verla en Mis unidades</button><button type="button" class="btn quiet" id="f-again">Crear otra</button></div>';
+      var items = $$("#f-done > *"); enter(items, { opacity: 0, y: 10, scale: 0.97 }, { d: M.slow, stagger: M.step });
+      $("#f-done-h").focus({ preventScroll: true }); say("Unidad creada: " + u.name);
+      $("#f-open").onclick = function () { goStage(); openUnit(u.id); };
+      $("#f-index").onclick = function () { goStage(); goIndex(true); };
+      $("#f-again").onclick = resetForm;
+      if (S.view === "index") renderIndex(true, u.id);
+    }, 450);
+  }
+  function resetForm() {
+    F = newForm(); $("#f").reset(); $("#f-done").hidden = true; $("#fnav").hidden = false; $("#stepper").style.visibility = "";
+    $("#f-name").value = ""; $("#f-name-e").textContent = ""; $("#f-name").removeAttribute("aria-invalid"); $("#f-hex").value = F.accent; $("#f-mono").value = ""; $("#f-desc-c").textContent = "0 de 140";
+    $$("#f .fpanel").forEach(function (p) { p.hidden = true; });
+    syncControls(); setAccent(F.accent, false); drawPreview();
+    $("#f-people").innerHTML = peopleHTML("f"); peopleApi = mountPeople("f", fStore);
+    F.step = 0; showStep(1, 1);
+  }
+  var fStore = { map: function () { return F.members; }, canEdit: function () { return true; }, guard: function () { return true; }, change: function () { drawPreview(); } };
+  function wireForm() {
+    buildOptions(); F = newForm(); $("#f-people").innerHTML = peopleHTML("f"); peopleApi = mountPeople("f", fStore);
+    $("#f-name").addEventListener("input", function (e) {
+      F.name = e.target.value;
+      var h = hash(norm(F.name));
+      if (!F.monoTouched) { F.mono = autoMono(F.name); $("#f-mono").value = F.mono; }
+      if (!F.accentTouched && F.name.trim()) { F.accent = ACCENTS[h % ACCENTS.length]; $("#f-hex").value = F.accent; $$("#f-sw button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.c === F.accent)); }); drawContrast(); }
+      if (!F.compTouched && F.name.trim()) { F.comp = Object.keys(COMPS)[(h >> 3) % 4]; syncControls(); }
+      if (F.touched.name) { var er = nameError(); $("#f-name-e").textContent = er; e.target.setAttribute("aria-invalid", String(!!er)); }
+      drawPreview();
+    });
+    $("#f-name").addEventListener("blur", function () { F.touched.name = true; var er = nameError(); if (F.name || er) { $("#f-name-e").textContent = er; $("#f-name").setAttribute("aria-invalid", String(!!er)); } });
+    $("#f-desc").addEventListener("input", function (e) { F.desc = e.target.value; $("#f-desc-c").textContent = e.target.value.length + " de 140"; drawPreview(); });
+    $$('input[name="tpl"]').forEach(function (r) { r.addEventListener("change", function () { F.tpl = r.value; drawPreview(); }); });
+    $("#f-link").addEventListener("change", function (e) { F.link = e.target.value; });
+    $("#f-mono").addEventListener("input", function (e) { F.monoTouched = true; F.mono = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); e.target.value = F.mono; var er = F.mono ? monoError() : ""; $("#f-mono-e").textContent = er; e.target.setAttribute("aria-invalid", String(!!er)); drawPreview(); });
+    $("#f-hex").addEventListener("input", function (e) { var h = parseHex(e.target.value); if (h) { F.accent = h; F.accentTouched = true; $$("#f-sw button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.c === h)); }); } else { F.accent = e.target.value; } drawContrast(); if (h) drawPreview(); });
+    $("#f-sw").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setAccent(b.dataset.c, true); });
+    radioGroup($("#f-icons"), function (b) { F.icon = b.dataset.i; syncControls(); drawPreview(); });
+    radioGroup($("#f-cover"), function (b) { F.cover = b.dataset.c; F.upload = null; syncControls(); drawPreview(); });
+    radioGroup($("#f-comp"), function (b) { F.comp = b.dataset.k; F.compTouched = true; syncControls(); drawPreview(); });
+    ["f-cx", "f-cy", "f-zoom"].forEach(function (id) { $("#" + id).addEventListener("input", function () { F.cx = +$("#f-cx").value; F.cy = +$("#f-cy").value; F.zoom = +$("#f-zoom").value / 100; drawPreview(); }); });
+    $("#f-file").addEventListener("change", function (e) {
+      var f = e.target.files[0], er = $("#f-file-e"); er.textContent = ""; if (!f) return;
+      if (!/^image\/(png|jpeg|webp)$/.test(f.type)) { er.textContent = "Ese archivo no es JPG, PNG ni WebP."; e.target.value = ""; return; }
+      if (f.size > 5 * 1024 * 1024) { er.textContent = "La imagen pesa más de 5 MB. Reduce su tamaño y vuelve a subirla."; e.target.value = ""; return; }
+      var rd = new FileReader(); rd.onload = function () { F.upload = rd.result; syncControls(); drawPreview(); say("Imagen cargada"); }; rd.readAsDataURL(f);
+    });
+    $("#f-back").addEventListener("click", function () { if (F.step > 1) showStep(F.step - 1, -1); });
+    $("#f-next").addEventListener("click", function () { if (F.step === 4) { createUnit(); return; } if (validateStep(F.step)) showStep(F.step + 1, 1); });
+    $("#f").addEventListener("submit", function (e) { e.preventDefault(); });
+    $("#f-name").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); $("#f-next").click(); } });
+    F.step = 0; syncControls(); setAccent(F.accent, false); drawPreview(); $("#f .fpanel").hidden = false; showStep(1, 1); window.__fstarted = true;
+    $("#f-back").hidden = true;
+  }
+  function radioGroup(el, fn) {
+    el.addEventListener("click", function (e) { var b = e.target.closest("button[role=radio]"); if (b) fn(b); });
+    el.addEventListener("keydown", function (e) {
+      var k = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!k) return;
+      var bs = $$("button[role=radio]", el), i = bs.indexOf(document.activeElement); if (i < 0) return; e.preventDefault();
+      var n = bs[(i + k + bs.length) % bs.length]; n.focus(); fn(n);
+    });
+  }
+
+  /* ---------- Escenario ---------- */
+  function logEv(what, unit) { AUDIT.unshift({ t: "ahora", who: person(ME[S.session]).name, how: S.session === "admin" ? "admin general" : "miembro", what: what, unit: unit }); }
+  function goStage() { var w = $("#win"); w.scrollIntoView({ behavior: rm() ? "auto" : "smooth", block: "start" }); }
+  function visible() { return U.filter(function (u) { return rankIn(u) > 0; }); }
+  function filtered() {
+    var q = norm(S.q.trim());
+    return visible().filter(function (u) {
+      if (q && norm(u.name + " " + u.desc + " " + u.mono).indexOf(q) < 0) return false;
+      var mine = u.members[ME[S.session]] === "admin";
+      if (S.filter === "archivadas") return u.archived;
+      if (u.archived) return false;
+      if (S.filter === "mias") return mine;
+      if (S.filter === "compartidas") return isMember(u) && !mine;
+      if (S.filter === "sinmiembro") return !isMember(u);
+      return true;
+    });
+  }
+  function crumb(parts) {
+    $("#crumb").innerHTML = parts.map(function (p, i) { return p.fn ? '<button type="button" data-c="' + i + '">' + esc(p.t) + "</button>" : "<b>" + esc(p.t) + "</b>"; }).join(" <span aria-hidden='true'>/</span> ");
+    $$("#crumb button").forEach(function (b) { b.onclick = parts[+b.dataset.c].fn; });
+  }
+  function adminBar() {
+    var b = $("#adminbar");
+    if (S.session !== "admin") { b.hidden = true; return; }
+    var u = S.view === "unit" ? U.filter(function (x) { return x.id === S.id; })[0] : null;
+    b.hidden = false;
+    b.innerHTML = "<span>Sesión de administración general. Ves todas las unidades, puedes editarlas y cada cambio queda en el registro." + (u && !isMember(u) ? " Entraste a esta unidad sin ser miembro: el ingreso quedó registrado." : "") + "</span>" + (S.view === "index" ? '<button type="button" id="ab-log">Ver el registro</button>' : "");
+    var l = $("#ab-log"); if (l) l.onclick = function () { var a = $("#audit"); if (a) a.scrollIntoView({ behavior: rm() ? "auto" : "smooth", block: "center" }); };
+  }
+  function renderIndex(animate, newId) {
+    S.view = "index"; S.id = null; crumb([{ t: "UDrive" }, { t: "Unidades de trabajo" }]); adminBar();
+    var list = filtered(), all = visible();
+    var cnt = function (f) { return all.filter(function (u) { var mine = u.members[ME[S.session]] === "admin"; return f === "archivadas" ? u.archived : (!u.archived && (f === "todas" || (f === "mias" && mine) || (f === "compartidas" && isMember(u) && !mine) || (f === "sinmiembro" && !isMember(u)))); }).length; };
+    var fs = [["todas", "Todas"], ["mias", "Mías"], ["compartidas", "Compartidas conmigo"]].concat(S.session === "admin" ? [["sinmiembro", "Sin ser miembro"]] : []).concat([["archivadas", "Archivadas"]]);
+    if (!fs.some(function (f) { return f[0] === S.filter; })) S.filter = "todas";
+    var h = '<div class="tools"><div class="fld"><label for="ix-q">Buscar una unidad</label><input type="text" id="ix-q" value="' + esc(S.q) + '" placeholder="Nombre, descripción o monograma" autocomplete="off"></div>' +
+      '<fieldset><legend>Mostrar</legend><div class="seg">' + fs.map(function (f) { return '<label><input type="radio" name="ixf" value="' + f[0] + '"' + (S.filter === f[0] ? " checked" : "") + "><span>" + f[1] + " " + cnt(f[0]) + "</span></label>"; }).join("") + "</div></fieldset>" +
+      '<fieldset><legend>Vista</legend><div class="seg"><label><input type="radio" name="ixm" value="grid"' + (S.mode === "grid" ? " checked" : "") + '><span>Portadas</span></label><label><input type="radio" name="ixm" value="list"' + (S.mode === "list" ? " checked" : "") + '><span>Lista</span></label></div></fieldset>' +
+      '<button type="button" class="btn" id="ix-new">Nueva unidad</button></div><p class="small" id="ix-n" aria-live="polite" style="margin:-4px 0 12px">' + list.length + (list.length === 1 ? " unidad" : " unidades") + "</p><div id=\"ix-res\"></div>";
+    if (S.session === "admin") {
+      h += '<div class="audit" id="audit"><h3>Registro de cambios</h3><div class="tb"><table><thead><tr><th>Cuándo</th><th>Quién</th><th>Cómo</th><th>Qué</th><th>Unidad</th></tr></thead><tbody>' + AUDIT.slice(0, 8).map(function (a) { return "<tr><td>" + esc(a.t) + "</td><td>" + esc(a.who) + "</td><td>" + (a.how === "miembro" ? "Miembro" : '<span class="chip nav">Admin general</span>') + "</td><td>" + esc(a.what) + "</td><td>" + esc(a.unit) + "</td></tr>"; }).join("") + "</tbody></table></div><p class='small' style='margin-top:6px'>Solo se agrega, nunca se edita ni se borra.</p></div>";
+    }
+    $("#stage").innerHTML = h;
+    fillResults(false, newId); if (animate) animateCards(newId);
+    $("#ix-q").addEventListener("input", function (e) { S.q = e.target.value; fillResults(true); });
+    $$('input[name="ixf"]').forEach(function (r) { r.addEventListener("change", function () { S.filter = r.value; fillResults(true); }); });
+    $$('input[name="ixm"]').forEach(function (r) { r.addEventListener("change", function () { S.mode = r.value; fillResults(true); }); });
+    $("#ix-new").addEventListener("click", function () { $("#formulario").scrollIntoView({ behavior: rm() ? "auto" : "smooth" }); setTimeout(function () { var el = $("#f-name") || $("#f-open"); if (el && !el.closest("[hidden]")) el.focus({ preventScroll: true }); }, 500); });
+  }
+  function fillResults(quick, newId) {
+    var list = filtered(), box = $("#ix-res");
+    $("#ix-n").textContent = list.length + (list.length === 1 ? " unidad" : " unidades");
+    if (!list.length) {
+      box.innerHTML = '<div class="empty"><strong>' + (S.q ? "Ninguna unidad coincide con «" + esc(S.q) + "»" : S.filter === "archivadas" ? "No hay unidades archivadas" : S.filter === "mias" ? "Todavía no administras ninguna unidad" : "No hay unidades en esta vista") + "</strong>" + (S.q ? "Prueba con otra palabra o quita el filtro." : "Crea una con el formulario de arriba o pide que te añadan a la de tu oficina.") + "</div>";
+    } else if (S.mode === "grid") {
+      box.innerHTML = '<div class="grid">' + list.map(function (u) { return card(u); }).join("") + "</div>";
+    } else {
+      box.innerHTML = '<ul class="ulist">' + list.map(function (u) { return '<li><button type="button" data-open="' + u.id + '" aria-label="Abrir ' + esc(u.name) + '"><span class="mono sm" style="--ac:' + u.accent + '" aria-hidden="true">' + esc(u.mono) + '</span><span><span class="t">' + esc(u.name) + '</span><br><span class="s">' + esc(u.desc) + '</span></span><span class="r">' + esc(roleLabel(u)) + "<br>" + Object.keys(u.members).length + " personas</span></button></li>"; }).join("") + "</ul>";
+    }
+    if (quick) { var els = $$(".ucard, .ulist li", box); enter(els, { opacity: 0 }, { d: M.fast }); }
+  }
+  function animateCards(newId) {
+    var els = $$("#ix-res .ucard, #ix-res .ulist li");
+    if (!els.length) return;
+    enter(els.slice(0, 8), { opacity: 0, y: 12 }, { d: M.base, stagger: M.step });
+    if (newId) { var nc = $('[data-open="' + newId + '"]'); if (nc) setTimeout(function () { nc.focus({ preventScroll: true }); }, 0); }
+  }
+  function goIndex(animate) {
+    var go = function () { renderIndex(animate !== false); };
+    var cur = $("#stage > .unit-wrap, #stage > .custom-wrap");
+    if (cur && G && !rm()) leave($("#stage"), function () { go(); G.set("#stage", { clearProps: "opacity" }); }, { d: M.fast }); else go();
+  }
+  var lastRect = null;
+  function openUnit(id, fromEl) {
+    var u = U.filter(function (x) { return x.id === id; })[0]; if (!u) return;
+    if (fromEl) { var cv = fromEl.querySelector(".hero"); lastRect = cv ? cv.getBoundingClientRect() : null; } else lastRect = null;
+    S.id = id; S.tab = "inicio"; S.draft = null;
+    if (S.session === "admin" && !isMember(u) && !S.logged[id]) { S.logged[id] = 1; logEv("Entró a la unidad sin ser miembro", u.name); }
+    renderUnit(true);
+  }
+  function renderUnit(anim) {
+    var u = U.filter(function (x) { return x.id === S.id; })[0]; if (!u) { renderIndex(true); return; }
+    S.view = "unit"; var rk = rankIn(u);
+    crumb([{ t: "UDrive" }, { t: "Unidades de trabajo", fn: function () { goIndex(true); } }, { t: u.name }]); adminBar();
+    var tabs = [["inicio", "Inicio"], ["personas", "Personas (" + Object.keys(u.members).length + ")"]].concat(rk >= 4 ? [["personalizar", "Personalizar"]] : []);
+    var nav = '<nav class="unav" aria-label="Secciones de ' + esc(u.name) + '">' + tabs.map(function (t) { return '<button type="button" data-t="' + t[0] + '"' + (S.tab === t[0] ? ' aria-current="page"' : "") + ">" + t[1] + "</button>"; }).join("") + '<span class="grow"></span><span class="chip' + (isMember(u) ? "" : " nav") + '">' + esc(isMember(u) ? "Tu papel: " + roleLabel(u) : "Administración general, sin ser miembro") + "</span></nav>";
+    var body = "";
+    if (S.tab === "inicio") body = homeHTML(u, u, rk);
+    else if (S.tab === "personas") body = peopleTab(u, rk);
+    else body = customHTML(u);
+    var arch = u.archived ? '<div class="note warn" style="border-radius:0">Esta unidad está archivada: se puede abrir pero no se puede cambiar. ' + (rk >= 4 ? "Restaurarla se hace en Personas." : "") + "</div>" : "";
+    $("#stage").innerHTML = '<div class="' + (S.tab === "personalizar" ? "custom-wrap" : "unit-wrap") + '"><div class="unit">' + (S.tab === "personalizar" ? "" : hero(u, "page", "h2")) + nav + arch + body + "</div></div>";
+    $$(".unav button").forEach(function (b) { b.onclick = function () { S.tab = b.dataset.t; S.draft = null; renderUnit(false); var a = $(".unit .blocks, .unit .peopletab, .unit .custom"); enter(a, { opacity: 0, y: 8 }, { d: M.base }); $(".unav [aria-current]").focus(); }; });
+    if (S.tab === "personas") mountUnitPeople(u);
+    if (S.tab === "personalizar") wireCustom(u);
+    if (S.tab === "inicio") wireHome(u);
+    if (anim) animateUnit(u);
+  }
+  function animateUnit(u) {
+    var hero_ = $(".unit .hero"), blocks = $$(".unit .blk");
+    if (G && !rm() && lastRect && hero_) {
+      var r = hero_.getBoundingClientRect(), dx = lastRect.left - r.left, dy = lastRect.top - r.top, sx = lastRect.width / r.width, sy = lastRect.height / r.height;
+      var kids = $$(".hb, .plate, .giant, .mono", hero_);
+      G.fromTo(hero_, { x: dx, y: dy, scaleX: sx, scaleY: sy, transformOrigin: "0 0" }, { x: 0, y: 0, scaleX: 1, scaleY: 1, duration: M.slow, ease: M.out, overwrite: "auto", clearProps: "transform" });
+      G.fromTo(kids, { opacity: 0 }, { opacity: 1, duration: M.base, delay: 0.16, clearProps: "opacity" });
+    } else enter(hero_, { opacity: 0, y: 8 }, { d: M.base });
+    enter(blocks.slice(0, 8), { opacity: 0, y: 10 }, { d: M.base, stagger: M.step, delay: rm() ? 0 : 0.12 });
+    enter($$(".unav, .note", $(".unit")), { opacity: 0 }, { d: M.base, delay: rm() ? 0 : 0.1 });
+    var st = $("#stage"); st.setAttribute("tabindex", "-1"); st.focus({ preventScroll: true }); say("Abriste " + u.name + ". Tu papel: " + roleLabel(u));
+    var w = $("#win"); var top = w.getBoundingClientRect().top; if (top < 0 || top > innerHeight * 0.6) w.scrollIntoView({ behavior: rm() ? "auto" : "smooth", block: "start" });
+  }
+
+  /* --- Bloques del inicio --- */
+  function homeHTML(u, d, rk) {
+    var st = ' style="--ac:' + d.accent + '"', ord = d.order, mem = Object.keys(u.members), by = {};
+    mem.forEach(function (k) { by[u.members[k]] = (by[u.members[k]] || 0) + 1; });
+    var B = {
+      carpetas: function () {
+        var pin = (u.pinned || []).filter(function (i) { return u.folders[i]; }).slice(0, 4);
+        var inner = pin.length ? '<div class="folders">' + pin.map(function (i) { var f = u.folders[i]; return '<button type="button" class="fold" data-fold="' + i + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><b>' + esc(f[0]) + "</b><span>" + f[1] + " elementos</span></button>"; }).join("") + "</div>" : '<div class="empty" style="padding:18px"><strong>Sin carpetas ancladas</strong>' + (rk >= 3 ? "Crea la primera carpeta o ancla una existente desde Personalizar." : "Quien tenga papel de Crear puede añadir carpetas.") + "</div>";
+        return '<section class="blk wide"><h4>Carpetas ancladas <button type="button" class="btn quiet" data-all>Ver las ' + u.folders.length + "</button></h4>" + inner + "</section>";
+      },
+      recientes: function () { return '<section class="blk"><h4>Recientes</h4>' + (u.recents.length ? '<ul class="lst">' + u.recents.map(function (r) { return "<li><span>" + esc(r[0]) + "</span><small>" + esc(r[1]) + " · " + esc(r[2]) + " · " + esc(r[3]) + "</small></li>"; }).join("") + "</ul>" : '<div class="empty" style="padding:18px"><strong>Aún no hay archivos</strong>' + (rk >= 3 ? "Sube el primero o arrástralo a una carpeta." : "Cuando alguien suba algo, aparecerá aquí.") + "</div>") + "</section>"; },
+      informes: function () { return '<section class="blk wide"><h4>Informes en construcción</h4>' + (u.informes.length ? '<ul class="lst">' + u.informes.map(function (r) { return "<li><span><b style='font-family:var(--disp);color:var(--navy)'>" + esc(r[0]) + "</b> <span class='chip'>" + esc(r[2]) + "</span></span><div class='prog' role='img' aria-label='" + r[1] + " por ciento completo'><i style='width:" + r[1] + "%'></i></div><small>" + r[1] + " % completo · <a href='#unidades' data-info>Abrir en el editor</a></small></li>"; }).join("") + "</ul>" : '<div class="empty" style="padding:18px"><strong>Sin informes en construcción</strong>Los informes que se armen con tablas y gráficas de esta unidad se listan aquí.</div>') + "</section>"; },
+      miembros: function () {
+        var show = mem.slice(0, 7).map(function (k) { return avatar(k); }).join("");
+        return '<section class="blk"><h4>Personas y papeles <button type="button" class="btn quiet" data-ppl>' + (rk >= 4 ? "Gestionar" : "Ver todas") + '</button></h4><div class="avs" aria-hidden="true">' + show + (mem.length > 7 ? '<span class="av" style="background:#4a5a70">+' + (mem.length - 7) + "</span>" : "") + '</div><div class="roles-sum">' + ROLES.slice().reverse().filter(function (r) { return by[r.k]; }).map(function (r) { return "<span><b>" + by[r.k] + "</b> " + r.n.toLowerCase() + "</span>"; }).join("") + "</div></section>";
+      },
+      actividad: function () { return '<section class="blk"><h4>Actividad</h4>' + (u.activity.length ? '<ul class="lst">' + u.activity.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : '<div class="empty" style="padding:18px"><strong>Sin movimiento todavía</strong>Aquí verás quién sube, edita o comenta.</div>') + "</section>"; }
+    };
+    return '<div class="blocks"' + st + ">" + ord.map(function (k) { return B[k](); }).join("") + "</div>";
+  }
+  function wireHome(u) {
+    var st = $("#stage");
+    st.querySelectorAll("[data-fold],[data-all],[data-info]").forEach(function (b) { b.addEventListener("click", function (e) { e.preventDefault(); toast("En la versión real esto abre el explorador de UDrive dentro de la unidad."); }); });
+    var p = st.querySelector("[data-ppl]"); if (p) p.addEventListener("click", function () { S.tab = "personas"; renderUnit(false); enter($(".peopletab"), { opacity: 0, y: 8 }, { d: M.base }); });
+  }
+
+  /* --- Personas de una unidad --- */
+  function peopleTab(u, rk) {
+    var ed = rk >= 4 && !u.archived, adminG = !isMember(u);
+    var h = '<div class="peopletab" style="padding:18px;background:var(--paper);display:grid;gap:18px">';
+    h += '<div class="note ' + (ed ? "info" : "warn") + '">' + (ed ? (adminG ? "Cambias a las personas como administración general. Cada cambio queda en el registro." : "Tú administras esta unidad: puedes añadir, quitar y cambiar papeles.") : "Tu papel es " + esc(roleLabel(u)) + ". Solo quien administra la unidad cambia a las personas. Puedes ver quién tiene acceso y con qué papel.") + "</div>";
+    h += peopleHTML("u");
+    if (ed) {
+      var cand = Object.keys(u.members).filter(function (k) { return u.members[k] !== "admin" || adminG; });
+      h += '<div class="panel" style="padding:16px;display:grid;gap:12px"><h4>' + (adminG ? "Reasignar la administración" : "Transferir la administración") + '</h4><p class="small">La persona elegida pasa a Administra. ' + (adminG ? "Se registra como acción de administración general." : "Tú puedes seguir administrando o pasar a Editar.") + '</p><div class="row"><div class="fld" style="flex:1 1 220px"><label for="tr-w">Persona</label><select id="tr-w">' + Object.keys(u.members).filter(function (k) { return u.members[k] !== "admin"; }).map(function (k) { return '<option value="' + esc(k) + '">' + esc(person(k).name) + "</option>"; }).join("") + '</select></div>' + (!adminG ? '<label class="row" style="font-size:13px"><input type="checkbox" id="tr-self" style="width:18px;height:18px"> Pasar mi papel a Editar</label>' : "") + '<button type="button" class="btn sec2" id="tr-go"' + (cand.length && Object.keys(u.members).some(function (k) { return u.members[k] !== "admin"; }) ? "" : " disabled") + ">" + (adminG ? "Reasignar" : "Transferir") + "</button></div></div>";
+      h += '<div class="panel" style="padding:16px;display:grid;gap:10px"><h4>' + (u.archived ? "Restaurar la unidad" : "Archivar la unidad") + '</h4><p class="small">' + (u.archived ? "Vuelve al índice con todas sus carpetas y personas." : "Se oculta del índice y queda de solo lectura. Se puede restaurar. No borra nada.") + '</p><div><button type="button" class="btn ' + (u.archived ? "sec2" : "danger") + '" id="ar-go">' + (u.archived ? "Restaurar" : "Archivar") + "</button></div></div>";
+    }
+    return h + "</div>";
+  }
+  function mountUnitPeople(u) {
+    var rk = rankIn(u), store = {
+      map: function () { return u.members; }, canEdit: function () { return rankIn(u) >= 4 && !u.archived; },
+      guard: function (k, nr) { var adm = Object.keys(u.members).filter(function (x) { return u.members[x] === "admin"; }); if (u.members[k] !== "admin") return true; if (nr === "admin") return true; return adm.length > 1; },
+      change: function (kind, keys) {
+        var m = {add: "Añadió personas", remove: "Quitó personas", role: "Cambió papeles"}[kind] || "Cambió personas";
+        logEv(m + (keys && keys.length === 1 ? ": " + person(keys[0]).name : ""), u.name);
+        var c = $(".unav button[data-t=personas]"); if (c) c.textContent = "Personas (" + Object.keys(u.members).length + ")";
+      }
+    };
+    mountPeople("u", store);
+    var go = $("#tr-go");
+    if (go) go.onclick = function () {
+      var k = $("#tr-w").value; if (!k) return; u.members[k] = "admin";
+      var self = $("#tr-self"); if (self && self.checked && u.members[ME[S.session]]) u.members[ME[S.session]] = "editar";
+      logEv((isMember(u) ? "Transfirió" : "Reasignó") + " la administración a " + person(k).name, u.name); toast(person(k).name + " ahora administra la unidad."); renderUnit(false); enter($(".peopletab"), { opacity: 0, y: 8 }, { d: M.base });
+    };
+    var ar = $("#ar-go");
+    if (ar) ar.onclick = function () { u.archived = !u.archived; logEv(u.archived ? "Archivó la unidad" : "Restauró la unidad", u.name); toast(u.archived ? "Unidad archivada. Sigue en el filtro Archivadas." : "Unidad restaurada."); renderUnit(false); enter($(".peopletab"), { opacity: 0, y: 8 }, { d: M.base }); };
+  }
+
+  /* --- Personalizar --- */
+  function customHTML(u) {
+    var d = S.draft = S.draft || { accent: u.accent, comp: u.comp, order: u.order.slice(), pinned: (u.pinned || []).slice() };
+    var dd = Object.assign({}, u, { accent: d.accent, comp: d.comp, order: d.order, pinned: d.pinned });
+    var nav = '';
+    return '<div class="custom"><div class="ctl"><h3>Personalizar esta unidad</h3>' +
+      '<div class="fld"><label for="c-hex">Color de acento</label><input type="text" id="c-hex" value="' + d.accent + '" maxlength="7" spellcheck="false" aria-describedby="c-ct"><div class="sw" id="c-sw" role="group" aria-label="Colores sugeridos">' + ACCENTS.map(function (c) { return '<button type="button" data-c="' + c + '" style="background:' + c + '" aria-pressed="' + (c === d.accent) + '" aria-label="Color ' + c + '"></button>'; }).join("") + '</div><div class="contrast" id="c-ct" aria-live="polite"></div></div>' +
+      '<fieldset><legend>Composición de la cabecera</legend><div class="opts" id="c-comp" role="radiogroup" aria-label="Composición">' + Object.keys(COMPS).map(function (k) { return '<button type="button" role="radio" aria-checked="' + (k === d.comp) + '" data-k="' + k + '" tabindex="' + (k === d.comp ? 0 : -1) + '">' + COMPS[k] + "</button>"; }).join("") + "</div></fieldset>" +
+      '<fieldset><legend>Orden de las secciones</legend><ol class="ord" id="c-ord">' + d.order.map(function (k, i) { return '<li data-k="' + k + '"><span>' + ORDER_N[k] + '</span><span class="row" style="gap:4px"><button type="button" data-mv="-1" aria-label="Subir ' + ORDER_N[k] + '"' + (i === 0 ? " disabled" : "") + '>&uarr;</button><button type="button" data-mv="1" aria-label="Bajar ' + ORDER_N[k] + '"' + (i === d.order.length - 1 ? " disabled" : "") + ">&darr;</button></span></li>"; }).join("") + "</ol></fieldset>" +
+      '<fieldset><legend>Carpetas ancladas <span class="hint">(hasta 4)</span></legend><div class="chk" id="c-pin">' + u.folders.map(function (f, i) { return '<label><input type="checkbox" value="' + i + '"' + (d.pinned.indexOf(i) >= 0 ? " checked" : "") + '> ' + esc(f[0]) + "</label>"; }).join("") + "</div></fieldset>" +
+      '<div class="row"><button type="button" class="btn" id="c-save">Guardar</button><button type="button" class="btn sec2" id="c-cancel">Descartar</button></div></div>' +
+      '<div class="unit" id="c-prev" style="--ac:' + d.accent + '" aria-label="Vista previa">' + hero(dd, "page", "h2") + homeHTML(u, dd, 4) + "</div></div>";
+  }
+  function wireCustom(u) {
+    var d = S.draft;
+    var redraw = function (fx) {
+      var dd = Object.assign({}, u, { accent: d.accent, comp: d.comp, order: d.order, pinned: d.pinned }), pv = $("#c-prev");
+      pv.innerHTML = hero(dd, "page", "h2") + homeHTML(u, dd, 4);
+      if (fx === "comp") enter(pv, { opacity: 0 }, { d: M.base });
+      if (fx === "order") enter($$(".blk", pv), { opacity: 0, y: 6 }, { d: M.fast, stagger: 0.02 });
+    };
+    var ct = function () { var r = ratio(d.accent, "#fff"), el = $("#c-ct"); if (r >= 4.5) { el.className = "contrast good"; el.innerHTML = "<b>Cumple.</b> " + fmt(r) + ":1 contra blanco."; } else { el.className = "contrast bad"; el.innerHTML = fmt(r) + ":1. Muy claro. <button type='button' class='btn sec2' id='c-dk' style='min-height:30px;padding:3px 10px'>Oscurecer hasta cumplir</button>"; $("#c-dk").onclick = function () { setC(darken(d.accent)); }; } $("#c-save").disabled = r < 4.5; };
+    var setC = function (h) { d.accent = h; $("#c-hex").value = h; $$("#c-sw button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.c === h)); }); ct(); redraw(); };
+    ct();
+    $("#c-hex").addEventListener("input", function (e) { var h = parseHex(e.target.value); if (h) { d.accent = h; $$("#c-sw button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.c === h)); }); ct(); redraw(); } else { $("#c-ct").className = "contrast bad"; $("#c-ct").textContent = "Escribe un color de seis cifras."; $("#c-save").disabled = true; } });
+    $("#c-sw").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setC(b.dataset.c); });
+    radioGroup($("#c-comp"), function (b) { d.comp = b.dataset.k; $$("#c-comp button").forEach(function (x) { x.setAttribute("aria-checked", String(x === b)); x.tabIndex = x === b ? 0 : -1; }); redraw("comp"); });
+    $("#c-ord").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-mv]"); if (!b) return; var li = b.closest("li"), k = li.dataset.k, i = d.order.indexOf(k), j = i + +b.dataset.mv;
+      if (j < 0 || j >= d.order.length) return; d.order.splice(i, 1); d.order.splice(j, 0, k);
+      $("#c-ord").innerHTML = d.order.map(function (kk, n) { return '<li data-k="' + kk + '"><span>' + ORDER_N[kk] + '</span><span class="row" style="gap:4px"><button type="button" data-mv="-1" aria-label="Subir ' + ORDER_N[kk] + '"' + (n === 0 ? " disabled" : "") + '>&uarr;</button><button type="button" data-mv="1" aria-label="Bajar ' + ORDER_N[kk] + '"' + (n === d.order.length - 1 ? " disabled" : "") + ">&darr;</button></span></li>"; }).join("");
+      var nb = $('#c-ord li[data-k="' + k + '"] button[data-mv="' + b.dataset.mv + '"]') || $('#c-ord li[data-k="' + k + '"] button:not([disabled])'); if (nb) nb.focus(); say(ORDER_N[k] + " ahora es la sección " + (j + 1) + " de " + d.order.length); redraw("order");
+    });
+    $("#c-pin").addEventListener("change", function (e) {
+      var on = $$("#c-pin input:checked").map(function (x) { return +x.value; });
+      if (on.length > 4) { e.target.checked = false; toast("Se pueden anclar hasta 4 carpetas. Quita una para anclar otra."); return; }
+      d.pinned = on; redraw();
+    });
+    $("#c-save").addEventListener("click", function () { u.accent = d.accent; u.comp = d.comp; u.order = d.order.slice(); u.pinned = d.pinned.slice(); logEv("Cambió la personalización (color, composición, orden o anclas)", u.name); S.draft = null; S.tab = "inicio"; toast("Cambios guardados. Así se ve la unidad para todo el equipo."); renderUnit(false); enter($(".unit"), { opacity: 0 }, { d: M.base }); });
+    $("#c-cancel").addEventListener("click", function () { S.draft = null; S.tab = "inicio"; renderUnit(false); enter($(".unit"), { opacity: 0 }, { d: M.fast }); });
+  }
+
+  /* ---------- Modelo mental ---------- */
+  var LENS = {
+    personal: { n: ["personal", "unidad"], h: "Carpetas personales", t: "Siguen igual. Una unidad no las sustituye.", l: ["Lo que haces solo o en borrador se queda en tu unidad personal.", "Para llevar una carpeta al equipo se usa «Mover a una unidad de trabajo». Antes de confirmar, la pantalla avisa quién empezará a verla.", "Lo que creas dentro de una unidad es de la unidad; si sales, no te lo llevas."] },
+    estructura: { n: ["unidad", "estructura"], h: "Estructura de la universidad", t: "Vínculo opcional y de una sola vía.", l: ["Al crear una unidad se puede partir de una unidad de la estructura para traer a su gente, con el papel sugerido: Gestor administra, Contribuyente crea, Consulta solo ve.", "Después no se sincroniza. Que alguien cambie de cargo no le quita ni le da acceso a los archivos.", "Los papeles de informes, tableros y rankings no cambian."] },
+    correo: { n: ["unidad", "personal"], h: "Compartir por correo", t: "Se conserva para lo puntual; deja de ser la forma de armar equipos.", l: ["Sirve para dar acceso a un archivo o una carpeta a una persona concreta, en tu unidad personal.", "Para un equipo estable (una oficina, un proyecto) se usa la unidad: una lista de personas con papel en lugar de veinte invitaciones sueltas.", "Dentro de una unidad, compartir hacia fuera queda solo para Administra."] }
+  };
+  function wireModel() {
+    var out = $("#lens-out");
+    function show(k, anim) {
+      var L = LENS[k]; $$("#model .node").forEach(function (n) { n.classList.toggle("is-lit", L.n.indexOf(n.dataset.n) >= 0 && n.dataset.n !== "unidad"); });
+      out.innerHTML = "<strong>" + L.h + ".</strong> " + L.t + "<ul>" + L.l.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul>";
+      if (anim) enter(out, { opacity: 0, y: 6 }, { d: M.base });
+    }
+    $$('input[name="lens"]').forEach(function (r) { r.addEventListener("change", function () { show(r.value, true); }); });
+    show("personal", false);
+  }
+
+  /* ---------- Demo de composiciones y especificación ---------- */
+  function wireDemo() {
+    var demo = [U[0], U[1], U[2], U[3]];
+    $("#comp-demo").innerHTML = demo.map(function (u, i) { return '<div class="phase" style="padding:0;overflow:hidden">' + hero(u, "card") + '<div style="padding:10px 14px"><span class="chip">Composición ' + COMPS[u.comp] + '</span><p class="small" style="margin-top:6px">' + ["Banda de imagen arriba, monograma y título debajo. La más neutra.", "Panel lateral con imagen y monograma claro. Buena para unidades con identidad visual fuerte.", "Sin imagen: el monograma grande es la portada. Para oficinas sin material gráfico.", "Imagen a todo el ancho con placa de color sólido para el título. La más expresiva."][i] + "</p></div></div>"; }).join("");
+    var rows = [
+      ["Entrada escalonada de tarjetas", "Mostrar el orden del índice al abrirlo", "220 ms, escalón 45 ms (máx. 8)", "power4.out", "opacity, translateY 12 → 0", "Fundido de 120 ms"],
+      ["Tarjeta a página de la unidad", "Mostrar de dónde viene la página", "380 ms; el texto aparece a los 160 ms", "power4.out", "transform de la portada desde el rectángulo de la tarjeta", "Fundido de 120 ms"],
+      ["Volver al índice", "Salir rápido de lo que ya no se usa", "140 ms fuera, luego entrada del índice", "power2.out", "opacity", "Igual"],
+      ["Añadir persona", "Marcar dónde cayó la fila nueva", "220 ms + resalte 600 ms", "power4.out", "opacity, translateY -8 → 0, fondo", "Fundido y resalte"],
+      ["Quitar persona", "Confirmar que se fue sin sobresalto", "140 ms de salida + 140 ms de colapso", "power2.out", "opacity, translateX; luego height de la fila", "Fundido de 120 ms"],
+      ["Cambio de papel", "Confirmar el cambio sin mover nada", "600 ms de resalte, sin movimiento", "power1.out", "background-color", "Resalte breve"],
+      ["Avance entre pasos", "Dar sentido de dirección", "140 ms sale, 220 ms entra", "power2.out / power4.out", "opacity, translateX ±16", "Fundido de 120 ms"],
+      ["Confirmación de creación", "Cerrar el flujo con una señal clara", "380 ms, escalón 45 ms", "power4.out", "opacity, translateY, scale 0,97 → 1", "Fundido de 120 ms"],
+      ["Cambio de composición o de orden", "Ver el efecto de la elección", "140 a 220 ms", "power4.out", "opacity", "Igual"],
+      ["Búsqueda y filtros del índice", "Se usan decenas de veces al día", "140 ms de fundido", "power4.out", "opacity", "Sin cambio"],
+      ["Botones y tarjetas al pulsar", "Confirmar que el clic se recibió", "140 ms (CSS)", "cubic-bezier(0.23, 1, 0.32, 1)", "transform scale 0,97", "Se mantiene"]
+    ];
+    $("#mov").innerHTML = "<thead><tr><th scope='col'>Transición</th><th scope='col'>Propósito</th><th scope='col'>Duración</th><th scope='col'>Curva</th><th scope='col'>Propiedad</th><th scope='col'>Con reducir movimiento</th></tr></thead><tbody>" + rows.map(function (r) { return "<tr><th scope='row' style='background:#fff;font-family:var(--ui);font-weight:600;color:var(--ink)'>" + r[0] + "</th>" + r.slice(1).map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody>";
+  }
+
+  /* ---------- Guía lateral ---------- */
+  function wireGuide() {
+    var links = $$("#guide a");
+    if (!("IntersectionObserver" in window)) return;
+    var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) links.forEach(function (a) { a.setAttribute("aria-current", String(a.getAttribute("href") === "#" + e.target.id)); }); }); }, { rootMargin: "-20% 0px -70% 0px" });
+    $$("section.sec").forEach(function (s) { io.observe(s); });
+  }
+
+  /* ---------- Arranque ---------- */
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-open]"); if (!b || !$("#stage").contains(b)) return;
+    var fromEl = b; openUnit(b.dataset.open, fromEl);
+  });
+  $$('input[name="ses"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      S.session = r.value; S.filter = "todas"; S.q = ""; S.draft = null;
+      var u = S.view === "unit" ? U.filter(function (x) { return x.id === S.id; })[0] : null;
+      if (u && rankIn(u) === 0) { renderIndex(true); toast("Con esta sesión no tienes acceso a esa unidad. Volviste al índice."); return; }
+      if (u && S.tab === "personalizar" && rankIn(u) < 4) S.tab = "inicio";
+      if (u) { if (S.session === "admin" && !isMember(u) && !S.logged[u.id]) { S.logged[u.id] = 1; logEv("Entró a la unidad sin ser miembro", u.name); } renderUnit(false); enter($(".unit"), { opacity: 0 }, { d: M.base }); } else { renderIndex(true); }
+      say("Sesión cambiada a " + (S.session === "admin" ? "administración general" : "miembro"));
+    });
+  });
+  $("#go-custom").addEventListener("click", function () { S.session = "miembro"; $('input[name="ses"][value="miembro"]').checked = true; S.id = "u1"; S.tab = "personalizar"; S.draft = null; lastRect = null; renderUnit(true); });
+  $("#replay").addEventListener("click", function () { if (S.view !== "index") renderIndex(true); else animateCards(); $("#win").scrollIntoView({ behavior: rm() ? "auto" : "smooth", block: "start" }); });
+  wireModel(); wireDemo(); wireForm(); wireGuide();
+  renderIndex(true);
+  window.__ut = { S: S, U: U, F: function () { return F; } };
+})();
+</script>

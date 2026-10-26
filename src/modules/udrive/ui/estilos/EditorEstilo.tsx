@@ -16,7 +16,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Aviso, useAviso } from "../../../../components/espacio/piezas";
 import { Icon } from "../../../../components/ui/Icon";
-import { useArchivos, useContenido, useCrearItem, useDuenos, useGuardarContenido, useRenombrar } from "../../datos";
+import { useQuery } from "@tanstack/react-query";
+import { enlaceDeArchivo, useArchivos, useContenido, useCrearItem, useDuenos, useGuardarContenido, useRenombrar } from "../../datos";
 import { ESTILO_SIN_ELEGIR, PAPEL_PX, avisosDeEstilo, estiloDeFabrica, estiloParaGuardar, normalizarEstilo } from "../../lib/estilo";
 import type { Estilo } from "../../lib/estilo";
 import { documentoDeMuestra, recursosDeMuestra } from "../../lib/muestra";
@@ -77,6 +78,10 @@ function Lienzo({ id, nombre, carpetaId, contenido, editable, decir }: { id: str
   const { estado, vaciar } = useAutoguardado(editable ? estilo : null, editable, (e) => guardar.mutateAsync({ id, contenido: estiloParaGuardar({ ...e, nombre: nombreActual }) }));
   useEffect(() => () => void vaciar(), [vaciar]);
 
+  // La foto propia del estilo, para verla en la vista previa.
+  const filaFoto = estilo.portada.foto.imagenId ? archivos.data?.find((a) => a.id === estilo.portada.foto.imagenId) : undefined;
+  const urlFoto = useQuery({ queryKey: ["ud", "url", filaFoto?.ruta_storage ?? ""], enabled: Boolean(filaFoto?.ruta_storage), retry: false, staleTime: 4 * 60_000, queryFn: () => enlaceDeArchivo(filaFoto?.ruta_storage ?? "") }).data ?? null;
+
   const doc = useMemo(() => documentoDeMuestra(), []);
   const recursos = useMemo(() => recursosDeMuestra(), []);
   const entrada = useMemo<EntradaPdf>(() => {
@@ -94,11 +99,11 @@ function Lienzo({ id, nombre, carpetaId, contenido, editable, decir }: { id: str
       borrador: true,
       estilo,
       papel: estilo.pagina.papel,
-      fotoUrl: null,
+      fotoUrl: urlFoto,
       logoPropioUrl: null,
       marcaUrl: null,
     };
-  }, [doc, recursos, estilo]);
+  }, [doc, recursos, estilo, urlFoto]);
 
   const avisos = useMemo(() => avisosDeEstilo(estilo), [estilo]);
   const nombresImagen = archivos.data ? new Map(archivos.data.map((a) => [a.id, a.nombre])) : new Map<string, string>();
@@ -135,7 +140,7 @@ function Lienzo({ id, nombre, carpetaId, contenido, editable, decir }: { id: str
       <div className="ud-estilo-layout">
         <aside aria-label="Controles del estilo">
           <p className="es-note" style={{ marginBottom: 8 }}>Los cambios se guardan solos. Cada informe guarda su propia copia del estilo al aplicarlo: cambiar este estilo no mueve los informes que ya lo usan.</p>
-          <PanelEstilo estilo={estilo} base={base} onChange={setEstilo} editable={editable} muestra={doc.portada} nombresImagen={nombresImagen} />
+          <PanelEstilo estilo={estilo} base={base} onChange={setEstilo} editable={editable} muestra={doc.portada} nombresImagen={nombresImagen} carpetaId={carpetaId} />
           <div style={{ marginTop: 16 }}>
             <h3 style={{ margin: "0 0 6px", fontSize: "var(--text-sm)" }}>Vista de advertencias</h3>
             <ListaAvisos items={avisos} />

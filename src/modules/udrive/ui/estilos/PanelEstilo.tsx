@@ -17,11 +17,12 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { contraste, normalizarHex, normalizarMonograma } from "../../../informes/vista/perfil";
 import type { Portada } from "../../lib/documento";
-import { ACENTOS, COMPOSICIONES, FAMILIAS, acentoValido, normalizarEstilo, oscurecerHasta45 } from "../../lib/estilo";
+import { ACENTOS, COMPOSICIONES, FAMILIAS, PAPEL_PX, acentoValido, normalizarEstilo, oscurecerHasta45 } from "../../lib/estilo";
 import type { Estilo } from "../../lib/estilo";
 import { PortadaEstilo } from "../../salida/Portadas";
 import { Escalado } from "../documento/Escalado";
 import { SelectorArchivo } from "../documento/Selectores";
+import { ControlFoto } from "./ControlFoto";
 import "../documento/documento.css";
 
 const coma = (n: number, d = 1): string => n.toFixed(d).replace(".", ",");
@@ -89,9 +90,13 @@ export interface PropsPanelEstilo {
   /** La portada del informe (o una de muestra) para las miniaturas de composición. */
   muestra: Portada;
   nombresImagen: ReadonlyMap<string, string>;
+  /** Carpeta de UDrive donde se guardan las imágenes que se suben desde el panel. */
+  carpetaId: string | null;
+  /** Por qué no se puede cambiar la foto aquí, si no se puede (con lo que hay que hacer). */
+  motivoFoto?: string;
 }
 
-export function PanelEstilo({ estilo, base, onChange, editable, muestra, nombresImagen }: PropsPanelEstilo) {
+export function PanelEstilo({ estilo, base, onChange, editable, muestra, nombresImagen, carpetaId, motivoFoto }: PropsPanelEstilo) {
   const [hex, setHex] = useState(estilo.portada.acento);
   const [mensajeAcento, setMensajeAcento] = useState("");
   const [oscurecible, setOscurecible] = useState("");
@@ -205,10 +210,23 @@ export function PanelEstilo({ estilo, base, onChange, editable, muestra, nombres
         ) : null}
         <Seg etiqueta="Tamaño del título" valor={estilo.portada.tam} deshabilitado={!editable} opciones={[{ id: 0, texto: "S" }, { id: 1, texto: "M" }, { id: 2, texto: "L" }]} onChange={(v) => cambiar("portada", { tam: v })} />
         {comp.id === 1 ? (
-          <Seg etiqueta="Fondo de la foto" valor={estilo.portada.fondo} deshabilitado={!editable} opciones={[{ id: "foto", texto: "Foto institucional" }, { id: "propia", texto: "Mi foto" }, { id: "color", texto: "Solo color" }]} onChange={(v) => cambiar("portada", { fondo: v })} />
+          <>
+            <Seg etiqueta="Fondo de la portada" valor={estilo.portada.fondo === "color" ? "color" : "foto"} deshabilitado={!editable} opciones={[{ id: "foto", texto: "Con foto" }, { id: "color", texto: "Solo color" }]} onChange={(v) => cambiar("portada", { fondo: v })} />
+            {estilo.portada.fondo !== "color" ? (
+              <ControlFoto
+                valor={estilo.portada.foto}
+                onChange={(f) => cambiar("portada", { foto: f })}
+                editable={editable}
+                carpetaId={carpetaId}
+                aspecto={`${PAPEL_PX[estilo.pagina.papel].mm[0]} / ${Math.round(PAPEL_PX[estilo.pagina.papel].mm[1] * 0.42 * 10) / 10}`}
+                titulo="Foto de portada del estilo"
+                motivoBloqueo={editable ? motivoFoto : "Este estilo es de solo lectura: duplíquelo para cambiar la foto."}
+              />
+            ) : null}
+          </>
         ) : null}
         <Seg etiqueta="Contraportada" valor={estilo.portada.tono} deshabilitado={!editable} opciones={[{ id: "marino", texto: "Azul marino" }, { id: "acento", texto: "Color de acento" }, { id: "foto", texto: "Blanco con foto" }]} onChange={(v) => cambiar("portada", { tono: v })} />
-        <p className="es-note">La foto de portada, su encuadre, los textos y el cierre son de cada informe: se editan en «Documento».</p>
+        <p className="es-note">Cada informe puede poner su propia foto en «Documento»: manda sobre la del estilo. Los textos y el cierre también son de cada informe.</p>
       </Grupo>
 
       <Grupo

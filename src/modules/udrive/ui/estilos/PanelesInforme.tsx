@@ -23,6 +23,7 @@ import type { Cierre, Documento, FotoPortada, Portada } from "../../lib/document
 import { ESTILO_SIN_ELEGIR, FABRICAS, PAPEL_PX, avisosDeEstilo, estiloDeFabrica, estiloDelInforme, estiloParaGuardar, hayAjustes, papelDe } from "../../lib/estilo";
 import { nombreUnico } from "../../lib/nombres";
 import type { Recursos } from "../../salida/recursos";
+import { ControlFoto } from "./ControlFoto";
 import { PanelEstilo } from "./PanelEstilo";
 import { ListaAvisos } from "./Revision";
 
@@ -161,6 +162,8 @@ export function EstiloDelInforme({
               editable={editable}
               muestra={doc.portada}
               nombresImagen={recursos.nombres}
+              carpetaId={carpetaId}
+              motivoFoto={d.deFabrica ? "Esta foto queda como ajuste de este informe. Para que sea parte de un estilo, guarde el aspecto como estilo propio." : undefined}
               onChange={(e) => cambiarDoc((prev) => conAjustes(prev, e), "ajustes")}
             />
           </div>
@@ -172,12 +175,10 @@ export function EstiloDelInforme({
 
 /* ---------- la portada del informe ----------------------------------------------------------------------------- */
 
-export function PortadaDelInforme({ doc, editable, cambiarDoc, elegirPortada, recursos }: { doc: Documento; editable: boolean; cambiarDoc: CambiarDoc; elegirPortada(): void; recursos: Recursos }) {
+export function PortadaDelInforme({ doc, editable, cambiarDoc, carpetaId, recursos }: { doc: Documento; editable: boolean; cambiarDoc: CambiarDoc; carpetaId: string | null; recursos: Recursos }) {
   const poner = (c: Partial<Portada>) => cambiarDoc((d) => ({ ...d, portada: { ...d.portada, ...c } }), `portada:${Object.keys(c).join(",")}`);
   const estilo = useMemo(() => estiloDelInforme(doc), [doc]);
   const p = doc.portada;
-  const imagen = p.imagenId ? (recursos.nombres.get(p.imagenId) ?? "Imagen que no veo") : "";
-  const url = p.imagenId ? (recursos.imagenes.get(p.imagenId)?.url ?? null) : null;
   const foto = p.foto ?? FOTO_BASE;
   const medidas = PAPEL_PX[papelDe(doc.papel, estilo)];
   const usaFoto = estilo.portada.comp === 1 || estilo.portada.comp === 0;
@@ -208,48 +209,26 @@ export function PortadaDelInforme({ doc, editable, cambiarDoc, elegirPortada, re
         <label className="es-fl">Entidad<input type="text" className="es-inp" value={p.entidad} maxLength={300} disabled={!editable} onChange={(e) => poner({ entidad: e.target.value })} /></label>
         <label className="es-fl">Año<input type="text" className="es-inp" value={p.anio} maxLength={12} disabled={!editable} onChange={(e) => poner({ anio: e.target.value })} /></label>
       </div>
-      <div className="es-fl">
-        Foto de portada
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <span className="es-inp" style={{ flex: 1, minWidth: 120 }}>{imagen || "Sin foto: se usa la institucional"}</span>
-          {editable ? <button type="button" className="es-btn es-btn--sm" onClick={elegirPortada}>{imagen ? "Cambiar" : "Elegir"}</button> : null}
-          {editable && imagen ? <button type="button" className="es-btn es-btn--sm" onClick={() => cambiarDoc((d) => { const { imagenId: _i, foto: _f, ...resto } = d.portada; void _i; void _f; return { ...d, portada: resto }; }, "portada:foto")}>Quitar</button> : null}
-        </div>
-        {!usaFoto ? <span className="es-note">La composición «{estilo.portada.comp === 2 ? "Bloque de color" : estilo.portada.comp === 3 ? "Tipográfica" : estilo.portada.comp === 4 ? "Barra lateral" : "Franja institucional"}» no usa foto. Cambie la composición en el estilo para usarla.</span> : null}
-        {estilo.portada.comp === 1 && estilo.portada.fondo !== "propia" ? <span className="es-note">El estilo muestra la foto institucional. Para usar la suya, ponga el fondo en «Mi foto» en los ajustes del estilo.</span> : null}
-      </div>
-      {url && usaFoto ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          <Encuadre url={url} foto={{ ruta: "", x: foto.x, y: foto.y, zoom: foto.zoom }} aspecto={`${medidas.mm[0]} / ${Math.round(medidas.mm[1] * 0.42 * 10) / 10}`} onChange={(f) => poner({ foto: { ...foto, x: f.x, y: f.y, zoom: f.zoom } })} />
-          <div className="ud-est-rango">
-            <label className="ud-est-lab" htmlFor="ud-foto-zoom" style={{ marginBottom: 0 }}>Zoom</label>
-            <output htmlFor="ud-foto-zoom">{Math.round(foto.zoom * 100)} %</output>
-            <input id="ud-foto-zoom" type="range" min={1} max={3} step={0.05} value={foto.zoom} disabled={!editable} onChange={(e) => poner({ foto: { ...foto, zoom: Number(e.target.value) } })} />
-          </div>
-          <div>
-            <span className="ud-est-lab">Alinear el recorte</span>
-            <div className="es-seg" role="group" aria-label="Alinear el recorte">
-              {([["Arriba", 0], ["Centro", 50], ["Abajo", 100]] as const).map(([t, y]) => (
-                <button key={t} type="button" aria-pressed={foto.y === y} disabled={!editable} onClick={() => poner({ foto: { ...foto, y } })}>{t}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <span className="ud-est-lab">Ajuste de la foto</span>
-            <div className="es-seg" role="group" aria-label="Ajuste de la foto">
-              {([["Cubrir el marco", "cubrir"], ["Mostrar entera", "contener"]] as const).map(([t, v]) => (
-                <button key={v} type="button" aria-pressed={foto.ajuste === v} disabled={!editable} onClick={() => poner({ foto: { ...foto, ajuste: v } })}>{t}</button>
-              ))}
-            </div>
-          </div>
-          <div className="ud-est-rango">
-            <label className="ud-est-lab" htmlFor="ud-foto-velo" style={{ marginBottom: 0 }}>Velo blanco sobre la foto</label>
-            <output htmlFor="ud-foto-velo">{foto.velo} %</output>
-            <input id="ud-foto-velo" type="range" min={0} max={60} step={5} value={foto.velo} disabled={!editable} onChange={(e) => poner({ foto: { ...foto, velo: Number(e.target.value) } })} />
-          </div>
-          <p className="es-note">Arrastre la foto para moverla. Con el teclado: flechas para moverla, más y menos para el zoom. No ponga texto en la foto: el título va debajo, sobre fondo blanco.</p>
-        </div>
-      ) : null}
+      {usaFoto ? (
+        <ControlFoto
+          valor={{ imagenId: p.imagenId ?? "", ...foto }}
+          editable={editable}
+          carpetaId={carpetaId}
+          aspecto={`${medidas.mm[0]} / ${Math.round(medidas.mm[1] * 0.42 * 10) / 10}`}
+          titulo="Foto de portada de este informe"
+          onChange={(v) =>
+            cambiarDoc((d) => {
+              const { imagenId: _i, foto: _f, ...resto } = d.portada;
+              void _i;
+              void _f;
+              return { ...d, portada: v.imagenId ? { ...resto, imagenId: v.imagenId, foto: { x: v.x, y: v.y, zoom: v.zoom, ajuste: v.ajuste, velo: v.velo } } : resto };
+            }, "portada:foto")
+          }
+        />
+      ) : (
+        <p className="es-note">La composición actual no usa foto. Cambie la composición en el estilo («Ajustar en este informe») para poner una.</p>
+      )}
+      {usaFoto && !p.imagenId && estilo.portada.foto.imagenId ? <p className="es-note">Este informe usa la foto del estilo. Si sube otra aquí, manda la del informe.</p> : null}
     </>
   );
 }

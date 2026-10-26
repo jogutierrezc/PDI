@@ -575,6 +575,7 @@ export function archivosUsados(doc: Documento): { tablas: string[]; graficas: st
   if (doc.instantanea || doc.ajustes) {
     const e = estiloDelInforme(doc);
     if (e.portada.logos.propioId) im.add(e.portada.logos.propioId);
+    if (e.portada.foto.imagenId) im.add(e.portada.foto.imagenId);
     if (e.cabpie.marca.modo === "imagen" && e.cabpie.marca.imagenId) im.add(e.cabpie.marca.imagenId);
   }
   return { tablas: [...t], graficas: [...g], imagenes: [...im] };

@@ -80,8 +80,10 @@ function Emblemas({ d }: { d: DatosPortada }) {
 
 function Foto({ d, className }: { d: DatosPortada; className: string }) {
   const e = d.estilo.portada;
-  const f = d.portada.foto ?? FOTO_DEFECTO;
-  const propia = e.fondo === "propia" && d.portada.imagenId && d.fotoUrl;
+  // La foto del informe manda sobre la del estilo; sin ninguna de las dos, la institucional.
+  const delInforme = Boolean(d.portada.imagenId);
+  const f = delInforme ? (d.portada.foto ?? FOTO_DEFECTO) : e.foto;
+  const propia = (delInforme || e.foto.imagenId) && d.fotoUrl;
   const fuente = e.fondo === "color" ? null : propia ? d.fotoUrl : FOTO_PORTADA;
   const estilo: CSSProperties = { ...estiloFoto(f.x, f.y, f.zoom), objectFit: f.ajuste === "contener" ? "contain" : "cover" };
   return (

@@ -89,7 +89,7 @@ export function useEntrada(doc: Documento, o: OpcionesEntrada): EntradaConLectur
     borrador: !o.aprobado,
     estilo,
     papel,
-    fotoUrl: urlDe(doc.portada.imagenId),
+    fotoUrl: urlDe(doc.portada.imagenId) ?? urlDe(estilo.portada.foto.imagenId),
     logoPropioUrl: urlDe(estilo.portada.logos.propioId),
     marcaUrl: estilo.cabpie.marca.modo === "imagen" ? urlDe(estilo.cabpie.marca.imagenId) : null,
     lecturas,

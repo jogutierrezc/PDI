@@ -232,10 +232,10 @@ export function FormularioUnidad({ onTerminar }: { onTerminar: () => void }) {
             <>
               <div className="un-fld">
                 <label htmlFor="un-nombre">Nombre de la unidad</label>
-                <input id="un-nombre" type="text" maxLength={60} autoComplete="off" placeholder="Por ejemplo, Planeación Institucional" value={b.nombre} aria-invalid={tocado.nombre && Boolean(errNombre)} aria-describedby="un-nombre-a un-nombre-e"
+                <input id="un-nombre" type="text" maxLength={120} autoComplete="off" placeholder="Por ejemplo, Planeación Institucional" value={b.nombre} aria-invalid={tocado.nombre && Boolean(errNombre)} aria-describedby="un-nombre-a un-nombre-e"
                   onChange={(e) => alEscribirNombre(e.target.value)} onBlur={() => b.nombre && setTocado({ nombre: true })}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ir(1); } }} />
-                <span className="un-ayuda" id="un-nombre-a">Es el que verá todo el equipo. Entre 3 y 60 caracteres.</span>
+                <span className="un-ayuda" id="un-nombre-a">Es el que verá todo el equipo. Entre 3 y 120 caracteres.</span>
                 <span className="un-error" id="un-nombre-e" aria-live="polite">{tocado.nombre ? errNombre : ""}</span>
               </div>
               <div className="un-fld">

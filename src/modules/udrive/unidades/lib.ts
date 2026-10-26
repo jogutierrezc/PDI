@@ -67,7 +67,7 @@ const ICONOS_LISTA: IconoUnidad[] = ["chart", "book", "flask", "heart", "buildin
 /** Un acento, una composición y un icono propuestos a partir del nombre, para que cada unidad nazca distinta. */
 export function propuestaDeNombre(nombre: string): { acento: string; composicion: "A" | "B" | "C" | "D"; icono: IconoUnidad } {
   const h = hashTexto(quitarTildes(nombre));
-  return { acento: ACENTOS[h % ACENTOS.length], composicion: (["A", "B", "C", "D"] as const)[(h >> 3) % 4], icono: ICONOS_LISTA[(h >> 5) % ICONOS_LISTA.length] };
+  return { acento: ACENTOS[h % ACENTOS.length], composicion: (["A", "B", "C", "D"] as const)[(h >>> 3) % 4], icono: ICONOS_LISTA[(h >>> 5) % ICONOS_LISTA.length] };
 }
 
 export function nombreUnidadError(nombre: string, otras: readonly string[]): string {

@@ -141,7 +141,7 @@ export function PersonalizarUnidad({ u }: { u: UnidadFila }) {
           <fieldset className="un-fld">
             <legend>Nombre y descripción</legend>
             <label htmlFor="un-pz-n" className="un-sr">Nombre de la unidad</label>
-            <input id="un-pz-n" type="text" value={nombre} maxLength={60} aria-invalid={!nombreOk} onChange={(e) => setNombre(e.target.value)} />
+            <input id="un-pz-n" type="text" value={nombre} maxLength={120} aria-invalid={!nombreOk} onChange={(e) => setNombre(e.target.value)} />
             <span className="un-error" aria-live="polite">{nombreOk ? "" : "Use al menos 3 caracteres."}</span>
             <label htmlFor="un-pz-d" className="un-sr">Descripción corta</label>
             <textarea id="un-pz-d" rows={2} maxLength={140} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />

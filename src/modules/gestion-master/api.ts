@@ -203,6 +203,8 @@ export function dispararAvisos() {
 
 export interface LineaEntrada {
   codigo: string;
+  codigo_nuevo?: string;
+  motivo?: string;
   origen_codigo?: string;
   origen_periodo?: string;
   origen_sede?: string;
@@ -248,6 +250,8 @@ export const useGuardarSolicitud = () =>
       p_justificacion: e.justificacion,
       p_lineas: e.lineas.map((l) => ({
         codigo: l.codigo.trim().toUpperCase() || null,
+        codigo_nuevo: l.codigo_nuevo?.trim().toUpperCase() || null,
+        motivo: l.motivo?.trim() || null,
         origen_codigo: l.origen_codigo || null,
         origen_periodo: l.origen_periodo || null,
         origen_sede: l.origen_sede || null,

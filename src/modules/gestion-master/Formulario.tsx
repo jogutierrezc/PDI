@@ -1,121 +1,95 @@
 /* =============================================================================
    Gestión Master · Nueva solicitud.
 
-   Es el formulario de Rua llevado al portal con su misma lógica:
-     · una solicitud puede tocar varias actividades, que se deciden juntas;
-     · el expediente guarda CÓMO DEBE QUEDAR cada actividad, precargada con lo
-       que hay hoy (el revisor lee el resultado, no una orden);
-     · justificación de 150 a 2000 caracteres, con contador;
-     · los errores solo se muestran en lo que la persona ya tocó, y todos de
-       golpe al intentar enviar;
-     · se guarda como borrador o se envía; una enviada ya no se edita, una
-       devuelta sí.
-   Lo que cambia, y es la mejora: al elegir un código que ya existe, el
-   formulario muestra los datos reales de ese código desde el Warehouse
-   (catálogo, cuántos profesores lo tienen, horas, promedio, programa) para que
-   quien solicita decida con información.
+   Un camino en cuatro pasos, uno a la vez:
+     1  Qué quiere hacer     Nuevo · Editar · Mejorar o mantener · Eliminar (y dónde aplica)
+     2  Actividades          una tarjeta plegable por actividad, solo con los campos del tipo
+     3  Justificación        con contador, una guía y un ejemplo
+     4  Revisar y enviar     resumen legible y qué pasa después
 
-   Tipos: Nuevo · Mejorar o mantener (parte de un código, de este periodo o de
-   uno anterior, y se puede ampliar) · Eliminar.
+   Sale de Rua con su lógica: varias actividades que se deciden juntas, cada una
+   precargada con lo que hay hoy, justificación de 150 a 2000 caracteres, errores
+   en línea solo en lo ya tocado (y un resumen que enlaza a cada campo al intentar
+   enviar), borrador, folio y la regla de que una enviada ya no se edita.
+
+   Lo propio de aquí: al elegir un código existente, el panel «Qué hay hoy con este
+   código» muestra, desde el Warehouse, el catálogo, cuántos profesores lo tienen,
+   horas, promedio, programa y (si se pide) nombres. Va aparte de los campos.
+
+   El borrador se guarda solo en este equipo mientras se escribe; «Guardar borrador»
+   lo guarda además en el portal, con folio.
    ========================================================================== */
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { fichaDe, useBuscarCodigos, useDetalle, useFlujos, useGuardarSolicitud, useUnidades, type LineaEntrada } from "./api";
+import { fichaDe, useDetalle, useFlujos, useGuardarSolicitud, useUnidades } from "./api";
 import type { Contexto } from "./contexto";
 import { sedeUnica } from "./contexto";
 import {
-  AYUDA_CODIGO, MAX_JUSTIFICACION, MIN_JUSTIFICACION, PLAZO_INDICADOR, PRIORIDADES, SEDES, TIPOS, mensajeDe, nombrePeriodo, nombreSede, validarCodigo,
-  type Prioridad, type Tipo,
+  aEntrada, camposQueCambian, idCampo, nuevaLinea, recortar, sinCambios, tituloLinea, validar, valorActual, valorPropuesto,
+  type Actual, type ErrorForm, type LineaForm,
+} from "./lineaForm";
+import {
+  MAX_INSTRUCCIONES, MAX_JUSTIFICACION, MAX_NOMBRE, MAX_VINCULACION, MIN_JUSTIFICACION, NOMBRE_CAMPO, PLAZO_INDICADOR, PRIORIDADES, SEDES, TIPOS,
+  mensajeDe, nombrePeriodo, nombreSede, nombreTipoActividad, type CampoEditar, type Prioridad, type Tipo,
 } from "./modelo";
 import { PanelCodigo } from "./PanelCodigo";
-import { aparecer, entrada } from "./movimiento";
+import { aparecer, cambiarPaso, entrada } from "./movimiento";
 import { Cargando, ErrorCaja } from "./partes";
+import { Campo, ParecidosNuevo, TarjetaActividad } from "./TarjetaActividad";
 
-interface LineaForm {
-  clave: string;
-  codigo: string;
-  origenCodigo: string;
-  origenPeriodo: string;
-  origenSede: string;
-  nombre: string;
-  tipoActividad: "" | "directa" | "apoyo";
-  instrucciones: string;
-  vinculacion: string;
-  activa: boolean;
-  /** En Mejorar y Eliminar: ya se eligió un código del catálogo. */
-  elegido: boolean;
-}
+const PASOS = [
+  { n: 1, titulo: "Qué quiere hacer" },
+  { n: 2, titulo: "Actividades" },
+  { n: 3, titulo: "Justificación" },
+  { n: 4, titulo: "Revisar y enviar" },
+] as const;
 
-let contador = 0;
-const nuevaLinea = (periodo: string, sede: string): LineaForm => ({
-  clave: `linea-${++contador}`,
-  codigo: "",
-  origenCodigo: "",
-  origenPeriodo: periodo,
-  origenSede: sede,
-  nombre: "",
-  tipoActividad: "",
-  instrucciones: "",
-  vinculacion: "",
-  activa: true,
-  elegido: false,
-});
+const CLAVE_LOCAL = "gm-formulario-borrador";
 
-/** Busca un código del catálogo del Master (periodo y sede de origen) y lo entrega al elegirlo. */
-function BuscadorCodigo({
-  periodo, sede, etiqueta, ayuda, onElegir, id,
-}: {
+interface Guardado {
+  v: 1;
+  tipo: Tipo | null;
+  prioridad: Prioridad;
   periodo: string;
   sede: string;
-  etiqueta: string;
-  ayuda?: string;
-  id: string;
-  onElegir: (c: { codigo: string; nombre: string | null; tipo_actividad: string; vinculacion: string | null }) => void;
-}) {
-  const [texto, setTexto] = useState("");
-  const [consulta, setConsulta] = useState("");
-  useEffect(() => {
-    const t = window.setTimeout(() => setConsulta(texto.trim()), 250);
-    return () => window.clearTimeout(t);
-  }, [texto]);
-  const q = useBuscarCodigos(periodo, sede, consulta, consulta.length >= 1);
-  return (
-    <div className="gm-buscador">
-      <label className="admin-field" htmlFor={id}>
-        <span>{etiqueta}</span>
-        <input id={id} type="search" autoComplete="off" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Código o nombre de la actividad" aria-describedby={`${id}-ayuda`} />
-      </label>
-      <small id={`${id}-ayuda`}>{ayuda ?? `Se busca en el catálogo del Master de ${nombreSede(sede)}, ${nombrePeriodo(periodo)}.`}</small>
-      {consulta.length >= 1 && (
-        <div className="gm-resultados" role="region" aria-label="Resultados de la búsqueda" aria-live="polite">
-          {q.isPending ? (
-            <p className="gm-nota">Buscando…</p>
-          ) : q.error ? (
-            <p className="gm-aviso">{mensajeDe(q.error)}</p>
-          ) : q.data.length === 0 ? (
-            <p className="gm-nota">No hay códigos que coincidan en el catálogo del Master para esta sede y periodo. Si no hay captura de ese periodo, pídale a Planeación que la cargue en el Warehouse.</p>
-          ) : (
-            <ul>
-              {q.data.map((c) => (
-                <li key={c.codigo}>
-                  <button type="button" onClick={() => { onElegir(c); setTexto(""); setConsulta(""); }}>
-                    <b className="gm-mono">{c.codigo}</b> {c.nombre ?? ""}
-                    <small>
-                      {c.tipo_actividad === "directa" ? "Directa" : c.tipo_actividad === "apoyo" ? "De apoyo" : c.tipo_actividad}
-                      {c.activa === false ? " · inactiva" : ""}
-                    </small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  unidad: string;
+  justificacion: string;
+  lineas: LineaForm[];
+  paso: number;
+  ts: number;
 }
+
+const leerLocal = (): Guardado | null => {
+  try {
+    const t = window.localStorage.getItem(CLAVE_LOCAL);
+    const g = t ? (JSON.parse(t) as Guardado) : null;
+    return g && g.v === 1 ? g : null;
+  } catch {
+    return null;
+  }
+};
+const escribirLocal = (g: Guardado | null) => {
+  try {
+    if (g) window.localStorage.setItem(CLAVE_LOCAL, JSON.stringify(g));
+    else window.localStorage.removeItem(CLAVE_LOCAL);
+  } catch {
+    /* sin almacenamiento: el formulario sigue, solo que sin copia local */
+  }
+};
+const hace = (ts: number, ahora: number) => {
+  const s = Math.max(0, Math.round((ahora - ts) / 1000));
+  return s < 10 ? "hace un momento" : s < 60 ? `hace ${s} segundos` : s < 3600 ? `hace ${Math.round(s / 60)} min` : "hace más de una hora";
+};
+const hayContenido = (g: { tipo: Tipo | null; lineas: LineaForm[]; justificacion: string }) =>
+  Boolean(g.tipo) && (g.justificacion.trim().length > 0 || g.lineas.some((l) => l.nombre.trim() || l.codigo.trim() || l.elegido));
+
+const PREGUNTA: Record<Tipo, string> = {
+  nuevo: "¿Qué actividad quiere crear?",
+  editar: "¿Qué códigos quiere editar y qué cambia en cada uno?",
+  mejorar: "¿De qué códigos parte y cómo quedan?",
+  eliminar: "¿Qué códigos quiere dar de baja?",
+};
 
 export function Formulario({ ctx, id }: { ctx: Contexto; id?: string }) {
   const sedeInicial = sedeUnica(ctx.sede);
@@ -123,50 +97,51 @@ export function Formulario({ ctx, id }: { ctx: Contexto; id?: string }) {
   const flujos = useFlujos();
   const guardar = useGuardarSolicitud();
   const borrador = useDetalle(id ?? null);
+  const [params] = useSearchParams();
 
-  const [tipo, setTipo] = useState<Tipo>("nuevo");
+  const [paso, setPaso] = useState(1);
+  const [tipo, setTipo] = useState<Tipo | null>(null);
   const [prioridad, setPrioridad] = useState<Prioridad>("normal");
   const [periodo, setPeriodo] = useState(ctx.periodo);
   const [sede, setSede] = useState(sedeInicial);
   const [unidad, setUnidad] = useState("");
-  const [lineas, setLineas] = useState<LineaForm[]>(() => [nuevaLinea(ctx.periodo, sedeInicial)]);
+  const [lineas, setLineas] = useState<LineaForm[]>([]);
   const [justificacion, setJustificacion] = useState("");
   const [tocado, setTocado] = useState<Set<string>>(new Set());
-  const [error, setError] = useState("");
+  const [mostrar, setMostrar] = useState(false);
+  const [falla, setFalla] = useState("");
+  const [aviso, setAviso] = useState("");
   const [cargado, setCargado] = useState(false);
-  const raiz = useRef<HTMLFormElement>(null);
-  const [params] = useSearchParams();
+  const [servidorId, setServidorId] = useState<string | null>(id ?? null);
+  const [guardadoEn, setGuardadoEn] = useState<number | null>(null);
+  const [ahora, setAhora] = useState(() => Date.now());
+  const [restaurable, setRestaurable] = useState<Guardado | null>(null);
+  const [enviado, setEnviado] = useState<{ id: string; folio: string } | null>(null);
+  const [panel, setPanel] = useState<{ codigo: string; periodo: string; sede: string } | null>(null);
+  const [anuncio, setAnuncio] = useState("");
+  const direccion = useRef<1 | -1>(1);
+  const panelPaso = useRef<HTMLDivElement>(null);
+  const tituloPaso = useRef<HTMLHeadingElement>(null);
+  const primeraVez = useRef(true);
+  const envio = useRef<HTMLDivElement>(null);
+  const ancho = useMemo(() => typeof window !== "undefined" && Boolean(window.matchMedia?.("(min-width: 1100px)").matches), []);
 
-  // Desde Estructura: «Proponer cambio» llega con el tipo y el código ya elegidos.
+  const errores = useMemo(() => validar(tipo, periodo, sede, lineas, justificacion), [tipo, periodo, sede, lineas, justificacion]);
+  const del = (p: number) => errores.filter((e) => e.paso === p);
+
+  // --- Valores por defecto inteligentes ---------------------------------------------------------
   useEffect(() => {
-    const t = params.get("tipo");
-    const codigo = (params.get("codigo") ?? "").toUpperCase();
-    if (id || !codigo || (t !== "mejorar" && t !== "eliminar")) return;
-    let vivo = true;
-    void (async () => {
-      try {
-        const f = await fichaDe(ctx.periodo, sedeInicial, codigo);
-        if (!vivo || !f.catalogo) return;
-        setTipo(t);
-        setLineas([{
-          ...nuevaLinea(ctx.periodo, sedeInicial),
-          elegido: true,
-          codigo,
-          origenCodigo: codigo,
-          nombre: f.catalogo.nombre ?? "",
-          tipoActividad: f.catalogo.directa === true ? "directa" : f.catalogo.directa === false ? "apoyo" : "",
-          vinculacion: f.catalogo.vinculacion ?? "",
-          instrucciones: f.catalogo.instrucciones ?? "",
-        }]);
-      } catch {
-        /* sin ficha, el formulario queda vacío y se elige a mano */
-      }
-    })();
-    return () => { vivo = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!unidad && unidades.data?.length === 1 && !id) setUnidad(unidades.data[0].id);
+  }, [unidades.data, unidad, id]);
 
-  // Editar un borrador o una devuelta: se parte de lo guardado.
+  // --- Un borrador sin enviar en este equipo ----------------------------------------------------
+  useEffect(() => {
+    if (id || params.get("codigo")) return;
+    const g = leerLocal();
+    if (g && hayContenido(g)) setRestaurable(g);
+  }, [id, params]);
+
+  // --- Editar un borrador o una devuelta: se parte de lo guardado --------------------------------
   useEffect(() => {
     if (!id || !borrador.data || cargado) return;
     const d = borrador.data;
@@ -177,427 +152,627 @@ export function Formulario({ ctx, id }: { ctx: Contexto; id?: string }) {
     setUnidad(d.unidad_id ?? "");
     setJustificacion(d.justificacion);
     setLineas(
-      d.lineas.map((l) => ({
-        clave: `linea-${++contador}`,
-        codigo: l.codigo ?? "",
-        origenCodigo: l.origen_codigo ?? "",
-        origenPeriodo: l.origen_periodo ?? d.periodo,
-        origenSede: l.origen_sede ?? d.sede,
-        nombre: l.nombre ?? "",
-        tipoActividad: (l.tipo_actividad ?? "") as LineaForm["tipoActividad"],
-        instrucciones: l.instrucciones ?? "",
-        vinculacion: l.vinculacion ?? "",
-        activa: l.activa,
-        elegido: d.tipo !== "nuevo",
-      })),
+      d.lineas.map((l, i) => {
+        const cat = l.antes?.ficha?.catalogo ?? null;
+        const actual: Actual | null = d.tipo === "nuevo" ? null : {
+          codigo: l.codigo ?? "",
+          nombre: cat?.nombre ?? "",
+          tipoActividad: cat?.directa === true ? "directa" : cat?.directa === false ? "apoyo" : "",
+          vinculacion: cat?.vinculacion ?? "",
+          instrucciones: cat?.instrucciones ?? "",
+          nProfesores: l.antes?.ficha?.n_profesores ?? null,
+          sinCaptura: Boolean(l.antes?.ficha?.sin_captura_nomina),
+        };
+        const base = nuevaLinea(d.periodo, d.sede);
+        const c = l.cambios ?? {};
+        return {
+          ...base,
+          codigo: l.codigo ?? "",
+          origenCodigo: l.origen_codigo ?? "",
+          origenPeriodo: l.origen_periodo ?? d.periodo,
+          origenSede: l.origen_sede ?? d.sede,
+          nombre: l.nombre ?? "",
+          tipoActividad: (l.tipo_actividad ?? "") as LineaForm["tipoActividad"],
+          instrucciones: l.instrucciones ?? "",
+          vinculacion: l.vinculacion ?? "",
+          activa: l.activa,
+          elegido: d.tipo !== "nuevo",
+          codigoNuevo: l.codigo_nuevo ?? "",
+          motivo: l.motivo ?? "",
+          cambia: { ...sinCambios(), ...Object.fromEntries(Object.keys(c).map((k) => [k, true])) },
+          actual,
+          abierta: i === 0,
+        };
+      }),
     );
+    setPaso(2);
     setCargado(true);
   }, [id, borrador.data, cargado]);
 
+  // --- Copia local mientras se escribe -----------------------------------------------------------
   useEffect(() => {
-    if (raiz.current) entrada(raiz.current.querySelectorAll(".gm-seccion"), 6);
+    if (id || enviado) return;
+    const g: Guardado = { v: 1, tipo, prioridad, periodo, sede, unidad, justificacion, lineas, paso, ts: Date.now() };
+    if (!hayContenido(g)) return;
+    const t = window.setTimeout(() => {
+      escribirLocal(g);
+      setGuardadoEn(g.ts);
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [tipo, prioridad, periodo, sede, unidad, justificacion, lineas, paso, id, enviado]);
+  useEffect(() => {
+    const t = window.setInterval(() => setAhora(Date.now()), 20_000);
+    return () => window.clearInterval(t);
   }, []);
 
-  const flujoDefecto = flujos.data?.find((f) => f.por_defecto && f.activo) ?? flujos.data?.[0];
+  // --- Transición entre pasos ---------------------------------------------------------------------
+  useEffect(() => {
+    if (primeraVez.current) {
+      primeraVez.current = false;
+      return;
+    }
+    cambiarPaso(panelPaso.current, direccion.current);
+    tituloPaso.current?.focus({ preventScroll: false });
+    setAnuncio(`Paso ${paso} de ${PASOS.length}: ${PASOS[paso - 1].titulo}`);
+  }, [paso]);
+  useEffect(() => {
+    if (enviado) aparecer(envio.current);
+  }, [enviado]);
 
-  const cambiarTipo = (t: Tipo) => {
-    // Las líneas de un «mejorar» no significan lo mismo en un «nuevo»: se vacían en vez de arrastrar una selección sin sentido.
-    setTipo(t);
-    setLineas([nuevaLinea(periodo, sede)]);
-    setTocado(new Set());
+  const ir = (n: number) => {
+    direccion.current = n >= paso ? 1 : -1;
+    setPaso(n);
   };
 
-  const editar = (clave: string, cambio: Partial<LineaForm>) => setLineas((prev) => prev.map((l) => (l.clave === clave ? { ...l, ...cambio } : l)));
-  const quitar = (clave: string) => setLineas((prev) => (prev.length > 1 ? prev.filter((l) => l.clave !== clave) : [nuevaLinea(periodo, sede)]));
+  const editar = useCallback((clave: string, cambio: Partial<LineaForm>) => setLineas((prev) => prev.map((l) => (l.clave === clave ? { ...l, ...cambio } : l))), []);
+  const marcar = useCallback((campo: string) => setTocado((t) => (t.has(campo) ? t : new Set(t).add(campo))), []);
 
-  /** Al elegir un código se precarga con lo que dice el catálogo: se edita lo que cambia. */
-  async function elegirCodigo(clave: string, c: { codigo: string; nombre: string | null; tipo_actividad: string; vinculacion: string | null }, origenPeriodo: string, origenSede: string) {
-    editar(clave, { elegido: true, codigo: c.codigo, origenCodigo: c.codigo, origenPeriodo, origenSede, nombre: c.nombre ?? "", tipoActividad: c.tipo_actividad === "directa" || c.tipo_actividad === "apoyo" ? c.tipo_actividad : "", vinculacion: c.vinculacion ?? "" });
+  function elegirTipo(t: Tipo) {
+    if (t === tipo) return;
+    setTipo(t);
+    // Las líneas de un tipo no significan lo mismo en otro: se parte de una tarjeta vacía.
+    setLineas([nuevaLinea(periodo, sede)]);
+    setTocado(new Set());
+    setMostrar(false);
+    setPanel(null);
+  }
+
+  /** Al elegir un código se lee su ficha del Warehouse: lo actual para comparar y, en Mejorar, los datos precargados. */
+  async function elegir(clave: string, tipoActual: Tipo, c: { codigo: string; nombre: string | null; tipo_actividad: string; vinculacion: string | null }, per: string, sed: string) {
+    editar(clave, { elegido: true, codigo: c.codigo, origenCodigo: c.codigo, origenPeriodo: per, origenSede: sed, actual: { codigo: c.codigo, nombre: c.nombre ?? "", tipoActividad: c.tipo_actividad === "directa" || c.tipo_actividad === "apoyo" ? c.tipo_actividad : "", vinculacion: c.vinculacion ?? "", instrucciones: "", nProfesores: null, sinCaptura: false }, nombre: tipoActual === "mejorar" ? (c.nombre ?? "").slice(0, MAX_NOMBRE) : "" });
+    setPanel({ codigo: c.codigo, periodo: per, sede: sed });
     try {
-      const f = await fichaDe(origenPeriodo, origenSede, c.codigo);
-      if (f.catalogo?.instrucciones) editar(clave, { instrucciones: f.catalogo.instrucciones });
-    } catch {
-      /* la ficha se muestra aparte; sin ella el formulario sigue */
-    }
-  }
-
-  // --- Validación: se calcula siempre, se muestra solo en lo tocado ---------------------------------
-  const errores: Record<string, string> = {};
-  if (lineas.length === 0) errores.lineas = "Añada al menos una actividad.";
-  const vistos = new Set<string>();
-  for (const l of lineas) {
-    const cod = l.codigo.trim().toUpperCase();
-    if (tipo === "nuevo") {
-      if (!l.nombre.trim()) errores[`nombre-${l.clave}`] = "Escriba el nombre de la actividad que quiere crear.";
-      if (!l.tipoActividad) errores[`tipo-${l.clave}`] = "Elija si es directa o de apoyo.";
-      const e = validarCodigo(l.codigo, false);
-      if (e) errores[`codigo-${l.clave}`] = e;
-    } else {
-      if (!l.elegido || !cod) errores[`codigo-${l.clave}`] = "Elija un código del catálogo del Master.";
-      if (tipo === "mejorar" && !l.nombre.trim()) errores[`nombre-${l.clave}`] = "Escriba cómo debe quedar el nombre.";
-    }
-    if (cod) {
-      if (vistos.has(cod)) errores[`codigo-${l.clave}`] = "Este código ya está en la solicitud.";
-      vistos.add(cod);
-    }
-  }
-  const largo = justificacion.trim().length;
-  if (largo < MIN_JUSTIFICACION) errores.justificacion = `Faltan ${MIN_JUSTIFICACION - largo} caracteres para el mínimo de ${MIN_JUSTIFICACION}.`;
-  const valido = Object.keys(errores).length === 0;
-  const ver = (campo: string) => (tocado.has(campo) ? (errores[campo] ?? null) : null);
-  const marcar = (campo: string) => setTocado((t) => (t.has(campo) ? t : new Set(t).add(campo)));
-
-  const unidadesLista = unidades.data ?? [];
-
-  async function enviar(comoBorrador: boolean, e?: FormEvent) {
-    e?.preventDefault();
-    setError("");
-    if (!comoBorrador) {
-      setTocado(new Set(Object.keys(errores)));
-      if (!valido) {
-        setError("Hay campos por completar. Están marcados abajo.");
-        return;
+      const f = await fichaDe(per, sed, c.codigo);
+      const cat = f.catalogo;
+      const actual: Actual = {
+        codigo: c.codigo,
+        nombre: cat?.nombre ?? c.nombre ?? "",
+        tipoActividad: cat?.directa === true ? "directa" : cat?.directa === false ? "apoyo" : c.tipo_actividad === "directa" || c.tipo_actividad === "apoyo" ? c.tipo_actividad : "",
+        vinculacion: cat?.vinculacion ?? c.vinculacion ?? "",
+        instrucciones: cat?.instrucciones ?? "",
+        nProfesores: f.n_profesores,
+        sinCaptura: f.sin_captura_nomina,
+      };
+      const parche: Partial<LineaForm> = { actual };
+      if (tipoActual === "mejorar") {
+        const n = recortar(actual.nombre, MAX_NOMBRE, "nombre");
+        const v = recortar(actual.vinculacion, MAX_VINCULACION, "vinculación");
+        const i = recortar(actual.instrucciones, MAX_INSTRUCCIONES, "instrucciones");
+        Object.assign(parche, { nombre: n.texto, tipoActividad: actual.tipoActividad, vinculacion: v.texto, instrucciones: i.texto, recortes: [n.recorte, v.recorte, i.recorte].filter((x): x is string => Boolean(x)) });
       }
+      editar(clave, parche);
+    } catch {
+      /* sin ficha, la tarjeta sigue con lo que trajo la búsqueda */
+    }
+  }
+
+  // --- Llegar desde Estructura con el tipo y el código ya elegidos -------------------------------
+  useEffect(() => {
+    const t = params.get("tipo");
+    const codigo = (params.get("codigo") ?? "").toUpperCase();
+    if (id || !codigo || (t !== "editar" && t !== "mejorar" && t !== "eliminar")) return;
+    const l = nuevaLinea(ctx.periodo, sedeInicial);
+    setTipo(t);
+    setLineas([l]);
+    setPaso(2);
+    void elegir(l.clave, t, { codigo, nombre: null, tipo_actividad: "", vinculacion: null }, ctx.periodo, sedeInicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const agregar = () => {
+    const nueva = nuevaLinea(periodo, sede);
+    setLineas((p) => [...p.map((l) => ({ ...l, abierta: false })), nueva]);
+    window.setTimeout(() => document.getElementById(`gm-cuerpo-${nueva.clave}`)?.querySelector<HTMLElement>("input, select, textarea")?.focus(), 60);
+  };
+  const duplicar = (clave: string) =>
+    setLineas((p) => {
+      const o = p.find((l) => l.clave === clave);
+      if (!o) return p;
+      const c = nuevaLinea(periodo, sede);
+      return [...p.map((l) => ({ ...l, abierta: false })), { ...o, clave: c.clave, codigo: "", abierta: true }];
+    });
+  const quitar = (clave: string) => setLineas((p) => (p.length > 1 ? p.filter((l) => l.clave !== clave) : [nuevaLinea(periodo, sede)]));
+
+  /** Lleva a un campo con problema: cambia de paso, abre su tarjeta y le da el foco. */
+  function irAlError(e: ErrorForm) {
+    if (e.clave) editar(e.clave, { abierta: true });
+    ir(e.paso);
+    window.setTimeout(() => document.getElementById(e.id)?.focus(), 120);
+  }
+
+  function continuar() {
+    const faltan = del(paso);
+    if (faltan.length > 0) {
+      setMostrar(true);
+      setAnuncio(`Falta completar ${faltan.length} ${faltan.length === 1 ? "dato" : "datos"} en este paso.`);
+      document.getElementById(faltan[0].id)?.focus();
+      return;
+    }
+    ir(paso + 1);
+  }
+
+  async function guardarEnPortal(enviar: boolean) {
+    setFalla("");
+    setAviso("");
+    if (!tipo) return;
+    if (enviar && errores.length > 0) {
+      setMostrar(true);
+      irAlError(errores[0]);
+      return;
     }
     try {
       const r = await guardar.mutateAsync({
-        id: id ?? null,
+        id: servidorId,
         tipo,
         prioridad,
         unidad: unidad || null,
         periodo,
         sede,
         justificacion: justificacion.trim(),
-        lineas: lineas.map<LineaEntrada>((l) => ({
-          codigo: l.codigo,
-          origen_codigo: l.origenCodigo || undefined,
-          origen_periodo: l.origenCodigo ? l.origenPeriodo : undefined,
-          origen_sede: l.origenCodigo ? l.origenSede : undefined,
-          nombre: l.nombre,
-          tipo_actividad: l.tipoActividad,
-          instrucciones: l.instrucciones,
-          vinculacion: l.vinculacion,
-          activa: l.activa,
-        })),
-        enviar: !comoBorrador,
+        lineas: lineas.map((l) => aEntrada(l, tipo)),
+        enviar,
       });
-      ctx.ir("bandeja", r.id);
-    } catch (err) {
-      setError(mensajeDe(err));
+      setServidorId(r.id);
+      if (enviar) {
+        escribirLocal(null);
+        setEnviado({ id: r.id, folio: r.folio });
+        setAnuncio(`Solicitud ${r.folio} enviada.`);
+      } else {
+        escribirLocal(null);
+        setAviso(`Borrador guardado en el portal como ${r.folio}. Puede seguir o volver luego desde la bandeja.`);
+      }
+    } catch (e) {
+      setFalla(mensajeDe(e));
     }
   }
 
-  const etiquetaLineas = tipo === "nuevo" ? "Actividades a crear" : tipo === "eliminar" ? "Actividades a dar de baja" : "Actividades a mejorar o mantener";
-  const periodosOrigen = useMemo(() => ctx.periodos, [ctx.periodos]);
+  function restaurar(g: Guardado) {
+    setTipo(g.tipo);
+    setPrioridad(g.prioridad);
+    setPeriodo(g.periodo);
+    setSede(g.sede);
+    setUnidad(g.unidad);
+    setJustificacion(g.justificacion);
+    setLineas(g.lineas);
+    setPaso(Math.min(g.paso, 4));
+    setRestaurable(null);
+  }
+  function descartarLocal() {
+    escribirLocal(null);
+    setRestaurable(null);
+  }
+
+  function otraSolicitud() {
+    setEnviado(null);
+    setServidorId(null);
+    setTipo(null);
+    setLineas([]);
+    setJustificacion("");
+    setPaso(1);
+    setMostrar(false);
+    setTocado(new Set());
+    setPanel(null);
+  }
+
+  const flujoDefecto = flujos.data?.find((f) => f.por_defecto && f.activo) ?? flujos.data?.[0];
+  const ver = (campoId: string) => {
+    const e = errores.find((x) => x.id === campoId);
+    return e && (mostrar || tocado.has(campoId)) ? e.mensaje : null;
+  };
+  const largoJust = justificacion.trim().length;
 
   if (id && borrador.isPending) return <Cargando filas={4} etiqueta="Abriendo la solicitud" />;
   if (id && borrador.error) return <ErrorCaja error={borrador.error} onReintentar={() => void borrador.refetch()} />;
   if (id && borrador.data && !borrador.data.puedo_editar) return <ErrorCaja error={new Error("Esta solicitud ya no se puede editar: solo un borrador o una devuelta.")} titulo="No se puede editar" />;
 
+  // --- Enviada ---------------------------------------------------------------------------------------
+  if (enviado) {
+    return (
+      <div className="gm-enviada" ref={envio}>
+        <p className="gm-enviada__marca" aria-hidden="true">
+          ✓
+        </p>
+        <h2 tabIndex={-1} ref={(el) => el?.focus()}>
+          Solicitud {enviado.folio} enviada
+        </h2>
+        <p>Quedó registrada y ya está en el primer paso de aprobación.</p>
+        <ol className="gm-pasos-lista">
+          {(flujoDefecto?.pasos ?? []).map((p) => (
+            <li key={p.orden}>{p.nombre}</li>
+          ))}
+        </ol>
+        <p className="gm-nota">Le llega un correo de acuse. Cada decisión lleva una nota y recibirá un aviso en cada paso. Plazo indicativo: {flujoDefecto?.plazo_dias ?? PLAZO_INDICADOR} días hábiles.</p>
+        <div className="gm-botones">
+          <button type="button" className="button-primary" onClick={() => ctx.ir("bandeja", enviado.id)}>
+            Ver la solicitud
+          </button>
+          <button type="button" className="button-secondary" onClick={otraSolicitud}>
+            Crear otra
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const faltanPaso = del(paso);
+  const resumenErrores = mostrar && faltanPaso.length > 0 ? faltanPaso : [];
+
   return (
-    <form className="gm-formulario" ref={raiz} onSubmit={(e) => void enviar(false, e)} noValidate>
-      <div className="gm-formulario__cuerpo">
-        <fieldset className="gm-seccion">
-          <legend>Qué quiere hacer</legend>
-          <div className="gm-tipos" role="radiogroup" aria-label="Tipo de solicitud">
-            {(Object.keys(TIPOS) as Tipo[]).map((t) => (
-              <label key={t} className="gm-tipo" data-activo={tipo === t}>
-                <input type="radio" name="tipo" checked={tipo === t} onChange={() => cambiarTipo(t)} disabled={Boolean(id)} />
-                <b>{TIPOS[t].nombre}</b>
-                <span>{TIPOS[t].ayuda}</span>
-              </label>
-            ))}
+    <div className="gm-formulario">
+      {restaurable && (
+        <div className="gm-restaurar" role="region" aria-label="Borrador sin enviar">
+          <span>Hay un borrador sin enviar en este equipo ({hace(restaurable.ts, ahora)}).</span>
+          <button type="button" className="button-secondary" onClick={() => restaurar(restaurable)}>
+            Continuar con él
+          </button>
+          <button type="button" className="button-ghost" onClick={descartarLocal}>
+            Descartar
+          </button>
+        </div>
+      )}
+
+      <nav aria-label="Pasos de la solicitud">
+        <ol className="gm-pasos-form">
+          {PASOS.map((p) => (
+            <li key={p.n} data-estado={p.n === paso ? "actual" : p.n < paso ? "hecho" : "pendiente"}>
+              <button type="button" aria-current={p.n === paso ? "step" : undefined} disabled={p.n > paso && del(paso).length > 0} onClick={() => ir(p.n)}>
+                <span className="gm-pasos-form__n" aria-hidden="true">
+                  {p.n < paso ? "✓" : p.n}
+                </span>
+                <span>{p.titulo}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <div className="gm-formulario__estado" aria-live="off">
+        <span>{id ? "Editando una solicitud ya guardada en el portal" : guardadoEn ? `Borrador guardado en este equipo ${hace(guardadoEn, ahora)}` : "Se guarda un borrador en este equipo mientras escribe"}</span>
+      </div>
+
+      <div className="gm-formulario__cuerpo" ref={panelPaso}>
+        <h2 className="gm-formulario__titulo" tabIndex={-1} ref={tituloPaso}>
+          {paso === 1 ? "¿Qué quiere hacer?" : paso === 2 && tipo ? PREGUNTA[tipo] : paso === 3 ? "¿Por qué lo pide?" : "Revise antes de enviar"}
+        </h2>
+
+        {resumenErrores.length > 0 && (
+          <div className="gm-resumen-errores" role="alert">
+            <h3>
+              Falta completar {resumenErrores.length} {resumenErrores.length === 1 ? "dato" : "datos"}
+            </h3>
+            <ul>
+              {resumenErrores.map((e, i) => (
+                <li key={`${e.id}-${i}`}>
+                  <button type="button" onClick={() => irAlError(e)}>
+                    {e.mensaje}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-          {id && <small>El tipo no se cambia al corregir una solicitud: para otro tipo, cree una nueva.</small>}
-        </fieldset>
+        )}
 
-        <fieldset className="gm-seccion">
-          <legend>Dónde aplica</legend>
-          <div className="gm-rejilla">
-            <label className="admin-field">
-              <span>Periodo</span>
-              <select value={periodo} onChange={(e) => { setPeriodo(e.target.value); setLineas(lineas.map((l) => ({ ...l, origenPeriodo: l.elegido ? l.origenPeriodo : e.target.value }))); }}>
-                {ctx.periodos.map((p) => (
-                  <option key={p} value={p}>
-                    {nombrePeriodo(p)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="admin-field">
-              <span>Sede</span>
-              <select value={sede} onChange={(e) => { setSede(e.target.value); setLineas(lineas.map((l) => ({ ...l, origenSede: l.elegido ? l.origenSede : e.target.value }))); }}>
-                {SEDES.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="admin-field">
-              <span>Unidad que solicita</span>
-              <select value={unidad} onChange={(e) => setUnidad(e.target.value)}>
-                <option value="">{unidadesLista.length ? "Sin unidad" : "No pertenece a una unidad"}</option>
-                {unidadesLista.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="admin-field">
-              <span>Prioridad</span>
-              <select value={prioridad} onChange={(e) => setPrioridad(e.target.value as Prioridad)}>
-                {(Object.keys(PRIORIDADES) as Prioridad[]).map((p) => (
-                  <option key={p} value={p}>
-                    {PRIORIDADES[p]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </fieldset>
+        {/* 1 · Qué quiere hacer */}
+        {paso === 1 && (
+          <>
+            <div className="gm-tipos" role="radiogroup" aria-label="Tipo de solicitud" id="gm-tipo" tabIndex={-1}>
+              {(Object.keys(TIPOS) as Tipo[]).map((t) => (
+                <label key={t} className="gm-tipo" data-activo={tipo === t}>
+                  <input type="radio" name="tipo" checked={tipo === t} onChange={() => elegirTipo(t)} disabled={Boolean(id)} />
+                  <b>{TIPOS[t].nombre}</b>
+                  <span>{TIPOS[t].ayuda}</span>
+                  <em>{TIPOS[t].ejemplo}</em>
+                </label>
+              ))}
+            </div>
+            {id && <p className="gm-nota">El tipo no se cambia al corregir una solicitud: para otro tipo, cree una nueva.</p>}
+            {tipo && (
+              <DondeAplica
+                key="donde"
+                periodo={periodo}
+                sede={sede}
+                unidad={unidad}
+                prioridad={prioridad}
+                periodos={ctx.periodos}
+                unidades={unidades.data ?? []}
+                onPeriodo={(p) => { setPeriodo(p); setLineas((ls) => ls.map((l) => (l.elegido ? l : { ...l, origenPeriodo: p }))); }}
+                onSede={(s) => { setSede(s); setLineas((ls) => ls.map((l) => (l.elegido ? l : { ...l, origenSede: s }))); }}
+                onUnidad={setUnidad}
+                onPrioridad={setPrioridad}
+              />
+            )}
+          </>
+        )}
 
-        <fieldset className="gm-seccion">
-          <legend>{etiquetaLineas}</legend>
-          <p className="gm-ayuda">
-            {tipo === "nuevo"
-              ? "Una fila por cada actividad nueva. Antes de crearla, busque si ya existe algo parecido: el Master le muestra su ficha."
-              : tipo === "mejorar"
-                ? "Elija el código del que parte (de este periodo o de uno anterior). Se precarga con lo que dice el Master y usted ajusta lo que cambia."
-                : "Elija el código que se da de baja. Abajo verá a cuántos profesores afecta."}
-          </p>
-          {ver("lineas") && <p className="gm-error">{ver("lineas")}</p>}
-
-          {lineas.map((l, i) => {
-            const codigoErr = ver(`codigo-${l.clave}`);
-            const nombreErr = ver(`nombre-${l.clave}`);
-            const tipoErr = ver(`tipo-${l.clave}`);
-            return (
-              <div className="gm-linea" key={l.clave}>
-                <div className="gm-linea__cabeza">
-                  <h4>
-                    Actividad {i + 1}
-                    {l.codigo ? <span className="gm-mono"> · {l.codigo.toUpperCase()}</span> : null}
-                  </h4>
-                  {(lineas.length > 1 || l.elegido) && (
-                    <button type="button" className="button-ghost" onClick={() => quitar(l.clave)}>
-                      Quitar
-                    </button>
-                  )}
+        {/* 2 · Actividades */}
+        {paso === 2 && tipo && (
+          <div className="gm-paso2">
+            <div className="gm-paso2__lista">
+              <p className="gm-ayuda">
+                {tipo === "nuevo"
+                  ? "Una tarjeta por cada actividad nueva. Mientras escribe el nombre, el portal busca si ya existe algo parecido."
+                  : tipo === "editar"
+                    ? "Elija el código y marque solo lo que cambia. Verá lo que hay hoy y cómo quedaría."
+                    : tipo === "mejorar"
+                      ? "Elija el código del que parte, de este periodo o de uno anterior. Se precarga y usted ajusta lo que cambia."
+                      : "Elija el código que se da de baja. Verá a cuántos profesores afecta."}{" "}
+                Varias actividades que se deciden juntas pueden ir en la misma solicitud.
+              </p>
+              {lineas.map((l, i) => (
+                <div key={l.clave}>
+                  <TarjetaActividad
+                    linea={l}
+                    indice={i}
+                    total={lineas.length}
+                    tipo={tipo}
+                    periodo={periodo}
+                    sede={sede}
+                    periodos={ctx.periodos}
+                    errores={errores.filter((e) => e.clave === l.clave)}
+                    mostrar={mostrar}
+                    tocado={tocado}
+                    onMarcar={marcar}
+                    onCambio={(c) => editar(l.clave, c)}
+                    onElegir={(c, per, sed) => void elegir(l.clave, tipo, c, per, sed)}
+                    onQuitar={() => quitar(l.clave)}
+                    onDuplicar={tipo === "nuevo" ? () => duplicar(l.clave) : undefined}
+                    onActivar={(codigo) => setPanel((p) => (p?.codigo === codigo ? p : { codigo, periodo: tipo === "mejorar" ? l.origenPeriodo : periodo, sede: tipo === "mejorar" ? l.origenSede : sede }))}
+                  />
+                  {tipo === "nuevo" && l.abierta && l.nombre.trim().length >= 3 && <ParecidosNuevo periodo={periodo} sede={sede} texto={l.nombre.trim()} onVer={(codigo) => setPanel({ codigo, periodo, sede })} />}
                 </div>
+              ))}
+              {lineas.length < 30 && (
+                <button type="button" id="gm-agregar" className="button-secondary gm-agregar" onClick={agregar}>
+                  + Agregar otra actividad
+                </button>
+              )}
+            </div>
 
-                {tipo !== "nuevo" && !l.elegido && (
-                  <>
-                    {tipo === "mejorar" && (
-                      <div className="gm-rejilla gm-rejilla--origen">
-                        <label className="admin-field">
-                          <span>Periodo del que parte</span>
-                          <select value={l.origenPeriodo} onChange={(e) => editar(l.clave, { origenPeriodo: e.target.value })}>
-                            {periodosOrigen.map((p) => (
-                              <option key={p} value={p}>
-                                {nombrePeriodo(p)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="admin-field">
-                          <span>Sede de origen</span>
-                          <select value={l.origenSede} onChange={(e) => editar(l.clave, { origenSede: e.target.value })}>
-                            {SEDES.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.nombre}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                    )}
-                    <BuscadorCodigo
-                      id={`buscar-${l.clave}`}
-                      periodo={tipo === "mejorar" ? l.origenPeriodo : periodo}
-                      sede={tipo === "mejorar" ? l.origenSede : sede}
-                      etiqueta={tipo === "mejorar" ? "Código del que parte" : "Código a eliminar"}
-                      onElegir={(c) => void elegirCodigo(l.clave, c, tipo === "mejorar" ? l.origenPeriodo : periodo, tipo === "mejorar" ? l.origenSede : sede)}
-                    />
-                    {codigoErr && <p className="gm-error">{codigoErr}</p>}
-                  </>
-                )}
-
-                {tipo === "nuevo" && (
-                  <>
-                    <div className="gm-rejilla">
-                      <label className="admin-field">
-                        <span>Código sugerido (opcional)</span>
-                        <input
-                          value={l.codigo}
-                          onChange={(e) => editar(l.clave, { codigo: e.target.value.toUpperCase() })}
-                          onBlur={() => marcar(`codigo-${l.clave}`)}
-                          placeholder="ACT-45"
-                          aria-invalid={Boolean(codigoErr)}
-                          aria-describedby={`ayuda-cod-${l.clave}`}
-                        />
-                        <small id={`ayuda-cod-${l.clave}`}>{codigoErr ?? `${AYUDA_CODIGO} Si lo deja vacío, Planeación asigna el código al crearla.`}</small>
-                      </label>
-                      <label className="admin-field">
-                        <span>Tipo *</span>
-                        <select value={l.tipoActividad} onChange={(e) => editar(l.clave, { tipoActividad: e.target.value as LineaForm["tipoActividad"] })} onBlur={() => marcar(`tipo-${l.clave}`)} aria-invalid={Boolean(tipoErr)}>
-                          <option value="">Elija…</option>
-                          <option value="directa">Directa</option>
-                          <option value="apoyo">De apoyo</option>
-                        </select>
-                        {tipoErr && <small className="gm-error">{tipoErr}</small>}
-                      </label>
-                    </div>
-                  </>
-                )}
-
-                {(tipo === "nuevo" || (tipo === "mejorar" && l.elegido)) && (
-                  <div className="gm-rejilla">
-                    <label className="admin-field gm-ancho">
-                      <span>Nombre {tipo === "mejorar" ? "(cómo debe quedar) " : ""}*</span>
-                      <input value={l.nombre} onChange={(e) => editar(l.clave, { nombre: e.target.value })} onBlur={() => marcar(`nombre-${l.clave}`)} placeholder="Ej. Preparación y diseño de clases" aria-invalid={Boolean(nombreErr)} />
-                      {nombreErr && <small className="gm-error">{nombreErr}</small>}
-                    </label>
-                    {tipo === "mejorar" && (
-                      <label className="admin-field">
-                        <span>Tipo</span>
-                        <select value={l.tipoActividad} onChange={(e) => editar(l.clave, { tipoActividad: e.target.value as LineaForm["tipoActividad"] })}>
-                          <option value="">Sin cambio</option>
-                          <option value="directa">Directa</option>
-                          <option value="apoyo">De apoyo</option>
-                        </select>
-                      </label>
-                    )}
-                    <label className="admin-field">
-                      <span>Vinculación (contratos)</span>
-                      <input value={l.vinculacion} onChange={(e) => editar(l.clave, { vinculacion: e.target.value })} placeholder="Ej. TC, MT, Cátedra" />
-                    </label>
-                    <label className="admin-field gm-ancho">
-                      <span>Instrucciones</span>
-                      <textarea rows={2} value={l.instrucciones} onChange={(e) => editar(l.clave, { instrucciones: e.target.value })} />
-                    </label>
-                  </div>
-                )}
-
-                {tipo === "eliminar" && l.elegido && <p className="gm-nota">Se dará de baja {l.nombre ? `«${l.nombre}»` : l.codigo}. Lo que sigue es lo que el Master dice de este código hoy.</p>}
-
-                {/* Los datos reales del código, desde el Warehouse: para decidir con información. */}
-                {tipo === "nuevo" && l.nombre.trim().length >= 3 && <SimilarNuevo periodo={periodo} sede={sede} texto={l.nombre.trim()} />}
-                {tipo !== "nuevo" && l.elegido && l.codigo && <PanelCodigo periodo={tipo === "mejorar" ? l.origenPeriodo : periodo} sede={tipo === "mejorar" ? l.origenSede : sede} codigo={l.codigo.trim().toUpperCase()} titulo={tipo === "eliminar" ? `A quién afecta eliminar ${l.codigo}` : undefined} />}
-              </div>
-            );
-          })}
-
-          {lineas.length < 30 && (
-            <button type="button" className="button-secondary" onClick={() => setLineas((p) => [...p, nuevaLinea(periodo, sede)])}>
-              Añadir otra actividad
-            </button>
-          )}
-        </fieldset>
-
-        <fieldset className="gm-seccion">
-          <legend>Justificación</legend>
-          <label className="admin-field">
-            <span>Exposición de motivos *</span>
-            <textarea
-              rows={7}
-              value={justificacion}
-              maxLength={MAX_JUSTIFICACION}
-              onChange={(e) => setJustificacion(e.target.value)}
-              onBlur={() => marcar("justificacion")}
-              aria-invalid={Boolean(ver("justificacion"))}
-              aria-describedby="gm-just-ayuda"
-              placeholder="Explique el impacto esperado, los recursos que necesita y cómo se alinea con los objetivos institucionales. Si requiere presupuesto adicional, dígalo de forma explícita: la Vicerrectoría Administrativa y Financiera lo lee primero."
-            />
-          </label>
-          <div className="gm-contador-texto" id="gm-just-ayuda" data-error={Boolean(ver("justificacion"))}>
-            <span>{ver("justificacion") ?? "Es lo que leen quienes aprueban. Determina si la solicitud avanza."}</span>
-            <span aria-live="polite">
-              {largo} / {MAX_JUSTIFICACION}
-            </span>
+            <aside className="gm-paso2__panel" aria-label="Qué hay hoy con este código">
+              {panel ? (
+                <details className="gm-panel-hoy" open={ancho} key={`${panel.codigo}|${panel.periodo}|${panel.sede}`}>
+                  <summary>Qué hay hoy con {panel.codigo}</summary>
+                  <PanelCodigo periodo={panel.periodo} sede={panel.sede} codigo={panel.codigo} />
+                </details>
+              ) : (
+                <div className="gm-panel-hoy gm-panel-hoy--vacio">
+                  <h3>Qué hay hoy con este código</h3>
+                  <p className="gm-nota">Al elegir un código verá aquí, desde el Warehouse, lo que el Master dice de él: cuántos profesores lo tienen, las horas, el promedio y el programa.</p>
+                </div>
+              )}
+            </aside>
           </div>
-        </fieldset>
+        )}
 
-        {error && (
+        {/* 3 · Justificación */}
+        {paso === 3 && (
+          <div className="gm-paso3">
+            <Campo id="gm-justificacion" etiqueta="Justificación" ayuda="Es lo que leen quienes aprueban. Determina si la solicitud avanza." error={ver("gm-justificacion")} contador={{ valor: justificacion.length, max: MAX_JUSTIFICACION }}>
+              <textarea
+                id="gm-justificacion"
+                rows={9}
+                value={justificacion}
+                maxLength={MAX_JUSTIFICACION}
+                onChange={(e) => setJustificacion(e.target.value)}
+                onBlur={() => marcar("gm-justificacion")}
+                aria-describedby="gm-justificacion-ayuda gm-just-medidor"
+                aria-invalid={Boolean(ver("gm-justificacion"))}
+                placeholder="Qué cambia, por qué, a quién afecta y si cuesta algo."
+              />
+            </Campo>
+            <p id="gm-just-medidor" className="gm-medidor" data-listo={largoJust >= MIN_JUSTIFICACION}>
+              <span className="gm-barra" aria-hidden="true">
+                <i style={{ transform: `scaleX(${Math.min(largoJust / MIN_JUSTIFICACION, 1)})` }} />
+              </span>
+              {largoJust >= MIN_JUSTIFICACION ? "Ya alcanza el mínimo." : `Faltan ${MIN_JUSTIFICACION - largoJust} caracteres para el mínimo de ${MIN_JUSTIFICACION}.`}
+            </p>
+            <div className="gm-guia">
+              <h3>Una buena justificación responde cuatro cosas</h3>
+              <ul>
+                <li>Qué cambia y en qué actividades.</li>
+                <li>Por qué hace falta ahora.</li>
+                <li>A cuántos profesores o programas toca.</li>
+                <li>Si necesita presupuesto: dígalo de forma explícita, la Vicerrectoría Administrativa y Financiera lo lee primero.</li>
+              </ul>
+              <details className="gm-plegable">
+                <summary>Ver un ejemplo</summary>
+                <p className="gm-ejemplo">
+                  «La cohorte 2026 tiene 38 proyectos de grado y el cupo de asesoría de DOC-02 no alcanza para asignarlos a tiempo. Se pide pasar de 2 a 4 horas por semana por profesor, lo que toca a 6 profesores de Ingeniería de Sistemas en Bucaramanga. No requiere presupuesto adicional: las horas salen de la carga ya contratada.»
+                </p>
+              </details>
+            </div>
+          </div>
+        )}
+
+        {/* 4 · Revisar y enviar */}
+        {paso === 4 && tipo && (
+          <div className="gm-paso4">
+            <dl className="gm-kv">
+              <dt>Qué hace</dt>
+              <dd>{TIPOS[tipo].nombre}</dd>
+              <dt>Dónde</dt>
+              <dd>
+                {nombreSede(sede)} · {nombrePeriodo(periodo)}
+              </dd>
+              <dt>Unidad</dt>
+              <dd>{unidades.data?.find((u) => u.id === unidad)?.nombre ?? "Sin unidad"}</dd>
+              <dt>Prioridad</dt>
+              <dd>{PRIORIDADES[prioridad]}</dd>
+            </dl>
+            <h3>Actividades ({lineas.length})</h3>
+            <ul className="gm-resumen-lineas">
+              {lineas.map((l, i) => (
+                <li key={l.clave}>
+                  <b>
+                    {i + 1}. {tituloLinea(l, tipo)}
+                  </b>
+                  {tipo === "editar" && (
+                    <ul className="gm-diff">
+                      {camposQueCambian(l).map((c: CampoEditar) => (
+                        <li key={c}>
+                          <span>{NOMBRE_CAMPO[c]}</span>
+                          <span>{valorActual(l.actual, c).slice(0, 90)}</span> → <b>{valorPropuesto(l, c).slice(0, 90)}</b>
+                        </li>
+                      ))}
+                      {l.motivo.trim() && <li className="gm-diff__motivo">Motivo: {l.motivo.trim()}</li>}
+                    </ul>
+                  )}
+                  {tipo === "nuevo" && <span className="gm-muted"> {nombreTipoActividad(l.tipoActividad)}</span>}
+                </li>
+              ))}
+            </ul>
+            <h3>Justificación</h3>
+            <p className="gm-justificacion-resumen">{justificacion.trim().length > 280 ? `${justificacion.trim().slice(0, 280)}…` : justificacion.trim() || "—"}</p>
+            <div className="gm-despues">
+              <h3>Qué pasa después</h3>
+              {flujoDefecto ? (
+                <p>
+                  Pasa a <b>{flujoDefecto.pasos[0]?.nombre}</b>
+                  {flujoDefecto.pasos.slice(1).map((p) => (
+                    <span key={p.orden}>
+                      , luego a <b>{p.nombre}</b>
+                    </span>
+                  ))}
+                  . Planeación aplica el cambio en el Master al final.
+                </p>
+              ) : (
+                <p>Todavía no hay un flujo configurado.</p>
+              )}
+              <p className="gm-nota">Plazo indicativo: {flujoDefecto?.plazo_dias ?? PLAZO_INDICADOR} días hábiles. Recibirá un correo de acuse al enviar y un aviso en cada paso. Una vez enviada no se edita; si la devuelven con una nota, podrá corregirla.</p>
+            </div>
+          </div>
+        )}
+
+        {falla && (
           <p className="gm-error gm-error--bloque" role="alert">
-            {error}
+            {falla}
           </p>
         )}
-        <div className="gm-acciones">
-          <button type="button" className="button-secondary" disabled={guardar.isPending} onClick={() => void enviar(true)}>
-            Guardar borrador
-          </button>
-          <button type="submit" className="button-primary" disabled={guardar.isPending}>
-            {guardar.isPending ? "Enviando…" : "Enviar a revisión"}
-          </button>
+        {aviso && (
+          <p className="gm-nota" role="status">
+            {aviso}
+          </p>
+        )}
+
+        <div className="gm-acciones gm-acciones--form">
+          {paso > 1 && (
+            <button type="button" className="button-ghost" onClick={() => ir(paso - 1)}>
+              Atrás
+            </button>
+          )}
+          {paso < 4 ? (
+            <button type="button" className="button-primary" onClick={continuar} disabled={paso === 1 && !tipo}>
+              Continuar
+            </button>
+          ) : (
+            <button type="button" className="button-primary" disabled={guardar.isPending} onClick={() => void guardarEnPortal(true)}>
+              {guardar.isPending ? "Enviando…" : "Enviar a revisión"}
+            </button>
+          )}
+          {tipo && (
+            <button type="button" className="button-secondary" disabled={guardar.isPending} onClick={() => void guardarEnPortal(false)}>
+              Guardar borrador
+            </button>
+          )}
           <button type="button" className="button-ghost" onClick={() => ctx.ir("bandeja")}>
             Cancelar
           </button>
         </div>
       </div>
 
-      <aside className="gm-formulario__lado" aria-label="Ayuda">
-        <section className="gm-guia">
-          <h3>Guía de llenado</h3>
-          <ul>
-            <li>Agrupe en una misma solicitud las actividades que se deciden juntas; separe las que no.</li>
-            <li>Evite descripciones genéricas: quien aprueba devuelve lo que no puede evaluar.</li>
-            <li>Si el cambio requiere presupuesto adicional, dígalo de forma explícita en el texto.</li>
-            <li>Un borrador y una solicitud devuelta se pueden editar; una enviada, no.</li>
-            <li>Al final, Planeación aplica el cambio en el Master. El portal no escribe en el Master.</li>
-          </ul>
-        </section>
-        <section className="gm-guia">
-          <h3>Quién la aprueba</h3>
-          {flujos.isPending ? (
-            <p className="gm-nota">Leyendo el flujo…</p>
-          ) : flujoDefecto ? (
-            <>
-              <ol className="gm-pasos-lista">
-                {flujoDefecto.pasos.map((p) => (
-                  <li key={p.orden}>{p.nombre}</li>
-                ))}
-              </ol>
-              <p className="gm-nota">Cada decisión lleva una nota. Plazo indicativo: {flujoDefecto.plazo_dias || PLAZO_INDICADOR} días hábiles en total.</p>
-            </>
-          ) : (
-            <p className="gm-aviso">Todavía no hay un flujo configurado.</p>
-          )}
-        </section>
-      </aside>
-    </form>
+      <p className="sr-only" role="status" aria-live="polite">
+        {anuncio}
+      </p>
+    </div>
   );
 }
 
-/** «¿Ya existe algo parecido?»: busca por el nombre que se está escribiendo y muestra la ficha de lo que encuentra. */
-function SimilarNuevo({ periodo, sede, texto }: { periodo: string; sede: string; texto: string }) {
-  const [consulta, setConsulta] = useState("");
-  const [abierto, setAbierto] = useState<string | null>(null);
-  useEffect(() => {
-    const t = window.setTimeout(() => setConsulta(texto.split(/\s+/).slice(0, 3).join(" ")), 400);
-    return () => window.clearTimeout(t);
-  }, [texto]);
-  const q = useBuscarCodigos(periodo, sede, consulta, consulta.length >= 3);
+/** Periodo y sede por defecto a la vista; unidad y prioridad, plegadas. */
+function DondeAplica({
+  periodo, sede, unidad, prioridad, periodos, unidades, onPeriodo, onSede, onUnidad, onPrioridad,
+}: {
+  periodo: string;
+  sede: string;
+  unidad: string;
+  prioridad: Prioridad;
+  periodos: string[];
+  unidades: { id: string; nombre: string }[];
+  onPeriodo: (p: string) => void;
+  onSede: (s: string) => void;
+  onUnidad: (u: string) => void;
+  onPrioridad: (p: Prioridad) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (q.data?.length) aparecer(ref.current);
-  }, [q.data?.length]);
-  if (!q.data?.length) return null;
+    if (ref.current) entrada(ref.current.children, 4);
+  }, []);
   return (
-    <div className="gm-parecidos" ref={ref}>
-      <h4>¿Ya existe algo parecido?</h4>
-      <p className="gm-nota">El catálogo del Master de {nombreSede(sede)} tiene {q.data.length === 40 ? "al menos " : ""}{q.data.length} {q.data.length === 1 ? "actividad que coincide" : "actividades que coinciden"} con «{consulta}».</p>
-      <ul>
-        {q.data.slice(0, 5).map((c) => (
-          <li key={c.codigo}>
-            <button type="button" aria-expanded={abierto === c.codigo} onClick={() => setAbierto(abierto === c.codigo ? null : c.codigo)}>
-              <b className="gm-mono">{c.codigo}</b> {c.nombre ?? ""}
-            </button>
-            {abierto === c.codigo && <PanelCodigo periodo={periodo} sede={sede} codigo={c.codigo} />}
-          </li>
-        ))}
-      </ul>
+    <div className="gm-donde" ref={ref}>
+      <h3>¿Dónde aplica?</h3>
+      <div className="gm-rejilla" id="gm-periodo">
+        <Campo id="gm-periodo-sel" etiqueta="Periodo">
+          <select id="gm-periodo-sel" value={periodo} onChange={(e) => onPeriodo(e.target.value)}>
+            {periodos.map((p) => (
+              <option key={p} value={p}>
+                {nombrePeriodo(p)}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        <Campo id="gm-sede-sel" etiqueta="Sede">
+          <select id="gm-sede-sel" value={sede} onChange={(e) => onSede(e.target.value)}>
+            {SEDES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
+            ))}
+          </select>
+        </Campo>
+      </div>
+      <details className="gm-plegable">
+        <summary>Unidad y prioridad ({unidades.find((u) => u.id === unidad)?.nombre ?? "sin unidad"}, {PRIORIDADES[prioridad].toLowerCase()})</summary>
+        <div className="gm-rejilla">
+          <Campo id="gm-unidad-sel" etiqueta="Unidad que solicita" ayuda={unidades.length ? "Las unidades donde usted es Gestor o Contribuyente." : "No pertenece a una unidad: la solicitud va sin unidad."}>
+            <select id="gm-unidad-sel" value={unidad} onChange={(e) => onUnidad(e.target.value)}>
+              <option value="">Sin unidad</option>
+              {unidades.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+          <Campo id="gm-prioridad-sel" etiqueta="Prioridad" ayuda="Normal salvo que haya una fecha encima.">
+            <select id="gm-prioridad-sel" value={prioridad} onChange={(e) => onPrioridad(e.target.value as Prioridad)}>
+              {(Object.keys(PRIORIDADES) as Prioridad[]).map((p) => (
+                <option key={p} value={p}>
+                  {PRIORIDADES[p]}
+                </option>
+              ))}
+            </select>
+          </Campo>
+        </div>
+      </details>
     </div>
   );
 }

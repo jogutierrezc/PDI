@@ -200,7 +200,7 @@ function FilaActividad({ a, maxHoras, abierto, onAbrir, periodo, sede, ir }: { a
           <span className="gm-pill gm-pill--fuente">Master</span>
           {a.solicitudes_abiertas > 0 && (
             <button type="button" className="gm-enlace" onClick={() => ir("bandeja")}>
-              Solicitud abierta ({a.solicitudes_abiertas})
+              {a.edicion_abierta ? "Cambio solicitado" : `Solicitud abierta (${a.solicitudes_abiertas})`}
             </button>
           )}
         </td>

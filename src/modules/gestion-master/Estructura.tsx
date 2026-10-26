@@ -135,7 +135,7 @@ export function Estructura({ ctx }: { ctx: Contexto }) {
                               </span>
                               {a.solicitudes_abiertas > 0 && (
                                 <button type="button" className="gm-enlace" onClick={() => ctx.ir("bandeja")}>
-                                  {a.solicitudes_abiertas} {a.solicitudes_abiertas === 1 ? "solicitud abierta" : "solicitudes abiertas"}
+                                  {a.edicion_abierta ? "Cambio solicitado" : `${a.solicitudes_abiertas} ${a.solicitudes_abiertas === 1 ? "solicitud abierta" : "solicitudes abiertas"}`}
                                 </button>
                               )}
                             </td>
@@ -143,8 +143,8 @@ export function Estructura({ ctx }: { ctx: Contexto }) {
                               <td>{c ? <span className="gm-pill" data-tono={c === "nueva" ? "ok" : "aviso"}>{c === "nueva" ? "Nueva" : "Modificada"}</span> : <span className="gm-muted">Igual</span>}</td>
                             )}
                             <td className="gm-acciones-fila">
-                              <button type="button" className="button-ghost" onClick={() => ctx.ir("nueva", undefined, { tipo: "mejorar", codigo: a.codigo })}>
-                                Proponer cambio
+                              <button type="button" className="button-ghost" onClick={() => ctx.ir("nueva", undefined, { tipo: "editar", codigo: a.codigo })}>
+                                Pedir un cambio
                               </button>
                             </td>
                           </tr>

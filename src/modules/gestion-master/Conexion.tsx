@@ -76,13 +76,24 @@ export function Conexion({ ctx }: { ctx: Contexto }) {
   async function descargar() {
     setError("");
     try {
-      const filas: string[][] = [["folio", "periodo", "sede", "tipo", "codigo", "campo", "valor_vigente_en_master", "valor_aprobado", "aprobada_el"]];
+      const filas: string[][] = [["folio", "periodo", "sede", "tipo", "codigo_actual", "codigo_nuevo", "campo", "valor_vigente_en_master", "valor_aprobado", "instruccion_para_el_master", "aprobada_el"]];
       for (const s of porReflejar.filter((x) => x.aplicacion === "sin_aplicar")) {
         const r = await supabase.rpc("gm_detalle", { p_id: s.id });
         if (r.error) throw new Error(mensajeDe(r.error));
         const d = r.data as Detalle;
         for (const l of d.lineas) {
           const cat = l.antes?.ficha?.catalogo;
+          const nombreCampo: Record<string, string> = { codigo: "el código", nombre: "el nombre", tipo_actividad: "el tipo de actividad", vinculacion: "el tipo de vinculación", instrucciones: "las instrucciones" };
+          const tipoTxt = (v: string | null | undefined) => (v === "directa" ? "directa" : v === "apoyo" ? "de apoyo" : (v ?? ""));
+          if (d.tipo === "editar") {
+            for (const [campo, v] of Object.entries(l.cambios ?? {})) {
+              const antes = campo === "tipo_actividad" ? tipoTxt(v.antes) : (v.antes ?? "");
+              const despues = campo === "tipo_actividad" ? tipoTxt(v.despues) : (v.despues ?? "");
+              const instruccion = campo === "codigo" ? `Cambiar el código ${l.codigo} por ${l.codigo_nuevo}` : `En ${l.codigo_nuevo ?? l.codigo}, cambiar ${nombreCampo[campo] ?? campo} de «${antes}» a «${despues}»`;
+              filas.push([d.folio, d.periodo, d.sede, d.tipo, l.codigo ?? "", l.codigo_nuevo ?? "", campo, antes, despues, instruccion, d.resuelta_en ?? ""]);
+            }
+            continue;
+          }
           const pares: [string, string, string][] =
             d.tipo === "eliminar"
               ? [["estado", cat?.activa === false ? "Inactiva" : "Activa", "Inactiva"]]
@@ -94,7 +105,7 @@ export function Conexion({ ctx }: { ctx: Contexto }) {
                     ["vinculacion", cat?.vinculacion ?? "", l.vinculacion ?? ""],
                     ["instrucciones", cat?.instrucciones ?? "", l.instrucciones ?? ""],
                   ];
-          for (const [campo, vigente, aprobado] of pares) if (vigente !== aprobado) filas.push([d.folio, d.periodo, d.sede, d.tipo, l.codigo ?? "", campo, vigente, aprobado, d.resuelta_en ?? ""]);
+          for (const [campo, vigente, aprobado] of pares) if (vigente !== aprobado) filas.push([d.folio, d.periodo, d.sede, d.tipo, l.codigo ?? "", "", campo, vigente, aprobado, d.tipo === "eliminar" ? `Dar de baja ${l.codigo}` : d.tipo === "nuevo" ? `Crear la actividad ${l.codigo ?? "(sin código)"}: ${aprobado}` : `En ${l.codigo}, cambiar ${campo} de «${vigente}» a «${aprobado}»`, d.resuelta_en ?? ""]);
         }
       }
       if (filas.length === 1) {

@@ -47,6 +47,16 @@ export function deslizar(panel: Element | null, fondo: Element | null, desdeTecl
   if (fondo) gsap.fromTo(fondo, { opacity: 0 }, { opacity: 1, duration: 0.16, clearProps: "opacity" });
 }
 
+/** El paso del formulario: llega por el lado al que se avanza (14 px y opacidad, 200 ms). Con movimiento reducido, solo un fundido. */
+export function cambiarPaso(panel: Element | null, direccion: 1 | -1) {
+  if (!panel) return;
+  if (movimientoReducido()) {
+    gsap.fromTo(panel, { opacity: 0 }, { opacity: 1, duration: 0.12, clearProps: "opacity" });
+    return;
+  }
+  gsap.fromTo(panel, { opacity: 0, x: 14 * direccion }, { opacity: 1, x: 0, duration: 0.2, ease: "power3.out", clearProps: "opacity,transform" });
+}
+
 /** Un panel que aparece (confirmación, formulario en línea). */
 export function aparecer(el: Element | null) {
   if (!el) return;

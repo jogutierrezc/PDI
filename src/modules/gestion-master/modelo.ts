@@ -7,7 +7,7 @@
    decisión, errores solo en lo que el usuario ya tocó) se conservan.
    ========================================================================== */
 
-export type Tipo = "nuevo" | "mejorar" | "eliminar";
+export type Tipo = "nuevo" | "editar" | "mejorar" | "eliminar";
 export type Estado = "borrador" | "pendiente" | "revision" | "devuelta" | "aprobada" | "rechazada" | "cancelada";
 export type Aplicacion = "sin_aplicar" | "aplicada" | "reflejada";
 export type Prioridad = "normal" | "alta" | "urgente";
@@ -18,13 +18,32 @@ export type Decision = "aprobar" | "devolver" | "rechazar";
 export const MIN_JUSTIFICACION = 150;
 export const MAX_JUSTIFICACION = 2000;
 export const MIN_NOTA = 20;
+/** Topes de largo de una actividad (los mismos que la base: gm_lin_largos, 0196 y 0197). */
+export const MAX_NOMBRE = 300;
+export const MAX_INSTRUCCIONES = 5000;
+export const MAX_VINCULACION = 1000;
+export const MAX_MOTIVO = 300;
+export const MIN_MOTIVO = 10;
+
+/** Los campos que «Editar» puede cambiar, en el orden en que se muestran. */
+export const CAMPOS_EDITAR = ["codigo", "nombre", "tipo_actividad", "vinculacion", "instrucciones"] as const;
+export type CampoEditar = (typeof CAMPOS_EDITAR)[number];
+export const NOMBRE_CAMPO: Record<CampoEditar, string> = {
+  codigo: "Código",
+  nombre: "Nombre",
+  tipo_actividad: "Tipo de actividad",
+  vinculacion: "Tipo de vinculación",
+  instrucciones: "Instrucciones",
+};
+export const TOPE_CAMPO: Partial<Record<CampoEditar, number>> = { nombre: MAX_NOMBRE, vinculacion: MAX_VINCULACION, instrucciones: MAX_INSTRUCCIONES };
 /** El indicador de plazo de Rua: 15 días hábiles. No corta nada: solo avisa. */
 export const PLAZO_INDICADOR = 15;
 
-export const TIPOS: Record<Tipo, { nombre: string; ayuda: string }> = {
-  nuevo: { nombre: "Nuevo", ayuda: "Una actividad que no existe en el Master. Mire primero si ya hay algo parecido." },
-  mejorar: { nombre: "Mejorar o mantener", ayuda: "Parte de un código que ya existe, con sus datos, y se puede ampliar o ajustar." },
-  eliminar: { nombre: "Eliminar", ayuda: "Dar de baja un código. Vea antes cuántos profesores lo tienen asignado." },
+export const TIPOS: Record<Tipo, { nombre: string; ayuda: string; ejemplo: string }> = {
+  nuevo: { nombre: "Nuevo", ayuda: "Una actividad que no existe en el Master. Mire primero si ya hay algo parecido.", ejemplo: "Ej. crear «Laboratorio de práctica guiada»." },
+  editar: { nombre: "Editar", ayuda: "Cambiar datos de un código que ya existe: su código, nombre, tipo, vinculación o instrucciones.", ejemplo: "Ej. corregir el nombre de DOC-10 o cambiar su código." },
+  mejorar: { nombre: "Mejorar o mantener", ayuda: "Parte de un código, de este periodo o de uno anterior, con sus datos, para ampliarlo como actividad.", ejemplo: "Ej. seguir con una actividad del periodo pasado y ampliarla." },
+  eliminar: { nombre: "Eliminar", ayuda: "Dar de baja un código. Vea antes cuántos profesores lo tienen asignado.", ejemplo: "Ej. retirar una actividad que ya no se usa." },
 };
 
 export const ESTADOS: Record<Estado, { nombre: string; tono: "neutro" | "aviso" | "info" | "devuelta" | "ok" | "mal" }> = {
@@ -90,7 +109,7 @@ export interface FilaLista {
   limite_en: string | null;
   dias_restantes: number | null;
   actualizada_en: string;
-  lineas: { codigo: string | null; nombre: string | null; origen_codigo: string | null }[];
+  lineas: { codigo: string | null; nombre: string | null; origen_codigo: string | null; codigo_nuevo?: string | null }[];
   es_mia: boolean;
   puedo_decidir: boolean;
 }
@@ -99,6 +118,12 @@ export interface Linea {
   id: string;
   orden: number;
   codigo: string | null;
+  /** Editar: el código que debe quedar en el Master, si el código cambia. */
+  codigo_nuevo: string | null;
+  /** Editar: por qué se pide el cambio. */
+  motivo: string | null;
+  /** Editar: por cada campo que cambia, lo de antes y lo de después (lo calcula la base). */
+  cambios: Partial<Record<CampoEditar, { antes: string | null; despues: string | null }>>;
   origen_codigo: string | null;
   origen_periodo: string | null;
   origen_sede: string | null;
@@ -189,6 +214,7 @@ export interface ActividadPeriodo {
   horas: number | null;
   promedio_horas: number | null;
   solicitudes_abiertas: number;
+  edicion_abierta: boolean;
 }
 
 export interface ProfesorPeriodo {
@@ -292,8 +318,19 @@ export const horasTexto = (n: number | null | undefined) => (n === null || n ===
 export function mensajeDe(error: unknown): string {
   const m = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String((error as { message: unknown }).message) : String(error ?? "");
   if (/gm_\w+.*does not exist|schema cache|PGRST202/i.test(m)) return "Falta aplicar la migración 0194 (Gestión Master) en la base de datos.";
+  // Nunca el error crudo de la base: las reglas de largo y de formato se dicen en palabras.
+  if (/gm_lin_largos/.test(m)) return `Un texto de la actividad es más largo de lo permitido: nombre ${MAX_NOMBRE}, vinculación ${MAX_VINCULACION}, instrucciones ${MAX_INSTRUCCIONES} y motivo ${MAX_MOTIVO} caracteres.`;
+  if (/gm_lin_codigo_nuevo/.test(m)) return "El código nuevo solo admite mayúsculas, números, punto, guion y guion bajo, hasta 32 caracteres.";
+  if (/gm_lin_codigo/.test(m)) return "El código de la actividad no es válido (de 1 a 40 caracteres).";
+  if (/gm_sol_tipo/.test(m)) return "Falta aplicar la migración 0197 (tipo Editar) en la base de datos.";
+  if (/gm_sol_just/.test(m)) return `La justificación debe tener entre ${MIN_JUSTIFICACION} y ${MAX_JUSTIFICACION} caracteres.`;
+  if (/violates check constraint|violates (unique|foreign key) constraint/i.test(m)) return "Un dato de la solicitud no cumple una regla. Revise los campos marcados e intente de nuevo.";
   return m.replace(/^ERROR:\s*/i, "").trim() || "Algo falló. Intente de nuevo.";
 }
 
 /** Lo que hay que mostrar de una línea: su código y nombre, o «(sin código)». */
-export const resumenLinea = (l: { codigo: string | null; nombre: string | null }) => `${l.codigo ?? "(sin código)"}${l.nombre ? ` · ${l.nombre}` : ""}`;
+export const resumenLinea = (l: { codigo: string | null; nombre: string | null; codigo_nuevo?: string | null }) =>
+  `${l.codigo ?? "(sin código)"}${l.codigo_nuevo ? ` → ${l.codigo_nuevo}` : ""}${l.nombre ? ` · ${l.nombre}` : ""}`;
+
+/** Lo que dice un campo de tipo de actividad, en palabras. */
+export const nombreTipoActividad = (v: string | null | undefined) => (v === "directa" ? "Directa" : v === "apoyo" ? "De apoyo" : "—");

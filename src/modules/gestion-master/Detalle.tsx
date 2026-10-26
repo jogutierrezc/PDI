@@ -60,8 +60,12 @@ function ComparacionLinea({ d, l }: { d: Detalle; l: Linea }) {
   const tipoVigente = cat ? (cat.directa === true ? "Directa" : cat.directa === false ? "De apoyo" : (cat.tipo ?? "—")) : "No existe";
   const pedido = (v: string | null | undefined, vigente: string) => (v && v !== vigente ? v : vigente);
   const tipoPedido = l.despues.tipo_actividad === "directa" ? "Directa" : l.despues.tipo_actividad === "apoyo" ? "De apoyo" : null;
+  const nombreCampo: Record<string, string> = { codigo: "Código", nombre: "Nombre", tipo_actividad: "Tipo de actividad", vinculacion: "Tipo de vinculación", instrucciones: "Instrucciones" };
+  const tipoTexto = (v: string | null | undefined) => (v === "directa" ? "Directa" : v === "apoyo" ? "De apoyo" : (v ?? "—"));
   const filas: [string, string, string][] =
-    d.tipo === "nuevo"
+    d.tipo === "editar"
+      ? Object.entries(l.cambios ?? {}).map(([campo, v]) => [nombreCampo[campo] ?? campo, campo === "tipo_actividad" ? tipoTexto(v.antes) : (v.antes ?? "—"), campo === "tipo_actividad" ? tipoTexto(v.despues) : (v.despues ?? "—")] as [string, string, string])
+      : d.tipo === "nuevo"
       ? [
           ["Nombre", "No existe", l.nombre ?? "—"],
           ["Tipo", "—", tipoPedido ?? "—"],
@@ -82,7 +86,7 @@ function ComparacionLinea({ d, l }: { d: Detalle; l: Linea }) {
   return (
     <div className="gm-comparacion__linea">
       <h4>
-        {resumenLinea({ codigo: l.codigo, nombre: l.nombre })}
+        {resumenLinea({ codigo: l.codigo, nombre: d.tipo === "editar" ? (cat?.nombre ?? null) : l.nombre, codigo_nuevo: l.codigo_nuevo })}
         {l.origen_codigo && l.origen_periodo && (
           <small>
             {" "}
@@ -93,6 +97,8 @@ function ComparacionLinea({ d, l }: { d: Detalle; l: Linea }) {
       <p className="gm-fuente">
         {ficha?.carga_actdir ? `Vigente: catálogo del Master (ms_actdir), corte del ${fechaCorta(ficha.carga_actdir.corte)}.` : l.antes?.ficha?.sin_captura_catalogo ? "No había captura del catálogo del Master al pedirlo." : d.tipo === "nuevo" ? "Es una actividad nueva: no hay nada vigente con qué comparar." : "Sin datos del catálogo."}
       </p>
+      {d.tipo === "editar" && l.motivo && <p className="gm-nota">Motivo del cambio: {l.motivo}</p>}
+      {d.tipo === "editar" && l.codigo_nuevo && (ficha?.n_profesores ?? 0) > 0 && <p className="gm-impacto">Cambiar el código afecta a {ficha?.n_profesores} {ficha?.n_profesores === 1 ? "profesor" : "profesores"} que hoy lo tienen asignado.</p>}
       <div className="gm-tabla-envoltura">
         <table className="gm-tabla gm-tabla--cmp">
           <thead>
@@ -252,7 +258,7 @@ export function Detalle({ id, ctx, onCerrar }: { id: string; ctx: Contexto; onCe
           </button>
         </div>
         <h3 ref={titulo} tabIndex={-1}>
-          {TIPOS[d.tipo].nombre}: {d.lineas.map((l) => l.codigo ?? l.nombre ?? "sin código").slice(0, 3).join(", ")}
+          {TIPOS[d.tipo].nombre}: {d.lineas.map((l) => (l.codigo ? `${l.codigo}${l.codigo_nuevo ? ` → ${l.codigo_nuevo}` : ""}` : (l.nombre ?? "sin código"))).slice(0, 3).join(", ")}
           {d.lineas.length > 3 ? ` y ${d.lineas.length - 3} más` : ""}
         </h3>
         <PastillaAplicacion aplicacion={d.aplicacion} />
@@ -317,7 +323,10 @@ export function Detalle({ id, ctx, onCerrar }: { id: string; ctx: Contexto; onCe
               <h4>Actividades ({d.lineas.length})</h4>
               {d.lineas.map((l) => (
                 <details key={l.id} className="gm-linea-detalle" open={d.lineas.length === 1}>
-                  <summary>{resumenLinea({ codigo: l.codigo, nombre: l.nombre })}</summary>
+                  <summary>{resumenLinea({ codigo: l.codigo, nombre: l.nombre, codigo_nuevo: l.codigo_nuevo })}</summary>
+                  {d.tipo === "editar" && Object.keys(l.cambios ?? {}).length > 0 && (
+                    <p className="gm-nota">Cambia: {Object.keys(l.cambios).map((c) => c.replace("tipo_actividad", "tipo").replace("vinculacion", "vinculación")).join(", ")}.{l.motivo ? ` Motivo: ${l.motivo}` : ""}</p>
+                  )}
                   {(l.origen_codigo ?? l.codigo) ? (
                     <PanelCodigo periodo={l.origen_periodo ?? d.periodo} sede={l.origen_sede ?? d.sede} codigo={(l.origen_codigo ?? l.codigo)!} titulo="Hoy, según el Warehouse" />
                   ) : (

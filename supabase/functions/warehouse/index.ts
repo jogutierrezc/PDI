@@ -40,10 +40,15 @@
      estado_tarea { tarea: { id, pase } }        → { ok, estado: "ejecutando"|"listo"|"fallo", progreso?, nombre?, pase? }
          una consulta a task_state (< ~15 s). Si la sesión caducó abre otra y devuelve un `pase` nuevo.
      finalizar { modo: "cargar"|"sondear", tarea: { id, pase }, motivo? }
-                                                 → lo mismo que sondear / cargar
-         descarga el resultado de la tarea terminada, lo procesa y guarda.
+                                                 → lo mismo que sondear / cargar, o { ok, pendiente: true, estado, pase? }
+         descarga el resultado de la tarea terminada, lo procesa y guarda. Si la plataforma aún no entrega el
+         Excel, responde pendiente (no es un error): el navegador espera y vuelve a finalizar (con `pase` si llega).
      cancelar { tarea: { id, pase } }            → { ok }
          cierra la sesión de la tarea (la plataforma no tiene una acción de cancelar).
+
+   Resultados neutros (ok: true, no son errores; en cargar, sondear y finalizar):
+     { ok, neutro: "sin_datos", mensaje }            la plataforma no tiene registros (periodo o sede sin datos)
+     { ok, neutro: "galileo_no_responde", mensaje }  Galileo responde 5xx por dentro en esa sede
 
    El `pase` es la sesión de la plataforma (token y llave) cifrada con AES-GCM con una clave derivada de la
    clave de servicio: el navegador solo lo guarda y lo devuelve, no puede leerlo ni cambiarlo, está atado a
@@ -148,6 +153,32 @@ const PERMANENTE = "permanente";
 class ErrorPlataforma extends Error {}
 /** 401/403 de una sesión que se reutilizó: la sesión caducó; quien llama puede abrir otra y reintentar una vez. */
 class ErrorSesion extends ErrorPlataforma {}
+/**
+ * Resultado neutro: no es un fallo ni cuenta como error. «sin_datos»: la plataforma no tiene registros para esa consulta
+ * (a veces lo dice con un 401). «galileo_no_responde»: Galileo responde 5xx por dentro en esa sede.
+ */
+type TipoNeutro = "sin_datos" | "galileo_no_responde";
+class Neutro extends ErrorPlataforma {
+  constructor(
+    readonly tipo: TipoNeutro,
+    mensaje: string,
+  ) {
+    super(mensaje);
+  }
+}
+/** Acciones que pueden responder un resultado neutro (con ok: true). Las demás lo siguen mostrando como error. */
+const ACCIONES_NEUTRAS = ["cargar", "sondear", "finalizar"];
+
+/** Frases con las que la plataforma dice «no hay datos» (sin distinguir mayúsculas ni tildes). */
+const PATRONES_SIN_DATOS = [/no se encontr/, /\bno hay\b/, /sin resultados/, /sin datos/, /\bno existen? (?:datos|registros|resultados|estudiantes|informacion)\b/];
+/** Un mensaje que habla de permisos o de la sesión no es «sin datos», aunque diga «no hay». */
+function pareceSinDatos(texto: string): boolean {
+  const t = texto.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (/permis|autoriz|credencial|contrase|sesion|token/.test(t)) return false;
+  return PATRONES_SIN_DATOS.some((p) => p.test(t));
+}
+/** Un resultado «sin datos» con su frase para la persona (la frase cuenta lo que no hay) y el detalle de la plataforma. */
+const sinDatos = (frase: string, detalle = "") => new Neutro("sin_datos", `Sin datos en este periodo y sede: ${frase}.${detalle ? ` Detalle de la plataforma: «${detalle}».` : ""}`);
 
 const baseDe = (sede: string) => (ENV(SEDES[sede].variable) || SEDES[sede].porDefecto).replace(/\/+$/, "");
 
@@ -182,6 +213,13 @@ function errorHttp(d: Destino, estado: number, cuerpo: string, opciones: { sesio
   const detalle = extractoSeguro(cuerpo, 200);
   const nota = detalle ? ` Detalle de la plataforma: «${detalle}».` : "";
   const galileo = d.sistema === "galileo" ? " Es posible que Galileo no esté habilitado en esta sede." : "";
+  if (d.sistema === "galileo" && estado >= 500) {
+    return new Neutro("galileo_no_responde", `Galileo no responde en esta sede (${SEDES[d.sede].nombre}): respondió ${estado} por dentro, no es un fallo de esta función. Reintente más tarde; si se repite, avise a Galileo.${nota}`);
+  }
+  // Un 401 (o 400, 403…) con texto de «no hay datos» es un periodo o sede sin registros, no falta de permiso. El 404 y los 5xx no se miran.
+  if (estado !== 404 && estado < 500 && !opciones.inicioSesion && pareceSinDatos(cuerpo)) {
+    return sinDatos(`${donde} no tiene registros para esta consulta`, detalle);
+  }
   if (estado === 401 || estado === 403) {
     if (opciones.reutilizada) return new ErrorSesion(`La plataforma respondió ${estado} (${donde}): la sesión caducó.`);
     if (opciones.inicioSesion) return new ErrorPlataforma(`La plataforma respondió ${estado} al iniciar sesión (${donde}): no aceptó la cuenta de servicio.${nota}${galileo}`);
@@ -359,6 +397,7 @@ async function conSesionDePase<T>(pase: PaseDatos, limite: number, trabajo: (s: 
   try {
     return { valor: await trabajo(sesion), sesion, renovada: true };
   } catch (e) {
+    if (e instanceof Neutro) throw e;
     // Con la sesión nueva la plataforma puede no reconocer una tarea que empezó otra sesión: se dice, no se confunde con otro fallo.
     if (e instanceof ErrorPlataforma) throw new ErrorPlataforma(`${e.message} La sesión de la tarea caducó y se abrió otra; si la plataforma no reconoce la tarea con la sesión nueva, inicie la carga otra vez.`);
     throw e;
@@ -372,6 +411,7 @@ async function descargar(s: Sesion, p: Peticion): Promise<{ bytes: Uint8Array | 
   const { json: r, base64 } = await pedir(s, p, s);
   if (base64 && (r.code === undefined || r.code === 200)) return { bytes: base64ABytes(base64), tareaId: null };
   if (r.task_id) return { bytes: null, tareaId: String(r.task_id) };
+  if (typeof r.msg === "string" && pareceSinDatos(r.msg)) throw sinDatos(`${NOMBRE_SISTEMA[s.sistema]} de ${SEDES[s.sede].nombre}, reporte «${s.reporte ?? ""}», no tiene registros para esta consulta`, extractoSeguro(r.msg, 160));
   throw new ErrorPlataforma(
     typeof r.msg === "string" && r.msg.length > 0 && r.msg.length < 200
       ? `La plataforma dijo: «${extractoSeguro(r.msg, 160)}» (${NOMBRE_SISTEMA[s.sistema]} de ${SEDES[s.sede].nombre}, «${s.reporte ?? ""}»).`
@@ -434,7 +474,7 @@ async function obtenerFuente(r: Reporte, ctx: Contexto, s: Sesion): Promise<{ fu
         if (err instanceof ErrorSesion) throw err;
       }
     }
-    if (partes.length === 0) throw new ErrorPlataforma("Ningún edificio devolvió horarios.");
+    if (partes.length === 0) throw sinDatos(`ningún edificio de ${SEDES[s.sede].nombre} tiene horarios para este periodo`);
     return { fuente: fuenteDeHoja(juntar(partes, "edificio")), tareaId: null };
   }
   const d = await descargar(s, r.armar(ctx));
@@ -536,7 +576,7 @@ async function procesar(e: Entrega): Promise<Response> {
     if (err instanceof ErrorPlataforma) throw err;
     throw new ErrorPlataforma(`El reporte llegó con otra forma de la esperada (¿cambió en esta sede?): ${extractoSeguro(err, 140) || "no se pudo leer"}`);
   }
-  if (total === 0) throw new ErrorPlataforma("El reporte llegó sin filas.");
+  if (total === 0) throw sinDatos(`el reporte de ${SEDES[sede].nombre} llegó sin filas para ${periodo === PERMANENTE ? "este catálogo" : periodo}`);
 
   // El periodo que la plataforma dice haber entregado debe ser el pedido. Si el reporte no lo dice, un periodo distinto
   // del abierto solo se acepta cuando está probado; si el periodo va en el cuerpo, se rechaza; si va en la URL, queda sin confirmar.
@@ -724,9 +764,14 @@ Deno.serve(async (request: Request) => {
         const { json: j, base64 } = await pedir(s, rutaEstado, s);
         const e = estadoTarea(j);
         if (e.fallo) throw new ErrorPlataforma(`La plataforma no pudo generar el reporte «${pase!.conjunto}» en ${SEDES[pase!.sede].nombre}.`);
-        if (!base64) throw new ErrorPlataforma("La tarea aún no termina en la plataforma: espere unos segundos y vuelva a consultar su estado.");
-        return { bytes: base64ABytes(base64), nombre: e.nombre };
+        // Sin Excel todavía: no es un fallo. El navegador vuelve a finalizar (ver «pendiente» abajo).
+        return { bytes: base64 ? base64ABytes(base64) : null, nombre: e.nombre };
       });
+      if (!r.valor.bytes) {
+        // La sesión sigue viva para el próximo intento: no se cierra aquí (sesion queda null). Si se renovó, va el pase nuevo.
+        const nuevoPase = r.renovada ? await sellarPase({ ...pase, t: r.sesion.token, k: r.sesion.apiKey, ab: r.sesion.periodo, e: Date.now() + VIDA_PASE_MS }) : undefined;
+        return json({ ok: true, pendiente: true, estado: "ejecutando", pase: nuevoPase });
+      }
       sesion = r.sesion;
       const fuente = fuenteDe(reporte, r.valor.bytes);
       return await procesar({
@@ -856,6 +901,11 @@ Deno.serve(async (request: Request) => {
 
 /** El fallo de una acción como respuesta HTTP: mensaje para la persona y una línea limpia en los registros de la función. */
 function respuestaDeError(e: unknown, accion: string, conjunto?: string, sede?: string): Response {
+  // Sin datos o Galileo caído: no es un error de la función. Va con ok: true y `neutro`; la pantalla lo muestra aparte.
+  if (e instanceof Neutro && ACCIONES_NEUTRAS.includes(accion)) {
+    console.log(JSON.stringify({ funcion: "warehouse", accion, conjunto: conjunto ?? null, sede: sede ?? null, neutro: e.tipo }));
+    return json({ ok: true, neutro: e.tipo, mensaje: e.message, conjunto: conjunto ?? null, sede: sede ?? null });
+  }
   const propio = e instanceof ErrorPlataforma;
   const motivo = extractoSeguro(e instanceof Error ? e.message : e, 200);
   console.error(JSON.stringify({ funcion: "warehouse", accion, conjunto: conjunto ?? null, sede: sede ?? null, tipo: propio ? "plataforma" : e instanceof Error ? e.name : "desconocido", motivo }));

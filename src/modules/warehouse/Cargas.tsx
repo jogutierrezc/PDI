@@ -18,6 +18,7 @@ import {
   usePoliticas,
   whKeys,
   type Cobertura,
+  type ResultadoNeutro,
   type Sonda,
 } from "./store";
 import type { Contexto } from "./Warehouse";
@@ -26,12 +27,17 @@ const fecha = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
 type EstadoLote = {
-  estado: "espera" | "cola" | "en curso" | "ok" | "igual" | "error" | "cancelada";
+  estado: "espera" | "cola" | "en curso" | "ok" | "igual" | "sin datos" | "galileo" | "error" | "cancelada";
   /** Lo corto que cabe en la celda. */
   texto: string;
   /** El mensaje completo del error, para el detalle de abajo y el tooltip. */
   detalle?: string;
 };
+
+/** Lo que se muestra cuando la plataforma no entregó datos o Galileo no responde (cuando la función no dio su propio mensaje). */
+function textoNeutro(tipo: ResultadoNeutro) {
+  return tipo === "galileo_no_responde" ? "Galileo no responde en esta sede." : "Sin datos en este periodo y sede.";
+}
 
 /** Cupo para los reportes pesados: de a `max` a la vez entre todas las sedes. */
 function crearCupo(max: number) {
@@ -70,7 +76,7 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
   const [archivo, setArchivo] = useState<{ nombre: string; hoja: Hoja } | null>(null);
   const [sobre, setSobre] = useState(false);
   const [avance, setAvance] = useState<{ texto: string; hecho: number; total: number } | null>(null);
-  const [resultado, setResultado] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+  const [resultado, setResultado] = useState<{ tipo: "ok" | "neutro" | "error"; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   // Para cancelar lo que se está trayendo (la espera de una tarea o las celdas que faltan del lote).
   const control = useRef<AbortController | null>(null);
@@ -154,6 +160,10 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
         { conjunto: conjunto.id, sede, periodo, corte: corteDeCarga, motivo },
         { signal: ctl.signal, alAvance: (texto) => setAvance({ texto, hecho: 0, total: 1 }) },
       );
+      if (r.neutro) {
+        setResultado({ tipo: "neutro", texto: `${r.mensaje ?? textoNeutro(r.neutro)} No se guardó nada.` });
+        return;
+      }
       setResultado({
         tipo: "ok",
         texto: r.duplicada
@@ -182,7 +192,8 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
     setCancelable(true);
     try {
       const r = await sondearServidor({ conjunto: conjunto.id, sede, periodo, corte: corteDeCarga }, { signal: ctl.signal, alAvance: (texto) => setAvance({ texto, hecho: 0, total: 1 }) });
-      setSonda(r);
+      if (r.neutro) setResultado({ tipo: "neutro", texto: r.mensaje ?? textoNeutro(r.neutro) });
+      else setSonda(r);
     } catch (e) {
       setResultado(esCancelacion(e) ? { tipo: "ok", texto: "Cancelado." } : { tipo: "error", texto: mensajeDe(e) });
     } finally {
@@ -238,6 +249,14 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                 { conjunto: id, sede: s, periodo, corte: "", motivo: "" },
                 { signal: ctl.signal, alAvance: (texto) => poner(clave, { estado: "en curso", texto }) },
               );
+              if (r.neutro === "sin_datos") {
+                poner(clave, { estado: "sin datos", texto: "Sin datos en este periodo y sede", detalle: r.mensaje });
+                continue;
+              }
+              if (r.neutro === "galileo_no_responde") {
+                poner(clave, { estado: "galileo", texto: "Galileo no responde en esta sede", detalle: r.mensaje });
+                continue;
+              }
               poner(
                 clave,
                 r.duplicada
@@ -419,7 +438,7 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
               </div>
             )}
             {resultado && (
-              <p className={resultado.tipo === "ok" ? "wh-aviso wh-aviso--verde" : "wh-aviso wh-aviso--rojo"} role={resultado.tipo === "error" ? "alert" : "status"}>
+              <p className={resultado.tipo === "ok" ? "wh-aviso wh-aviso--verde" : resultado.tipo === "neutro" ? "wh-aviso wh-aviso--ambar" : "wh-aviso wh-aviso--rojo"} role={resultado.tipo === "error" ? "alert" : "status"}>
                 {resultado.texto}
               </p>
             )}
@@ -605,7 +624,7 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                           return (
                             <td key={s}>
                               {e && (
-                                <span className="wh-etiqueta" data-t={e.estado === "ok" || e.estado === "igual" ? "ok" : e.estado === "error" ? "error" : undefined} title={e.detalle ?? e.texto}>
+                                <span className="wh-etiqueta" data-t={e.estado === "ok" || e.estado === "igual" ? "ok" : e.estado === "error" ? "error" : e.estado === "galileo" ? "sin_politica" : undefined} title={e.detalle ?? e.texto}>
                                   {e.texto}
                                 </span>
                               )}
@@ -624,6 +643,8 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
           <div className="wh-panel__cuerpo" style={{ display: "grid", gap: "var(--space-3)" }}>
             <p className={pendientes.length ? "wh-aviso wh-aviso--ambar" : "wh-aviso wh-aviso--verde"} role="status">
               Terminó: {resumen.ok ?? 0} bien, {resumen.igual ?? 0} sin cambios, {resumen.error ?? 0} con error
+              {resumen["sin datos"] ? `, ${resumen["sin datos"]} sin datos en este periodo y sede` : ""}
+              {resumen.galileo ? `, ${resumen.galileo} con Galileo sin responder` : ""}
               {resumen.cancelada ? `, ${resumen.cancelada} canceladas` : ""}.
             </p>
             {pendientes.length > 0 && (

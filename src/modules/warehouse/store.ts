@@ -373,7 +373,13 @@ export interface ResultadoCarga {
   periodo?: string;
   /** false: el reporte no dice de qué periodo es y se guardó con el pedido (solo pasa cuando la plataforma recibe el periodo en la URL). */
   confirmado?: boolean;
+  /** Resultado neutro (no se guardó nada y no es un error): sin datos en ese periodo y sede, o Galileo no responde. */
+  neutro?: ResultadoNeutro;
+  mensaje?: string;
 }
+
+/** «sin_datos»: la plataforma no tiene registros; «galileo_no_responde»: Galileo responde 5xx por dentro en esa sede. */
+export type ResultadoNeutro = "sin_datos" | "galileo_no_responde";
 
 export type Avance = (texto: string, hecho: number, total: number) => void;
 
@@ -606,6 +612,32 @@ async function esperarTarea(tarea: TareaServidor, op: OpcionesPedido): Promise<T
 }
 
 /**
+ * Descarga y guarda la tarea terminada. Si la plataforma todavía no entrega el Excel, la función responde `pendiente`:
+ * eso no es un error, así que se espera PAUSA_TAREA_MS y se vuelve a finalizar, con el mismo tope de espera.
+ */
+async function finalizarTarea<T>(tarea: TareaServidor, cuerpo: { modo: "cargar" | "sondear"; motivo?: string }, op: OpcionesPedido): Promise<T> {
+  const inicio = Date.now();
+  let actual = tarea;
+  for (;;) {
+    if (op.signal?.aborted) {
+      await invocar({ action: "cancelar", tarea: { id: actual.id, pase: actual.pase } }).catch(() => undefined);
+      throw new FinDeTarea("Cancelado.", true);
+    }
+    const r = await invocar<T & { pendiente?: boolean; pase?: string }>({ action: "finalizar", ...cuerpo, tarea: { id: actual.id, pase: actual.pase } });
+    if (!r.pendiente) return r as T;
+    if (r.pase) actual = { ...actual, pase: r.pase };
+    if (Date.now() - inicio > ESPERA_TAREA_MS) {
+      await invocar({ action: "cancelar", tarea: { id: actual.id, pase: actual.pase } }).catch(() => undefined);
+      throw new FinDeTarea(
+        `La plataforma marcó «${actual.conjunto}» como lista, pero no entregó el Excel tras ${Math.round(ESPERA_TAREA_MS / 60_000)} minutos. Reintente; si se repite, descargue el Excel en la plataforma y cárguelo a mano.`,
+      );
+    }
+    op.alAvance?.("La plataforma está terminando de preparar el reporte…");
+    await dormir(PAUSA_TAREA_MS, op.signal);
+  }
+}
+
+/**
  * Pide un reporte a la plataforma. Los de entrega directa vuelven en una sola llamada; los de tarea se inician,
  * se siguen desde aquí y se finalizan (descargar, procesar y guardar).
  */
@@ -615,7 +647,7 @@ export async function cargarDesdeServidor(p: PedidoServidor, op: OpcionesPedido 
   if (!r.tarea) return r;
   const lista = await esperarTarea(r.tarea, op);
   op.alAvance?.("Descargando y guardando el reporte");
-  return invocar<ResultadoCarga & { ok: boolean }>({ action: "finalizar", modo: "cargar", tarea: { id: lista.id, pase: lista.pase }, motivo: p.motivo });
+  return finalizarTarea<ResultadoCarga & { ok: boolean }>(lista, { modo: "cargar", motivo: p.motivo }, op);
 }
 /** Pide el reporte y devuelve solo los nombres de sus columnas: no guarda nada ni muestra filas. */
 export interface Sonda {
@@ -635,6 +667,8 @@ export interface Sonda {
   descartadas?: string[];
   otroReporte?: boolean;
   avisos?: string[];
+  neutro?: ResultadoNeutro;
+  mensaje?: string;
 }
 export async function sondearServidor(p: Omit<PedidoServidor, "motivo">, op: OpcionesPedido = {}): Promise<Sonda> {
   op.alAvance?.("Pidiendo el reporte a la plataforma");
@@ -642,7 +676,7 @@ export async function sondearServidor(p: Omit<PedidoServidor, "motivo">, op: Opc
   if (!r.tarea) return r;
   const lista = await esperarTarea(r.tarea, op);
   op.alAvance?.("Leyendo las columnas del reporte");
-  return invocar<Sonda>({ action: "finalizar", modo: "sondear", tarea: { id: lista.id, pase: lista.pase } });
+  return finalizarTarea<Sonda>(lista, { modo: "sondear" }, op);
 }
 
 export interface PeriodosPlataforma {

@@ -1,0 +1,1420 @@
+<title>Gestión Master</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<style>
+/* Concepto: la mesa de revisión. Una bandeja que se lee como una lista de expedientes, con el detalle al lado y el
+   flujo siempre a la vista. Misma familia visual que las propuestas de UDrive e Informes (navy, banda azul, señal naranja).
+   Tema claro único, por decisión del proyecto. */
+:root {
+  --navy: #072b58;
+  --band: #4078b9;
+  --signal: #e8892b;
+  --ink: #16243a;
+  --ink-2: #4a5a70;
+  --ink-3: #5d6c80;
+  --rule: #d6dee8;
+  --paper: #eef3f9;
+  --desk: #f4f7fb;
+  --white: #ffffff;
+  --good: #12633a;
+  --good-bg: #e4f3ea;
+  --warn: #8a5d00;
+  --warn-bg: #fbf2e0;
+  --bad: #a02525;
+  --bad-bg: #fbeaea;
+  --info-bg: #e3edf9;
+  --back: #5a3a86;
+  --back-bg: #efe9f7;
+  --ui: "Open Sans", system-ui, "Segoe UI", sans-serif;
+  --disp: "Montserrat", "Open Sans", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --d-fast: 140ms;
+  --d-base: 220ms;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--desk); color: var(--ink); font: 400 15px/1.55 var(--ui); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 90; background: var(--navy); }
+h1, h2, h3, h4 { font-family: var(--disp); color: var(--navy); margin: 0; text-wrap: balance; letter-spacing: -0.012em; }
+h1 { font-size: clamp(1.7rem, 1.2rem + 2vw, 2.6rem); font-weight: 800; line-height: 1.08; }
+h2 { font-size: clamp(1.3rem, 1.1rem + 0.9vw, 1.7rem); font-weight: 800; line-height: 1.15; }
+h3 { font-size: 1.05rem; font-weight: 700; line-height: 1.25; }
+h4 { font-size: 0.92rem; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--navy); }
+code, .mono { font-family: var(--mono); font-size: 0.86em; background: var(--paper); padding: 1px 5px; border-radius: 2px; overflow-wrap: anywhere; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--band); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.kicker { font: 700 11px/1 var(--disp); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+.muted { color: var(--ink-2); }
+small, .small { font-size: 12.5px; color: var(--ink-3); }
+.skip { position: absolute; left: -999px; top: 8px; background: var(--navy); color: #fff; padding: 8px 12px; z-index: 95; }
+.skip:focus { left: 8px; }
+
+.shell { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 0 36px; }
+.guide { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; padding-block: 28px; font-size: 13.5px; }
+.guide ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; }
+.guide a { display: block; text-decoration: none; color: var(--ink-2); padding: 6px 10px; border-radius: 3px; transition: background-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease); }
+.guide a[aria-current="true"] { background: var(--navy); color: #fff; }
+@media (hover: hover) and (pointer: fine) { .guide a:hover:not([aria-current="true"]) { background: var(--paper); color: var(--navy); } }
+main { min-width: 0; padding-block: 28px 80px; }
+.top { display: grid; gap: 14px; padding-bottom: 28px; border-bottom: 1px solid var(--rule); }
+.top .lead { max-width: 70ch; font-size: 16px; color: var(--ink-2); }
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 28px; margin-top: 8px; }
+.decisions div { border-top: 2px solid var(--navy); padding-top: 8px; font-size: 13.5px; color: var(--ink-2); }
+.decisions strong { display: block; font: 700 13px/1.3 var(--disp); color: var(--navy); margin-bottom: 2px; }
+section.sec { padding-top: 56px; scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+section.sec > header { display: grid; gap: 8px; margin-bottom: 20px; }
+section.sec > header p { max-width: 72ch; color: var(--ink-2); }
+section.sec h3 { margin: 26px 0 8px; }
+.sample { display: inline-block; font: 600 11px/1 var(--ui); color: var(--warn); background: var(--warn-bg); padding: 4px 7px; border-radius: 2px; }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .guide { position: static; padding-block: 16px 0; }
+  .guide ol { display: flex; flex-wrap: wrap; gap: 4px; }
+  .guide a { border: 1px solid var(--rule); background: #fff; }
+}
+
+/* Controles */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 7px 14px; border-radius: 3px; border: 1px solid var(--navy); background: var(--navy); color: #fff; font-weight: 600; font-size: 14px; transition: transform 140ms var(--ease), background-color var(--d-fast) var(--ease), opacity var(--d-fast) var(--ease); }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn.ghost { background: #fff; color: var(--navy); border-color: var(--rule); }
+.btn.ok { background: var(--good); border-color: var(--good); }
+.btn.bad { background: #fff; color: var(--bad); border-color: #d9a3a3; }
+.btn.sm { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .btn:hover:not(:disabled) { background: var(--band); border-color: var(--band); color: #fff; } .btn.bad:hover:not(:disabled) { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); } }
+.fld { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-3); min-width: 0; }
+.fld select, .fld input, .fld textarea { min-height: 36px; border: 1px solid #b9c5d4; border-radius: 3px; background: #fff; padding: 5px 9px; font-size: 14px; color: var(--ink); width: 100%; min-width: 0; }
+.fld textarea { min-height: 74px; resize: vertical; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font: 600 11.5px/1 var(--ui); padding: 4px 8px; border-radius: 2px; white-space: nowrap; background: var(--paper); color: var(--ink-2); }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.pend { background: var(--warn-bg); color: var(--warn); }
+.pill.rev { background: var(--info-bg); color: var(--navy); }
+.pill.dev { background: var(--back-bg); color: var(--back); }
+.pill.apr, .pill.ok { background: var(--good-bg); color: var(--good); }
+.pill.rec, .pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.src { background: #fff; border: 1px solid var(--rule); color: var(--navy); }
+.pill.src.sol { border-style: dashed; color: var(--warn); }
+.pill.nuevo, .pill.prop { background: #fff; border: 1px dashed var(--band); color: var(--navy); }
+.pill.cons { background: var(--paper); color: var(--ink-2); }
+
+.tblwrap { overflow-x: auto; border: 1px solid var(--rule); background: #fff; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 700 11px/1.2 var(--disp); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); background: var(--paper); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px 36px; }
+.two > * { min-width: 0; }
+.cols4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0; border: 1px solid var(--rule); background: #fff; }
+.cols4 > div { padding: 14px 16px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); min-width: 0; }
+.cols4 h4 { margin-bottom: 6px; }
+.cols4 ul, .plain ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: 13.5px; color: var(--ink-2); }
+.notice { background: var(--warn-bg); color: #5c3f00; padding: 10px 14px; font-size: 13.5px; border-radius: 2px; }
+.notice.info { background: var(--info-bg); color: var(--navy); }
+.dudas { margin: 0; padding-left: 1.4em; display: grid; gap: 10px; max-width: 78ch; }
+.dudas li::marker { font: 700 13px var(--disp); color: var(--navy); }
+
+/* Maqueta */
+.app { border: 1px solid #aebbd0; background: var(--white); border-radius: 4px; overflow: hidden; }
+.app-top { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: end; padding: 12px 16px; background: var(--navy); color: #fff; }
+.app-top .brand { margin-right: auto; display: grid; gap: 2px; min-width: 160px; }
+.app-top .brand small { color: #b9cbe4; }
+.app-top .brand b { font: 800 16px/1.1 var(--disp); }
+.app-top .fld { color: #b9cbe4; min-width: 130px; }
+.app-top .fld select { background: #0d3a73; color: #fff; border-color: #35609b; }
+.scope { padding: 8px 16px; font-size: 13px; background: var(--paper); color: var(--ink-2); border-bottom: 1px solid var(--rule); }
+.tabs { display: flex; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--rule); background: #fff; scrollbar-width: thin; }
+.tabs button { flex: none; border: 0; border-bottom: 3px solid transparent; background: none; padding: 11px 15px; font: 600 13.5px var(--ui); color: var(--ink-2); transition: color var(--d-fast) var(--ease), background-color var(--d-fast) var(--ease); }
+.tabs button[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--signal); font-weight: 700; }
+@media (hover: hover) and (pointer: fine) { .tabs button:hover { background: var(--paper); } }
+.panel { padding: 16px; min-width: 0; }
+.panel[hidden] { display: none; }
+.counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--rule); margin-bottom: 14px; }
+.counters div { padding: 10px 14px; border-right: 1px solid var(--rule); }
+.counters div:last-child { border-right: 0; }
+.counters b { display: block; font: 800 26px/1.1 var(--disp); color: var(--navy); font-variant-numeric: tabular-nums; }
+.counters span { font-size: 12.5px; color: var(--ink-3); }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.bandeja { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.listcol { min-width: 0; }
+.bulk { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 8px 12px; background: var(--info-bg); border: 1px solid #b3cbe8; margin-bottom: 8px; font-size: 13.5px; }
+.bulk .grow { margin-right: auto; }
+.bulkform { display: grid; gap: 8px; padding: 10px 12px; background: #fff; border: 1px solid #b3cbe8; border-top: 0; margin: -8px 0 8px; }
+.listhead { display: flex; align-items: center; gap: 10px; padding: 6px 4px; font-size: 12.5px; color: var(--ink-3); }
+ul.rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.r { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid var(--rule); background: #fff; transition: background-color var(--d-fast) var(--ease); }
+.r[data-sel="true"] { background: var(--info-bg); }
+.r[data-open="true"] { box-shadow: inset 0 0 0 2px var(--band); }
+.r .ck { display: grid; place-items: center; align-self: stretch; cursor: pointer; }
+.r .ck input { width: 18px; height: 18px; accent-color: var(--navy); }
+.ro { all: unset; box-sizing: border-box; display: grid; gap: 2px; padding: 9px 4px; cursor: pointer; min-width: 0; }
+.ro:focus-visible { outline: 3px solid var(--band); outline-offset: -3px; }
+.r1 { font-size: 14px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.r1 .folio { font: 600 12px var(--mono); color: var(--ink-3); margin-right: 6px; }
+.r2 { font-size: 12.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.rside { display: grid; justify-items: end; gap: 3px; padding: 6px 12px 6px 6px; text-align: right; font-size: 12px; color: var(--ink-3); }
+@media (hover: hover) and (pointer: fine) { .r:hover:not([data-sel="true"]) { background: var(--desk); } }
+.late { color: var(--bad); font-weight: 700; }
+.soon { color: var(--warn); font-weight: 700; }
+.empty { padding: 32px 16px; text-align: center; border: 1px dashed #aebbd0; background: var(--desk); display: grid; gap: 8px; justify-items: center; }
+.empty p { max-width: 52ch; color: var(--ink-2); }
+.skel { height: 52px; border-bottom: 1px solid var(--rule); background: #fff; display: grid; gap: 6px; padding: 10px 12px; }
+.skel i { display: block; height: 10px; background: var(--paper); border-radius: 2px; }
+.skel i:first-child { width: 60%; } .skel i:last-child { width: 38%; }
+@media (prefers-reduced-motion: no-preference) { .skel i { animation: pulse 1.2s ease-in-out infinite; } }
+@keyframes pulse { 50% { opacity: 0.45; } }
+
+.detail { display: none; background: #fff; border: 1px solid #aebbd0; min-width: 0; }
+.bandeja.has-detail .detail { display: flex; flex-direction: column; position: fixed; z-index: 80; inset: 0 0 0 auto; width: min(480px, 100%); padding-top: env(safe-area-inset-top, 0px); box-shadow: -12px 0 32px rgba(7,43,88,0.18); }
+.detail-back { position: fixed; inset: 0; z-index: 79; background: rgba(7,43,88,0.35); }
+.detail-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--rule); display: grid; gap: 6px; }
+.detail-head .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.detail-head h3 { margin: 0; font-size: 1.05rem; }
+.detail-body { flex: 1; overflow-y: auto; padding: 12px 16px; min-height: 0; }
+.detail-foot { border-top: 1px solid var(--rule); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; background: var(--desk); position: relative; }
+.detail-foot .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.confirm { display: grid; gap: 8px; background: #fff; border: 1px solid var(--rule); padding: 10px; }
+.confirm .cnt { font-size: 12px; color: var(--ink-3); }
+.stamp { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(255,255,255,0.94); font: 800 17px var(--disp); color: var(--good); text-align: center; padding: 12px; opacity: 0; pointer-events: none; }
+.stamp.dev { color: var(--back); } .stamp.rec { color: var(--bad); }
+@media (min-width: 1360px) {
+  .bandeja.has-detail { grid-template-columns: minmax(0, 1fr) 430px; }
+  .bandeja.has-detail .detail { position: sticky; top: 12px; inset: auto; z-index: 1; width: auto; max-height: calc(100vh - 24px); padding-top: 0; box-shadow: none; }
+  .detail-back { display: none; }
+}
+dl.kv { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 13.5px; }
+dl.kv dt { color: var(--ink-3); } dl.kv dd { margin: 0; overflow-wrap: anywhere; }
+.just { background: var(--desk); padding: 10px 12px; font-size: 13.5px; margin: 10px 0; }
+.cmp td.chg { background: var(--warn-bg); font-weight: 600; }
+.cmp td.chg::after { content: "  ← cambia"; font-weight: 400; font-size: 11px; color: var(--warn); }
+.hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.hist li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; padding-bottom: 12px; position: relative; font-size: 13.5px; }
+.hist li::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--navy); margin-top: 6px; justify-self: center; }
+.hist li::after { content: ""; position: absolute; left: 6.5px; top: 16px; bottom: -4px; width: 1px; background: var(--rule); }
+.hist li:last-child::after { display: none; }
+.hist time { font-size: 12px; color: var(--ink-3); display: block; }
+.subtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); margin-bottom: 10px; overflow-x: auto; }
+.subtabs button { border: 0; background: none; padding: 7px 11px; font: 600 13px var(--ui); color: var(--ink-2); border-bottom: 2px solid transparent; flex: none; }
+.subtabs button[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--signal); }
+.cmt { padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+.bar { height: 8px; background: var(--paper); position: relative; }
+.bar i { position: absolute; inset: 0; background: var(--band); transform-origin: left center; display: block; }
+.bar i.warn { background: var(--signal); } .bar i.bad { background: #b32d2d; } .bar i.good { background: #2b8a57; }
+.bar .mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--navy); }
+.tree .grp td { background: var(--paper); font-weight: 700; color: var(--navy); }
+.tgl { all: unset; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; padding: 2px 4px; }
+.tgl:focus-visible { outline: 3px solid var(--band); }
+.tgl::before { content: "▸"; display: inline-block; transition: transform 140ms var(--ease); }
+.tgl[aria-expanded="true"]::before { transform: rotate(90deg); }
+.viewsw { display: inline-flex; border: 1px solid var(--rule); }
+.viewsw button { border: 0; background: #fff; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.viewsw button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin-bottom: 12px; }
+.toolbar .fld { min-width: 150px; }
+.bucket { display: grid; gap: 6px; align-content: start; }
+.bucket ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.bucket li button { all: unset; cursor: pointer; display: block; padding: 4px 6px; width: 100%; box-sizing: border-box; border: 1px solid var(--rule); background: #fff; overflow-wrap: anywhere; }
+.bucket li button:focus-visible { outline: 3px solid var(--band); }
+.steps { display: flex; gap: 0; align-items: flex-start; margin: 14px 0; overflow-x: auto; padding-bottom: 6px; }
+.stp { flex: 1 0 120px; min-width: 120px; display: grid; gap: 6px; justify-items: start; position: relative; padding-right: 8px; }
+.stp .dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--rule); background: #fff; display: grid; place-items: center; font: 700 12px var(--disp); color: var(--ink-3); z-index: 1; position: relative; }
+.stp.done .dot { background: var(--good); border-color: var(--good); color: #fff; }
+.stp.cur .dot { border-color: var(--signal); color: var(--ink); background: #fff; }
+.stp .line { position: absolute; left: 26px; right: 0; top: 12px; height: 2px; background: var(--rule); }
+.stp .line i { position: absolute; inset: 0; background: var(--good); transform-origin: left center; transform: scaleX(0); display: block; }
+.stp.done .line i { transform: scaleX(1); }
+.stp:last-child .line { display: none; }
+.stp b { font-size: 13px; line-height: 1.25; } .stp span.s { font-size: 12px; color: var(--ink-3); }
+.builder { display: grid; gap: 0; border: 1px solid var(--rule); }
+.bstep { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 10px; padding: 12px; border-bottom: 1px solid var(--rule); background: #fff; }
+.bstep:last-child { border-bottom: 0; }
+.bstep .n { font: 800 18px var(--disp); color: var(--navy); }
+.bgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 10px; }
+.bact { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+
+/* Diagramas */
+svg.dg { width: 100%; height: auto; display: block; font-family: var(--ui); }
+.dgwrap { overflow-x: auto; border: 1px solid var(--rule); background: #fff; padding: 8px; }
+.dgwrap svg { min-width: 760px; }
+svg .bx { fill: #fff; stroke: var(--navy); stroke-width: 1.5; }
+svg .bx.new { stroke-dasharray: 5 4; stroke: var(--band); }
+svg .bx.neg { stroke: var(--bad); }
+svg .bx.mute { fill: var(--paper); stroke: #8e9db3; stroke-dasharray: 3 3; }
+svg .t { font-size: 13px; font-weight: 700; fill: var(--navy); }
+svg .s { font-size: 11px; fill: var(--ink-2); }
+svg .ar { stroke: var(--navy); stroke-width: 1.5; fill: none; }
+svg .ar.d { stroke-dasharray: 5 4; stroke: var(--ink-3); }
+svg .lb { font-size: 11px; fill: var(--ink-2); }
+svg .num { font-size: 10px; font-weight: 700; fill: #fff; }
+svg .nd { cursor: pointer; }
+svg .nd:focus-visible { outline: 3px solid var(--band); }
+svg .nd.on .bx { stroke: var(--signal); stroke-width: 3; }
+.map { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0; border: 1px solid var(--rule); background: #fff; }
+.map a { padding: 12px 14px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); text-decoration: none; display: grid; gap: 3px; align-content: start; }
+.map a b { font: 700 14px var(--disp); color: var(--navy); }
+.map a span { font-size: 12.5px; color: var(--ink-2); }
+@media (hover: hover) and (pointer: fine) { .map a:hover { background: var(--paper); } }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 14px; background: var(--navy); color: #fff; font-size: 13.5px; margin-bottom: 14px; }
+.path b { font: 700 13.5px var(--disp); } .path i { font-style: normal; color: #8fb0dc; }
+ol.seq { margin: 8px 0 0; padding-left: 1.3em; display: grid; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+ol.seq li[aria-current="step"] { color: var(--navy); font-weight: 700; }
+.fase { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 4px 18px; padding: 12px 0; border-top: 1px solid var(--rule); }
+.fase h4 { color: var(--navy); }
+@media (max-width: 560px) { .fase { grid-template-columns: minmax(0, 1fr); } dl.kv { grid-template-columns: minmax(0, 1fr); gap: 0; } dl.kv dd { margin-bottom: 6px; } .r { grid-template-columns: 2.2rem minmax(0, 1fr); } .rside { grid-column: 2; justify-items: start; text-align: left; padding: 0 8px 8px 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } }
+</style>
+
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="shell">
+<nav class="guide" aria-label="Secciones de la propuesta">
+  <span class="kicker">Propuesta</span>
+  <ol id="guide">
+    <li><a href="#resumen">Resumen</a></li>
+    <li><a href="#rua">Qué hay en Rua</a></li>
+    <li><a href="#flujo">Flujo de aprobación</a></li>
+    <li><a href="#arquitectura">Arquitectura</a></li>
+    <li><a href="#maqueta">Maqueta</a></li>
+    <li><a href="#roles">Roles y reglas</a></li>
+    <li><a href="#warehouse">Conexión Warehouse</a></li>
+    <li><a href="#movimiento">Movimiento</a></li>
+    <li><a href="#accesibilidad">Accesibilidad</a></li>
+    <li><a href="#tecnica">Recomendación técnica</a></li>
+    <li><a href="#dudas">Dudas</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+<div class="top" id="resumen">
+  <span class="kicker">Propuesta para aprobar · Planeación UDES</span>
+  <h1>Gestión Master, en la categoría Actividades de Apoyo</h1>
+  <p class="lead">Rua tenía un segmento de Actividades con estructura, solicitudes, flujo de firmas y seguimiento. Esta propuesta lo recrea en el portal como un módulo que revisan los directivos y vicerrectores, lee del Warehouse lo que ya se captura del Master y deja registrado en el portal cada solicitud y cada decisión.</p>
+  <div class="decisions">
+    <div><strong>El portal lee del Master, no escribe</strong>Un cambio aprobado se convierte en una tarea para Planeación. La siguiente captura del Warehouse confirma si el Master ya lo refleja.</div>
+    <div><strong>Cada decisión lleva su nota</strong>Como en Rua, aprobar también exige un motivo escrito. Se añade «devolver con nota» y la aprobación en bloque.</div>
+    <div><strong>El acceso sale de un permiso del rol</strong>No de la capacidad global. Es la lección de Informes, aplicada desde el primer día.</div>
+    <div><strong>Los docentes aparecen como seudónimo</strong>La política del Warehouse no cambia: ningún nombre ni documento llega a la bandeja.</div>
+  </div>
+  <p class="small">Todo lo que se ve en la maqueta (solicitudes, personas, cifras, cortes) es <span class="sample">Ejemplo</span> inventado para esta propuesta. Los hallazgos sobre Rua y el Warehouse salen del código de ambos proyectos.</p>
+</div>
+
+<!-- ============ RUA ============ -->
+<section class="sec" id="rua">
+  <header>
+    <span class="kicker">Lo que encontré</span>
+    <h2>Cómo funciona hoy el segmento de Actividades de Rua</h2>
+    <p>Revisé las pantallas, las migraciones y los textos de Rua (React con Supabase). El segmento tiene siete piezas. La última columna dice qué hago con cada una.</p>
+  </header>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Pieza en Rua</th><th>Cómo funciona hoy</th><th>En Gestión Master</th></tr></thead>
+    <tbody>
+    <tr><td><b>Estructura de Actividades</b><br><code>/actividades</code></td><td>Árbol de tres niveles: principal, directa y de apoyo. Cada actividad tiene código único, nomenclatura, estado (borrador, activa, en revisión, archivada) y las vicerrectorías con acceso. Se importa y exporta en Excel y CSV, y se archiva por ramas. La búsqueda muestra las coincidencias con sus ancestros.</td><td><span class="pill cons">Se conserva</span> el árbol y la búsqueda. <span class="pill prop">Cambia</span> que el vigente viene del Master y se edita como propuesta.</td></tr>
+    <tr><td><b>Solicitudes</b><br><code>/solicitudes</code></td><td>Pedidos de crear, editar o eliminar. Un expediente puede tocar varias actividades del mismo pilar. Folio <code>REQ-AAAA-NNNN</code>, prioridad normal, alta o urgente, justificación de 150 a 2000 caracteres. Estados: borrador, pendiente, en revisión, aprobada, denegada, cancelada. La bandeja filtra por texto, estado y tipo.</td><td><span class="pill cons">Se conserva</span> el expediente de varias actividades, el folio y la justificación mínima. <span class="pill nuevo">Nuevo</span> filtros por periodo, sede, departamento y solicitante, y selección múltiple.</td></tr>
+    <tr><td><b>Flujo de validación</b><br><code>/flujo</code></td><td>Cadena de etapas que el administrador configura: qué etapas, en qué orden y qué permiso firma cada una. Por defecto: Vicerrectoría Administrativa y Financiera, Auditoría y creación en plataforma. Toda decisión exige justificación, también aprobar. Una denegación corta la cadena. Nadie firma su propia solicitud. La administración puede resolver saltando etapas, con una justificación por cada rol y una marca visible.</td><td><span class="pill cons">Se conserva</span> la lógica completa. <span class="pill prop">Propuesta</span> pasos nuevos: directivo, vicerrector, Planeación.</td></tr>
+    <tr><td><b>Seguimiento</b><br><code>/solicitudes/:id</code></td><td>El Rua Tracker cuenta la historia al solicitante: carril de firmas, comentarios y un plazo normativo de 15 días hábiles. El revisor ve una versión reducida del carril.</td><td><span class="pill cons">Se conserva</span>. <span class="pill nuevo">Nuevo</span> tablero de vencimientos y tiempos por aprobador.</td></tr>
+    <tr><td><b>Visibilidad</b></td><td>Se ve lo que se tiene que firmar, y se sigue viendo después de firmado. Nació de un error: las oficinas que firmaban veían la bandeja vacía.</td><td><span class="pill cons">Se conserva</span> como regla del módulo.</td></tr>
+    <tr><td><b>Actividades del periodo</b><br><code>/actividades/periodo</code></td><td>Tabla de solo lectura de <code>actividad_periodo</code>: estado (planificada, en curso, realizada, aprobada, cancelada), un responsable y quién aprobó. Sin horas, sin varios docentes y sin sede.</td><td><span class="pill prop">Se reemplaza</span> por los datos del Warehouse por periodo y sede.</td></tr>
+    <tr><td><b>Correo, notificaciones y auditoría</b></td><td>Plantillas de correo editables con variables (folio, tipo, estado, solicitante, unidad, actividad, justificación, periodo). Notificaciones internas y bitácora.</td><td><span class="pill cons">Se reutiliza</span> el módulo de correos del portal y una bitácora propia del módulo.</td></tr>
+    </tbody></table></div>
+  <h3>Lo que no encontré en Rua</h3>
+  <div class="plain"><ul>
+    <li>Un rol llamado «directivos y vicerrectores». Rua tiene roles como Decano de Facultad y Coordinador Académico, y cinco vicerrectorías sembradas (VAC, VIN, VEX, DFI, DGH), pero la revisión se reparte por permiso de etapa, no por ese rol.</li>
+    <li>La acción «devolver con nota». Rua solo aprueba o deniega.</li>
+    <li>Aprobación en bloque. Cada expediente se firma uno por uno.</li>
+    <li>Suplentes y escalamiento automático. El plazo de 15 días hábiles es un indicador, no dispara nada.</li>
+    <li>Sede o departamento como dato de la actividad o de la solicitud. La unidad del solicitante se toma de su vicerrectoría en el perfil.</li>
+    <li>Horas ni asignación a docentes en <code>actividad_periodo</code>.</li>
+  </ul></div>
+  <p class="small" style="margin-top:8px">Todo eso queda marcado como <span class="pill prop">propuesta</span> en esta página. No lo presento como regla de Rua.</p>
+</section>
+
+<!-- ============ FLUJO ============ -->
+<section class="sec" id="flujo">
+  <header>
+    <span class="kicker">Flujo de aprobación</span>
+    <h2>Estados y transiciones de una solicitud</h2>
+    <p>Línea continua: ya existe en Rua. Línea punteada: propuesta nueva. Los números remiten a la tabla de abajo, que dice quién actúa en cada paso.</p>
+  </header>
+  <div class="dgwrap"><svg class="dg" viewBox="0 0 960 300" role="img" aria-labelledby="dgf-t dgf-d">
+    <title id="dgf-t">Estados de una solicitud</title>
+    <desc id="dgf-d">Borrador, pendiente, en revisión con tres pasos, aprobada y reflejada en Master. Desde la revisión se puede devolver al borrador o rechazar. Un borrador o una pendiente puede cancelarse.</desc>
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#072b58"/></marker></defs>
+    <g><rect class="bx" x="10" y="40" width="120" height="64" rx="3"/><text class="t" x="70" y="70" text-anchor="middle">Borrador</text><text class="s" x="70" y="88" text-anchor="middle">Solicitante</text></g>
+    <g><rect class="bx" x="170" y="40" width="130" height="64" rx="3"/><text class="t" x="235" y="70" text-anchor="middle">Pendiente</text><text class="s" x="235" y="88" text-anchor="middle">Espera el paso 1</text></g>
+    <g><rect class="bx" x="340" y="28" width="260" height="88" rx="3"/><text class="t" x="470" y="54" text-anchor="middle">En revisión</text><text class="s" x="470" y="74" text-anchor="middle">1 Directivo · 2 Vicerrector · 3 Planeación</text><text class="s" x="470" y="92" text-anchor="middle">Cada paso firma con nota</text></g>
+    <g><rect class="bx" x="645" y="40" width="120" height="64" rx="3"/><text class="t" x="705" y="70" text-anchor="middle">Aprobada</text><text class="s" x="705" y="88" text-anchor="middle">Tarea para Master</text></g>
+    <g><rect class="bx new" x="800" y="40" width="150" height="64" rx="3"/><text class="t" x="875" y="70" text-anchor="middle">Reflejada en Master</text><text class="s" x="875" y="88" text-anchor="middle">La captura lo confirma</text></g>
+    <g><rect class="bx new" x="170" y="190" width="130" height="64" rx="3"/><text class="t" x="235" y="220" text-anchor="middle">Devuelta</text><text class="s" x="235" y="238" text-anchor="middle">Con nota</text></g>
+    <g><rect class="bx neg" x="410" y="190" width="130" height="64" rx="3"/><text class="t" x="475" y="220" text-anchor="middle">Rechazada</text><text class="s" x="475" y="238" text-anchor="middle">En Rua: denegada</text></g>
+    <g><rect class="bx mute" x="10" y="190" width="120" height="64" rx="3"/><text class="t" x="70" y="220" text-anchor="middle">Cancelada</text><text class="s" x="70" y="238" text-anchor="middle">Solicitante</text></g>
+    <path class="ar" d="M130 72H168" marker-end="url(#ah)"/><path class="ar" d="M300 72H338" marker-end="url(#ah)"/><path class="ar" d="M600 72H643" marker-end="url(#ah)"/><path class="ar d" d="M765 72H798" marker-end="url(#ah)"/>
+    <path class="ar d" d="M390 116V150H250V188" marker-end="url(#ah)"/><path class="ar d" d="M215 188V160H100V106" marker-end="url(#ah)"/>
+    <path class="ar" d="M475 116V188" marker-end="url(#ah)"/>
+    <path class="ar d" d="M40 106V188" marker-end="url(#ah)"/>
+    <circle cx="149" cy="58" r="9" fill="#072b58"/><text class="num" x="149" y="61.5" text-anchor="middle">1</text>
+    <circle cx="319" cy="58" r="9" fill="#072b58"/><text class="num" x="319" y="61.5" text-anchor="middle">2</text>
+    <circle cx="621" cy="58" r="9" fill="#072b58"/><text class="num" x="621" y="61.5" text-anchor="middle">3</text>
+    <circle cx="782" cy="58" r="9" fill="#4078b9"/><text class="num" x="782" y="61.5" text-anchor="middle">4</text>
+    <circle cx="320" cy="150" r="9" fill="#4078b9"/><text class="num" x="320" y="153.5" text-anchor="middle">5</text>
+    <circle cx="475" cy="156" r="9" fill="#072b58"/><text class="num" x="475" y="159.5" text-anchor="middle">6</text>
+    <circle cx="40" cy="150" r="9" fill="#072b58"/><text class="num" x="40" y="153.5" text-anchor="middle">7</text>
+    <text class="lb" x="590" y="230">Línea continua: existe en Rua</text><text class="lb" x="590" y="250">Línea punteada: propuesta</text>
+  </svg></div>
+  <div class="tblwrap" style="margin-top:12px"><table>
+    <thead><tr><th>#</th><th>Transición</th><th>Quién actúa</th><th>Regla</th><th>Origen</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td>Borrador a pendiente</td><td>Solicitante</td><td>Justificación de al menos 150 caracteres. Se instancian los pasos del flujo.</td><td><span class="pill cons">Rua</span></td></tr>
+    <tr><td>2</td><td>Pendiente a en revisión</td><td>Directivo de la unidad (paso 1)</td><td>Firma con nota. El paso siguiente se desbloquea. Nadie firma su propia solicitud.</td><td><span class="pill cons">Rua</span></td></tr>
+    <tr><td>3</td><td>En revisión a aprobada</td><td>Planeación (último paso)</td><td>La solicitud queda aprobada y genera la tarea de aplicar en el Master. En Rua el último paso creaba la actividad en su propia base.</td><td><span class="pill prop">Propuesta</span></td></tr>
+    <tr><td>4</td><td>Aprobada a reflejada</td><td>Planeación marca «aplicada»; el Warehouse confirma</td><td>Cuando una captura nueva del Master contiene el cambio, la solicitud se cierra sola.</td><td><span class="pill prop">Propuesta</span></td></tr>
+    <tr><td>5</td><td>Devolver</td><td>Cualquier paso en turno</td><td>Nota obligatoria. Vuelve al solicitante, que corrige y reenvía; el flujo empieza otra vez.</td><td><span class="pill prop">Propuesta</span></td></tr>
+    <tr><td>6</td><td>Rechazar</td><td>Cualquier paso en turno</td><td>Nota obligatoria. Corta la cadena y los pasos restantes quedan omitidos.</td><td><span class="pill cons">Rua</span></td></tr>
+    <tr><td>7</td><td>Cancelar</td><td>Solicitante</td><td>Mientras esté en borrador o pendiente sin firmas.</td><td><span class="pill cons">Rua</span></td></tr>
+    </tbody></table></div>
+</section>
+
+<!-- ============ ARQUITECTURA ============ -->
+<section class="sec" id="arquitectura">
+  <header>
+    <span class="kicker">Arquitectura</span>
+    <h2>Del lanzador a cada pantalla</h2>
+    <p>El lanzador de la intranet muestra hoy un cartel por módulo. Gestión Master se suma como un cartel nuevo, agrupado bajo el rótulo «Actividades de Apoyo». Un módulo con dos o más pantallas se abre como microportal con tarjetas, igual que Warehouse e Informes.</p>
+  </header>
+  <div class="path" aria-label="Ruta de navegación"><b>Intranet</b><i>›</i><b>Lanzador</b><i>›</i><b>Actividades de Apoyo</b><i>›</i><b>Gestión Master</b><i>›</i><b>Bandeja de solicitudes</b></div>
+  <div class="map" id="mapa">
+    <a href="#maqueta" data-go="bandeja"><b>Bandeja de solicitudes</b><span>Pantalla central. Revisar, comparar, decidir, en bloque o una por una.</span><small>/admin/gestion-master</small></a>
+    <a href="#maqueta" data-go="estructura"><b>Estructura de actividades</b><span>Catálogo vigente del Master, vigencia por periodo, comparación y propuesta de cambio.</span><small>/estructura</small></a>
+    <a href="#maqueta" data-go="periodo"><b>Actividades del periodo</b><span>Tabla por periodo y sede, vista por departamento y por docente.</span><small>/periodo</small></a>
+    <a href="#maqueta" data-go="seguimiento"><b>Seguimiento</b><span>Línea de tiempo, vencimientos y cuellos de botella.</span><small>/seguimiento</small></a>
+    <a href="#maqueta" data-go="flujos"><b>Flujos de aprobación</b><span>Pasos, quién aprueba, suplentes, plazos y escalamiento.</span><small>/flujos</small></a>
+    <a href="#maqueta" data-go="conexion"><b>Conexión con el Warehouse</b><span>Último corte por sede, cola de cambios por reflejar y eventos.</span><small>/conexion</small></a>
+  </div>
+  <p class="small" style="margin-top:8px">Cada tarjeta lleva a la pestaña correspondiente de la maqueta de abajo. Rua tenía además importar y editor de rama; aquí el editor es «Proponer cambio» y la importación masiva queda fuera, porque el catálogo vigente ya llega desde el Master.</p>
+</section>
+
+<!-- ============ MAQUETA ============ -->
+<section class="sec" id="maqueta">
+  <header>
+    <span class="kicker">Maqueta interactiva <span class="sample">Ejemplo</span></span>
+    <h2>Gestión Master, pantalla por pantalla</h2>
+    <p>Cambie «Ver como» para comprobar qué puede hacer cada rol. Cambie periodo y sede para ver la lectura del Warehouse. «Estado de la maqueta» muestra la carga, el vacío y el error. En la bandeja funcionan las flechas arriba y abajo, Enter, Espacio y Esc.</p>
+  </header>
+  <div class="app" id="app">
+    <div class="app-top">
+      <div class="brand"><small>Actividades de Apoyo</small><b>Gestión Master</b></div>
+      <label class="fld" for="role">Ver como<select id="role"></select></label>
+      <label class="fld" for="per">Periodo<select id="per"></select></label>
+      <label class="fld" for="sede">Sede<select id="sede"></select></label>
+      <label class="fld" for="mode">Estado de la maqueta<select id="mode"><option value="normal">Normal</option><option value="cargando">Cargando</option><option value="vacio">Sin solicitudes</option><option value="error">Error de lectura</option></select></label>
+    </div>
+    <div class="scope" id="scope"></div>
+    <div class="tabs" role="tablist" aria-label="Pantallas de Gestión Master" id="apptabs">
+      <button role="tab" id="tab-bandeja" aria-controls="pnl-bandeja" aria-selected="true">Bandeja de solicitudes</button>
+      <button role="tab" id="tab-estructura" aria-controls="pnl-estructura" aria-selected="false" tabindex="-1">Estructura</button>
+      <button role="tab" id="tab-periodo" aria-controls="pnl-periodo" aria-selected="false" tabindex="-1">Actividades del periodo</button>
+      <button role="tab" id="tab-seguimiento" aria-controls="pnl-seguimiento" aria-selected="false" tabindex="-1">Seguimiento</button>
+      <button role="tab" id="tab-flujos" aria-controls="pnl-flujos" aria-selected="false" tabindex="-1">Flujos</button>
+      <button role="tab" id="tab-conexion" aria-controls="pnl-conexion" aria-selected="false" tabindex="-1">Conexión</button>
+    </div>
+
+    <div class="panel" id="pnl-bandeja" role="tabpanel" aria-labelledby="tab-bandeja">
+      <div class="counters" id="counters" aria-label="Resumen de la bandeja"></div>
+      <div class="filters">
+        <label class="fld" for="f-est">Estado<select id="f-est"></select></label>
+        <label class="fld" for="f-dep">Departamento<select id="f-dep"></select></label>
+        <label class="fld" for="f-sol">Solicitante<select id="f-sol"></select></label>
+        <label class="fld" for="f-q">Buscar<input id="f-q" type="search" placeholder="Folio, actividad o código" autocomplete="off"></label>
+      </div>
+      <div class="bandeja" id="bandeja">
+        <div class="listcol">
+          <div id="bulkzone"></div>
+          <div class="listhead"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="selall" style="width:18px;height:18px;accent-color:var(--navy)"> Seleccionar las visibles</label><span id="listcount" style="margin-left:auto"></span></div>
+          <div id="listarea"></div>
+        </div>
+        <div class="detail-back" id="dback" hidden></div>
+        <aside class="detail" id="detail" aria-label="Detalle de la solicitud" hidden></aside>
+      </div>
+    </div>
+
+    <div class="panel" id="pnl-estructura" role="tabpanel" aria-labelledby="tab-estructura" hidden></div>
+    <div class="panel" id="pnl-periodo" role="tabpanel" aria-labelledby="tab-periodo" hidden></div>
+    <div class="panel" id="pnl-seguimiento" role="tabpanel" aria-labelledby="tab-seguimiento" hidden></div>
+    <div class="panel" id="pnl-flujos" role="tabpanel" aria-labelledby="tab-flujos" hidden></div>
+    <div class="panel" id="pnl-conexion" role="tabpanel" aria-labelledby="tab-conexion" hidden></div>
+  </div>
+  <div id="live" class="sr" role="status" aria-live="polite"></div>
+</section>
+
+<!-- ============ ROLES ============ -->
+<section class="sec" id="roles">
+  <header>
+    <span class="kicker">Roles y reglas</span>
+    <h2>Qué ve y qué hace cada rol</h2>
+    <p>«Directivos y vicerrectores» no existe como rol en Rua. Aquí se define como una plantilla de rol de acceso con el permiso de revisión del módulo, y su alcance sale de las unidades donde la persona es Gestor. Los demás roles ya existen en el portal.</p>
+  </header>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Capacidad</th><th>Solicitante</th><th>Directivo</th><th>Vicerrector</th><th>Planeación</th><th>Administración</th></tr></thead>
+    <tbody>
+    <tr><td>Ver solicitudes</td><td>Las propias</td><td>De sus unidades</td><td>De su vicerrectoría</td><td>Todas</td><td>Todas</td></tr>
+    <tr><td>Crear y enviar solicitudes</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+    <tr><td>Aprobar, devolver o rechazar</td><td>No</td><td>Su paso, su alcance</td><td>Su paso, su alcance</td><td>Su paso</td><td>Cualquier paso, con nota por cada rol que sustituye</td></tr>
+    <tr><td>Aprobar en bloque</td><td>No</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+    <tr><td>Proponer cambio a la estructura</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+    <tr><td>Ver actividades del periodo</td><td>De su unidad</td><td>De sus unidades</td><td>De su vicerrectoría</td><td>Todas las sedes</td><td>Todas las sedes</td></tr>
+    <tr><td>Ver docentes</td><td colspan="5">Siempre como seudónimo. Ver el nombre exigiría cambiar la política del Warehouse (duda 11).</td></tr>
+    <tr><td>Definir flujos, suplentes y plazos</td><td>No</td><td>No</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+    <tr><td>Marcar «aplicada en Master»</td><td>No</td><td>No</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+    <tr><td>Resolver a nombre de otro rol</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Sí, y queda marcado</td></tr>
+    </tbody></table></div>
+  <div class="two" style="margin-top:18px">
+    <div><h4>Reglas que vienen de Rua</h4><div class="plain"><ul>
+      <li>Toda decisión lleva nota, también aprobar.</li>
+      <li>Nadie resuelve su propia solicitud, tampoco la administración.</li>
+      <li>Se ve lo que se tiene que firmar y se sigue viendo después.</li>
+      <li>Una firma de la administración en nombre de otro rol queda marcada y no se confunde con la firma real.</li>
+    </ul></div></div>
+    <div><h4>Reglas nuevas, por confirmar</h4><div class="plain"><ul>
+      <li>Un directivo solo decide sobre unidades donde es Gestor.</li>
+      <li>La aprobación en bloque omite lo que no le corresponde y lo dice antes de confirmar.</li>
+      <li>Devolver reinicia el flujo; rechazar lo cierra.</li>
+      <li>Un suplente firma con su propio usuario y el historial muestra a quién reemplaza.</li>
+    </ul></div></div>
+  </div>
+</section>
+
+<!-- ============ WAREHOUSE ============ -->
+<section class="sec" id="warehouse">
+  <header>
+    <span class="kicker">Conexión con el Warehouse</span>
+    <h2>Qué lee, qué escribe y qué no hace</h2>
+    <p>Pulse un nodo para ver su detalle, o reproduzca el recorrido de una solicitud aprobada.</p>
+  </header>
+  <div class="dgwrap"><svg class="dg" id="whsvg" viewBox="0 0 960 400" role="img" aria-labelledby="dgw-t dgw-d">
+    <title id="dgw-t">Datos entre el Master, el Warehouse y Gestión Master</title>
+    <desc id="dgw-d">El Master alimenta al Warehouse por la función warehouse. Gestión Master lee del Warehouse, escribe en tablas gm y cierra cortes hacia el Warehouse. Los cambios aprobados salen como tarea para Planeación, que los aplica a mano en el Master.</desc>
+    <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#072b58"/></marker><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5d6c80"/></marker></defs>
+    <g class="nd" tabindex="0" role="button" data-n="master" aria-label="Master"><rect class="bx mute" x="14" y="150" width="150" height="76" rx="3"/><text class="t" x="89" y="182" text-anchor="middle">Master</text><text class="s" x="89" y="202" text-anchor="middle">Solo lectura para el portal</text></g>
+    <g class="nd" tabindex="0" role="button" data-n="funcion" aria-label="Función warehouse"><rect class="bx" x="212" y="150" width="140" height="76" rx="3"/><text class="t" x="282" y="182" text-anchor="middle">Función warehouse</text><text class="s" x="282" y="202" text-anchor="middle">Cuenta de servicio</text></g>
+    <g class="nd" tabindex="0" role="button" data-n="wh" aria-label="Warehouse"><rect class="bx" x="400" y="150" width="170" height="76" rx="3"/><text class="t" x="485" y="178" text-anchor="middle">Warehouse wh_*</text><text class="s" x="485" y="196" text-anchor="middle">ms_actdir · ms_nom</text><text class="s" x="485" y="212" text-anchor="middle">dm_act · dm_con · dm_dep</text></g>
+    <g class="nd" tabindex="0" role="button" data-n="gm" aria-label="Gestión Master"><rect class="bx" x="620" y="150" width="150" height="76" rx="3"/><text class="t" x="695" y="182" text-anchor="middle">Gestión Master</text><text class="s" x="695" y="202" text-anchor="middle">Módulo del portal</text></g>
+    <g class="nd" tabindex="0" role="button" data-n="tablas" aria-label="Tablas gm"><rect class="bx new" x="620" y="300" width="150" height="70" rx="3"/><text class="t" x="695" y="330" text-anchor="middle">Tablas gm_*</text><text class="s" x="695" y="349" text-anchor="middle">Solicitudes y decisiones</text></g>
+    <g class="nd" tabindex="0" role="button" data-n="conjunto" aria-label="Conjunto gm_solicitudes"><rect class="bx new" x="400" y="300" width="170" height="70" rx="3"/><text class="t" x="485" y="330" text-anchor="middle">Conjunto gm_solicitudes</text><text class="s" x="485" y="349" text-anchor="middle">Origen: portal</text></g>
+    <g class="nd" tabindex="0" role="button" data-n="tarea" aria-label="Tarea para Planeación"><rect class="bx new" x="810" y="150" width="136" height="76" rx="3"/><text class="t" x="878" y="180" text-anchor="middle">Tarea para</text><text class="t" x="878" y="197" text-anchor="middle">Planeación</text><text class="s" x="878" y="214" text-anchor="middle">Lista y exportable</text></g>
+    <path class="ar" d="M164 188H210" marker-end="url(#ah2)"/><path class="ar" d="M352 188H398" marker-end="url(#ah2)"/>
+    <path class="ar" d="M570 188H618" marker-end="url(#ah2)"/><path class="ar" d="M695 226V298" marker-end="url(#ah2)"/>
+    <path class="ar" d="M618 335H572" marker-end="url(#ah2)"/><path class="ar" d="M485 298V228" marker-end="url(#ah2)"/>
+    <path class="ar" d="M770 188H808" marker-end="url(#ah2)"/>
+    <path class="ar d" d="M878 148V70H89V148" marker-end="url(#ah3)"/>
+    <text class="lb" x="487" y="60" text-anchor="middle">Aplicación manual en el Master (el portal no escribe ahí)</text>
+    <text class="lb" x="188" y="172" text-anchor="middle">captura</text><text class="lb" x="376" y="172" text-anchor="middle">carga</text>
+    <text class="lb" x="594" y="172" text-anchor="middle">lee</text><text class="lb" x="745" y="268">escribe</text>
+    <text class="lb" x="595" y="326" text-anchor="middle">cierre</text><text class="lb" x="495" y="268">versión</text>
+    <circle id="pkt" r="7" fill="#e8892b" stroke="#072b58" stroke-width="1.5" cx="695" cy="188" opacity="0"/>
+  </svg></div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">
+    <button class="btn" id="play">Reproducir una solicitud aprobada</button>
+    <span class="small" id="nodeinfo">Pulse un nodo del diagrama.</span>
+  </div>
+  <ol class="seq" id="seqlist" aria-label="Recorrido de una solicitud aprobada">
+    <li>El directivo y el vicerrector firman en Gestión Master. Cada decisión se escribe en <code>gm_decisiones</code> y <code>gm_eventos</code>.</li>
+    <li>Planeación firma el último paso. La solicitud pasa a «aprobada» y entra a la cola de cambios por aplicar.</li>
+    <li>Al cerrar el corte, las solicitudes y decisiones del periodo y la sede se cargan como el conjunto <code>gm_solicitudes</code>, con versión y huella.</li>
+    <li>Planeación aplica el cambio en el Master a mano y marca «aplicada».</li>
+    <li>La siguiente captura de <code>ms_actdir</code> trae el cambio y la solicitud pasa a «reflejada en Master».</li>
+  </ol>
+  <div class="cols4" style="margin-top:18px">
+    <div><h4>Lee del Warehouse</h4><ul>
+      <li><code>ms_actdir</code>: estructura de actividades (código, nombre, tipo, instrucciones, activa, directa, vinculación). Solo el periodo abierto, sin personas.</li>
+      <li><code>ms_nom</code>: carga por docente, horas y programa, con la cédula como seudónimo.</li>
+      <li>Catálogos <code>dm_act</code>, <code>dm_con</code>, <code>dm_dep</code>.</li>
+      <li>Por periodo y sede, siempre la versión vigente de cada corte.</li></ul></div>
+    <div><h4>Escribe en el portal</h4><ul>
+      <li>Cada solicitud, decisión, comentario y aviso, con periodo y sede.</li>
+      <li>Cada evento, sin posibilidad de editarlo.</li>
+      <li>Al cerrar el corte, el conjunto <code>gm_solicitudes</code> en el Warehouse, por el mismo camino de carga (<code>wh_abrir_carga</code>) que usan los demás.</li>
+      <li>La diferencia entre lo capturado y lo solicitado se consulta en <code>v_gm_diferencias</code>.</li></ul></div>
+    <div><h4>No hace</h4><ul>
+      <li>No escribe en el Master. El portal solo lee de él.</li>
+      <li>No cambia filas ya capturadas en <code>wh_filas</code>.</li>
+      <li>No aplica por sí mismo un cambio aprobado: queda como tarea y exportable.</li>
+      <li>No trae el Excel original ni datos personales.</li></ul></div>
+    <div><h4>Privacidad</h4><ul>
+      <li>El docente es un seudónimo con sal propia, irreversible, como en el Warehouse.</li>
+      <li>Hoy solo Planeación lee <code>wh_filas</code>. Los revisores leen por funciones que filtran por su alcance.</li>
+      <li>Las solicitudes no guardan nombres de docentes; apuntan al seudónimo.</li>
+      <li>El solicitante sí es una persona del portal y se muestra por su nombre.</li></ul></div>
+  </div>
+  <h3>Modelo de datos propuesto <span class="small">(sin migración escrita)</span></h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Tabla o vista</th><th>Qué guarda</th></tr></thead>
+    <tbody>
+    <tr><td><code>gm_flujos</code>, <code>gm_flujo_pasos</code></td><td>Flujos con su condición de uso y sus pasos: orden, función que firma, alcance, plazo en días hábiles, suplente y si escala.</td></tr>
+    <tr><td><code>gm_solicitudes</code></td><td>Folio <code>GM-AAAA-NNNN</code>, tipo, periodo, sede, unidad, solicitante, prioridad, estado, flujo, paso actual, justificación.</td></tr>
+    <tr><td><code>gm_solicitud_lineas</code></td><td>Una fila por actividad afectada: código, estado «antes» y «después» en jsonb, y el corte del Warehouse (<code>wh_cargas.id</code>) con que se comparó.</td></tr>
+    <tr><td><code>gm_decisiones</code></td><td>Paso, quién firmó, a quién reemplaza si es suplente o administración, decisión, nota y fecha. Sin UPDATE ni DELETE.</td></tr>
+    <tr><td><code>gm_eventos</code></td><td>Registro de solo anexar: tipo, carga útil, periodo, sede, fecha. Es lo que se carga al Warehouse al cerrar el corte.</td></tr>
+    <tr><td><code>gm_comentarios</code>, <code>gm_avisos</code></td><td>Comentarios por solicitud y cola de avisos que consume el módulo de correos.</td></tr>
+    <tr><td><code>gm_estructura_ajustes</code></td><td>Datos que el Master no trae: horas tope por actividad y periodo, y propuestas de estructura aprobadas.</td></tr>
+    <tr><td><code>gm_suplencias</code></td><td>Quién reemplaza a quién, de qué fecha a qué fecha, en qué alcance.</td></tr>
+    <tr><td><code>v_gm_estructura_master</code>, <code>v_gm_actividades_periodo</code>, <code>v_gm_diferencias</code></td><td>Vistas de lectura sobre <code>wh_*</code>, entregadas por funciones <code>security definer</code> filtradas por alcance.</td></tr>
+    </tbody></table></div>
+  <p class="small" style="margin-top:8px">Límites reales: <code>ms_actdir</code> solo entrega el periodo abierto en la sesión, así que comparar periodos pasados depende de haber capturado cada corte. Solo Bucaramanga está verificada con un HAR; Cúcuta, Valledupar y Bogotá usan las mismas rutas sin confirmar.</p>
+</section>
+
+<!-- ============ MOVIMIENTO ============ -->
+<section class="sec" id="movimiento">
+  <header>
+    <span class="kicker">Especificación de movimiento</span>
+    <h2>Qué se mueve, cuánto y por qué</h2>
+    <p>Se usa GSAP 3.12.5 desde cdnjs. Solo se anima <code>opacity</code> y <code>transform</code>, con dos excepciones marcadas. Lo que se repite cientos de veces al día (navegar la lista con el teclado, abrir el detalle con Enter) no se anima. Con «reducir movimiento» activo desaparece todo desplazamiento y escala; quedan fundidos de 120 ms o cambios instantáneos.</p>
+  </header>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Transición</th><th>Propósito</th><th>Duración</th><th>Curva GSAP</th><th>Propiedad</th></tr></thead>
+    <tbody>
+    <tr><td>Entrada de la bandeja</td><td>Mostrar que llegó contenido nuevo al cambiar de pantalla, periodo o sede</td><td>260 ms, desfase de 30 ms, solo las 12 primeras filas</td><td><code>power3.out</code></td><td>opacity 0 a 1, y 8 px a 0</td></tr>
+    <tr><td>Lista a detalle (con ratón o toque)</td><td>Continuidad espacial: el detalle viene del lado donde está la lista</td><td>220 ms; el fondo 160 ms</td><td><code>power3.out</code></td><td>x 28 px a 0, opacity</td></tr>
+    <tr><td>Lista a detalle (con teclado)</td><td>Es una acción repetida; se omite</td><td>0 ms</td><td>Ninguna</td><td>Ninguna</td></tr>
+    <tr><td>Panel de confirmación</td><td>Dar peso a la decisión sin bloquear</td><td>200 ms</td><td><code>power3.out</code></td><td>opacity, scale 0.97 a 1</td></tr>
+    <tr><td>Sello de decisión</td><td>Confirmar el resultado antes de que cambie la pantalla</td><td>entra 200 ms, espera 700 ms, sale 180 ms</td><td><code>power3.out</code> / <code>power1.in</code></td><td>opacity, scale 0.96 a 1</td></tr>
+    <tr><td>Fila que sale del filtro</td><td>Evitar que la lista salte cuando una fila ya no cumple el filtro</td><td>200 ms</td><td><code>power2.inOut</code></td><td>opacity, x 12 px; luego height (excepción: no hay equivalente en transform)</td></tr>
+    <tr><td>Avance del flujo</td><td>Mostrar qué paso se firmó y cuál sigue</td><td>320 ms la línea, 180 ms el paso nuevo</td><td><code>power2.inOut</code></td><td>scaleX de la línea; scale 0.9 a 1 del punto</td></tr>
+    <tr><td>Contadores</td><td>Hacer visible el efecto de una decisión en el resumen</td><td>450 ms</td><td><code>power2.out</code></td><td>Texto numérico (no es CSS)</td></tr>
+    <tr><td>Cambio de periodo o sede</td><td>Indicar que se está leyendo otro corte</td><td>320 ms de lectura simulada, luego entrada escalonada</td><td><code>power3.out</code></td><td>opacity y transform; esqueleto con pulso suave</td></tr>
+    <tr><td>Pestañas, desplegar árbol, botones</td><td>Respuesta inmediata al toque</td><td>140 ms</td><td>CSS <code>cubic-bezier(0.23, 1, 0.32, 1)</code></td><td>color, transform; botones a scale 0.97 al pulsar</td></tr>
+    <tr><td>Barras de tiempo y cumplimiento</td><td>Dar escala visual al dato</td><td>400 ms, una sola vez</td><td><code>power3.out</code></td><td>scaleX desde la izquierda</td></tr>
+    <tr><td>Paquete del diagrama</td><td>Explicar el recorrido de una solicitud (uso ocasional)</td><td>0.7 s por tramo</td><td><code>power1.inOut</code></td><td>posición del círculo; sin movimiento con reducir movimiento</td></tr>
+    </tbody></table></div>
+</section>
+
+<!-- ============ ACCESIBILIDAD ============ -->
+<section class="sec" id="accesibilidad">
+  <header>
+    <span class="kicker">Accesibilidad y pantallas pequeñas</span>
+    <h2>Teclado, lectores de pantalla y 360 px</h2>
+  </header>
+  <div class="two">
+    <div class="plain"><h4>Teclado</h4><ul>
+      <li>Todo se alcanza con Tab. El foco tiene un contorno de 3 px siempre visible.</li>
+      <li>En la lista: flechas arriba y abajo mueven entre solicitudes, Enter abre el detalle, Espacio marca la casilla, Esc cierra el detalle y devuelve el foco a la fila.</li>
+      <li>Las pestañas siguen el patrón de flechas izquierda y derecha, Inicio y Fin.</li>
+      <li>El constructor de flujos mueve pasos con botones «Subir» y «Bajar», sin depender de arrastrar.</li>
+    </ul></div>
+    <div class="plain"><h4>Lectores de pantalla</h4><ul>
+      <li>Una región <code>aria-live="polite"</code> anuncia cada acción masiva: «4 solicitudes aprobadas, 1 omitida porque no te corresponde».</li>
+      <li>El estado nunca va solo en color: cada etiqueta lleva texto y, en cambios de la comparación, la marca «← cambia».</li>
+      <li>El detalle es un panel con nombre; al abrirlo el foco pasa a su título.</li>
+      <li>Los diagramas tienen título, descripción y una tabla equivalente.</li>
+    </ul></div>
+    <div class="plain"><h4>Contraste y movimiento</h4><ul>
+      <li>Texto sobre fondo claro con contraste de al menos 4,5:1; los tonos de estado usan texto oscuro sobre fondo suave.</li>
+      <li><code>prefers-reduced-motion</code> quita desplazamientos y escalas; el pulso del esqueleto se detiene.</li>
+    </ul></div>
+    <div class="plain"><h4>360 px</h4><ul>
+      <li>La lista pasa a una columna y la etiqueta de estado baja bajo el título.</li>
+      <li>El detalle ocupa toda la pantalla como hoja y se cierra con Esc o con el fondo.</li>
+      <li>Las tablas se desplazan dentro de su propio contenedor; la página no se desplaza de lado.</li>
+      <li>Los controles miden al menos 36 px de alto.</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============ TÉCNICA ============ -->
+<section class="sec" id="tecnica">
+  <header>
+    <span class="kicker">Recomendación técnica</span>
+    <h2>Cómo construirlo sin repetir el hueco de Informes</h2>
+    <p>Esta sección es para quien construye. Nada de esto está escrito todavía.</p>
+  </header>
+  <h3>Rutas y lanzador</h3>
+  <div class="plain"><ul>
+    <li>Rutas: <code>/admin/gestion-master</code> (bandeja), <code>/bandeja/:id</code>, <code>/estructura</code>, <code>/periodo</code>, <code>/seguimiento</code>, <code>/flujos</code> y <code>/conexion</code>. Periodo y sede en <code>?periodo=2026b&amp;sede=buc</code>, como Warehouse.</li>
+    <li>Un <code>ModuleId</code> nuevo (<code>gestion-master</code>) en <code>AdminShell</code> y <code>portales.ts</code>, con color de cartel <code>--wall-gestion-master</code>. Hoy el lanzador no tiene categorías, solo módulos: «Actividades de Apoyo» sería un rótulo de agrupación nuevo (duda 2).</li>
+    <li>Pantalla de roles nueva: <code>gestion_master</code> en <code>AdminScreen</code> y un <code>ModuleDef</code> en <code>role-matrix.ts</code> con niveles Ver, Editar y Administrar.</li>
+  </ul></div>
+  <h3>Acceso: permiso explícito del rol, más pertenencia a la unidad</h3>
+  <div class="plain"><ul>
+    <li>Columna nueva <code>access_roles.gm_nivel</code> (<code>none</code>, <code>solicitante</code>, <code>revisor</code>, <code>gestor</code>), escrita solo cuando en la matriz se elige un nivel para Gestión Master. Mismo patrón que <code>informe_gestion</code> (0192).</li>
+    <li>Una función <code>gm_actor()</code> devuelve unidad y función de la persona uniendo su pertenencia (<code>unit_members.role</code>: Gestor, Contribuyente, Consulta) con el alcance del rol. Revisa quien tiene <code>gm_nivel = revisor</code> <em>y</em> es Gestor de esa unidad.</li>
+    <li>Ninguna política ni función usa <code>has_role_at_least('planeacion')</code> como llave. En Informes, ese atajo dejó que la capacidad global concediera gestión; aquí el nivel «Ver» de otro módulo no abre nada.</li>
+    <li>«Directivos y vicerrectores» es una plantilla de rol: <code>gm_nivel = revisor</code> más pertenencia como Gestor.</li>
+  </ul></div>
+  <h3>RLS, escritura y auditoría</h3>
+  <div class="plain"><ul>
+    <li>Las tablas <code>gm_*</code> no tienen política de escritura: se escribe por funciones <code>security definer</code> que comprueban permiso, turno y que nadie firme lo suyo (<code>gm_guardar_solicitud</code>, <code>gm_decidir_paso</code>, <code>gm_decidir_lote</code>), como Rua con <code>fn_decidir_etapa</code>.</li>
+    <li><code>gm_decidir_lote</code> procesa cada solicitud en su propia transacción y devuelve cuáles se aplicaron y cuáles se omitieron, con el motivo.</li>
+    <li>Lectura de <code>wh_*</code> solo por <code>gm_leer_estructura(periodo, sede)</code> y <code>gm_leer_periodo(periodo, sede)</code>. No se amplía <code>wh_autorizado()</code>.</li>
+    <li><code>gm_eventos</code> solo admite INSERT. El corte se carga al Warehouse con <code>wh_abrir_carga</code>, <code>wh_agregar_filas</code> y <code>wh_cerrar_carga</code>, y una política <code>gm_solicitudes</code> que excluye los textos libres de los docentes.</li>
+    <li>Avisos: el módulo de correos recibe seis plantillas (<code>solicitud_enviada</code>, <code>paso_asignado</code>, <code>devuelta</code>, <code>decision_final</code>, <code>vence_pronto</code>, <code>escalada</code>) con las variables que Rua ya usa.</li>
+  </ul></div>
+  <h3>Fases</h3>
+  <div>
+    <div class="fase"><h4>Fase 1</h4><div><b>Bandeja y aprobación.</b> Tablas de solicitudes y decisiones, flujo fijo de tres pasos, bandeja con filtros, detalle, comparación contra <code>ms_actdir</code>, aprobar, devolver y rechazar con nota, aprobación en bloque, roles y avisos por correo.</div></div>
+    <div class="fase"><h4>Fase 2</h4><div><b>Estructura y actividades del periodo.</b> Catálogo vigente por periodo y sede, comparación entre cortes, proponer cambio, horas tope en <code>gm_estructura_ajustes</code>, tabla por periodo con vistas por departamento y docente, semáforo de cumplimiento.</div></div>
+    <div class="fase"><h4>Fase 3</h4><div><b>Seguimiento, flujos configurables y escritura al Warehouse.</b> Línea de tiempo y tablero de vencimientos, constructor de flujos con suplentes y escalamiento, cierre de corte como conjunto <code>gm_solicitudes</code>, cola de cambios por reflejar con conciliación automática y exportable para Planeación.</div></div>
+  </div>
+  <h3>Riesgos</h3>
+  <div class="plain"><ul>
+    <li><b>Un cambio aprobado que nadie aplica en el Master.</b> La cola de «aprobadas sin reflejar» y su aviso a Planeación son la defensa; sin ellas, el portal diría una cosa y el Master otra.</li>
+    <li><b>Periodos pasados.</b> El Master solo entrega el periodo abierto. La comparación histórica existe si cada corte se capturó a tiempo; hoy no hay carga programada.</li>
+    <li><b>Sedes sin HAR.</b> La lectura de Cúcuta, Valledupar y Bogotá no está verificada. La maqueta muestra el estado «sin captura».</li>
+    <li><b>Qué reporte trae las actividades por docente.</b> Hoy no está claro (duda 3). Si no existe, «Actividades del periodo» se limita a la estructura y a las horas de la nómina.</li>
+    <li><b>Duplicar Rua.</b> Si Rua sigue en uso mientras tanto, habría dos bandejas con la misma función (duda 9).</li>
+    <li><b>Permisos mal escritos.</b> Es el riesgo de Informes. Por eso la prueba de coherencia entre catálogo de permisos y políticas se hace antes de la fase 1.</li>
+  </ul></div>
+</section>
+
+<!-- ============ DUDAS ============ -->
+<section class="sec" id="dudas">
+  <header>
+    <span class="kicker">Para decidir</span>
+    <h2>Dudas que necesito resolver antes de construir</h2>
+  </header>
+  <ol class="dudas">
+    <li><b>Quiénes son «directivos y vicerrectores».</b> En Rua no existe ese rol. ¿Son decanos, directores de programa y los vicerrectores por cargo? ¿Se les asigna como Gestores de unidad en el portal?</li>
+    <li><b>La categoría «Actividades de Apoyo».</b> El lanzador solo tiene módulos. ¿Quiere una carpeta nueva que podrá agrupar otros módulos más adelante, o basta con ese rótulo sobre Gestión Master?</li>
+    <li><b>Qué reporte del Warehouse trae las actividades del periodo por docente.</b> <code>ms_actdir</code> es el catálogo, sin personas y solo del periodo abierto. La carga y las horas por docente las da <code>ms_nom</code>. Las rutas <code>activities/filter/</code> y <code>validate_period/</code> del HAR no están en el catálogo. ¿Cuál es el reporte que usted considera «actividades del periodo»?</li>
+    <li><b>Quién aplica el cambio en el Master y cómo.</b> ¿Una persona de Planeación, a mano, desde una lista? ¿Prefiere un Excel con el formato que pide el Master?</li>
+    <li><b>La cadena de pasos.</b> Propongo directivo, vicerrector y Planeación. ¿Es correcto el orden? ¿Cuál es el plazo por paso y el total? (Rua usa 15 días hábiles en total; la maqueta usa 5 por paso).</li>
+    <li><b>Devolver con nota.</b> Rua no lo tiene. ¿Acepta el estado «devuelta» y que el flujo reinicie al reenviar?</li>
+    <li><b>Aprobación en bloque.</b> ¿Solo aprobar y devolver, con una nota común, y el rechazo siempre individual? ¿Hay un máximo por lote?</li>
+    <li><b>Suplentes y escalamiento.</b> ¿Quién designa al suplente? Cuando vence un plazo, ¿el sistema solo avisa o también pasa la solicitud al nivel siguiente?</li>
+    <li><b>Qué pasa con Rua.</b> ¿Se migran las solicitudes históricas a <code>gm_*</code>, se archivan en Rua o se empieza de cero? ¿Rua se apaga cuando salga la fase 1?</li>
+    <li><b>Horas.</b> <code>ms_actdir</code> no trae horas. ¿Las horas tope por actividad serán un dato que Planeación mantiene en el portal (<code>gm_estructura_ajustes</code>) o existe otro reporte?</li>
+    <li><b>Nombre de los docentes.</b> Hoy todo es seudónimo. ¿El directivo de la unidad necesita ver el nombre para decidir? Eso exigiría otra política de privacidad y un permiso aparte.</li>
+    <li><b>Escritura al Warehouse.</b> Recomiendo cerrar el corte como conjunto <code>gm_solicitudes</code> para que tenga versiones y periodos cerrados. La alternativa es dejar todo en <code>gm_*</code> y mostrarlo desde el módulo. ¿Cuál prefiere?</li>
+  </ol>
+</section>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function () {
+"use strict";
+var $ = function (s, r) { return (r || document).querySelector(s); };
+var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+var esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+var RM = window.matchMedia("(prefers-reduced-motion: reduce)");
+var HAS = typeof window.gsap !== "undefined";
+var animOK = function () { return HAS && !RM.matches; };
+
+/* ---------- movimiento ---------- */
+function enter(els, o) {
+  o = o || {};
+  els = els.slice(0, o.max || 12);
+  if (!els.length || !HAS) return;
+  if (RM.matches) { gsap.fromTo(els, { opacity: 0 }, { opacity: 1, duration: 0.12, clearProps: "opacity" }); return; }
+  gsap.fromTo(els, { opacity: 0, y: o.y == null ? 8 : o.y }, { opacity: 1, y: 0, duration: o.d || 0.26, ease: "power3.out", stagger: 0.03, clearProps: "opacity,transform" });
+}
+function slideIn(el, fromKeyboard) {
+  if (!HAS || fromKeyboard) return;
+  if (RM.matches) { gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.12, clearProps: "opacity" }); return; }
+  gsap.fromTo(el, { opacity: 0, x: 28 }, { opacity: 1, x: 0, duration: 0.22, ease: "power3.out", clearProps: "opacity,transform" });
+  var b = $("#dback"); if (b) gsap.fromTo(b, { opacity: 0 }, { opacity: 1, duration: 0.16, clearProps: "opacity" });
+}
+function pop(el) {
+  if (!HAS) return;
+  if (RM.matches) { gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.12, clearProps: "opacity" }); return; }
+  gsap.fromTo(el, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.2, ease: "power3.out", clearProps: "opacity,transform" });
+}
+function count(el, val) {
+  var from = Number(el.dataset.v || 0);
+  el.dataset.v = val;
+  if (el._t) el._t.kill();
+  if (!animOK() || from === val) { el.textContent = val; return; }
+  var o = { v: from };
+  el._t = gsap.to(o, { v: val, duration: 0.45, ease: "power2.out", onUpdate: function () { el.textContent = Math.round(o.v); }, onComplete: function () { el.textContent = val; } });
+}
+function bars(root) {
+  if (!animOK()) return;
+  var els = $$(".bar i", root);
+  if (els.length) gsap.from(els, { scaleX: 0, duration: 0.4, ease: "power3.out", stagger: 0.025 });
+}
+function swap(el, fn) {
+  if (!animOK()) { fn(); return; }
+  gsap.to(el, { opacity: 0.35, filter: "blur(2px)", duration: 0.12, ease: "power1.out", onComplete: function () { fn(); gsap.to(el, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", clearProps: "filter,opacity" }); } });
+}
+var live = function (t) { var l = $("#live"); l.textContent = ""; setTimeout(function () { l.textContent = t; }, 30); };
+
+/* ---------- datos de ejemplo ---------- */
+var SEDES = [{ id: "buc", n: "Bucaramanga" }, { id: "cuc", n: "Cúcuta" }, { id: "val", n: "Valledupar" }, { id: "bog", n: "Bogotá" }];
+var sedeN = function (id) { var s = SEDES.filter(function (x) { return x.id === id; })[0]; return s ? s.n : "Todas"; };
+var PERIODOS = [{ id: "2026b", n: "2026 B (abierto)", corte: "21 oct 2026" }, { id: "2026a", n: "2026 A", corte: "28 may 2026" }, { id: "2025b", n: "2025 B", corte: "1 dic 2025" }];
+var CORTES = { buc: { act: "21 oct 2026", nom: "21 oct 2026", har: "Verificada con HAR" }, cuc: { act: "19 oct 2026", nom: "19 oct 2026", har: "Sin HAR: rutas de Bucaramanga" }, val: { act: "19 oct 2026", nom: "—", har: "Sin HAR: rutas de Bucaramanga" }, bog: null };
+var ROLES = {
+  sol: { n: "Solicitante", scope: "Ve solo las solicitudes que creó. Persona de ejemplo: Andrea Pineda.", act: null },
+  dir: { n: "Directivo", scope: "Directivo de Ingeniería de Sistemas y Ciencias Básicas. Alcance por unidad donde es Gestor.", act: 0, deps: ["Ingeniería de Sistemas", "Ciencias Básicas"] },
+  vic: { n: "Vicerrector", scope: "Vicerrectoría Académica. Alcance: todos los departamentos académicos.", act: 1 },
+  plan: { n: "Planeación", scope: "Oficina de Planeación. Ve todas las sedes y cierra el último paso.", act: 2 },
+  adm: { n: "Administración", scope: "Administración del portal. Puede firmar a nombre de otro rol, con nota por cada rol que sustituye.", act: "any" }
+};
+var PASOS = [{ n: "Dirección de la unidad", rol: "dir" }, { n: "Vicerrectoría", rol: "vic" }, { n: "Planeación", rol: "plan" }];
+var MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function fecha(back) { var d = new Date(2026, 9, 26 - back); return d.getDate() + " " + MES[d.getMonth()]; }
+
+var STRUCT = [
+  { cod: "DOC", nom: "Docencia", kids: [
+    { cod: "DOC-01", nom: "Clases presenciales", tipo: "Directa", vinc: "TC · MT · Cátedra", h: 16 },
+    { cod: "DOC-02", nom: "Asesoría de proyecto de grado", tipo: "Directa", vinc: "TC · MT", h: 2 },
+    { cod: "DOC-10", nom: "Preparación de clases", tipo: "Apoyo", vinc: "TC · MT", h: 8 },
+    { cod: "DOC-11", nom: "Evaluación y calificación", tipo: "Apoyo", vinc: "TC · MT · Cátedra", h: 4 },
+    { cod: "DOC-12", nom: "Tutoría académica", tipo: "Apoyo", vinc: "TC", h: 3 } ] },
+  { cod: "INV", nom: "Investigación", kids: [
+    { cod: "INV-01", nom: "Semillero de investigación", tipo: "Apoyo", vinc: "TC · MT", h: 4 },
+    { cod: "INV-02", nom: "Dirección de proyecto", tipo: "Directa", vinc: "TC", h: 6 } ] },
+  { cod: "EXT", nom: "Extensión", kids: [
+    { cod: "EXT-01", nom: "Proyección social", tipo: "Apoyo", vinc: "TC · MT", h: 3 } ] },
+  { cod: "GES", nom: "Gestión académica", kids: [
+    { cod: "GES-01", nom: "Coordinación de programa", tipo: "Apoyo", vinc: "TC", h: 10 },
+    { cod: "GES-02", nom: "Comité curricular", tipo: "Apoyo", vinc: "TC · MT", h: 2 } ] }
+];
+var FLAT = []; STRUCT.forEach(function (g) { g.kids.forEach(function (k) { FLAT.push(k); }); });
+var byCod = function (c) { return FLAT.filter(function (x) { return x.cod === c; })[0]; };
+function structFor(per) {
+  var list = FLAT.map(function (k) { return Object.assign({}, k); });
+  if (per === "2026a") { list = list.filter(function (k) { return k.cod !== "GES-02"; }); list.forEach(function (k) { if (k.cod === "INV-02") k.h = 4; if (k.cod === "EXT-01") k.vinc = "TC"; }); }
+  if (per === "2025b") { list = list.filter(function (k) { return k.cod !== "INV-01" && k.cod !== "DOC-12" && k.cod !== "GES-02"; }); list.forEach(function (k) { if (k.cod === "DOC-10") k.h = 6; }); }
+  return list;
+}
+
+var DEPS = ["Ingeniería de Sistemas", "Ciencias Básicas", "Administración", "Derecho", "Enfermería", "Psicología"];
+// id, tipo, cod, dep, sede, per, solicitante, prioridad, estado, paso, venc, cambio, justificación
+var SEED = [
+  ["GM-2026-031", "Editar", "DOC-02", "Ingeniería de Sistemas", "buc", "2026b", "Camilo Rueda", "alta", "pend", 0, 1, { h: [2, 4] }, "La cohorte 2026 tiene 38 proyectos de grado y el cupo actual de asesoría no alcanza para asignarlos a tiempo."],
+  ["GM-2026-032", "Crear", "DOC-13", "Ciencias Básicas", "buc", "2026b", "Sandra Meneses", "normal", "pend", 0, 4, { nuevo: "Laboratorio de práctica guiada" }, "Los cursos de física y química requieren una actividad de apoyo propia para las prácticas guiadas del laboratorio."],
+  ["GM-2026-029", "Editar", "DOC-10", "Administración", "cuc", "2026b", "Julián Arenas", "normal", "rev", 1, 0, { n: ["Preparación de clases", "Preparación y diseño de clases"] }, "Se incorpora el diseño de material virtual dentro de la misma actividad para no abrir una nueva."],
+  ["GM-2026-027", "Editar", "INV-02", "Ingeniería de Sistemas", "buc", "2026b", "Lucía Barrios", "alta", "rev", 1, -1, { h: [6, 8] }, "Dos proyectos con financiación externa exigen más horas de dirección durante el segundo semestre."],
+  ["GM-2026-025", "Archivar", "DOC-12", "Derecho", "val", "2026b", "Mauricio Peña", "normal", "pend", 0, -2, { est: ["Activa", "Inactiva"] }, "La tutoría de este programa se integró a la asesoría de proyecto y la actividad ya no se usa."],
+  ["GM-2026-033", "Editar", "GES-01", "Enfermería", "bog", "2026b", "Diana Carrascal", "urgente", "pend", 0, 1, { h: [10, 12] }, "El programa abre una segunda cohorte en Bogotá y la coordinación necesita dos horas semanales más."],
+  ["GM-2026-022", "Editar", "DOC-01", "Psicología", "buc", "2026b", "Ricardo Fuentes", "normal", "dev", 0, 0, { v: ["TC · MT", "TC · MT · Cátedra"] }, "Se pide abrir la actividad a docentes de cátedra en los grupos de práctica clínica."],
+  ["GM-2026-018", "Crear", "INV-03", "Ciencias Básicas", "buc", "2026b", "Paola Estévez", "normal", "rev", 2, 3, { nuevo: "Publicación de resultados" }, "Se necesita registrar el tiempo de escritura de artículos de los grupos de investigación."],
+  ["GM-2026-015", "Editar", "EXT-01", "Administración", "cuc", "2026b", "Héctor Quintero", "normal", "apr", 3, 0, { h: [3, 4] }, "Dos convenios de proyección social con empresas del área metropolitana requieren una hora más de seguimiento."],
+  ["GM-2026-012", "Editar", "DOC-11", "Derecho", "val", "2026b", "Natalia Cárdenas", "normal", "apr", 3, 0, { h: [4, 5] }, "Los exámenes escritos de consultorio jurídico aumentan el tiempo de calificación."],
+  ["GM-2026-009", "Editar", "GES-02", "Psicología", "buc", "2026b", "Óscar Villamizar", "baja", "rec", 1, 0, { h: [2, 6] }, "Se solicitaban seis horas semanales para el comité curricular durante todo el periodo."],
+  ["GM-2026-034", "Editar", "DOC-01", "Ingeniería de Sistemas", "buc", "2026b", "Andrea Pineda", "normal", "pend", 0, 3, { h: [16, 18] }, "Dos grupos de programación pasan a sesiones de tres horas, por lo que la actividad sube a 18 horas."],
+  ["GM-2026-030", "Editar", "DOC-10", "Ciencias Básicas", "buc", "2026b", "Andrea Pineda", "normal", "rev", 1, 2, { h: [8, 9] }, "El nuevo plan de estudios añade una asignatura de matemáticas aplicadas."],
+  ["GM-2026-035", "Crear", "DOC-14", "Enfermería", "bog", "2026b", "Diana Carrascal", "normal", "pend", 0, 4, { nuevo: "Simulación clínica" }, "La sede Bogotá incorpora un laboratorio de simulación que hoy no tiene una actividad que lo cubra."],
+  ["GM-2026-008", "Editar", "INV-01", "Administración", "cuc", "2026a", "Julián Arenas", "normal", "apr", 3, 0, { h: [3, 4] }, "Un semillero nuevo en el área de logística."],
+  ["GM-2026-004", "Editar", "DOC-01", "Derecho", "val", "2026a", "Natalia Cárdenas", "normal", "rec", 0, 0, { h: [16, 20] }, "Aumento de clases presenciales sin soporte de matrícula."]
+];
+var SOL = SEED.map(function (r, i) {
+  var s = { id: r[0], tipo: r[1], cod: r[2], dep: r[3], sede: r[4], per: r[5], sol: r[6], prio: r[7], est: r[8], paso: r[9], venc: r[10], ch: r[11], just: r[12], comm: [], ap: 0 };
+  var base = byCod(s.cod);
+  s.act = s.ch.nuevo || (base ? base.nom : s.cod);
+  if (s.est !== "pend" && s.est !== "rev") s.venc = null;
+  var d0 = 14 + (i % 5);
+  s.hist = [{ d: fecha(d0), who: s.sol, t: "Creó y envió la solicitud." }];
+  for (var p = 0; p < s.paso; p++) s.hist.push({ d: fecha(d0 - 3 - p * 2), who: PASOS[p].n, t: "Aprobó. «Revisado con el programa; procede.»" });
+  if (s.est === "dev") s.hist.push({ d: fecha(2), who: PASOS[0].n, t: "Devolvió. «Falta indicar cuántos grupos de práctica clínica se abrirían.»" });
+  if (s.est === "rec") s.hist.push({ d: fecha(6), who: PASOS[s.paso].n, t: "Rechazó. «No hay soporte de matrícula para esta ampliación.»" });
+  if (s.est === "apr") s.hist.push({ d: fecha(4), who: "Planeación", t: "Aprobó. Pasa a la cola de aplicación en el Master." });
+  if (s.est === "apr" && s.per === "2026a") s.ap = 2;
+  return s;
+});
+SOL.find = function (id) { return SOL.filter(function (s) { return s.id === id; })[0]; };
+var EVENTS = [];
+var nextNum = 36;
+
+var FLOWS = {
+  std: { n: "Flujo estándar", steps: [
+    { n: "Dirección de la unidad", rol: "Directivo", alc: "Misma unidad", plazo: 5, sup: "Subdirector designado", esc: true },
+    { n: "Vicerrectoría", rol: "Vicerrector", alc: "Vicerrectoría de la unidad", plazo: 5, sup: "Asistente de vicerrectoría", esc: true },
+    { n: "Planeación", rol: "Planeación", alc: "Institucional", plazo: 3, sup: "Sin suplente", esc: false } ] },
+  rap: { n: "Flujo corto (hasta 2 horas de diferencia)", steps: [
+    { n: "Dirección de la unidad", rol: "Directivo", alc: "Misma unidad", plazo: 3, sup: "Subdirector designado", esc: false },
+    { n: "Planeación", rol: "Planeación", alc: "Institucional", plazo: 3, sup: "Sin suplente", esc: false } ] }
+};
+
+/* ---------- estado ---------- */
+var S = { role: "dir", per: "2026b", sede: "buc", mode: "normal", loading: false, est: "todas", dep: "", sol: "", q: "", sel: {}, open: null, tab: "bandeja", subtab: "sol", view: "tabla", cmp: "", flow: "std", demoStep: 1, segId: null, expanded: { DOC: true, INV: true, EXT: true, GES: true }, propose: null };
+var kbd = false;
+document.addEventListener("keydown", function () { kbd = true; }, true);
+document.addEventListener("pointerdown", function () { kbd = false; }, true);
+
+var statName = { pend: "Pendiente", rev: "En revisión", dev: "Devuelta", apr: "Aprobada", rec: "Rechazada" };
+var pill = function (e, extra) { return '<span class="pill ' + e + '">' + statName[e] + (extra || "") + "</span>"; };
+
+function inScope(s) {
+  var r = ROLES[S.role];
+  if (S.role === "sol") return s.sol === "Andrea Pineda";
+  if (S.role === "dir") return r.deps.indexOf(s.dep) >= 0;
+  return true;
+}
+function baseSet() { return SOL.filter(function (s) { return s.per === S.per && (S.sede === "all" || s.sede === S.sede) && inScope(s); }); }
+function canAct(s) {
+  if (s.est !== "pend" && s.est !== "rev") return false;
+  if (S.role === "sol") return false;
+  var a = ROLES[S.role].act;
+  return a === "any" || a === s.paso;
+}
+function whyNot(s) {
+  if (s.est === "apr" || s.est === "rec") return "Esta solicitud ya está cerrada.";
+  if (s.est === "dev") return "Está devuelta; la corrige el solicitante.";
+  if (S.role === "sol") return "El solicitante no decide sobre solicitudes.";
+  return "Esta solicitud espera a " + PASOS[s.paso].n + ", que no es su rol.";
+}
+function visibleList() {
+  return baseSet().filter(function (s) {
+    if (S.est === "decidir" && !(s.est === "pend" || s.est === "rev")) return false;
+    if (S.est === "mias" && !canAct(s)) return false;
+    if (["dev", "apr", "rec"].indexOf(S.est) >= 0 && s.est !== S.est) return false;
+    if (S.dep && s.dep !== S.dep) return false;
+    if (S.sol && s.sol !== S.sol) return false;
+    if (S.q) { var q = S.q.toLowerCase(); if ((s.id + " " + s.act + " " + s.cod).toLowerCase().indexOf(q) < 0) return false; }
+    return true;
+  });
+}
+
+/* ---------- selectores globales ---------- */
+function fillSelect(el, items, val) { el.innerHTML = items.map(function (i) { return '<option value="' + esc(i[0]) + '"' + (i[0] === val ? " selected" : "") + ">" + esc(i[1]) + "</option>"; }).join(""); }
+fillSelect($("#role"), Object.keys(ROLES).map(function (k) { return [k, ROLES[k].n]; }), S.role);
+fillSelect($("#per"), PERIODOS.map(function (p) { return [p.id, p.n]; }), S.per);
+fillSelect($("#sede"), [["all", "Todas las sedes"]].concat(SEDES.map(function (s) { return [s.id, s.n]; })).map(function (x) { return x; }), S.sede);
+$("#sede").value = S.sede;
+
+function renderScope() {
+  var r = ROLES[S.role];
+  $("#scope").innerHTML = "<b>" + esc(r.n) + ".</b> " + esc(r.scope);
+}
+
+/* ---------- pestañas ---------- */
+function makeTabs(list, onSel) {
+  var tabs = $$('[role="tab"]', list);
+  function select(t, focus) {
+    tabs.forEach(function (x) { var on = x === t; x.setAttribute("aria-selected", on); x.tabIndex = on ? 0 : -1; });
+    if (focus) t.focus();
+    onSel(t);
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () { select(t, false); });
+    t.addEventListener("keydown", function (e) {
+      var i = tabs.indexOf(t), n = null;
+      if (e.key === "ArrowRight") n = tabs[(i + 1) % tabs.length];
+      else if (e.key === "ArrowLeft") n = tabs[(i - 1 + tabs.length) % tabs.length];
+      else if (e.key === "Home") n = tabs[0]; else if (e.key === "End") n = tabs[tabs.length - 1];
+      if (n) { e.preventDefault(); select(n, true); }
+    });
+  });
+  return select;
+}
+var PANELS = ["bandeja", "estructura", "periodo", "seguimiento", "flujos", "conexion"];
+var selectTab = makeTabs($("#apptabs"), function (t) { showTab(t.id.replace("tab-", "")); });
+function showTab(id, noAnim) {
+  S.tab = id;
+  PANELS.forEach(function (p) { $("#pnl-" + p).hidden = p !== id; });
+  $$("#apptabs [role=tab]").forEach(function (x) { var on = x.id === "tab-" + id; x.setAttribute("aria-selected", on); x.tabIndex = on ? 0 : -1; });
+  renderTab(id, !noAnim);
+}
+$$("#mapa a").forEach(function (a) { a.addEventListener("click", function () { showTab(a.getAttribute("data-go")); }); });
+
+function renderTab(id, anim) {
+  if (id === "bandeja") renderBandeja(anim);
+  else if (id === "estructura") renderEstructura(anim);
+  else if (id === "periodo") renderPeriodo(anim);
+  else if (id === "seguimiento") renderSeg(anim);
+  else if (id === "flujos") renderFlujos(anim);
+  else renderConexion(anim);
+}
+function rerenderAll(anim) { renderScope(); renderTab(S.tab, anim); }
+
+function onContext(kind) {
+  var pnl = $("#pnl-" + S.tab);
+  if (S.tab === "bandeja") {
+    closeDetail(true);
+    S.loading = true; S.sel = {}; renderBandeja(false);
+    setTimeout(function () { S.loading = false; renderBandeja(true); }, animOK() ? 320 : 0);
+  } else swap(pnl, function () { renderTab(S.tab, false); });
+}
+$("#role").addEventListener("change", function (e) { S.role = e.target.value; S.sel = {}; renderScope(); if (S.open && !visibleList().some(function (s) { return s.id === S.open; })) closeDetail(true); renderTab(S.tab, false); });
+$("#per").addEventListener("change", function (e) { S.per = e.target.value; onContext(); });
+$("#sede").addEventListener("change", function (e) { S.sede = e.target.value; onContext(); });
+$("#mode").addEventListener("change", function (e) { S.mode = e.target.value; renderTab(S.tab, true); });
+
+/* ---------- bandeja ---------- */
+function buildFilters() {
+  fillSelect($("#f-est"), [["todas", "Todas"], ["decidir", "Esperan decisión"], ["mias", "Te corresponden"], ["dev", "Devueltas"], ["apr", "Aprobadas"], ["rec", "Rechazadas"]], S.est);
+  fillSelect($("#f-dep"), [["", "Todos"]].concat(DEPS.map(function (d) { return [d, d]; })), S.dep);
+  var sols = {}; baseSet().forEach(function (s) { sols[s.sol] = 1; });
+  fillSelect($("#f-sol"), [["", "Todos"]].concat(Object.keys(sols).sort().map(function (n) { return [n, n]; })), S.sol);
+}
+["f-est", "f-dep", "f-sol"].forEach(function (id) {
+  $("#" + id).addEventListener("change", function (e) { S[id.replace("f-", "")] = e.target.value; S.sel = {}; renderList(false); renderCounters(); });
+});
+$("#f-q").addEventListener("input", function (e) { S.q = e.target.value; renderList(false); });
+
+function renderCounters() {
+  var b = baseSet();
+  var vals = [
+    ["Esperan decisión", b.filter(function (s) { return s.est === "pend" || s.est === "rev"; }).length],
+    ["Te corresponden", b.filter(canAct).length],
+    ["Devueltas", b.filter(function (s) { return s.est === "dev"; }).length],
+    ["Vencen en 1 día o ya vencidas", b.filter(function (s) { return s.venc !== null && s.venc <= 1; }).length],
+    ["Aprobadas del periodo", b.filter(function (s) { return s.est === "apr"; }).length]
+  ];
+  var host = $("#counters");
+  if (host.children.length !== vals.length) host.innerHTML = vals.map(function (v) { return "<div><b data-v=\"0\">0</b><span></span></div>"; }).join("");
+  vals.forEach(function (v, i) { var d = host.children[i]; $("span", d).textContent = v[0]; count($("b", d), v[1]); });
+}
+function sinceTxt(s) {
+  if (s.venc === null) return "";
+  if (s.venc < 0) return '<span class="late">Vencida hace ' + (-s.venc) + (s.venc === -1 ? " día" : " días") + "</span>";
+  if (s.venc <= 1) return '<span class="soon">' + (s.venc === 0 ? "Vence hoy" : "Vence mañana") + "</span>";
+  return "Vence en " + s.venc + " días";
+}
+function rowHtml(s) {
+  var paso = (s.est === "pend" || s.est === "rev") ? "Paso " + (s.paso + 1) + " de 3 · " + PASOS[s.paso].n : (s.est === "apr" ? "Aplicación: " + ["sin aplicar en Master", "aplicada, falta captura", "reflejada en Master"][s.ap] : "");
+  return '<li class="r" data-id="' + s.id + '" data-sel="' + !!S.sel[s.id] + '" data-open="' + (S.open === s.id) + '">' +
+    '<label class="ck"><span class="sr">Seleccionar ' + s.id + '</span><input type="checkbox" ' + (S.sel[s.id] ? "checked" : "") + "></label>" +
+    '<button class="ro" type="button" aria-label="Abrir ' + s.id + ", " + esc(s.act) + '"><span class="r1"><span class="folio">' + s.id + "</span>" + esc(s.act) + ' <span class="mono">' + s.cod + "</span></span>" +
+    '<span class="r2">' + s.tipo + " · " + esc(s.dep) + " · " + sedeN(s.sede) + " · " + esc(s.sol) + (s.prio === "urgente" || s.prio === "alta" ? " · Prioridad " + s.prio : "") + "</span></button>" +
+    '<span class="rside">' + pill(s.est) + "<span>" + esc(paso) + "</span><span>" + sinceTxt(s) + "</span></span></li>";
+}
+function renderList(anim) {
+  var area = $("#listarea"), list = visibleList(), mode = S.mode;
+  var all = $("#selall");
+  if (S.loading || mode === "cargando") {
+    area.innerHTML = '<div aria-busy="true" aria-label="Leyendo el último corte del Warehouse">' + [1, 2, 3, 4, 5].map(function () { return '<div class="skel"><i></i><i></i></div>'; }).join("") + "</div>";
+    $("#listcount").textContent = "Leyendo el corte de " + sedeN(S.sede) + "…"; all.disabled = true; renderBulk(); return;
+  }
+  all.disabled = false;
+  if (mode === "error") {
+    area.innerHTML = '<div class="empty" role="alert"><h4>No se pudo leer el último corte</h4><p>El Warehouse no respondió para ' + esc(sedeN(S.sede)) + " " + S.per.toUpperCase() + ". Las solicitudes guardadas siguen en el portal; la comparación con la estructura vigente no está disponible.</p><button class=\"btn\" id=\"retry\" type=\"button\">Reintentar lectura</button></div>";
+    $("#retry").addEventListener("click", function () { $("#mode").value = "normal"; S.mode = "normal"; renderBandeja(true); });
+    $("#listcount").textContent = ""; renderBulk(); return;
+  }
+  if (mode === "vacio" || !baseSet().length) {
+    area.innerHTML = '<div class="empty"><h4>Aún no hay solicitudes en este periodo y sede</h4><p>Cuando alguien envíe una solicitud para ' + esc(sedeN(S.sede)) + " " + S.per.toUpperCase() + " aparecerá aquí. Las solicitudes se crean desde «Proponer cambio» en la estructura.</p></div>";
+    $("#listcount").textContent = "0 solicitudes"; renderBulk(); return;
+  }
+  if (!list.length) {
+    area.innerHTML = '<div class="empty"><h4>Ninguna solicitud con estos filtros</h4><p>Pruebe con otro estado o departamento, o quite la búsqueda.</p><button class="btn ghost" id="clr" type="button">Quitar filtros</button></div>';
+    $("#clr").addEventListener("click", function () { S.est = "todas"; S.dep = ""; S.sol = ""; S.q = ""; $("#f-q").value = ""; buildFilters(); renderList(false); });
+    $("#listcount").textContent = "0 de " + baseSet().length; renderBulk(); return;
+  }
+  area.innerHTML = '<ul class="rows" role="list">' + list.map(rowHtml).join("") + "</ul>";
+  $("#listcount").textContent = list.length + " de " + baseSet().length + " solicitudes";
+  var ids = list.map(function (s) { return s.id; });
+  all.checked = ids.length > 0 && ids.every(function (i) { return S.sel[i]; });
+  if (anim) enter($$(".r", area));
+  renderBulk();
+}
+$("#selall").addEventListener("change", function (e) {
+  visibleList().forEach(function (s) { if (e.target.checked) S.sel[s.id] = true; else delete S.sel[s.id]; });
+  renderList(false);
+});
+$("#listarea").addEventListener("change", function (e) {
+  if (e.target.type !== "checkbox") return;
+  var id = e.target.closest(".r").getAttribute("data-id");
+  if (e.target.checked) S.sel[id] = true; else delete S.sel[id];
+  var li = e.target.closest(".r"); li.setAttribute("data-sel", !!S.sel[id]);
+  var ids = visibleList().map(function (s) { return s.id; }); $("#selall").checked = ids.every(function (i) { return S.sel[i]; });
+  renderBulk();
+});
+$("#listarea").addEventListener("click", function (e) {
+  var b = e.target.closest(".ro"); if (!b) return;
+  openDetail(b.closest(".r").getAttribute("data-id"), kbd);
+});
+$("#listarea").addEventListener("keydown", function (e) {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  var btns = $$(".ro", $("#listarea")), i = btns.indexOf(document.activeElement);
+  if (i < 0) return; e.preventDefault();
+  var n = btns[Math.max(0, Math.min(btns.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (n) n.focus();
+});
+
+/* acción en bloque */
+var bulkMode = null;
+function renderBulk() {
+  var z = $("#bulkzone"), ids = Object.keys(S.sel);
+  if (!ids.length) { z.innerHTML = ""; bulkMode = null; return; }
+  var mine = ids.filter(function (i) { return canAct(SOL.find(i)); });
+  var skip = ids.length - mine.length;
+  var html = '<div class="bulk"><span class="grow"><b>' + ids.length + (ids.length === 1 ? " seleccionada" : " seleccionadas") + "</b>" + (skip ? " · " + skip + (skip === 1 ? " no te corresponde y se omitirá" : " no te corresponden y se omitirán") : "") + "</span>" +
+    '<button class="btn ok sm" id="b-apr" type="button" ' + (mine.length ? "" : "disabled") + ">Aprobar " + mine.length + '</button><button class="btn ghost sm" id="b-dev" type="button" ' + (mine.length ? "" : "disabled") + '>Devolver con nota</button><button class="btn ghost sm" id="b-clr" type="button">Quitar selección</button></div>';
+  if (bulkMode && mine.length) {
+    html += '<div class="bulkform"><label class="fld" for="b-note">Nota común para ' + mine.length + " solicitudes (mínimo 20 caracteres)<textarea id=\"b-note\"></textarea></label><div class=\"acts\" style=\"display:flex;gap:8px;flex-wrap:wrap\"><button class=\"btn " + (bulkMode === "apr" ? "ok" : "") + ' sm" id="b-go" type="button" disabled>Confirmar: ' + (bulkMode === "apr" ? "aprobar" : "devolver") + '</button><button class="btn ghost sm" id="b-no" type="button">Cancelar</button><span class="small" id="b-cnt">0 / 20</span></div></div>';
+  }
+  z.innerHTML = html;
+  if (bulkMode && mine.length) pop($(".bulkform", z));
+  var go = function (m) { return function () { bulkMode = m; renderBulk(); var t = $("#b-note"); if (t) t.focus(); }; };
+  var a = $("#b-apr"), d = $("#b-dev");
+  if (a) a.addEventListener("click", go("apr")); if (d) d.addEventListener("click", go("dev"));
+  $("#b-clr").addEventListener("click", function () { S.sel = {}; bulkMode = null; renderList(false); });
+  var no = $("#b-no"); if (no) no.addEventListener("click", function () { bulkMode = null; renderBulk(); });
+  var note = $("#b-note");
+  if (note) {
+    note.addEventListener("input", function () { var n = note.value.trim().length; $("#b-cnt").textContent = n + " / 20"; $("#b-go").disabled = n < 20; });
+    $("#b-go").addEventListener("click", function () { doBulk(mine, skip, bulkMode, note.value.trim()); });
+  }
+}
+function doBulk(mine, skip, m, note) {
+  mine.forEach(function (id) { decide(SOL.find(id), m === "apr" ? "apr" : "dev", note, true); });
+  var verb = m === "apr" ? "aprobadas" : "devueltas";
+  live(mine.length + " solicitudes " + verb + (skip ? ", " + skip + " omitidas porque no te corresponden." : "."));
+  S.sel = {}; bulkMode = null;
+  var gone = [];
+  var vis = visibleList().map(function (s) { return s.id; });
+  mine.forEach(function (id) { if (vis.indexOf(id) < 0) gone.push(id); });
+  finishChange(gone);
+}
+
+/* detalle */
+function bandeja() { return $("#bandeja"); }
+function openDetail(id, fromKeyboard) {
+  var wasOpen = !!S.open; S.open = id; S.subtab = S.subtab || "sol";
+  bandeja().classList.add("has-detail"); $("#detail").hidden = false; $("#dback").hidden = false;
+  renderDetail();
+  $$(".r").forEach(function (r) { r.setAttribute("data-open", r.getAttribute("data-id") === id); });
+  if (!wasOpen) slideIn($("#detail"), fromKeyboard);
+  var h = $("#dt"); if (h) h.focus();
+}
+function closeDetail(silent) {
+  var id = S.open; S.open = null;
+  bandeja().classList.remove("has-detail"); $("#detail").hidden = true; $("#dback").hidden = true; $("#detail").innerHTML = "";
+  $$(".r").forEach(function (r) { r.setAttribute("data-open", "false"); });
+  if (!silent && id) { var b = $('.r[data-id="' + id + '"] .ro'); if (b) b.focus(); }
+}
+$("#dback").addEventListener("click", function () { closeDetail(); });
+document.addEventListener("keydown", function (e) { if (e.key === "Escape" && S.open && S.tab === "bandeja") closeDetail(); });
+
+function cmpRows(s) {
+  var b = byCod(s.cod), ch = s.ch;
+  var vig = b ? { nom: b.nom, tipo: b.tipo, vinc: b.vinc, h: b.h + " h", est: "Activa" } : { nom: "No existe", tipo: "—", vinc: "—", h: "—", est: "—" };
+  var sol = { nom: vig.nom, tipo: vig.tipo, vinc: vig.vinc, h: vig.h, est: vig.est };
+  var chg = {};
+  if (ch.h) { sol.h = ch.h[1] + " h"; chg.h = 1; vig.h = ch.h[0] + " h"; }
+  if (ch.n) { sol.nom = ch.n[1]; chg.nom = 1; }
+  if (ch.v) { sol.vinc = ch.v[1]; chg.vinc = 1; vig.vinc = ch.v[0]; }
+  if (ch.est) { sol.est = ch.est[1]; chg.est = 1; }
+  if (ch.nuevo) { sol = { nom: ch.nuevo, tipo: "Apoyo", vinc: "TC · MT", h: "2 h", est: "Activa" }; chg = { nom: 1, tipo: 1, vinc: 1, h: 1, est: 1 }; }
+  var rows = [["Nombre", "nom"], ["Tipo", "tipo"], ["Vinculación", "vinc"], ["Horas por semana", "h"], ["Estado", "est"]];
+  return rows.map(function (r) { return "<tr><td>" + r[0] + "</td><td>" + esc(vig[r[1]]) + '</td><td class="' + (chg[r[1]] ? "chg" : "") + '">' + esc(sol[r[1]]) + "</td></tr>"; }).join("");
+}
+function renderDetail() {
+  var s = SOL.find(S.open); if (!s) return closeDetail(true);
+  var d = $("#detail"), act = canAct(s);
+  var cor = CORTES[s.sede];
+  var panes = {
+    sol: '<dl class="kv"><dt>Tipo</dt><dd>' + s.tipo + "</dd><dt>Actividad</dt><dd>" + esc(s.act) + ' <span class="mono">' + s.cod + "</span></dd><dt>Departamento</dt><dd>" + esc(s.dep) + "</dd><dt>Sede y periodo</dt><dd>" + sedeN(s.sede) + " · " + s.per.toUpperCase() + "</dd><dt>Solicitante</dt><dd>" + esc(s.sol) + "</dd><dt>Prioridad</dt><dd>" + s.prio + "</dd><dt>Turno</dt><dd>" + ((s.est === "pend" || s.est === "rev") ? "Paso " + (s.paso + 1) + " de 3, " + PASOS[s.paso].n : statName[s.est]) + '</dd></dl><div class="just"><b>Justificación</b><br>' + esc(s.just) + "</div>",
+    cmp: (cor ? "" : '<p class="notice">No hay captura del Master para esta sede. No se puede mostrar la estructura vigente.</p>') + '<p class="small" style="margin-bottom:6px">Vigente: <span class="pill src">Master · corte ' + (cor ? cor.act : "—") + '</span></p><div class="tblwrap"><table class="cmp"><thead><tr><th></th><th>Vigente</th><th>Solicitado</th></tr></thead><tbody>' + cmpRows(s) + "</tbody></table></div>",
+    his: '<ol class="hist">' + s.hist.map(function (h) { return "<li><div><time>" + h.d + "</time><b>" + esc(h.who) + "</b> " + esc(h.t) + "</div></li>"; }).join("") + "</ol>",
+    com: (s.comm.length ? s.comm.map(function (c) { return '<div class="cmt"><b>' + esc(c.who) + "</b> · " + c.d + "<br>" + esc(c.t) + "</div>"; }).join("") : '<p class="small">Sin comentarios todavía.</p>') + '<label class="fld" for="cm-t" style="margin-top:10px">Nuevo comentario<textarea id="cm-t"></textarea></label><button class="btn ghost sm" id="cm-go" type="button" style="margin-top:6px">Publicar comentario</button>'
+  };
+  d.innerHTML = '<div class="detail-head"><div class="row"><span class="mono">' + s.id + "</span>" + pill(s.est) + '<button class="btn ghost sm" id="dclose" type="button">Cerrar</button></div><h3 id="dt" tabindex="-1">' + esc(s.act) + "</h3></div>" +
+    '<div class="detail-body"><div class="subtabs" role="tablist" aria-label="Secciones del detalle">' +
+    [["sol", "Solicitud"], ["cmp", "Comparación"], ["his", "Historial"], ["com", "Comentarios (" + s.comm.length + ")"]].map(function (t) { return '<button role="tab" type="button" data-t="' + t[0] + '" aria-selected="' + (S.subtab === t[0]) + '" tabindex="' + (S.subtab === t[0] ? 0 : -1) + '">' + t[1] + "</button>"; }).join("") +
+    '</div><div id="dpane">' + panes[S.subtab] + "</div></div>" +
+    '<div class="detail-foot" id="dfoot">' + (act ? '<div class="acts"><button class="btn ok" id="d-apr" type="button">Aprobar</button><button class="btn ghost" id="d-dev" type="button">Devolver con nota</button><button class="btn bad" id="d-rec" type="button">Rechazar</button></div><div id="cfm"></div>' : '<p class="small">' + esc(whyNot(s)) + "</p>") + '<div class="stamp" id="stamp"></div></div>';
+  $("#dclose").addEventListener("click", function () { closeDetail(); });
+  var tl = $(".subtabs", d), tabs = $$("[role=tab]", tl);
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () { S.subtab = t.getAttribute("data-t"); renderDetailKeep(); });
+    t.addEventListener("keydown", function (e) {
+      var i = tabs.indexOf(t), n = null;
+      if (e.key === "ArrowRight") n = tabs[(i + 1) % tabs.length]; else if (e.key === "ArrowLeft") n = tabs[(i - 1 + tabs.length) % tabs.length];
+      if (n) { e.preventDefault(); S.subtab = n.getAttribute("data-t"); renderDetailKeep(); var cur = $('[data-t="' + S.subtab + '"]', $("#detail")); if (cur) cur.focus(); }
+    });
+  });
+  var cm = $("#cm-go");
+  if (cm) cm.addEventListener("click", function () { var v = $("#cm-t").value.trim(); if (!v) return; s.comm.push({ who: ROLES[S.role].n, d: fecha(0), t: v }); EVENTS.unshift({ t: "comentario", f: s.id, sede: s.sede, per: s.per }); renderDetailKeep(); live("Comentario publicado."); });
+  if (act) {
+    $("#d-apr").addEventListener("click", function () { askNote(s, "apr"); });
+    $("#d-dev").addEventListener("click", function () { askNote(s, "dev"); });
+    $("#d-rec").addEventListener("click", function () { askNote(s, "rec"); });
+  }
+}
+function renderDetailKeep() { var sc = $(".detail-body") ? $(".detail-body").scrollTop : 0; var ae = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute("data-t"); renderDetail(); if ($(".detail-body")) $(".detail-body").scrollTop = sc; }
+var VERB = { apr: ["Aprobar", "Aprobada", "ok"], dev: ["Devolver", "Devuelta", ""], rec: ["Rechazar", "Rechazada", "bad"] };
+function askNote(s, kind) {
+  var c = $("#cfm"); var v = VERB[kind];
+  var extra = (S.role === "adm" && ROLES.adm) ? '<p class="small">Firma a nombre de ' + esc(PASOS[s.paso].n) + ". Quedará marcada como resolución administrativa.</p>" : "";
+  c.innerHTML = '<div class="confirm" id="cfbox"><label class="fld" for="n-t">Nota de la decisión (obligatoria, mínimo 20 caracteres)<textarea id="n-t"></textarea></label>' + extra + '<div class="cnt" id="n-c">0 / 20</div><div class="acts" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ' + v[2] + '" id="n-go" type="button" disabled>Confirmar: ' + v[0].toLowerCase() + '</button><button class="btn ghost" id="n-no" type="button">Cancelar</button></div></div>';
+  pop($("#cfbox")); $("#n-t").focus();
+  $("#n-t").addEventListener("input", function () { var n = $("#n-t").value.trim().length; $("#n-c").textContent = n + " / 20"; $("#n-go").disabled = n < 20; });
+  $("#n-no").addEventListener("click", function () { c.innerHTML = ""; });
+  $("#n-go").addEventListener("click", function () {
+    var note = $("#n-t").value.trim(), before = s.paso;
+    decide(s, kind, note, false);
+    stampIt(kind, s, before, function () { afterSingle(s); });
+  });
+}
+function stampIt(kind, s, before, done) {
+  var st = $("#stamp"); st.className = "stamp " + kind;
+  st.textContent = kind === "apr" ? (s.est === "apr" ? "Aprobada. Pasa a la cola de aplicación en el Master." : "Paso " + (before + 1) + " firmado. Sigue: " + PASOS[s.paso].n + ".") : (kind === "dev" ? "Devuelta al solicitante con su nota." : "Solicitud rechazada. La cadena queda cerrada.");
+  live(st.textContent);
+  if (!HAS) { st.style.opacity = 1; setTimeout(done, 700); return; }
+  if (RM.matches) { gsap.to(st, { opacity: 1, duration: 0.12, onComplete: function () { gsap.to(st, { opacity: 0, delay: 0.8, duration: 0.12, onComplete: done }); } }); return; }
+  var tl = gsap.timeline({ onComplete: done });
+  tl.fromTo(st, { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.2, ease: "power3.out" }).to(st, { opacity: 0, duration: 0.18, ease: "power1.in" }, "+=0.7");
+}
+function afterSingle(s) {
+  var vis = visibleList().some(function (x) { return x.id === s.id; });
+  if (!vis) { var ids = [s.id]; closeDetail(true); finishChange(ids); }
+  else { renderDetail(); finishChange([]); }
+}
+function decide(s, kind, note, bulk) {
+  var who = PASOS[Math.min(s.paso, 2)].n + (S.role === "adm" ? " (por administración)" : "") + (bulk ? " · en bloque" : "");
+  var verb = kind === "apr" ? "Aprobó" : (kind === "dev" ? "Devolvió" : "Rechazó");
+  s.hist.push({ d: fecha(0), who: who, t: verb + ". «" + note + "»" });
+  EVENTS.unshift({ t: kind === "apr" ? "paso firmado" : (kind === "dev" ? "devuelta" : "rechazada"), f: s.id, sede: s.sede, per: s.per });
+  if (kind === "apr") { s.paso++; if (s.paso >= 3) { s.est = "apr"; s.venc = null; s.ap = 0; EVENTS.unshift({ t: "aprobada", f: s.id, sede: s.sede, per: s.per }); } else { s.est = "rev"; s.venc = 5; } }
+  else if (kind === "dev") { s.est = "dev"; s.venc = null; }
+  else { s.est = "rec"; s.venc = null; }
+}
+function finishChange(gone) {
+  renderCounters(); buildFilters();
+  var area = $("#listarea");
+  if (gone.length && animOK()) {
+    var els = gone.map(function (id) { return $('.r[data-id="' + id + '"]', area); }).filter(Boolean);
+    if (els.length) { gsap.to(els, { opacity: 0, x: 12, duration: 0.2, ease: "power2.inOut", onComplete: function () { gsap.to(els, { height: 0, duration: 0.2, ease: "power2.inOut", onComplete: function () { renderList(false); } }); } }); return; }
+  }
+  renderList(false);
+}
+
+function renderBandeja(anim) {
+  buildFilters();
+  renderCounters();
+  renderList(!!anim);
+  if (S.open && !visibleList().some(function (s) { return s.id === S.open; })) closeDetail(true);
+}
+
+/* ---------- estructura ---------- */
+function fuenteBanner(sede, per) {
+  if (sede === "all") return "";
+  var c = CORTES[sede];
+  if (!c) return '<p class="notice" style="margin-bottom:12px">Sin captura del Master para ' + sedeN(sede) + ". No hay estructura vigente que mostrar; solo las solicitudes del portal.</p>";
+  return '<p style="margin-bottom:12px"><span class="pill src">Master · ms_actdir · corte ' + c.act + '</span> <span class="small">' + c.har + (per !== "2026b" ? ". Periodo anterior: depende de que ese corte se haya capturado en su momento." : ".") + "</span></p>";
+}
+function renderEstructura(anim) {
+  var p = $("#pnl-estructura"), per = S.per, list = structFor(per);
+  var cmpList = S.cmp ? structFor(S.cmp) : null;
+  var diff = {}, retired = [];
+  if (cmpList) {
+    list.forEach(function (k) { var o = cmpList.filter(function (x) { return x.cod === k.cod; })[0]; if (!o) diff[k.cod] = "Nueva"; else if (o.h !== k.h || o.vinc !== k.vinc) diff[k.cod] = "Modificada"; });
+    cmpList.forEach(function (o) { if (!list.some(function (k) { return k.cod === o.cod; })) retired.push(o); });
+  }
+  var can = true;
+  var sedeNoData = S.sede !== "all" && !CORTES[S.sede];
+  var html = fuenteBanner(S.sede, per) + '<div class="toolbar"><label class="fld" for="cmpper">Comparar con<select id="cmpper"><option value="">Sin comparar</option>' + PERIODOS.filter(function (x) { return x.id !== per; }).map(function (x) { return '<option value="' + x.id + '"' + (S.cmp === x.id ? " selected" : "") + ">" + x.n.replace(" (abierto)", "") + "</option>"; }).join("") + '</select></label><p class="small" style="max-width:48ch">Las horas tope no vienen del Master (<code>ms_actdir</code> no las trae). Las mantiene el portal.</p></div>';
+  if (sedeNoData) { p.innerHTML = html + '<div class="empty"><h4>Sin estructura vigente para ' + sedeN(S.sede) + '</h4><p>Hace falta una captura de <code>ms_actdir</code> para esta sede. Cargas desde Warehouse, sección Cargas.</p></div>'; bindCmp(); if (anim) enter([p.lastElementChild], { max: 1 }); return; }
+  html += '<div class="tblwrap"><table class="tree"><thead><tr><th>Código</th><th>Actividad</th><th>Tipo</th><th>Vinculación</th><th class="num">Horas tope (portal)</th><th>Vigencia</th>' + (cmpList ? "<th>Cambio</th>" : "") + "<th>Acción</th></tr></thead><tbody>";
+  STRUCT.forEach(function (g) {
+    var kids = list.filter(function (k) { return k.cod.indexOf(g.cod + "-") === 0; });
+    if (!kids.length) return;
+    var open = S.expanded[g.cod];
+    html += '<tr class="grp"><td>' + g.cod + '</td><td colspan="' + (cmpList ? 7 : 6) + '"><button class="tgl" type="button" data-g="' + g.cod + '" aria-expanded="' + !!open + '">' + g.nom + " (" + kids.length + ")</button></td></tr>";
+    if (open) kids.forEach(function (k) {
+      html += '<tr class="kid"><td class="mono">' + k.cod + "</td><td>" + k.nom + "</td><td>" + k.tipo + "</td><td>" + k.vinc + '</td><td class="num">' + k.h + "</td><td>" + per.toUpperCase() + " a hoy</td>" + (cmpList ? "<td>" + (diff[k.cod] ? '<span class="pill ' + (diff[k.cod] === "Nueva" ? "ok" : "pend") + '">' + diff[k.cod] + "</span>" : "") + "</td>" : "") +
+        '<td><button class="btn ghost sm" type="button" data-prop="' + k.cod + '">Proponer cambio</button></td></tr>';
+    });
+  });
+  html += "</tbody></table></div>";
+  if (retired.length) html += '<p class="small" style="margin-top:8px"><b>Retiradas desde ' + S.cmp.toUpperCase() + ":</b> " + retired.map(function (r) { return r.cod + " " + r.nom; }).join(" · ") + ".</p>";
+  html += '<div id="propbox"></div>';
+  p.innerHTML = html;
+  bindCmp();
+  $$(".tgl", p).forEach(function (b) { b.addEventListener("click", function () { var g = b.getAttribute("data-g"); S.expanded[g] = !S.expanded[g]; renderEstructura(false); var nb = $('[data-g="' + g + '"]', $("#pnl-estructura")); if (nb) nb.focus(); }); });
+  $$("[data-prop]", p).forEach(function (b) { b.addEventListener("click", function () { openProp(b.getAttribute("data-prop")); }); });
+  if (anim) enter($$(".kid", p));
+  if (S.propose) openProp(S.propose);
+}
+function bindCmp() { var c = $("#cmpper"); if (c) c.addEventListener("change", function () { S.cmp = c.value; renderEstructura(true); }); }
+function openProp(cod) {
+  S.propose = cod;
+  var k = byCod(cod), box = $("#propbox"); if (!box) return;
+  box.innerHTML = '<div class="confirm" style="margin-top:14px;max-width:560px" id="pbx"><h4>Proponer cambio a ' + cod + " · " + esc(k.nom) + '</h4><p class="small">No cambia el Master. Crea una solicitud que sigue el flujo y, si se aprueba, queda como tarea para Planeación.</p><div class="bgrid"><label class="fld" for="p-h">Horas por semana<input id="p-h" type="number" min="0" max="40" value="' + k.h + '"></label><label class="fld" for="p-e">Estado<select id="p-e"><option>Activa</option><option>Inactiva</option></select></label></div><label class="fld" for="p-j">Justificación (mínimo 20 caracteres en la maqueta; 150 en Rua)<textarea id="p-j"></textarea></label><div class="acts" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="p-go" type="button" disabled>Enviar al flujo</button><button class="btn ghost" id="p-no" type="button">Cancelar</button></div></div>';
+  pop($("#pbx"));
+  $("#p-j").addEventListener("input", function () { $("#p-go").disabled = $("#p-j").value.trim().length < 20; });
+  $("#p-no").addEventListener("click", function () { S.propose = null; box.innerHTML = ""; });
+  $("#p-go").addEventListener("click", function () {
+    var h = Number($("#p-h").value), e = $("#p-e").value, ch = {};
+    if (e === "Inactiva") ch.est = ["Activa", "Inactiva"]; if (h !== k.h) ch.h = [k.h, h];
+    if (!ch.est && !ch.h) { ch.h = [k.h, k.h + 1]; }
+    var id = "GM-2026-0" + (nextNum++), sede = S.sede === "all" ? "buc" : S.sede;
+    var s = { id: id, tipo: ch.est ? "Archivar" : "Editar", cod: cod, dep: "Ingeniería de Sistemas", sede: sede, per: S.per, sol: ROLES[S.role].n === "Solicitante" ? "Andrea Pineda" : "Andrea Pineda", prio: "normal", est: "pend", paso: 0, venc: 5, ch: ch, just: $("#p-j").value.trim(), comm: [], ap: 0, act: k.nom };
+    s.hist = [{ d: fecha(0), who: s.sol, t: "Creó y envió la solicitud." }];
+    SOL.unshift(s); EVENTS.unshift({ t: "enviada", f: id, sede: sede, per: S.per });
+    S.propose = null; box.innerHTML = '<p class="notice info" style="margin-top:14px" role="status">Solicitud ' + id + " enviada. Entró a la bandeja de " + sedeN(sede) + " " + S.per.toUpperCase() + " en el paso 1.</p>"; live("Solicitud " + id + " enviada al flujo.");
+  });
+  $("#p-h").focus();
+}
+
+/* ---------- actividades del periodo ---------- */
+function hash(str) { var h = 7; for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; }
+function seeded(str) { var h = hash(str); return function () { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; }; }
+function periodoRows(per, sede) {
+  var rows = [], R = seeded(per + sede);
+  var pool = ["D-4F2A", "D-9K7M", "D-2QX8", "D-7H3C", "D-5TW1", "D-8B6P", "D-1ZN4", "D-6R9E"];
+  for (var i = 0; i < 10; i++) {
+    var k = FLAT[Math.floor(R() * FLAT.length)], dep = DEPS[Math.floor(R() * DEPS.length)], doc = pool[Math.floor(R() * pool.length)];
+    var plan = k.h, asg = Math.max(0, plan + Math.round((R() - 0.55) * 6));
+    rows.push({ cod: k.cod, nom: k.nom, dep: dep, doc: doc, plan: plan, asg: asg, src: "m", sede: sede, ap: "Vigente en Master" });
+  }
+  SOL.forEach(function (s) { if (s.per === per && s.sede === sede && (s.est === "pend" || s.est === "rev" || s.est === "dev")) { var b = byCod(s.cod); rows.push({ cod: s.cod, nom: s.act, dep: s.dep, doc: "—", plan: b ? b.h : 2, asg: s.ch.h ? s.ch.h[1] : (b ? b.h : 2), src: "s", sede: sede, ap: statName[s.est] + " · " + s.id }); } });
+  return rows;
+}
+function sem(r) { var x = r.plan ? r.asg / r.plan : 1; if (x >= 0.95 && x <= 1.05) return ["ok", "En meta", x]; if ((x >= 0.8 && x < 0.95) || (x > 1.05 && x <= 1.2)) return ["pend", "Revisar", x]; return ["rec", "Fuera de rango", x]; }
+function renderPeriodo(anim) {
+  var p = $("#pnl-periodo"), sedes = S.sede === "all" ? SEDES.map(function (s) { return s.id; }) : [S.sede];
+  var rows = [];
+  sedes.forEach(function (sd) { if (CORTES[sd] || S.mode === "x") rows = rows.concat(periodoRows(S.per, sd)); else rows = rows.concat(periodoRows(S.per, sd).filter(function (r) { return r.src === "s"; })); });
+  var banner = S.sede === "all" ? '<p class="small" style="margin-bottom:10px">Todas las sedes. Bogotá no tiene captura del Master: solo aparecen sus solicitudes.</p>' : fuenteBanner(S.sede, S.per);
+  var html = banner + '<div class="toolbar"><div class="viewsw" role="group" aria-label="Vista">' + [["tabla", "Tabla"], ["dep", "Por departamento"], ["doc", "Por docente"]].map(function (v) { return '<button type="button" data-v="' + v[0] + '" aria-pressed="' + (S.view === v[0]) + '">' + v[1] + "</button>"; }).join("") + '</div><span class="small">Semáforo: En meta entre 95 y 105 % de lo planeado; Revisar entre 80 y 95 % o 105 y 120 %. Umbrales propuestos.</span></div>';
+  if (!rows.length) { p.innerHTML = html + '<div class="empty"><h4>No hay actividades que mostrar</h4><p>Sin captura del Master ni solicitudes para ' + sedeN(S.sede) + " " + S.per.toUpperCase() + ".</p></div>"; bindView(); return; }
+  if (S.view === "tabla") {
+    html += '<div class="tblwrap"><table><thead><tr><th>Actividad</th><th>Departamento</th>' + (S.sede === "all" ? "<th>Sede</th>" : "") + '<th>Docente (seudónimo)</th><th class="num">Planeadas</th><th class="num">Asignadas</th><th>Cumplimiento</th><th>Origen</th><th>Aprobación</th></tr></thead><tbody>' +
+      rows.map(function (r) { var m = sem(r); return '<tr class="prow"><td><b class="mono">' + r.cod + "</b> " + esc(r.nom) + "</td><td>" + esc(r.dep) + "</td>" + (S.sede === "all" ? "<td>" + sedeN(r.sede) + "</td>" : "") + '<td class="mono">' + r.doc + '</td><td class="num">' + r.plan + ' h</td><td class="num">' + r.asg + ' h</td><td><span class="pill ' + m[0] + '">' + m[1] + " " + Math.round(m[2] * 100) + ' %</span></td><td>' + (r.src === "m" ? '<span class="pill src">Master · corte ' + (CORTES[r.sede] ? CORTES[r.sede].act : "—") + "</span>" : '<span class="pill src sol">Solicitud pendiente</span>') + "</td><td>" + esc(r.ap) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+  } else if (S.view === "dep") {
+    var g = {}; rows.forEach(function (r) { var o = g[r.dep] = g[r.dep] || { plan: 0, asg: 0, n: 0 }; o.plan += r.plan; o.asg += r.asg; o.n++; });
+    html += '<div class="tblwrap"><table><thead><tr><th>Departamento</th><th class="num">Actividades</th><th class="num">Planeadas</th><th class="num">Asignadas</th><th style="min-width:220px">Cumplimiento</th></tr></thead><tbody>' + Object.keys(g).sort().map(function (d) { var o = g[d], x = o.plan ? o.asg / o.plan : 1, c = x >= 0.95 && x <= 1.05 ? "good" : ((x >= 0.8 && x <= 1.2) ? "warn" : "bad"); return "<tr><td>" + esc(d) + '</td><td class="num">' + o.n + '</td><td class="num">' + o.plan + ' h</td><td class="num">' + o.asg + ' h</td><td><div class="bar" role="img" aria-label="' + Math.round(x * 100) + ' % de lo planeado"><i class="' + c + '" style="transform:scaleX(' + Math.min(x, 1.3) / 1.3 + ')"></i><span class="mark" style="left:' + (1 / 1.3 * 100) + '%"></span></div><small>' + Math.round(x * 100) + " % de lo planeado</small></td></tr>"; }).join("") + "</tbody></table></div>";
+  } else {
+    var gd = {}; rows.filter(function (r) { return r.doc !== "—"; }).forEach(function (r) { var o = gd[r.doc] = gd[r.doc] || { asg: 0, acts: [] }; o.asg += r.asg; o.acts.push(r.cod); });
+    html += '<div class="tblwrap"><table><thead><tr><th>Docente (seudónimo)</th><th>Actividades</th><th class="num">Horas asignadas</th><th style="min-width:220px">Frente al tope de 40 h</th></tr></thead><tbody>' + Object.keys(gd).sort().map(function (d) { var o = gd[d], c = o.asg > 40 ? "bad" : (o.asg > 36 ? "warn" : "good"); return '<tr><td class="mono">' + d + "</td><td>" + o.acts.join(", ") + '</td><td class="num">' + o.asg + ' h</td><td><div class="bar" role="img" aria-label="' + o.asg + ' de 40 horas"><i class="' + c + '" style="transform:scaleX(' + Math.min(o.asg / 48, 1) + ')"></i><span class="mark" style="left:' + (40 / 48 * 100) + '%"></span></div></td></tr>'; }).join("") + '</tbody></table></div><p class="small" style="margin-top:6px">El tope de 40 horas es un valor de ejemplo. Los seudónimos no se pueden revertir a un nombre.</p>';
+  }
+  p.innerHTML = html; bindView();
+  if (anim) enter($$(".prow", p), { max: 12 });
+  bars(p);
+}
+function bindView() { $$("#pnl-periodo [data-v]").forEach(function (b) { b.addEventListener("click", function () { S.view = b.getAttribute("data-v"); swap($("#pnl-periodo"), function () { renderPeriodo(false); }); }); }); }
+
+/* ---------- seguimiento ---------- */
+function renderSeg(anim) {
+  var p = $("#pnl-seguimiento"), all = SOL.filter(function (s) { return inScope(s) || S.role === "sol"; }).filter(function (s) { return s.per === S.per; });
+  var pend = baseSet().filter(function (s) { return s.est === "pend" || s.est === "rev"; });
+  var cur = all.filter(function (s) { return s.id === S.segId; })[0] || all[0];
+  var buckets = [["Vencidas", pend.filter(function (s) { return s.venc < 0; }), "late"], ["Vencen hoy o mañana", pend.filter(function (s) { return s.venc >= 0 && s.venc <= 1; }), "soon"], ["En plazo", pend.filter(function (s) { return s.venc > 1; }), ""]];
+  var BN = [["Dirección de Ciencias Básicas", 1.4], ["Dirección de Ingeniería de Sistemas", 1.8], ["Dirección de Derecho", 3.9], ["Vicerrectoría Académica", 6.3], ["Vicerrectoría de Investigación", 4.1], ["Planeación", 0.9]];
+  var html = '<h3 style="margin-top:0">Vencimientos</h3><p class="small" style="margin-bottom:8px">Plazo propuesto: 5 días hábiles por paso. Rua usa 15 en total.</p><div class="cols4">' + buckets.map(function (b) { return '<div class="bucket"><h4>' + b[0] + " (" + b[1].length + ")</h4><ul>" + (b[1].length ? b[1].map(function (s) { return '<li><button type="button" data-seg="' + s.id + '"><b class="mono">' + s.id + "</b> " + esc(s.act) + '<br><span class="' + b[2] + '">' + sinceTxt(s).replace(/<[^>]+>/g, "") + " · " + PASOS[s.paso].n + "</span></button></li>"; }).join("") : '<li class="small">Nada en este grupo.</li>') + "</ul></div>"; }).join("") + "</div>";
+  html += '<h3>Línea de tiempo por solicitud</h3>';
+  if (!cur) { html += '<div class="empty"><h4>Sin solicitudes en este periodo</h4><p>No hay nada que seguir para su rol, periodo y sede.</p></div>'; }
+  else {
+    html += '<div class="toolbar"><label class="fld" for="segsel">Solicitud<select id="segsel">' + all.map(function (s) { return '<option value="' + s.id + '"' + (s.id === cur.id ? " selected" : "") + ">" + s.id + " · " + esc(s.act) + "</option>"; }).join("") + "</select></label>" + pill(cur.est) + '</div><ol class="hist">' +
+      cur.hist.map(function (h) { return "<li><div><time>" + h.d + "</time><b>" + esc(h.who) + "</b> " + esc(h.t) + "</div></li>"; }).join("") + ((cur.est === "pend" || cur.est === "rev") ? '<li><div><time>Hoy</time>Espera a <b>' + PASOS[cur.paso].n + "</b>. " + sinceTxt(cur).replace(/<[^>]+>/g, "") + ".</div></li>" : "") + "</ol>";
+  }
+  html += '<h3>Cuellos de botella: días hábiles promedio por aprobador</h3><div class="tblwrap"><table><thead><tr><th>Aprobador</th><th class="num">Días</th><th style="min-width:240px">Frente al plazo de 5 días</th></tr></thead><tbody>' + BN.map(function (b) { var c = b[1] > 5 ? "bad" : (b[1] > 3.5 ? "warn" : "good"); return "<tr><td>" + b[0] + '</td><td class="num">' + b[1].toFixed(1).replace(".", ",") + '</td><td><div class="bar" role="img" aria-label="' + b[1] + ' días de un plazo de 5"><i class="' + c + '" style="transform:scaleX(' + Math.min(b[1] / 8, 1) + ')"></i><span class="mark" style="left:' + (5 / 8 * 100) + '%"></span></div></td></tr>'; }).join("") + '</tbody></table></div><p class="small" style="margin-top:6px"><span class="sample">Ejemplo</span> Cifras inventadas. La línea oscura marca el plazo.</p>';
+  html += '<h3>Avisos</h3><div class="plain"><ul><li>A las 48 horas del turno: recordatorio por correo al aprobador.</li><li>Al vencer el plazo: aviso al aprobador y al solicitante; si el paso tiene escalamiento, pasa al nivel siguiente (por confirmar, duda 8).</li><li>Una solicitud devuelta sin respuesta en 10 días hábiles se cancela con aviso previo (propuesta).</li></ul></div>';
+  p.innerHTML = html;
+  $$("[data-seg]", p).forEach(function (b) { b.addEventListener("click", function () { S.segId = b.getAttribute("data-seg"); renderSeg(false); $("#segsel").focus(); }); });
+  var sel = $("#segsel"); if (sel) sel.addEventListener("change", function () { S.segId = sel.value; swap($("#pnl-seguimiento"), function () { renderSeg(false); }); });
+  if (anim) enter($$(".hist li", p)); bars(p);
+}
+
+/* ---------- flujos ---------- */
+var ROLOPS = ["Directivo", "Vicerrector", "Planeación", "Administración"];
+var ALCOPS = ["Misma unidad", "Vicerrectoría de la unidad", "Facultad", "Institucional"];
+var SUPOPS = ["Sin suplente", "Subdirector designado", "Asistente de vicerrectoría", "Delegado de Planeación"];
+function opts(list, v) { return list.map(function (o) { return "<option" + (o === v ? " selected" : "") + ">" + o + "</option>"; }).join(""); }
+function renderFlujos(anim) {
+  var p = $("#pnl-flujos"), F = FLOWS[S.flow], editable = S.role === "plan" || S.role === "adm";
+  var html = '<div class="toolbar"><label class="fld" for="flsel">Flujo<select id="flsel">' + Object.keys(FLOWS).map(function (k) { return '<option value="' + k + '"' + (k === S.flow ? " selected" : "") + ">" + FLOWS[k].n + "</option>"; }).join("") + '</select></label>' + (editable ? "" : '<p class="notice" style="flex:1;min-width:220px">Solo Planeación y Administración definen flujos. Cambie «Ver como» para editar.</p>') + "</div>";
+  html += '<div class="two"><div><h3 style="margin-top:0">Pasos del flujo</h3><div class="builder" id="builder">' + F.steps.map(function (s, i) {
+    var dis = editable ? "" : " disabled";
+    return '<div class="bstep" data-i="' + i + '"><div class="n">' + (i + 1) + '</div><div><div class="bgrid"><label class="fld" for="sn' + i + '">Nombre<input id="sn' + i + '" data-f="n" value="' + esc(s.n) + '"' + dis + '></label><label class="fld" for="sr' + i + '">Quién aprueba<select id="sr' + i + '" data-f="rol"' + dis + ">" + opts(ROLOPS, s.rol) + '</select></label><label class="fld" for="sa' + i + '">Alcance por unidad<select id="sa' + i + '" data-f="alc"' + dis + ">" + opts(ALCOPS, s.alc) + '</select></label><label class="fld" for="sp' + i + '">Plazo (días hábiles)<input id="sp' + i + '" data-f="plazo" type="number" min="1" max="30" value="' + s.plazo + '"' + dis + '></label><label class="fld" for="ss' + i + '">Suplente<select id="ss' + i + '" data-f="sup"' + dis + ">" + opts(SUPOPS, s.sup) + '</select></label></div><div class="bact"><label class="chk"><input type="checkbox" data-f="esc"' + (s.esc ? " checked" : "") + dis + "> Escalar al nivel siguiente al vencer</label>" + (editable ? '<button class="btn ghost sm" type="button" data-a="up"' + (i === 0 ? " disabled" : "") + '>Subir</button><button class="btn ghost sm" type="button" data-a="down"' + (i === F.steps.length - 1 ? " disabled" : "") + '>Bajar</button><button class="btn ghost sm" type="button" data-a="del"' + (F.steps.length <= 1 ? " disabled" : "") + ">Quitar</button>" : "") + "</div></div></div>";
+  }).join("") + "</div>" + (editable ? '<div style="margin-top:10px"><button class="btn" id="addstep" type="button">Añadir paso</button></div>' : "") + '<p class="small" style="margin-top:8px">Cada paso se ata a una función, no a un nombre de cargo, como en Rua: si cambia el titular, el flujo sigue válido.</p></div>';
+  html += '<div><h3 style="margin-top:0">Solicitud en curso con este flujo</h3><p class="small">GM-2026-027 · Dirección de proyecto · <span class="sample">Ejemplo</span></p><div class="steps" id="steps" aria-label="Avance de la solicitud">' + F.steps.map(function (s, i) { return '<div class="stp" data-i="' + i + '"><div class="dot"></div><div class="line"><i></i></div><b>' + esc(s.n) + '</b><span class="s">' + s.rol + " · " + s.plazo + ' días hábiles</span></div>'; }).join("") + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ok" id="fl-next" type="button">Aprobar el paso en turno</button><button class="btn ghost" id="fl-back" type="button">Devolver</button><button class="btn ghost" id="fl-reset" type="button">Reiniciar</button></div><p class="small" id="fl-msg" role="status" style="margin-top:8px"></p></div></div>';
+  html += '<h3>Cuándo se usa cada flujo</h3><p class="small" style="max-width:70ch">El flujo corto se aplica a cambios de hasta 2 horas semanales que no tocan vinculación ni crean actividades. El resto sigue el flujo estándar. La condición la evalúa el sistema al enviar la solicitud (propuesta).</p>';
+  p.innerHTML = html;
+  $("#flsel").addEventListener("change", function () { S.flow = $("#flsel").value; S.demoStep = Math.min(S.demoStep, FLOWS[S.flow].steps.length); swap($("#pnl-flujos"), function () { renderFlujos(false); }); });
+  if (editable) {
+    $("#builder").addEventListener("input", function (e) { var st = e.target.closest(".bstep"); if (!st) return; var i = Number(st.getAttribute("data-i")), f = e.target.getAttribute("data-f"); F.steps[i][f] = e.target.type === "checkbox" ? e.target.checked : (f === "plazo" ? Number(e.target.value) : e.target.value); if (f === "n" || f === "rol" || f === "plazo") updateSteps(false, true); });
+    $("#builder").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-a]"); if (!b) return; var i = Number(b.closest(".bstep").getAttribute("data-i")), a = b.getAttribute("data-a");
+      if (a === "up" && i > 0) { var t = F.steps[i]; F.steps[i] = F.steps[i - 1]; F.steps[i - 1] = t; live("Paso movido hacia arriba, ahora es el " + i + "."); }
+      else if (a === "down" && i < F.steps.length - 1) { var t2 = F.steps[i]; F.steps[i] = F.steps[i + 1]; F.steps[i + 1] = t2; live("Paso movido hacia abajo, ahora es el " + (i + 2) + "."); }
+      else if (a === "del" && F.steps.length > 1) { F.steps.splice(i, 1); live("Paso quitado."); }
+      S.demoStep = Math.min(S.demoStep, F.steps.length); renderFlujos(false);
+      var nb = $('.bstep[data-i="' + Math.max(0, Math.min(F.steps.length - 1, a === "up" ? i - 1 : a === "down" ? i + 1 : i)) + '"] [data-a="' + a + '"]', $("#pnl-flujos")) || $("#addstep"); if (nb) nb.focus();
+    });
+    $("#addstep").addEventListener("click", function () { F.steps.push({ n: "Nuevo paso", rol: "Directivo", alc: "Misma unidad", plazo: 5, sup: "Sin suplente", esc: false }); renderFlujos(false); var ni = $('.bstep:last-child input', $("#pnl-flujos")); if (ni) { ni.focus(); ni.select(); } live("Paso añadido al final."); });
+  }
+  $("#fl-next").addEventListener("click", function () { var n = F.steps.length; if (S.demoStep >= n) return; S.demoStep++; updateSteps(true); });
+  $("#fl-back").addEventListener("click", function () { S.demoStep = 0; updateSteps(false); $("#fl-msg").textContent = "Devuelta al solicitante con una nota. El flujo empieza de nuevo cuando la reenvíe."; });
+  $("#fl-reset").addEventListener("click", function () { S.demoStep = 1; updateSteps(false); });
+  updateSteps(false); if (anim) enter($$(".bstep", p));
+}
+function updateSteps(animate, labelOnly) {
+  var F = FLOWS[S.flow], host = $("#steps"); if (!host) return;
+  if (labelOnly) { $$(".stp", host).forEach(function (el, i) { if (!F.steps[i]) return; $("b", el).textContent = F.steps[i].n; $(".s", el).textContent = F.steps[i].rol + " · " + F.steps[i].plazo + " días hábiles"; }); return; }
+  var n = F.steps.length;
+  $$(".stp", host).forEach(function (el, i) {
+    var done = i < S.demoStep, cur = i === S.demoStep;
+    el.classList.toggle("done", done); el.classList.toggle("cur", cur);
+    $(".dot", el).textContent = done ? "✓" : i + 1;
+    el.setAttribute("aria-label", F.steps[i].n + (done ? ", firmado" : cur ? ", en turno" : ", pendiente"));
+  });
+  $("#fl-next").disabled = S.demoStep >= n; $("#fl-next").textContent = S.demoStep >= n - 1 && S.demoStep < n ? "Aprobar el último paso" : "Aprobar el paso en turno";
+  $("#fl-msg").textContent = S.demoStep >= n ? "Todos los pasos firmados. La solicitud queda aprobada y pasa a la cola de aplicación en el Master." : (S.demoStep === 0 ? $("#fl-msg").textContent : "En turno: " + F.steps[S.demoStep].n + " (" + F.steps[S.demoStep].rol + ").");
+  if (animate && animOK()) {
+    var i = S.demoStep - 1, el = $$(".stp", host)[i];
+    if (el) { gsap.fromTo($(".line i", el), { scaleX: 0 }, { scaleX: 1, duration: 0.32, ease: "power2.inOut", clearProps: "transform" }); gsap.fromTo($(".dot", el), { scale: 0.9 }, { scale: 1, duration: 0.18, ease: "power3.out", clearProps: "transform" }); }
+  }
+}
+
+/* ---------- conexión ---------- */
+function renderConexion(anim) {
+  var p = $("#pnl-conexion");
+  var apr = SOL.filter(function (s) { return s.est === "apr" && s.per === S.per; });
+  var html = '<h3 style="margin-top:0">Último corte leído del Warehouse</h3><div class="tblwrap"><table><thead><tr><th>Sede</th><th>ms_actdir (estructura)</th><th>ms_nom (carga docente)</th><th>Verificación</th></tr></thead><tbody>' + SEDES.map(function (s) { var c = CORTES[s.id]; return "<tr><td>" + s.n + "</td><td>" + (c ? c.act : '<span class="pill pend">Sin captura</span>') + "</td><td>" + (c && c.nom !== "—" ? c.nom : '<span class="pill pend">Sin captura</span>') + "</td><td>" + (c ? c.har : "Sin HAR") + "</td></tr>"; }).join("") + '</tbody></table></div><p class="small" style="margin-top:6px"><span class="sample">Ejemplo</span> Fechas inventadas. La lectura real usa la versión vigente de cada corte.</p>';
+  html += '<h3>Cambios aprobados por reflejar en el Master (' + S.per.toUpperCase() + ')</h3>';
+  if (!apr.length) html += '<div class="empty"><h4>Nada por reflejar</h4><p>Cuando se apruebe una solicitud de este periodo aparecerá aquí como tarea.</p></div>';
+  else {
+    html += '<div class="tblwrap"><table><thead><tr><th>Solicitud</th><th>Actividad</th><th>Sede</th><th>Estado de la aplicación</th><th>Acción</th></tr></thead><tbody>' + apr.map(function (s) { return '<tr><td class="mono">' + s.id + "</td><td>" + esc(s.act) + "</td><td>" + sedeN(s.sede) + "</td><td>" + ['<span class="pill pend">Sin aplicar en el Master</span>', '<span class="pill rev">Aplicada, falta la captura</span>', '<span class="pill ok">Reflejada en Master</span>'][s.ap] + "</td><td>" + (s.ap === 0 ? '<button class="btn ghost sm" type="button" data-ap="' + s.id + '"' + ((S.role === "plan" || S.role === "adm") ? "" : " disabled") + ">Marcar aplicada</button>" + ((S.role === "plan" || S.role === "adm") ? "" : ' <small>Solo Planeación</small>') : (s.ap === 1 ? '<button class="btn ghost sm" type="button" data-cap="' + s.id + '">Simular nueva captura</button>' : "")) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+  }
+  html += '<h3>Eventos que quedan registrados <span class="small">(<code>gm_eventos</code>)</span></h3>';
+  html += EVENTS.length ? '<ol class="hist">' + EVENTS.slice(0, 8).map(function (e) { return "<li><div><time>" + sedeN(e.sede) + " · " + e.per.toUpperCase() + "</time><b>" + e.f + "</b> " + e.t + "</div></li>"; }).join("") + "</ol>" : '<p class="small">Todavía no hay eventos en esta sesión. Apruebe, devuelva o comente una solicitud en la bandeja y aparecerá aquí.</p>';
+  html += '<h3>Exportable para Planeación</h3><p class="small" style="max-width:70ch">Columnas previstas: folio, periodo, sede, código de actividad, campo, valor vigente en el Master, valor aprobado, fecha de la aprobación. El archivo se genera en el módulo real; esta maqueta no descarga nada.</p>';
+  p.innerHTML = html;
+  $$("[data-ap]", p).forEach(function (b) { b.addEventListener("click", function () { var s = SOL.find(b.getAttribute("data-ap")); s.ap = 1; EVENTS.unshift({ t: "aplicada en Master (marcada)", f: s.id, sede: s.sede, per: s.per }); live(s.id + " marcada como aplicada."); renderConexion(false); }); });
+  $$("[data-cap]", p).forEach(function (b) { b.addEventListener("click", function () { var s = SOL.find(b.getAttribute("data-cap")); s.ap = 2; EVENTS.unshift({ t: "reflejada en Master (captura)", f: s.id, sede: s.sede, per: s.per }); live(s.id + ": la captura confirma el cambio."); renderConexion(false); }); });
+  if (anim) enter($$("tbody tr", p), { max: 8 });
+}
+
+/* ---------- diagrama Warehouse ---------- */
+var NODEINFO = {
+  master: "Master: plataforma de horarios y gestión académica. El portal solo lee de ella, por la cuenta de servicio.",
+  funcion: "Función warehouse: inicia sesión por sede, descarga el reporte y guarda las filas con la política de privacidad. Ya existe.",
+  wh: "Warehouse: guarda por periodo y sede cada captura, con versiones. Gestión Master lee de aquí la estructura y la carga docente.",
+  gm: "Gestión Master: la bandeja y las demás pantallas. Lee por funciones filtradas por alcance; no lee wh_filas directamente.",
+  tablas: "Tablas gm_*: solicitudes, decisiones, comentarios y eventos. Se escriben solo por funciones que comprueban permiso y turno.",
+  conjunto: "Conjunto gm_solicitudes: al cerrar el corte, los eventos del periodo y la sede entran al Warehouse como un conjunto más, con versión y huella.",
+  tarea: "Tarea para Planeación: lista y exportable con los cambios aprobados. Una persona los aplica en el Master."
+};
+$$("#whsvg .nd").forEach(function (n) {
+  function sel() { $$("#whsvg .nd").forEach(function (x) { x.classList.remove("on"); }); n.classList.add("on"); $("#nodeinfo").textContent = NODEINFO[n.getAttribute("data-n")]; }
+  n.addEventListener("click", sel); n.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sel(); } });
+});
+var playing = false;
+$("#play").addEventListener("click", function () {
+  if (playing) return; var items = $$("#seqlist li"), pkt = $("#pkt");
+  var marks = function (i) { items.forEach(function (li, j) { if (j === i) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current"); }); };
+  if (!animOK()) { items.forEach(function (li, j) { setTimeout(function () { marks(j); }, j * 600); }); setTimeout(function () { marks(-1); }, 3600); return; }
+  playing = true; $("#play").disabled = true;
+  var tl = gsap.timeline({ onComplete: function () { playing = false; $("#play").disabled = false; gsap.to(pkt, { opacity: 0, duration: 0.2 }); marks(-1); } });
+  tl.call(marks, [0]).set(pkt, { attr: { cx: 695, cy: 188 }, opacity: 1 })
+    .to(pkt, { attr: { cy: 335 }, duration: 0.7, ease: "power1.inOut" })
+    .call(marks, [1]).to(pkt, { attr: { cx: 485 }, duration: 0.7, ease: "power1.inOut" })
+    .call(marks, [2]).to(pkt, { attr: { cy: 188 }, duration: 0.7, ease: "power1.inOut" })
+    .call(marks, [3]).to(pkt, { attr: { cx: 878, cy: 188 }, duration: 0.9, ease: "power1.inOut" })
+    .to(pkt, { attr: { cy: 70 }, duration: 0.5, ease: "power1.inOut" }).to(pkt, { attr: { cx: 89 }, duration: 0.9, ease: "power1.inOut" })
+    .to(pkt, { attr: { cy: 188 }, duration: 0.4, ease: "power1.inOut" }).call(marks, [4]).to(pkt, { attr: { cx: 282 }, duration: 0.5, ease: "power1.inOut" }).to(pkt, { attr: { cx: 485 }, duration: 0.5, ease: "power1.inOut" }).to({}, { duration: 0.6 });
+});
+
+/* ---------- guía lateral ---------- */
+var secs = $$("main section.sec, main .top"), links = $$("#guide a");
+if ("IntersectionObserver" in window) {
+  var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) links.forEach(function (a) { a.setAttribute("aria-current", a.getAttribute("href") === "#" + e.target.id ? "true" : "false"); }); }); }, { rootMargin: "-20% 0px -70% 0px" });
+  secs.forEach(function (s) { if (s.id) io.observe(s); });
+}
+
+/* ---------- arranque ---------- */
+renderScope();
+renderBandeja(true);
+window.__GM = { S: S, SOL: SOL, showTab: showTab, openDetail: openDetail };
+})();
+</script>

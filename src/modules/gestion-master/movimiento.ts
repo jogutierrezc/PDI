@@ -22,7 +22,7 @@ const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
 export const movimientoReducido = (): boolean =>
   typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 
-type Blancos = Element | Element[] | NodeListOf<Element> | null | undefined;
+type Blancos = Element | Element[] | NodeListOf<Element> | HTMLCollection | null | undefined;
 const lista = (b: Blancos): Element[] => (!b ? [] : b instanceof Element ? [b] : Array.from(b));
 
 /** Entrada escalonada: opacidad + 8 px. Con movimiento reducido, solo un fundido. */

@@ -10,13 +10,19 @@
 
      estado {}                                   → { ok, configurado, sedes, reportes }
      probar { sede }                             → { ok, periodo }
-         inicia sesión en las tres plataformas y lee el periodo abierto.
-     sondear { conjunto, sede, periodo?, corte? } → { ok, periodo, columnas, filas }
+         inicia sesión en las tres plataformas, lee el periodo abierto y comprueba
+         (en Master) que el servidor responde como la sede pedida.
+     periodos { sede }                           → { ok, periodos, actual, aspirantes, deserciones }
+         las listas de periodos de Master de esa sede (get_periods,
+         periods_applicants, periods_to_student_desertion_report).
+     sondear { conjunto, sede, periodo?, corte? } → { ok, periodo, columnas, filas, … }
          pide el reporte y devuelve SOLO los nombres de sus columnas y cuántas
          filas trae: no guarda nada y no muestra ninguna fila. Sirve para
-         escribir la política de privacidad de un reporte nuevo.
+         escribir la política de privacidad de un reporte nuevo y para ver si el
+         reporte de una sede tiene la misma forma que el de Bucaramanga (columnas
+         que la política espera y faltan, periodo que dice el archivo, avisos).
      cargar { conjunto, sede, periodo?, corte?, motivo? }
-                                                 → { ok, periodo, version, filas, duplicada }
+                                                 → { ok, periodo, version, filas, duplicada, confirmado }
 
    Reglas:
      · Solo con sesión, y solo Planeación o más (wh_autorizado). Las escrituras
@@ -24,9 +30,17 @@
        wh_agregar_filas / wh_cerrar_carga: la política de privacidad la aplica
        la base, no esta función. Un reporte sin política no se guarda.
      · El periodo lo elige quien llama solo si la plataforma lo deja pedir
-       (va en la ruta o en selected_period). Si lo fija la sesión (rendimiento,
-       horarios…), es el periodo abierto que informa la plataforma: etiquetarlo
-       con otro mentiría.
+       (va en la ruta, en ?selected_period o en el cuerpo). Si lo fija la sesión
+       (horarios, posgrado…), es el periodo abierto que informa la plataforma:
+       pedir otro falla en vez de guardarse con el periodo equivocado.
+     · Lo que la plataforma devuelve se compara con lo pedido: el título del
+       Excel, el nombre de la tarea o la última columna del histórico dicen de
+       qué periodo es. Si no coincide, no se guarda nada. Si el reporte no lo
+       dice, un periodo distinto del abierto solo se acepta cuando está probado
+       (rendimiento) o se marca «sin confirmar» (consulta); en el cuerpo se rechaza.
+     · Cada sede va a su servidor, con su propio inicio de sesión; las claves de
+       la base incluyen la sede, así que una carga de una sede nunca reemplaza
+       ni se confunde con la de otra.
      · Ni la contraseña ni el token salen de aquí ni van a los registros: esta
        función no usa `console`.
      · El contenido se huella (no el archivo): dos descargas iguales no cuentan
@@ -41,8 +55,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { unzipSync } from "https://esm.sh/fflate@0.8.2";
-import { FILAS_POR_LOTE, aplanarJson, derivarColumnas, base64ABytes, enLotes, enParalelo, esExcelBase64, huellaContenido, leerSegun, periodoValido, type Hoja } from "./motor.ts";
-import { consultaDe, edificiosDe, estadoTarea, REPORTES, reportePorId, type Contexto, type Peticion, type Reporte, type SistemaApi } from "./reportes.ts";
+import { FILAS_POR_LOTE, aplanarJson, derivarColumnas, base64ABytes, enLotes, enParalelo, esExcelBase64, huellaContenido, leerSegun, periodoDelArchivo, periodosEnTexto, periodoValido, ultimoPeriodoDe, type Hoja } from "./motor.ts";
+import { consultaDe, edificiosDe, estadoTarea, periodosDeLista, REPORTES, reportePorId, sedeDeNombre, type Contexto, type Peticion, type Reporte, type SistemaApi } from "./reportes.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
 const CORS = {
@@ -94,6 +108,8 @@ async function pedirJson(base: string, p: Peticion, sesion?: { token: string; ap
   } catch {
     throw new ErrorPlataforma("No se pudo conectar con la plataforma. Revise que el servidor de la función llegue a la red de la universidad.");
   }
+  if (respuesta.status === 404) throw new ErrorPlataforma("La plataforma respondió 404: esa ruta no existe en esa plataforma o en esa sede (¿el reporte cambió de lugar?).");
+  if (respuesta.status === 401 || respuesta.status === 403) throw new ErrorPlataforma(`La plataforma respondió ${respuesta.status}: la sesión caducó o la cuenta de servicio no tiene permiso para este reporte.`);
   if (!respuesta.ok) throw new ErrorPlataforma(`La plataforma respondió ${respuesta.status}.`);
   try {
     return (await respuesta.json()) as { msg?: unknown; code?: number; task_id?: string };
@@ -115,6 +131,19 @@ async function iniciarSesion(sede: string, sistema: SistemaApi): Promise<Sesion>
   const p = await pedirJson(base, { metodo: "GET", ruta: `/${sistema}/mod_auth/current_period/` }, sesion);
   const periodo = (p.msg as { period?: string } | undefined)?.period ?? "";
   if (!periodoValido(periodo)) throw new ErrorPlataforma(`${sistema}: no informó el periodo abierto.`);
+  if (sistema === "master") {
+    // Master dice a qué sede pertenece: si el servidor configurado para una sede responde como otra, se detiene aquí.
+    let real: string | null = null;
+    try {
+      const h = await pedirJson(base, { metodo: "GET", ruta: "/master/mod_auth/headquarter/" }, sesion);
+      real = sedeDeNombre((h.msg as { name?: unknown } | undefined)?.name);
+    } catch {
+      // Sin respuesta de la sede: no es motivo para detener la carga.
+    }
+    if (real && real !== sede) {
+      throw new ErrorPlataforma(`El servidor configurado para ${SEDES[sede].nombre} responde como ${SEDES[real].nombre}. Revise WAREHOUSE_MASTER_URL_${sede.toUpperCase()}.`);
+    }
+  }
   return { base, sistema, ...sesion, periodo };
 }
 
@@ -126,16 +155,18 @@ async function cerrarSesion(s: Sesion) {
   }
 }
 
-/** Un archivo Excel pedido: llega en `msg` (base64) o, si es una tarea, al terminarla. */
-async function descargarExcel(s: Sesion, p: Peticion, entrega: Reporte["entrega"]): Promise<Record<string, Uint8Array>> {
+/** Un archivo Excel pedido: llega en `msg` (base64) o, si es una tarea, al terminarla (con el nombre que la plataforma le dio). */
+async function descargarExcel(s: Sesion, p: Peticion, entrega: Reporte["entrega"]): Promise<{ archivos: Record<string, Uint8Array>; nombre?: string }> {
   const r = await pedirJson(s.base, p, s);
   let base64: string | undefined;
+  let nombre: string | undefined;
   if (entrega === "tarea" || (!esExcelBase64(r.msg) && r.task_id)) {
     if (!r.task_id) throw new ErrorPlataforma("La plataforma no inició la tarea del reporte.");
     const limite = Date.now() + ESPERA_TAREA_MS;
     while (Date.now() < limite) {
       await dormir(PAUSA_TAREA_MS);
       const e = estadoTarea(await pedirJson(s.base, { metodo: "GET", ruta: `/${s.sistema}/mod_home/home/task_state/${encodeURIComponent(r.task_id)}/` }, s));
+      nombre = e.nombre ?? nombre;
       if (e.fallo) throw new ErrorPlataforma("La plataforma no pudo generar el reporte.");
       if (e.listo) {
         base64 = e.base64;
@@ -150,7 +181,7 @@ async function descargarExcel(s: Sesion, p: Peticion, entrega: Reporte["entrega"
     throw new ErrorPlataforma(typeof r.msg === "string" && r.msg.length < 200 ? `La plataforma: ${r.msg}` : "La plataforma no devolvió el reporte (¿aún no hay datos?).");
   }
   try {
-    return unzipSync(base64ABytes(base64));
+    return { archivos: unzipSync(base64ABytes(base64)), nombre };
   } catch {
     throw new ErrorPlataforma("La plataforma devolvió un archivo que no es un Excel.");
   }
@@ -165,7 +196,18 @@ function juntar(partes: { rotulo: string; hoja: Hoja }[], columna: string): Hoja
   return { columnas, originales, filas };
 }
 
-/** Pide un reporte y lo deja como tabla. */
+/** De qué periodo dice ser lo que entregó la plataforma, según donde el reporte lo deja leer (ver `Reporte.confirma`). */
+function periodoHallado(r: Reporte, archivos: Record<string, Uint8Array>, nombreTarea: string | undefined, hoja: Hoja): string | null {
+  if (r.confirma === "columnas") return ultimoPeriodoDe(hoja);
+  if (r.confirma === "tarea") {
+    const enNombre = periodosEnTexto(nombreTarea ?? "");
+    return enNombre.length === 1 ? enNombre[0] : periodoDelArchivo(archivos);
+  }
+  if (r.confirma === "archivo") return periodoDelArchivo(archivos);
+  return null;
+}
+
+/** Pide un reporte y lo deja como tabla; `periodoArchivo` trae el periodo que la plataforma dice haber entregado, si lo dice. */
 async function obtenerHoja(r: Reporte, ctx: Contexto, s: Sesion): Promise<Hoja> {
   if (r.entrega === "json") {
     const primero = await pedirJson(s.base, r.armar(ctx), s);
@@ -181,7 +223,7 @@ async function obtenerHoja(r: Reporte, ctx: Contexto, s: Sesion): Promise<Hoja> 
     const partes: { rotulo: string; hoja: Hoja }[] = [];
     for (const e of lista) {
       try {
-        const hoja = leerSegun(r.lector, await descargarExcel(s, r.armar({ ...ctx, edificio: e }), r.entrega));
+        const hoja = leerSegun(r.lector, (await descargarExcel(s, r.armar({ ...ctx, edificio: e }), r.entrega)).archivos);
         if (hoja.filas.length) partes.push({ rotulo: e.name, hoja });
       } catch {
         // Un edificio sin horarios responde vacío o con error: se salta.
@@ -190,7 +232,47 @@ async function obtenerHoja(r: Reporte, ctx: Contexto, s: Sesion): Promise<Hoja> 
     if (partes.length === 0) throw new ErrorPlataforma("Ningún edificio devolvió horarios.");
     return juntar(partes, "edificio");
   }
-  return leerSegun(r.lector, await descargarExcel(s, r.armar(ctx), r.entrega));
+  const { archivos, nombre } = await descargarExcel(s, r.armar(ctx), r.entrega);
+  let hoja: Hoja;
+  try {
+    hoja = leerSegun(r.lector, archivos);
+  } catch (e) {
+    throw new ErrorPlataforma(`El reporte llegó con otra forma de la esperada (¿cambió en esta sede?): ${e instanceof Error ? e.message : "no se pudo leer"}`);
+  }
+  hoja.periodoArchivo = periodoHallado(r, archivos, nombre, hoja);
+  return hoja;
+}
+
+/** Una lista de periodos de Master de la sede (aspirantes o deserciones); null si no se pudo leer (no es motivo para detener la carga). */
+async function listaDePeriodos(sede: string, clave: NonNullable<Reporte["listaPeriodos"]>, abierta?: Sesion): Promise<string[] | null> {
+  let propia: Sesion | null = null;
+  try {
+    const s = abierta?.sistema === "master" ? abierta : (propia = await iniciarSesion(sede, "master"));
+    const ruta = clave === "aspirantes" ? "/master/mod_reports/reports/periods_applicants/" : "/master/mod_reports/reports/periods_to_student_desertion_report/";
+    const lista = periodosDeLista((await pedirJson(s.base, { metodo: "GET", ruta }, s)).msg).periodos;
+    return lista.length ? lista : null;
+  } catch {
+    return null;
+  } finally {
+    if (propia) await cerrarSesion(propia);
+  }
+}
+
+/** Lo que la política de privacidad espera del reporte frente a lo que la sede entregó (solo nombres de columnas). */
+// deno-lint-ignore no-explicit-any
+async function revisarPolitica(db: any, conjunto: string, hoja: Hoja) {
+  const { data } = await db.from("wh_politicas").select("modo,lista").eq("conjunto", conjunto).maybeSingle();
+  const pol = data as { modo: "permitir" | "excluir"; lista: string[] } | null;
+  if (!pol) return { sinPolitica: true, faltan: [] as string[], descartadas: [] as string[], otroReporte: false };
+  if (pol.modo === "excluir") return { sinPolitica: false, faltan: [] as string[], descartadas: hoja.columnas.filter((c) => pol.lista.includes(c)), otroReporte: false };
+  const conserva = hoja.columnas.filter((c) => pol.lista.includes(c));
+  return {
+    sinPolitica: false,
+    faltan: pol.lista.filter((c) => !hoja.columnas.includes(c)),
+    descartadas: hoja.columnas.filter((c) => !pol.lista.includes(c)),
+    // Un archivo que no trae casi ninguna de las columnas que la política conserva es otro reporte (o el de otra sede con otra forma).
+    otroReporte: conserva.length < Math.min(3, pol.lista.length),
+  };
 }
 
 Deno.serve(async (request: Request) => {
@@ -209,7 +291,7 @@ Deno.serve(async (request: Request) => {
     return json({ error: "Cuerpo inválido." }, 400);
   }
   const accion = String(cuerpo.action ?? "");
-  if (!["estado", "probar", "sondear", "cargar"].includes(accion)) return json({ error: "Acción desconocida." }, 400);
+  if (!["estado", "probar", "periodos", "sondear", "cargar"].includes(accion)) return json({ error: "Acción desconocida." }, 400);
 
   const authorization = request.headers.get("Authorization") ?? "";
   if (!authorization.startsWith("Bearer ") || authorization.slice(7) === anonKey) return json({ error: "Falta la sesión." }, 401);
@@ -232,7 +314,7 @@ Deno.serve(async (request: Request) => {
       ok: true,
       configurado: credenciales,
       sedes: Object.keys(SEDES).map((id) => ({ id, nombre: SEDES[id].nombre, configurada: credenciales })),
-      reportes: REPORTES.map((r) => ({ id: r.id, sistema: r.sistema, verificado: r.verificado })),
+      reportes: REPORTES.map((r) => ({ id: r.id, sistema: r.sistema, verificado: r.verificado, periodoVia: r.periodoVia, confirma: r.confirma ?? null })),
     });
   }
 
@@ -253,6 +335,30 @@ Deno.serve(async (request: Request) => {
     }
   }
 
+  if (accion === "periodos") {
+    // Las listas de periodos de Master de esta sede: de ahí sale lo que la pantalla ofrece pedir.
+    let s: Sesion | null = null;
+    try {
+      s = await iniciarSesion(sede, "master");
+      const leer = async (ruta: string) => {
+        try {
+          return periodosDeLista((await pedirJson(s!.base, { metodo: "GET", ruta }, s!)).msg);
+        } catch {
+          return { periodos: [] as string[], actual: null };
+        }
+      };
+      const todos = await leer("/master/mod_reports/reports/get_periods/");
+      if (todos.periodos.length === 0) throw new ErrorPlataforma("La plataforma no entregó la lista de periodos.");
+      const aspirantes = await leer("/master/mod_reports/reports/periods_applicants/");
+      const deserciones = await leer("/master/mod_reports/reports/periods_to_student_desertion_report/");
+      return json({ ok: true, periodos: todos.periodos, actual: todos.actual ?? s.periodo, abierto: s.periodo, aspirantes: aspirantes.periodos, deserciones: deserciones.periodos });
+    } catch (e) {
+      return json({ ok: false, error: e instanceof ErrorPlataforma ? e.message : "No se pudo leer la lista de periodos." }, 502);
+    } finally {
+      if (s) await cerrarSesion(s);
+    }
+  }
+
   // sondear · cargar -------------------------------------------------------------------
   const conjunto = String(cuerpo.conjunto ?? "");
   const reporte = reportePorId(conjunto);
@@ -260,21 +366,73 @@ Deno.serve(async (request: Request) => {
   const corte = String(cuerpo.corte ?? "");
   if (reporte.corte && !CORTES.includes(corte)) return json({ error: "Falta el corte (1, 2, 3 o f)." }, 400);
   const pedido = String(cuerpo.periodo ?? "");
-  if ((reporte.periodoVia === "ruta" || reporte.periodoVia === "consulta") && !periodoValido(pedido)) return json({ error: "Falta el periodo (por ejemplo 2026b)." }, 400);
+  if (["ruta", "consulta", "cuerpo"].includes(reporte.periodoVia) && !periodoValido(pedido)) return json({ error: "Falta el periodo (por ejemplo 2026b)." }, 400);
   const motivo = String(cuerpo.motivo ?? "").slice(0, 300);
 
   let sesion: Sesion | null = null;
   try {
     sesion = await iniciarSesion(sede, reporte.sistema);
-    const periodo = reporte.periodoVia === "ninguno" ? PERMANENTE : reporte.periodoVia === "sesion" ? sesion.periodo : pedido;
-    const ctx: Contexto = { sede, periodo: periodo === PERMANENTE ? sesion.periodo : periodo, corte: reporte.corte ? corte : "", usuario: ENV("WAREHOUSE_MASTER_USER") };
+    const abierto = sesion.periodo;
+    // Qué periodo se guarda: el pedido si la plataforma deja pedirlo; el abierto si lo fija la sesión (y entonces pedir
+    // otro falla: guardar el abierto con la etiqueta de otro periodo sería mentir); «permanente» en los catálogos.
+    if (reporte.periodoVia === "sesion" && periodoValido(pedido) && pedido !== abierto) {
+      throw new ErrorPlataforma(`Periodo distinto del pedido: este reporte solo se puede traer del periodo abierto (${abierto}), no de ${pedido}. Cambie el periodo o cárguelo con el Excel del periodo que necesita.`);
+    }
+    const periodo = reporte.periodoVia === "ninguno" ? PERMANENTE : reporte.periodoVia === "sesion" ? abierto : pedido;
+    if (reporte.listaPeriodos && periodo !== PERMANENTE) {
+      const lista = await listaDePeriodos(sede, reporte.listaPeriodos, sesion);
+      if (lista && !lista.includes(periodo)) {
+        throw new ErrorPlataforma(`El periodo ${periodo} no está en la lista de ${reporte.listaPeriodos === "aspirantes" ? "aspirantes" : "deserciones"} de ${SEDES[sede].nombre} (${lista.slice(0, 6).join(", ")}…).`);
+      }
+    }
+    const ctx: Contexto = { sede, periodo: periodo === PERMANENTE ? abierto : periodo, abierto, corte: reporte.corte ? corte : "", usuario: ENV("WAREHOUSE_MASTER_USER") };
     const original = await obtenerHoja(reporte, ctx, sesion);
     if (original.filas.length === 0) throw new ErrorPlataforma("El reporte llegó sin filas.");
+
+    // El periodo que la plataforma dice haber entregado debe ser el pedido. Si el reporte no lo dice, un periodo distinto
+    // del abierto solo se acepta cuando está probado; si el periodo va en el cuerpo, se rechaza; si va en la URL, queda sin confirmar.
+    const hallado = original.periodoArchivo ?? null;
+    let confirmado = true;
+    if (periodo !== PERMANENTE) {
+      if (hallado && hallado !== periodo) {
+        throw new ErrorPlataforma(`Periodo distinto del pedido: se pidió ${periodo} y la plataforma entregó ${hallado}. No se guardó nada.`);
+      }
+      if (!hallado && (reporte.periodoVia === "cuerpo" || reporte.periodoVia === "consulta") && periodo !== abierto && !reporte.periodoProbado) {
+        if (reporte.periodoVia === "cuerpo") {
+          throw new ErrorPlataforma(`Periodo sin confirmar: este reporte no dice de qué periodo es, y ${SEDES[sede].nombre} tiene abierto ${abierto}, no ${periodo}. Solo se guarda el periodo abierto; para otro, cargue el Excel a mano.`);
+        }
+        confirmado = false;
+      }
+    }
+
     // La huella es del contenido tal como llegó; las columnas derivadas (grupo etario, origen) se añaden después.
     const hoja = derivarColumnas(conjunto, original, periodo === PERMANENTE ? ctx.periodo : periodo);
+    const revision = await revisarPolitica(db, conjunto, hoja);
 
     if (accion === "sondear") {
-      return json({ ok: true, periodo, columnas: hoja.columnas, originales: hoja.originales, filas: hoja.filas.length, verificado: reporte.verificado });
+      const avisos = [...(reporte.avisos ?? [])];
+      if (sede !== "buc") avisos.push("Los HAR con que se hizo este reporte son de Bucaramanga: en esta sede la ruta y el cuerpo son los mismos, pero las columnas pueden variar. Revise «faltan».");
+      if (!reporte.verificado) avisos.push("Este reporte no se vio completo en un HAR: confirme las columnas antes de darlo por bueno.");
+      if (!hallado && reporte.periodoVia !== "ruta" && reporte.periodoVia !== "sesion" && reporte.periodoVia !== "ninguno") avisos.push("El archivo no dice de qué periodo es.");
+      return json({
+        ok: true,
+        periodo,
+        abierto,
+        periodoArchivo: hallado,
+        confirmado,
+        columnas: hoja.columnas,
+        originales: hoja.originales,
+        filas: hoja.filas.length,
+        verificado: reporte.verificado,
+        sinPolitica: revision.sinPolitica,
+        faltan: revision.faltan,
+        descartadas: revision.descartadas,
+        otroReporte: revision.otroReporte,
+        avisos,
+      });
+    }
+    if (revision.otroReporte) {
+      throw new ErrorPlataforma(`El archivo de ${SEDES[sede].nombre} no se parece a este reporte (faltan columnas que la política conserva: ${revision.faltan.slice(0, 6).join(", ")}). No se guardó nada; use «Sondear» para ver sus columnas.`);
     }
 
     const huella = await huellaContenido(original);
@@ -290,7 +448,7 @@ Deno.serve(async (request: Request) => {
     });
     if (abierta.error) return json({ ok: false, error: abierta.error.message.replace(/^[a-z_]+: /, ""), code: abierta.error.message.split(":")[0] }, 409);
     const carga = (abierta.data as { id: string; version: number; duplicada: boolean }[])[0];
-    if (carga.duplicada) return json({ ok: true, periodo, version: carga.version, filas: hoja.filas.length, duplicada: true });
+    if (carga.duplicada) return json({ ok: true, periodo, version: carga.version, filas: hoja.filas.length, duplicada: true, confirmado });
 
     try {
       await enParalelo(enLotes(hoja.filas, FILAS_POR_LOTE), async (lote, i) => {
@@ -303,7 +461,7 @@ Deno.serve(async (request: Request) => {
     }
     const cerrada = await db.rpc("wh_cerrar_carga", { p_carga: carga.id, p_ok: true, p_error: "", p_columnas: hoja.columnas });
     if (cerrada.error) throw new ErrorPlataforma(cerrada.error.message);
-    return json({ ok: true, periodo, version: carga.version, filas: Number(cerrada.data), duplicada: false });
+    return json({ ok: true, periodo, version: carga.version, filas: Number(cerrada.data), duplicada: false, confirmado });
   } catch (e) {
     return json({ ok: false, error: e instanceof ErrorPlataforma ? e.message : "No se pudo completar la carga." }, 502);
   } finally {

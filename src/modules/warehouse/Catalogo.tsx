@@ -1,7 +1,8 @@
 /* Warehouse UDES · Catálogo: los conjuntos, cómo se piden y qué se guarda de cada uno. */
 
-import { useMemo, useState } from "react";
-import { CONJUNTOS, ENTREGAS, ESTADOS, SISTEMAS, TIPOS, VIAS, cargaPorArchivo, pideSolo, type Conjunto, type Sistema, type TipoConjunto } from "./conjuntos";
+import { Fragment, useMemo, useState } from "react";
+import { CONJUNTOS, ENTREGAS, ESTADOS, GRUPOS, SISTEMAS, TIPOS, VIAS, agrupar, cargaPorArchivo, pideSolo, type Conjunto, type Sistema, type TipoConjunto } from "./conjuntos";
+import { reportePorId } from "./reportes";
 import { usePoliticas, type Cobertura } from "./store";
 import type { Contexto } from "./Warehouse";
 
@@ -65,17 +66,29 @@ export function Catalogo({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertu
               </tr>
             </thead>
             <tbody>
-              {lista.map((x) => (
-                <tr key={x.id} tabIndex={0} data-sel={x.id === c.id} onClick={() => setElegido(x.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setElegido(x.id))}>
-                  <td>{x.nombre}</td>
-                  <td>{SISTEMAS[x.sistema].nombre}</td>
-                  <td>{TIPOS[x.tipo]}</td>
-                  <td>
-                    <span className="wh-etiqueta" data-t={x.estado}>
-                      {ESTADOS[x.estado]}
-                    </span>
-                  </td>
-                </tr>
+              {agrupar(lista).map((g) => (
+                <Fragment key={g.grupo}>
+                  <tr>
+                    <th scope="rowgroup" colSpan={4} className="wh-muted">
+                      {GRUPOS[g.grupo].nombre} · {GRUPOS[g.grupo].detalle}
+                    </th>
+                  </tr>
+                  {g.conjuntos.map((x) => (
+                    <tr key={x.id} tabIndex={0} data-sel={x.id === c.id} onClick={() => setElegido(x.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setElegido(x.id))}>
+                      <td>
+                        {x.nombre}
+                        {reportePorId(x.id)?.verificado === false && <small className="wh-muted"> · sin verificar</small>}
+                      </td>
+                      <td>{SISTEMAS[x.sistema].nombre}</td>
+                      <td>{TIPOS[x.tipo]}</td>
+                      <td>
+                        <span className="wh-etiqueta" data-t={x.estado}>
+                          {ESTADOS[x.estado]}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -116,7 +129,10 @@ export function Catalogo({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertu
             )}
           </div>
           {c.nota && <p className="wh-aviso">{c.nota}</p>}
-          <p className="wh-muted">{pideSolo(c) ? "El servidor sabe pedirlo solo." : "Aún no se pide solo: se carga con el Excel descargado."}</p>
+          <p className="wh-muted">
+            {pideSolo(c) ? "El servidor sabe pedirlo solo." : "Aún no se pide solo: se carga con el Excel descargado."}
+            {cargaPorArchivo(c) ? " También se puede subir a mano el Excel descargado, con el mismo lector." : ""}
+          </p>
           <p className="wh-muted">
             {guardados.length ? `${guardados.length} cargas vigentes guardadas.` : "Aún no hay nada guardado de este conjunto."}
           </p>

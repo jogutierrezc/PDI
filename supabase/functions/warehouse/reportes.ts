@@ -1,14 +1,29 @@
 /* =============================================================================
    Warehouse UDES · cómo se pide cada reporte a las plataformas.
 
-   Todo sale de los HAR de «har warehouse» (Capa 1–3): la ruta, el cuerpo y la
-   forma en que llega el archivo. Es lógica pura (sin red), para poder probar
-   que cada petición es la que el HAR muestra. La función `warehouse` la usa
-   para pedir; la pantalla, para saber cómo leer un Excel cargado a mano.
+   Todo sale de los HAR de «har warehouse» (Capa 1–3 y los de octubre de 2026,
+   carpetas «Master Har» y «davinci har»): la ruta, el cuerpo y la forma en que
+   llega el archivo. Es lógica pura (sin red), para poder probar que cada
+   petición es la que el HAR muestra. La función `warehouse` la usa para pedir;
+   la pantalla, para saber cómo leer un Excel cargado a mano.
 
    Las tres plataformas viven en el mismo servidor de cada sede
    (https://master-{sede}.udes.edu.co:81) bajo /master/, /galileo/ y /davinci/,
-   y cada una inicia sesión por separado (/{sistema}/mod_auth/login/).
+   y cada una inicia sesión por separado (/{sistema}/mod_auth/login/). Todos los
+   HAR son de Bucaramanga (BUC): las otras tres sedes (CUC, VAL, BOG) usan la misma
+   ruta con su servidor y el código de la sede en el título; hasta que haya un HAR
+   de cada una, «Sondear» por sede es la prueba (revisa también que las columnas
+   que la política conserva sigan en el archivo).
+
+   Cómo se identifica el periodo (`periodoVia`):
+     ruta     va en la ruta (/{periodo}/): la plataforma deja pedir cualquiera.
+     consulta va en ?selected_period=: Master lo acepta en algunos reportes.
+     cuerpo   va en el cuerpo (selected_period): Master lo trae null (el periodo abierto).
+     sesion   lo fija la sesión (current_period): solo el periodo abierto.
+     ninguno  catálogos; se guardan como «permanente».
+   Lo que la plataforma devuelve se compara con lo pedido (`confirma`): si el
+   archivo, el nombre de la tarea o las columnas dicen otro periodo, la carga
+   falla en vez de guardarse con el periodo equivocado.
 
    `verificado: false` quiere decir que el HAR no mostró la petición completa o
    su respuesta: el reporte se puede probar con «Sondear» (que no guarda nada),
@@ -16,15 +31,17 @@
    ========================================================================== */
 
 /** Cómo se lee lo que entrega el reporte (el mismo tipo de motor.ts; aquí no se importa para no atar este archivo a Deno). */
-export type Lector = "hoja" | `encabezado:${string}` | "uso-aulas" | "json";
+export type Lector = "hoja" | "tabla" | `encabezado:${string}` | "uso-aulas" | "json" | "aspirantes" | "desercion";
 
 export type SistemaApi = "davinci" | "galileo" | "master";
 
 export interface Contexto {
   /** Sede: buc, val, cuc o bog. */
   sede: string;
-  /** Periodo pedido (2026b). Para los reportes «de sesión» es el abierto en Master. */
+  /** Periodo pedido (2026b). Para los reportes «de sesión» es el abierto en la plataforma. */
   periodo: string;
+  /** El periodo abierto de la sesión (current_period). Cuando coincide con el pedido, Master se pide como en el HAR (selected_period null). */
+  abierto: string;
   /** Corte del reporte de rendimiento: 1, 2, 3 o f. */
   corte: string;
   /** Usuario de la cuenta de servicio (algunos reportes de evaluación lo piden en el cuerpo). */
@@ -48,8 +65,22 @@ export interface Reporte {
   /** archivo: el Excel llega en la respuesta · tarea: se inicia y se espera · json: la respuesta es la lista. */
   entrega: "archivo" | "tarea" | "json";
   lector: Lector;
-  /** ruta: el periodo va en la ruta · consulta: en selected_period · sesion: lo fija la sesión · ninguno. */
-  periodoVia: "ruta" | "consulta" | "sesion" | "ninguno";
+  /** ruta: el periodo va en la ruta · consulta: en ?selected_period · cuerpo: en selected_period del cuerpo · sesion: lo fija la sesión · ninguno. */
+  periodoVia: "ruta" | "consulta" | "cuerpo" | "sesion" | "ninguno";
+  /**
+   * Dónde se puede leer de qué periodo es lo que devolvió la plataforma:
+   *   archivo   títulos o nombres de hoja que arma la plataforma (no el título que enviamos, que vuelve como eco);
+   *   tarea     el nombre de la tarea (o, si no, el archivo);
+   *   columnas  la última columna de periodo de un histórico.
+   * Sin esto el periodo solo se da por bueno cuando es el abierto de la sesión o el reporte está `periodoProbado`.
+   */
+  confirma?: "archivo" | "tarea" | "columnas";
+  /** Se comprobó contra la plataforma que respeta el periodo pedido aunque el archivo no lo diga. */
+  periodoProbado?: boolean;
+  /** Qué lista de periodos de Master vale para este reporte (periods_applicants o periods_to_student_desertion_report). */
+  listaPeriodos?: "aspirantes" | "deserciones";
+  /** Advertencias para «Sondear» sobre lo que puede ser propio de Bucaramanga. */
+  avisos?: string[];
   corte?: boolean;
   /** Se pide una vez por edificio y se juntan. */
   porEdificio?: boolean;
@@ -64,7 +95,36 @@ const NOMBRE_SEDE: Record<string, string> = { buc: "Bucaramanga", val: "Valledup
 const sedeTxt = (c: Contexto) => SEDE_TITULO[c.sede] ?? c.sede.toUpperCase();
 const EXCEL = "application/vnd.ms-excel";
 const AUTOR = "Master - Web: Gestión integral de horarios ";
+/** «26/10/2026 11:35:25» en hora de Colombia: el título de la nómina lleva la hora en que se pide. */
+function fechaHoraTitulo(ahora = new Date()): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
+      .formatToParts(ahora)
+      .map((x) => [x.type, x.value]),
+  );
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+}
+/** selected_period del cuerpo de Master: null (el periodo abierto) cuando se pide ese, y el periodo cuando es otro. */
+const periodoCuerpo = (c: Contexto): string | null => (c.periodo === c.abierto ? null : c.periodo);
+/** ?selected_period= de la URL, solo cuando el periodo pedido no es el abierto. */
+const periodoConsulta = (c: Contexto): Record<string, string> | undefined => (c.periodo === c.abierto ? undefined : { selected_period: c.periodo });
 const NOMINA_CAMPOS = ["apellidos y nombres", "cédula", "contrato", "asignatura/actividad", "tipo act.", "código", "tipo de actividad", "grp", "dpto/carrera", "horas", "h x sem", "semanas", "mat", "observaciones"];
+/**
+ * El cuerpo que Master espera para nómina, nuevos matriculados y estudiantes activos: los tres HAR llevan los mismos
+ * campos (los de la nómina, aunque el reporte sea otro), `status` y `selected_period`. Cambian `type`, `title`,
+ * `name_doc` y `report`.
+ */
+const cuerpoMaster = (c: Contexto, type: "xls" | "pdf", resto: Record<string, unknown>): Record<string, unknown> => ({
+  type,
+  size: "A4",
+  orientation: "landscape",
+  author: AUTOR,
+  fields: NOMINA_CAMPOS,
+  fields_size: [12, 7, 10, 15, 6, 4, 12, 4, 5, 5, 4, 10],
+  ...resto,
+  status: [true, false, false, false],
+  selected_period: periodoCuerpo(c),
+});
 
 const json = (id: string, sistema: SistemaApi, ruta: string, periodoVia: Reporte["periodoVia"] = "ninguno", extra?: Reporte["extra"]): Reporte => ({
   id,
@@ -86,6 +146,7 @@ export const REPORTES: Reporte[] = [
     // Master acepta selected_period en la URL (verificado contra la plataforma, 2026-10-15):
     // sin él entrega el periodo abierto de la sesión; con él, cualquiera de get_periods (desde 2018b).
     periodoVia: "consulta",
+    periodoProbado: true,
     corte: true,
     verificado: true,
     armar: (c) => ({
@@ -102,6 +163,7 @@ export const REPORTES: Reporte[] = [
     lector: "hoja",
     periodoVia: "ruta",
     verificado: true,
+    avisos: ["El filtro «courses» (semestres 5 a 8 y electivas) sale del HAR de Bucaramanga: si esta sede tiene otros semestres, el reporte podría no traer a todos. Compare el número de filas con el de la plataforma."],
     armar: (c) => ({
       metodo: "POST",
       ruta: `/davinci/mod_reports/reports/students_matriculated/${c.periodo}/download/`,
@@ -186,8 +248,10 @@ export const REPORTES: Reporte[] = [
     id: "dv_homol",
     sistema: "davinci",
     entrega: "archivo",
-    lector: "hoja",
+    // El Excel trae el nombre de la universidad y «GESTION DE HOMOLOGACIONES - PERIODO 2026B» antes de la tabla.
+    lector: "tabla",
     periodoVia: "ruta",
+    confirma: "archivo",
     verificado: true,
     armar: (c) => ({
       metodo: "POST",
@@ -196,17 +260,173 @@ export const REPORTES: Reporte[] = [
     }),
   },
   {
-    id: "dv_asp",
-    sistema: "davinci",
+    // Aspirantes de pregrado. Está en MASTER: bajo /davinci/ la misma ruta responde 404 (HAR de Davinci y de Master).
+    // El HAR de Master muestra un 404 en el primer intento (con la sesión de más de diez minutos) y un 200 tras iniciar sesión de nuevo.
+    id: "ms_asp",
+    sistema: "master",
     entrega: "archivo",
-    lector: "hoja",
+    lector: "aspirantes",
     periodoVia: "ruta",
-    // Los dos HAR de aspirantes están cortados: solo se conoce la ruta, y se supone el mismo cuerpo de los demás.
+    confirma: "archivo",
+    listaPeriodos: "aspirantes",
+    verificado: true,
+    armar: (c) => ({
+      metodo: "POST",
+      ruta: `/master/mod_reports/reports/applicants_consolidated/${c.periodo}/download/`,
+      cuerpo: { type: EXCEL, title: `Consolidado general de aspirantes de pregrado - ${sedeTxt(c)} ${c.periodo}`, title_doc: "consolidado_aspirantes", formation: "pre", report: "consolidado_aspirantes" },
+    }),
+  },
+  {
+    // Posgrado: ningún HAR lo muestra. Se supone la misma ruta con formation «pos» y el título análogo.
+    id: "ms_asppos",
+    sistema: "master",
+    entrega: "archivo",
+    lector: "aspirantes",
+    periodoVia: "ruta",
+    confirma: "archivo",
+    listaPeriodos: "aspirantes",
     verificado: false,
     armar: (c) => ({
       metodo: "POST",
-      ruta: `/davinci/mod_reports/reports/applicants_consolidated/${c.periodo}/download/`,
-      cuerpo: { type: EXCEL, title: `Reporte consolidado de aspirantes ${sedeTxt(c)} ${c.periodo}`, title_doc: "aspirantes_consolidado", report: "aspirantes_consolidado" },
+      ruta: `/master/mod_reports/reports/applicants_consolidated/${c.periodo}/download/`,
+      cuerpo: { type: EXCEL, title: `Consolidado general de aspirantes de posgrado - ${sedeTxt(c)} ${c.periodo}`, title_doc: "consolidado_aspirantes", formation: "pos", report: "consolidado_aspirantes" },
+    }),
+  },
+  {
+    id: "dv_cred",
+    sistema: "davinci",
+    entrega: "archivo",
+    lector: "tabla",
+    periodoVia: "ruta",
+    // ~17.500 filas y 2 MB en base64: tarda. Trae correo personal y celular; la política los descarta.
+    verificado: true,
+    armar: (c) => ({
+      metodo: "POST",
+      ruta: `/davinci/mod_reports/reports/credits_sumary/${c.periodo}/download/`,
+      cuerpo: { type: EXCEL, title: `Promedio, créditos y ubicación de estudiantes - ${sedeTxt(c)} ${c.periodo}`, title_doc: `ReportePromedio${c.periodo}`, report: `ReportePromedio${c.periodo}` },
+    }),
+  },
+  {
+    id: "dv_prom",
+    sistema: "davinci",
+    entrega: "archivo",
+    lector: "tabla",
+    periodoVia: "ruta",
+    verificado: true,
+    armar: (c) => ({
+      metodo: "POST",
+      ruta: `/davinci/mod_reports/reports/student_averages/${c.periodo}/download/`,
+      cuerpo: { type: EXCEL, title: `Reporte de promedios de estudiantes - ${sedeTxt(c)} ${c.periodo}`, title_doc: `ReportePromedio${c.periodo}`, report: `ReportePromedio${c.periodo}` },
+    }),
+  },
+  {
+    id: "dv_cond",
+    sistema: "davinci",
+    entrega: "archivo",
+    lector: "tabla",
+    periodoVia: "ruta",
+    verificado: true,
+    armar: (c) => {
+      const titulo = `Reporte de estudiantes condicionales - ${sedeTxt(c)} ${c.periodo}`;
+      return { metodo: "POST", ruta: `/davinci/mod_reports/reports/conditionalities/${c.periodo}/download/`, cuerpo: { type: EXCEL, title: titulo, title_doc: titulo, report: titulo } };
+    },
+  },
+  {
+    // La ruta NO lleva periodo: es el histórico completo desde initial_period hasta el periodo abierto. Se asocia al
+    // periodo abierto (la última columna del Excel), que se comprueba contra el que informa la plataforma.
+    id: "dv_deser",
+    sistema: "davinci",
+    entrega: "archivo",
+    lector: "desercion",
+    periodoVia: "sesion",
+    confirma: "columnas",
+    listaPeriodos: "deserciones",
+    verificado: true,
+    armar: (c) => {
+      const titulo = `Reporte historico de desertores de pregrado - ${sedeTxt(c)} 2014a`;
+      return { metodo: "POST", ruta: "/davinci/mod_reports/reports/general_defactor_history/download/", cuerpo: { type: EXCEL, title: titulo, title_doc: titulo, report: titulo, is_posgraduate: false, initial_period: "2014a" } };
+    },
+  },
+  {
+    // El HAR solo muestra pregrado (is_posgraduate false). Posgrado se supone con el mismo cuerpo y is_posgraduate true.
+    id: "dv_deserpos",
+    sistema: "davinci",
+    entrega: "archivo",
+    lector: "desercion",
+    periodoVia: "sesion",
+    confirma: "columnas",
+    listaPeriodos: "deserciones",
+    verificado: false,
+    armar: (c) => {
+      const titulo = `Reporte historico de desertores de posgrado - ${sedeTxt(c)} 2014a`;
+      return { metodo: "POST", ruta: "/davinci/mod_reports/reports/general_defactor_history/download/", cuerpo: { type: EXCEL, title: titulo, title_doc: titulo, report: titulo, is_posgraduate: true, initial_period: "2014a" } };
+    },
+  },
+  {
+    // Nuevos matriculados: Excel directo (ficha de 36 columnas, con datos personales y sensibles que la política descarta).
+    // El Excel no dice de qué periodo es: solo se acepta el periodo abierto (la plataforma lo entrega con selected_period null).
+    id: "ms_nuevos",
+    sistema: "master",
+    entrega: "archivo",
+    lector: "tabla",
+    periodoVia: "cuerpo",
+    verificado: true,
+    armar: (c) => ({
+      metodo: "POST",
+      ruta: "/master/mod_reports/reports/new_students_matriculated/download/",
+      consulta: periodoConsulta(c),
+      cuerpo: cuerpoMaster(c, "pdf", { title: `Reporte de nuevos matriculados - ${sedeTxt(c)} ${c.periodo.toUpperCase()}`, name_doc: "reporte_nuevos_matriculados.xlsx", report: "matriculated" }),
+    }),
+  },
+  {
+    // Estudiantes activos: es una tarea (el HAR la muestra terminar con el Excel en task_state). El nombre de la tarea
+    // trae el periodo («Reporte de estudiantes activos - BUC 2026b.xlsx»): con él se comprueba.
+    id: "ms_activos",
+    sistema: "master",
+    entrega: "tarea",
+    lector: "tabla",
+    periodoVia: "cuerpo",
+    confirma: "tarea",
+    verificado: true,
+    armar: (c) => ({
+      metodo: "POST",
+      ruta: "/master/mod_reports/reports/active_students/",
+      consulta: periodoConsulta(c),
+      cuerpo: cuerpoMaster(c, "pdf", { title: "Reporte de estudiantes activos", name_doc: "reporte_estudiantes_activos.xlsx", report: "matriculated" }),
+    }),
+  },
+  {
+    id: "ms_actdir",
+    sistema: "master",
+    entrega: "archivo",
+    // Dos filas de título y «Generado: fecha» antes de la tabla; el Excel no nombra el periodo (es la lista vigente de actividades).
+    lector: "tabla",
+    periodoVia: "sesion",
+    verificado: true,
+    armar: (c) => ({
+      metodo: "POST",
+      ruta: "/master/mod_activities/activities/download/",
+      cuerpo: { code: "", name: "", is_active: true, cp: "cp", limit: 10, page: 0, orderField: "code", orderReverse: -1, title: `Actividades directas y de apoyo - ${sedeTxt(c)} ${c.periodo.toUpperCase()}` },
+    }),
+  },
+  {
+    // Matrícula de posgrados por estudiante y grupo. Distinto de ms_posg (matriculados por grupo, sin estudiantes): este trae
+    // documento y nombre del estudiante, que la política descarta; el código del estudiante se conserva.
+    id: "ms_posgmat",
+    sistema: "master",
+    entrega: "archivo",
+    lector: "tabla",
+    periodoVia: "sesion",
+    verificado: true,
+    armar: (c) => ({
+      metodo: "POST",
+      ruta: "/master/mod_postgraduate_reports/postgraduate_reports/postgraduate_enrollments_groups/download/",
+      cuerpo: {
+        type: EXCEL,
+        title: `Reporte de matrículas de posgrados - ${sedeTxt(c)} ${c.periodo.toUpperCase()}`,
+        title_doc: "reporte_matriculas_posgrados",
+        fields: ["Codigo", "Doc. Estudiante", "Estudiante", "Cod. Programa", "Programa", "Cod. Materia", "Grupo", "Materia"],
+      },
     }),
   },
   {
@@ -289,53 +509,55 @@ export const REPORTES: Reporte[] = [
     id: "ms_nom",
     sistema: "master",
     entrega: "tarea",
-    // El Excel trae cuatro filas de título antes de la tabla, que empieza en «CÉDULA».
-    lector: "encabezado:cedula",
-    periodoVia: "sesion",
+    // El Excel trae tres filas de título («REPORTE CONSOLIDADO DE NÓMINA 2026B», sede, fecha) y la tabla desde la cuarta:
+    // 18 columnas que empiezan en «APELLIDOS Y NOMBRES» (la ruta anterior, consolidated_table, empezaba en «CÉDULA»).
+    lector: "tabla",
+    // selected_period va en el cuerpo (null = el abierto). El título del Excel y el nombre de la tarea dicen el periodo real.
+    periodoVia: "cuerpo",
+    confirma: "tarea",
     verificado: true,
     armar: (c) => ({
       metodo: "POST",
-      ruta: "/master/mod_reports/reports/paysheet/consolidated_table/download/",
-      cuerpo: {
-        type: "xls",
-        size: "A4",
-        orientation: "landscape",
-        author: AUTOR,
-        fields: NOMINA_CAMPOS,
-        fields_size: [12, 7, 10, 15, 6, 4, 12, 4, 5, 5, 4, 10],
-        title: `Reporte consolidado nómina de profesores ${sedeTxt(c)} ${c.periodo.toUpperCase()}`,
-        name_doc: "reporte_consolidado_nomina_profesores.xlsx",
-        selected_period: null,
-        status: [true, false, false, false],
-      },
+      ruta: "/master/mod_reports/reports/paysheet/consolidated/download/",
+      consulta: periodoConsulta(c),
+      cuerpo: cuerpoMaster(c, "xls", {
+        title: `Generar reporte de nómina consolidado (${fechaHoraTitulo()}) ${sedeTxt(c)} ${c.periodo.toUpperCase()}`,
+        name_doc: `Generar reporte de nómina consolidado ${sedeTxt(c)} ${c.periodo.toUpperCase()}.pdf`,
+        report: "paysheet",
+      }),
     }),
   },
   {
     id: "ms_comp",
     sistema: "master",
     entrega: "archivo",
-    lector: "hoja",
+    // Tres filas de título («UNIVERSIDAD DE SANTANDER - BUCARAMANGA», nombre del informe, «Generado: fecha») y la tabla desde la sexta.
+    lector: "tabla",
+    // El HAR lleva `period: "2026B"` (mayúsculas) en el cuerpo y no muestra selected_period en la URL; se envían los dos.
+    // El Excel no nombra el periodo: con uno distinto del abierto el resultado queda «sin confirmar».
     periodoVia: "consulta",
     verificado: true,
     armar: (c) => ({
       metodo: "POST",
       ruta: "/master/mod_details_prof_eval_periods/details_prof_eval_periods/get_consolidated_by_competence_xls/download/",
       consulta: { selected_period: c.periodo },
-      cuerpo: { title: `Informe por Competencias ${NOMBRE_SEDE[c.sede] ?? c.sede} ${c.periodo}`, title_doc: "Informe por Competencias.xlsx", period: c.periodo },
+      cuerpo: { title: `Informe por Competencias ${NOMBRE_SEDE[c.sede] ?? c.sede} ${c.periodo.toUpperCase()}`, title_doc: "Informe por Competencias.xlsx", period: c.periodo.toUpperCase() },
     }),
   },
   {
     id: "ms_eval",
     sistema: "master",
     entrega: "archivo",
-    lector: "hoja",
+    lector: "tabla",
+    // El HAR no muestra selected_period en la URL (solo el título y el usuario). El título del Excel repite el que se envía,
+    // así que no confirma el periodo: con uno distinto del abierto el resultado queda «sin confirmar».
     periodoVia: "consulta",
     verificado: true,
     armar: (c) => ({
       metodo: "POST",
       ruta: "/master/mod_details_prof_eval_periods/details_prof_eval_periods/get_consolidated_report/download/",
       consulta: { selected_period: c.periodo },
-      cuerpo: { title: `Consolidado general evaluación ${NOMBRE_SEDE[c.sede] ?? c.sede} ${c.periodo}`, title_doc: "consolidado.xlsx", username: c.usuario },
+      cuerpo: { title: `Consolidado general evaluación ${NOMBRE_SEDE[c.sede] ?? c.sede} ${c.periodo.toUpperCase()}`, title_doc: "consolidado.xlsx", username: c.usuario },
     }),
   },
   {
@@ -345,6 +567,7 @@ export const REPORTES: Reporte[] = [
     lector: "hoja",
     periodoVia: "sesion",
     verificado: true,
+    avisos: ["El cuerpo lleva dpt_ref «0» (todos los departamentos) e is_postgraduate «1»: se tomaron de Bucaramanga; en otra sede confirme que traen todos los posgrados."],
     armar: (c) => ({
       metodo: "POST",
       ruta: "/master/mod_postgraduate_reports/postgraduate_reports/enrollments_group/download/",
@@ -392,12 +615,48 @@ export function consultaDe(token: string, apiKey: string, propia?: Record<string
   return q.toString();
 }
 
-/** ¿Qué dice la tarea de Master o de Davinci? `msg.state` y, al terminar, el Excel en `msg.data`. */
-export function estadoTarea(respuesta: unknown): { listo: boolean; fallo: boolean; base64?: string; progreso?: number } {
+/**
+ * ¿Qué dice la tarea de Master o de Davinci? `msg.state` (BUSY, SUCCESS…) y, al terminar, el Excel en `msg.data`.
+ * `nombre` es el que la plataforma le da («Reporte de estudiantes activos - BUC 2026b.xlsx»): trae el periodo real.
+ */
+export function estadoTarea(respuesta: unknown): { listo: boolean; fallo: boolean; base64?: string; progreso?: number; nombre?: string } {
   const msg = (respuesta as { msg?: Record<string, unknown> } | null)?.msg;
   if (!msg || typeof msg !== "object") return { listo: false, fallo: false };
   const estado = String(msg.state ?? "").toUpperCase();
   const data = msg.data;
-  if (typeof data === "string" && data.startsWith("UEsDB")) return { listo: true, fallo: false, base64: data, progreso: 100 };
-  return { listo: false, fallo: estado === "FAILURE" || estado === "REVOKED", progreso: typeof msg.progress === "number" ? msg.progress : undefined };
+  const nombre = typeof msg.name === "string" ? msg.name : undefined;
+  if (typeof data === "string" && data.startsWith("UEsDB")) return { listo: true, fallo: false, base64: data, progreso: 100, nombre };
+  return { listo: false, fallo: estado === "FAILURE" || estado === "REVOKED", progreso: typeof msg.progress === "number" ? msg.progress : undefined, nombre };
+}
+
+/**
+ * Las listas de periodos de Master (`get_periods`: [{period, current}]; `periods_to_student_desertion_report`: ["2014a"…];
+ * `periods_applicants`: {"2026b": "2026B"}). Devuelve los válidos («2026b»), del más reciente al más antiguo, y cuál está abierto.
+ */
+export function periodosDeLista(msg: unknown): { periodos: string[]; actual: string | null } {
+  const valido = (p: unknown): p is string => typeof p === "string" && /^[0-9]{4}[ab]$/.test(p);
+  const vistos = new Set<string>();
+  let actual: string | null = null;
+  if (Array.isArray(msg)) {
+    for (const x of msg) {
+      const p = typeof x === "string" ? x : (x as { period?: unknown } | null)?.period;
+      if (valido(p)) {
+        vistos.add(p);
+        if (x && typeof x === "object" && (x as { current?: unknown }).current === true) actual = p;
+      }
+    }
+  } else if (msg && typeof msg === "object") {
+    for (const k of Object.keys(msg)) if (valido(k)) vistos.add(k);
+  }
+  return { periodos: [...vistos].sort().reverse(), actual };
+}
+
+/** La sede que dice ser un servidor, según `mod_auth/headquarter` («BUCARAMANGA», «CÚCUTA»…): buc, cuc, val o bog; null si no se reconoce. */
+export function sedeDeNombre(nombre: unknown): string | null {
+  const n = String(nombre ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  if (n.includes("BUCARAMANGA")) return "buc";
+  if (n.includes("CUCUTA")) return "cuc";
+  if (n.includes("VALLEDUPAR")) return "val";
+  if (n.includes("BOGOTA")) return "bog";
+  return null;
 }

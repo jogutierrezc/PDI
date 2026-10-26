@@ -191,19 +191,35 @@ export const CONJUNTOS: Conjunto[] = [
     har: "Homologaciones",
   },
   {
-    id: "dv_asp",
-    sistema: "davinci",
-    nombre: "Aspirantes consolidado",
+    id: "ms_asp",
+    sistema: "master",
+    nombre: "Aspirantes de pregrado (consolidado)",
     tipo: "hecho",
     via: "ruta",
     entrega: "archivo",
-    metodo: "GET",
-    ruta: "/davinci/mod_reports/reports/applicants_consolidated/{periodo}/download/",
-    cuerpo: "por confirmar",
-    estado: "har_danado",
-    privacidad: "Pendiente.",
-    nota: "La función la intenta pedir con el cuerpo habitual, sin verificar. Los HAR aspirantespregrado y aspirantesposgrados están cortados. Volver a exportarlos filtrando Fetch/XHR y udes.edu.co.",
-    har: "aspirantespregrado, aspirantesposgrados",
+    metodo: "POST",
+    ruta: "/master/mod_reports/reports/applicants_consolidated/{periodo}/download/",
+    cuerpo: "type, title, title_doc, formation (pre), report",
+    estado: "listo",
+    privacidad: "Solo conteos «ahora / histórico» por estado del proceso, tipo de aspirante y programa. Sin datos de personas.",
+    nota:
+      "Está en Master: bajo /davinci/ la misma ruta responde 404. El Excel trae una hoja por tipo de aspirante más «Consolidado por tipo» y «por programa»; se aplana en una tabla con el ámbito (detalle, consolidado_tipo, consolidado_programa), el tipo, el programa y, por estado, la cifra actual y la histórica. Se saltan los totales. El periodo se valida contra la lista de periodos de aspirantes de la sede.",
+    har: "Consolidado general de Aspirantes (Master)",
+  },
+  {
+    id: "ms_asppos",
+    sistema: "master",
+    nombre: "Aspirantes de posgrado (consolidado)",
+    tipo: "hecho",
+    via: "ruta",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/master/mod_reports/reports/applicants_consolidated/{periodo}/download/",
+    cuerpo: "type, title, title_doc, formation (pos), report",
+    estado: "listo",
+    privacidad: "Solo conteos «ahora / histórico» por estado del proceso, tipo de aspirante y programa. Sin datos de personas.",
+    nota: "Sin verificar: ningún HAR muestra el consolidado de posgrado. Se pide como el de pregrado con formation «pos»; «Sondear» dice si la plataforma lo entrega.",
+    har: "sin HAR de posgrado",
   },
   {
     id: "dv_notas",
@@ -220,21 +236,143 @@ export const CONJUNTOS: Conjunto[] = [
     nota: "«Reporte global de notas» de Davinci: una fila por estudiante y materia (~29.000 en Bucaramanga). Es la base de las alertas por notas de cada corte.",
     har: "rendimientoacademicoporestudiante",
   },
-
   {
     id: "dv_deser",
     sistema: "davinci",
-    nombre: "Deserciones (histórico)",
+    nombre: "Deserciones de pregrado (histórico)",
+    tipo: "hecho",
+    via: "sesion",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/davinci/mod_reports/reports/general_defactor_history/download/",
+    cuerpo: "type, title, title_doc, report, is_posgraduate (false), initial_period (2014a)",
+    estado: "listo",
+    privacidad: "Se guarda el código real del estudiante (dato personal), el programa, el periodo de ingreso, PFP, la modalidad y el estado de cada periodo (MP, MAT, AUS, DES, GRAD, DP, PFP).",
+    nota:
+      "La ruta no lleva periodo: es el histórico completo desde 2014a hasta el periodo abierto. Se guarda con el periodo abierto, que se comprueba con la última columna del Excel y con la lista de periodos de deserciones. ~23.600 filas y 2,7 MB: tarda. La hoja «Convenciones» solo explica las siglas y no se guarda.",
+    har: "Reporte historico de deserciones (Davinci)",
+  },
+  {
+    id: "dv_deserpos",
+    sistema: "davinci",
+    nombre: "Deserciones de posgrado (histórico)",
+    tipo: "hecho",
+    via: "sesion",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/davinci/mod_reports/reports/general_defactor_history/download/",
+    cuerpo: "igual que pregrado con is_posgraduate (true)",
+    estado: "listo",
+    privacidad: "Se guarda el código real del estudiante (dato personal), el programa, el periodo de ingreso, PFP, la modalidad y el estado de cada periodo.",
+    nota: "Sin verificar: el HAR solo muestra pregrado. Se supone el mismo cuerpo con is_posgraduate true; «Sondear» lo prueba.",
+    har: "sin HAR de posgrado",
+  },
+  {
+    id: "dv_cred",
+    sistema: "davinci",
+    nombre: "Promedio, créditos y ubicación",
+    tipo: "hecho",
+    via: "ruta",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/davinci/mod_reports/reports/credits_sumary/{periodo}/download/",
+    cuerpo: "type, title, title_doc, report",
+    estado: "listo",
+    privacidad: "Se guardan código real, estado, créditos, ubicación y promedios. Se descartan nombre, correo personal y celular.",
+    nota: "~17.500 filas y 2 MB: tarda. Una fila por estudiante con los créditos del plan, electivas y bienestar, el semestre de ubicación y los promedios.",
+    har: "Reporte promedio creditos y ubicacion de estudiantes (Davinci)",
+  },
+  {
+    id: "dv_prom",
+    sistema: "davinci",
+    nombre: "Promedios de estudiantes",
+    tipo: "hecho",
+    via: "ruta",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/davinci/mod_reports/reports/student_averages/{periodo}/download/",
+    cuerpo: "type, title, title_doc, report",
+    estado: "listo",
+    privacidad: "Se guardan código real, programa, pénsum, periodo del polígrafo y los dos promedios. Se descartan tipo de documento, identificación y nombre.",
+    har: "Reporte de promedios de estudiantes (Davinci)",
+  },
+  {
+    id: "dv_cond",
+    sistema: "davinci",
+    nombre: "Estudiantes condicionales",
+    tipo: "hecho",
+    via: "ruta",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/davinci/mod_reports/reports/conditionalities/{periodo}/download/",
+    cuerpo: "type, title, title_doc, report",
+    estado: "listo",
+    privacidad: "Se guardan código real, condicionalidades, programa y si está activo (académico y financiero). Se descartan nombre, apellidos e identificación.",
+    nota: "El HAR trae pocas filas. Revise con «Sondear» que «Condicionalidades» sea un código y no un texto libre antes de cargar.",
+    har: "Reporte estudiantes condicionales (Davinci)",
+  },
+  {
+    id: "ms_nuevos",
+    sistema: "master",
+    nombre: "Nuevos matriculados",
     tipo: "hecho",
     via: "cuerpo",
     entrega: "archivo",
     metodo: "POST",
-    ruta: "(por capturar)",
-    cuerpo: "por confirmar",
-    estado: "sin_har",
-    privacidad: "Pendiente.",
-    nota: "Solo se capturó la lista de periodos (periods_to_student_desertion_report).",
-    har: "sin HAR",
+    ruta: "/master/mod_reports/reports/new_students_matriculated/download/",
+    cuerpo: "type (pdf), size, orientation, author, fields, fields_size, title, name_doc, status, report (matriculated), selected_period",
+    estado: "listo",
+    privacidad:
+      "La misma política de «Estudiantes matriculados»: programa, pénsum, jornada, ubicación, créditos, promedios y fechas de matrícula; código real (dato personal), grupo etario y origen derivados. Se descartan documento, nombres, género, nacimiento, ciudad, dirección, barrio, estrato, teléfonos, correo, colegio, salud y responsable.",
+    nota:
+      "El Excel trae 36 columnas con datos personales y de salud: la política descarta lo no permitido antes de guardar. No dice de qué periodo es: solo se guarda el periodo abierto de la sede (si se pide otro, falla).",
+    har: "Reporte Estudiantes Nuevos Matriculados (Master)",
+  },
+  {
+    id: "ms_activos",
+    sistema: "master",
+    nombre: "Estudiantes activos",
+    tipo: "hecho",
+    via: "cuerpo",
+    entrega: "tarea",
+    metodo: "POST",
+    ruta: "/master/mod_reports/reports/active_students/",
+    cuerpo: "igual que nuevos matriculados, con title «Reporte de estudiantes activos»",
+    estado: "listo",
+    privacidad: "La misma política de «Estudiantes matriculados»: código real (dato personal), grupo etario y origen derivados; sin documento, nombres, contacto, dirección ni salud.",
+    nota:
+      "Es una tarea: la plataforma responde un task_id y el Excel llega en task_state/{id}. El HAR la muestra terminar (~4.400 filas, ~1 MB). El nombre de la tarea trae el periodo y se compara con el pedido.",
+    har: "Reporte de estudiantes activos (Master)",
+  },
+  {
+    id: "ms_actdir",
+    sistema: "master",
+    nombre: "Actividades directas y de apoyo",
+    tipo: "hecho",
+    via: "sesion",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/master/mod_activities/activities/download/",
+    cuerpo: "code, name, is_active, cp, limit, page, orderField, orderReverse, title",
+    estado: "listo",
+    privacidad: "Código, nombre, tipo, instrucciones, si está activa, si es directa y los tipos de vinculación. Sin datos de personas.",
+    nota: "Distinto del catálogo «Actividades» (JSON): este es el reporte con instrucciones y vinculación. El Excel no nombra el periodo; se guarda con el abierto.",
+    har: "Reporte de Actividades directas y de apoyo (Master)",
+  },
+  {
+    id: "ms_posgmat",
+    sistema: "master",
+    nombre: "Matrícula de posgrados (por estudiante)",
+    tipo: "hecho",
+    via: "sesion",
+    entrega: "archivo",
+    metodo: "POST",
+    ruta: "/master/mod_postgraduate_reports/postgraduate_reports/postgraduate_enrollments_groups/download/",
+    cuerpo: "type, title, title_doc, fields",
+    estado: "listo",
+    privacidad: "Se guardan código real, programa, materia y grupo. Se descartan el documento y el nombre del estudiante.",
+    nota: "Distinto de «Matriculados por grupo (posgrado)»: aquel cuenta matriculados por grupo; este trae una fila por estudiante y materia (~2.450 filas).",
+    har: "Reporte matricula posgrados (Master)",
   },
   {
     id: "gl_uso",
@@ -301,11 +439,12 @@ export const CONJUNTOS: Conjunto[] = [
     via: "cuerpo",
     entrega: "tarea",
     metodo: "POST",
-    ruta: "/master/mod_reports/reports/paysheet/consolidated_table/download/",
-    cuerpo: "type, size, orientation, author, fields, fields_size, title, name_doc, selected_period, status",
+    ruta: "/master/mod_reports/reports/paysheet/consolidated/download/",
+    cuerpo: "type, size, orientation, author, fields, fields_size, title, name_doc, status, report (paysheet), selected_period",
     estado: "listo",
     privacidad: "Carga académica por docente: asignatura, grupo, horas y programa. Se descartan nombres, correos y observaciones; la cédula queda como seudónimo.",
-    nota: "Es una tarea: la plataforma tarda en generarlo (a veces minutos) y el Excel trae un título antes de la tabla.",
+    nota:
+      "Es una tarea: la plataforma responde un task_id y el Excel llega en task_state/{id} (~1 minuto en Bucaramanga). Reemplaza a la ruta anterior (consolidated_table). El Excel trae tres filas de título y 18 columnas; el título dice el periodo y se compara con el pedido. selected_period va en null cuando se pide el periodo abierto.",
     har: "ReporteNominaconestado, master profesores",
   },
   {
@@ -400,12 +539,63 @@ export const cargable = (c: Conjunto) => c.estado === "listo";
 /** ¿La función `warehouse` sabe pedirlo sola? (Ver reportes.ts: de ahí sale cómo.) */
 export const pideSolo = (c: Conjunto) => reportePorId(c.id) !== undefined;
 
-/** ¿Se puede cargar hoy con el Excel descargado de la plataforma? Los catálogos llegan como JSON y esperan su adaptador. */
-export const cargaPorArchivo = (c: Conjunto) => cargable(c) && c.entrega === "archivo";
+/**
+ * ¿Se puede cargar con el Excel descargado de la plataforma? Los que la plataforma entrega como tarea
+ * también llegan como Excel (se descarga igual desde su pantalla); los catálogos JSON no.
+ */
+export const cargaPorArchivo = (c: Conjunto) => cargable(c) && c.entrega !== "json";
+
+/** Cómo se agrupan los conjuntos en el catálogo y en las cargas. */
+export type GrupoConjunto = "estudiantes" | "admisiones" | "permanencia" | "docentes" | "horarios" | "posgrado" | "catalogos";
+export const GRUPOS: Record<GrupoConjunto, { nombre: string; detalle: string }> = {
+  estudiantes: { nombre: "Estudiantes", detalle: "Matrícula, notas y rendimiento" },
+  admisiones: { nombre: "Admisiones y egreso", detalle: "Aspirantes, graduados y homologaciones" },
+  permanencia: { nombre: "Permanencia y riesgo", detalle: "Promedios, créditos, condicionales y deserción" },
+  docentes: { nombre: "Docentes y actividades", detalle: "Nómina, evaluación y actividades" },
+  horarios: { nombre: "Horarios y aulas", detalle: "Horarios, auditoría, uso de aulas y equipos" },
+  posgrado: { nombre: "Posgrado", detalle: "Matrícula, aspirantes y deserción de posgrado" },
+  catalogos: { nombre: "Catálogos", detalle: "Listas de programas, aulas, cursos y periodos" },
+};
+const GRUPO_DE: Record<string, GrupoConjunto> = {
+  ma_rendimiento: "estudiantes",
+  dv_matric: "estudiantes",
+  dv_global: "estudiantes",
+  dv_notas: "estudiantes",
+  ms_nuevos: "estudiantes",
+  ms_activos: "estudiantes",
+  dv_fin: "estudiantes",
+  ms_asp: "admisiones",
+  dv_grad: "admisiones",
+  dv_homol: "admisiones",
+  dv_cred: "permanencia",
+  dv_prom: "permanencia",
+  dv_cond: "permanencia",
+  dv_deser: "permanencia",
+  ms_asppos: "posgrado",
+  dv_deserpos: "posgrado",
+  ms_posg: "posgrado",
+  ms_posgmat: "posgrado",
+  ms_nom: "docentes",
+  ms_comp: "docentes",
+  ms_eval: "docentes",
+  ms_doc: "docentes",
+  ms_actdir: "docentes",
+  ms_hor: "horarios",
+  ms_hordep: "horarios",
+  ms_audit: "horarios",
+  gl_uso: "horarios",
+  gl_eq: "horarios",
+};
+export const grupoDe = (c: Conjunto): GrupoConjunto => (c.tipo === "catalogo" ? "catalogos" : (GRUPO_DE[c.id] ?? "estudiantes"));
+
+/** Los conjuntos agrupados, en el orden de GRUPOS, para mostrarlos en secciones. */
+export function agrupar<T extends Conjunto>(lista: T[]): { grupo: GrupoConjunto; conjuntos: T[] }[] {
+  return (Object.keys(GRUPOS) as GrupoConjunto[]).map((grupo) => ({ grupo, conjuntos: lista.filter((c) => grupoDe(c) === grupo) })).filter((g) => g.conjuntos.length > 0);
+}
 
 /**
- * Periodos que ofrece el almacén: desde 2018b (el primero de get_periods hasta
- * el semestre en curso). Enero a junio es «a»; julio a diciembre, «b».
+ * Periodos que ofrece el almacén cuando la plataforma no los ha dicho: desde 2018b (el primero de get_periods hasta
+ * el semestre en curso). Enero a junio es «a»; julio a diciembre, «b». Con la plataforma disponible se usa `mezclarPeriodos`.
  */
 export function periodosDisponibles(hoy = new Date()): string[] {
   const actual = hoy.getFullYear();
@@ -416,4 +606,14 @@ export function periodosDisponibles(hoy = new Date()): string[] {
     if (y < actual || mitad === "b") salida.push(`${y}b`);
   }
   return salida.reverse();
+}
+
+/**
+ * La lista de periodos que se ofrece en pantalla: los que la plataforma de la sede dice tener (get_periods) más los ya
+ * guardados. Si la plataforma no responde, los guardados más los que se calculan desde 2018b.
+ */
+export function mezclarPeriodos(plataforma: string[] | undefined, guardados: string[], hoy = new Date()): string[] {
+  const valido = (p: string) => /^[0-9]{4}[ab]$/.test(p);
+  const todos = new Set<string>([...(plataforma?.length ? plataforma : periodosDisponibles(hoy)).filter(valido), ...guardados.filter(valido)]);
+  return [...todos].sort().reverse();
 }

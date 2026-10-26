@@ -18,6 +18,11 @@ export interface Hoja {
   filas: Fila[];
   /** Encabezados tal como venían en el archivo, en el mismo orden que `columnas`. */
   originales: string[];
+  /**
+   * El periodo que el propio archivo dice tener (en el título, el nombre de la hoja…), si el reporte lo trae.
+   * No entra en la huella ni se guarda: sirve para comprobar que el archivo es del periodo pedido.
+   */
+  periodoArchivo?: string | null;
 }
 
 /** «% Reprobados» → «pct_reprobados»; «Créd. según ubicación» → «cred_segun_ubicacion». */
@@ -79,8 +84,8 @@ function cadenasCompartidas(xml: string): string[] {
  * `archivos` es el mapa nombre → bytes de las entradas del zip.
  * La primera fila no vacía son los encabezados; las filas vacías se saltan.
  */
-export function leerXlsx(archivos: Record<string, Uint8Array>, opciones: { hoja?: number; encabezado?: string } = {}): Hoja {
-  return aHoja(matrizDeHoja(archivos, opciones.hoja ?? 0), opciones.encabezado);
+export function leerXlsx(archivos: Record<string, Uint8Array>, opciones: { hoja?: number; encabezado?: string; minCeldas?: number } = {}): Hoja {
+  return aHoja(matrizDeHoja(archivos, opciones.hoja ?? 0), opciones.encabezado, opciones.minCeldas);
 }
 
 type Celda = string | number | boolean | null;
@@ -140,9 +145,17 @@ export function cuantasHojas(archivos: Record<string, Uint8Array>): number {
  * primera celda, normalizada, es ese texto (los reportes de nómina y de uso de
  * aulas traen un título y una cabecera antes de la tabla).
  */
-export function aHoja(matriz: Celda[][], encabezado?: string): Hoja {
+export function aHoja(matriz: Celda[][], encabezado?: string, minCeldas = 1): Hoja {
   const lleno = (f: Celda[]) => f.some((x) => x !== null && String(x).trim() !== "");
-  const inicio = encabezado ? matriz.findIndex((f) => lleno(f) && normalizarColumna(String(f[0] ?? "")) === normalizarColumna(encabezado)) : matriz.findIndex(lleno);
+  const llenas = (f: Celda[]) => f.filter((x) => x !== null && String(x).trim() !== "").length;
+  // Con `minCeldas` (reportes con títulos de varias filas) el encabezado es la primera fila con al menos ese número de
+  // celdas con contenido: los títulos ocupan una sola. Si ninguna alcanza, la primera fila con contenido, como siempre.
+  let inicio = encabezado
+    ? matriz.findIndex((f) => lleno(f) && normalizarColumna(String(f[0] ?? "")) === normalizarColumna(encabezado))
+    : minCeldas > 1
+      ? matriz.findIndex((f) => llenas(f) >= minCeldas)
+      : matriz.findIndex(lleno);
+  if (inicio < 0 && !encabezado && minCeldas > 1) inicio = matriz.findIndex(lleno);
   if (inicio < 0) {
     if (encabezado) throw new Error(`No se encontró el encabezado «${encabezado}» en el archivo: el reporte cambió de forma.`);
     return { columnas: [], originales: [], filas: [] };
@@ -269,12 +282,146 @@ export function aplanarJson(msg: unknown): Hoja {
   return { columnas: orden, originales: orden, filas };
 }
 
-/** Cómo se lee lo que entrega cada reporte. */
-export type Lector = "hoja" | `encabezado:${string}` | "uso-aulas" | "json";
+/** Los nombres de las hojas de un .xlsx, en el orden de sus archivos (el mismo de `matrizDeHoja`). */
+export function nombresDeHojas(archivos: Record<string, Uint8Array>): string[] {
+  const libro = archivos["xl/workbook.xml"] ? texto(archivos["xl/workbook.xml"]) : "";
+  const relaciones = archivos["xl/_rels/workbook.xml.rels"] ? texto(archivos["xl/_rels/workbook.xml.rels"]) : "";
+  const destino = new Map<string, string>();
+  for (const r of relaciones.matchAll(/<Relationship\b([^>]*)\/?>/g)) {
+    const id = r[1].match(/\bId="([^"]*)"/)?.[1];
+    const objetivo = r[1].match(/\bTarget="([^"]*)"/)?.[1];
+    if (id && objetivo) destino.set(id, objetivo);
+  }
+  const hojas: { numero: number; nombre: string }[] = [];
+  for (const h of libro.matchAll(/<sheet\b([^>]*)\/?>/g)) {
+    const nombre = h[1].match(/\bname="([^"]*)"/)?.[1];
+    const rid = h[1].match(/\br:id="([^"]*)"/)?.[1];
+    const numero = Number((rid ? (destino.get(rid) ?? "") : "").match(/sheet(\d+)\.xml/)?.[1]);
+    if (nombre !== undefined && Number.isFinite(numero)) hojas.push({ numero, nombre: decodificar(nombre) });
+  }
+  return hojas.sort((a, b) => a.numero - b.numero).map((h) => h.nombre);
+}
+
+/** Los periodos («2026b») que nombra un texto, en minúscula y sin repetir. */
+export function periodosEnTexto(textoLibre: unknown): string[] {
+  const vistos = new Set<string>();
+  for (const m of String(textoLibre ?? "").matchAll(/\b(20\d{2})([ab])\b/gi)) vistos.add(`${m[1]}${m[2].toLowerCase()}`);
+  return [...vistos];
+}
+
+/**
+ * El periodo que el archivo dice tener: en el nombre de sus hojas o en las primeras filas (títulos que arma la
+ * plataforma, como «REPORTE CONSOLIDADO DE NÓMINA 2026B» o «PERIODO 2026B»). null si no dice ninguno o dice varios.
+ * No sirve con reportes cuyo título es el que se envió en la petición: ese texto es eco, no confirmación.
+ */
+export function periodoDelArchivo(archivos: Record<string, Uint8Array>): string | null {
+  const vistos = new Set<string>();
+  for (const n of nombresDeHojas(archivos)) periodosEnTexto(n).forEach((p) => vistos.add(p));
+  try {
+    // Solo las filas de título (una o dos celdas): una fila de datos puede traer un periodo que no es el del archivo.
+    for (const f of matrizDeHoja(archivos, 0).slice(0, 6)) {
+      if (f.filter((c) => c !== null && String(c).trim() !== "").length > 2) continue;
+      for (const c of f) if (typeof c === "string") periodosEnTexto(c).forEach((p) => vistos.add(p));
+    }
+  } catch {
+    // Sin hojas legibles: ya lo dirá el lector.
+  }
+  return vistos.size === 1 ? [...vistos][0] : null;
+}
+
+/** La última columna que es un periodo («2026b»): hasta dónde llega un histórico. */
+export function ultimoPeriodoDe(hoja: Hoja): string | null {
+  const periodos = hoja.columnas.filter((c) => /^20\d{2}[ab]$/.test(c)).sort();
+  return periodos.length ? periodos[periodos.length - 1] : null;
+}
+
+/**
+ * «Consolidado general de aspirantes» (Master): un libro con una hoja por tipo de aspirante («001 - NUEVO NACIONAL
+ * (PREGRADO)»…) más «CONSOLIDADO POR TIPO» y «CONSOLIDADO POR PROGRAMA». Cada hoja trae títulos, la cabecera en la
+ * tercera fila, una fila por programa (o por tipo) con celdas «N/M» (aspirantes ahora / histórico) y, al final, filas de
+ * totales y un recuadro de convenciones. Se aplana en una sola tabla: `ambito` (detalle, consolidado_tipo,
+ * consolidado_programa), `tipo`, `codigo`, `programa` y, por cada estado, `{estado}_actual` y `{estado}_historico`.
+ * Los totales se saltan (se suman de las filas). Son conteos: ningún dato de personas.
+ */
+export function leerAspirantes(archivos: Record<string, Uint8Array>): Hoja {
+  const columnas = ["ambito", "tipo", "codigo", "programa"];
+  const originales = ["Ámbito", "Tipo de aspirante", "Código", "Programa"];
+  const filas: Fila[] = [];
+  const txt = (x: Celda | undefined) => String(x ?? "").trim();
+  const llenas = (f: Celda[]) => f.filter((x) => x !== null && txt(x) !== "").length;
+  const par = (x: Celda | undefined): [number | null, number | null] => {
+    const m = txt(x).match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (m) return [Number(m[1]), Number(m[2])];
+    const n = typeof x === "number" ? x : txt(x) !== "" && Number.isFinite(Number(txt(x))) ? Number(txt(x)) : null;
+    return [n, null];
+  };
+  for (let i = 0; i < cuantasHojas(archivos); i++) {
+    const m = matrizDeHoja(archivos, i);
+    const h = m.findIndex((f) => llenas(f) >= 5);
+    if (h < 0) continue;
+    const titulo = txt(m.slice(0, h).flat().find((x) => x !== null && txt(x) !== ""));
+    const detalle = normalizarColumna(txt(m[h][0])) === "codigo";
+    const ambito = detalle ? "detalle" : normalizarColumna(titulo).includes("tipo") ? "consolidado_tipo" : "consolidado_programa";
+    const primera = detalle ? 2 : 1;
+    const estados = m[h].map((x, k) => ({ k, nombre: normalizarColumna(txt(x)), original: txt(x) })).filter((c) => c.k >= primera && c.original !== "");
+    for (const e of estados) {
+      for (const [sufijo, rotulo] of [["actual", "actual"], ["historico", "histórico"]] as const) {
+        const nombre = `${e.nombre}_${sufijo}`;
+        if (!columnas.includes(nombre)) {
+          columnas.push(nombre);
+          originales.push(`${e.original} (${rotulo})`);
+        }
+      }
+    }
+    for (const r of m.slice(h + 1)) {
+      if (llenas(r) === 0) continue;
+      const primero = normalizarColumna(txt(r[0]));
+      if (primero === "convenciones") break;
+      if ((detalle ? normalizarColumna(txt(r[1])) : primero).startsWith("totales")) continue;
+      const fila: Fila = {
+        ambito,
+        tipo: detalle ? titulo : ambito === "consolidado_tipo" ? txt(r[0]) : null,
+        codigo: detalle ? txt(r[0]) || null : null,
+        programa: detalle ? txt(r[1]) || null : ambito === "consolidado_programa" ? txt(r[0]) : null,
+      };
+      for (const e of estados) {
+        const [actual, historico] = par(r[e.k]);
+        fila[`${e.nombre}_actual`] = actual;
+        fila[`${e.nombre}_historico`] = historico;
+      }
+      filas.push(fila);
+    }
+  }
+  if (filas.length === 0) throw new Error("El archivo no trae hojas de aspirantes: el reporte cambió de forma.");
+  for (const f of filas) for (const c of columnas) if (!(c in f)) f[c] = null;
+  return { columnas, originales, filas };
+}
+
+/**
+ * «Histórico de deserciones» (Davinci): la hoja «Histórico de deserciones» trae Estudiante (el código), Programa,
+ * Periodo (de ingreso), PFP, Modalidad y una columna por periodo (2014a…) con el estado de ese periodo (MP, MAT, AUS,
+ * DES, GRAD, DP, PFP o «-»); la hoja «Convenciones» solo explica esas siglas y no se guarda.
+ */
+export function leerDesercion(archivos: Record<string, Uint8Array>): Hoja {
+  const h = leerXlsx(archivos, { minCeldas: 3 });
+  if (h.columnas[0] !== "estudiante" || !h.columnas.some((c) => /^20\d{2}[ab]$/.test(c))) {
+    throw new Error("El histórico de deserciones cambió de forma: se esperaba «Estudiante» y una columna por periodo.");
+  }
+  return h;
+}
+
+/**
+ * Cómo se lee lo que entrega cada reporte. `tabla` salta los títulos de varias filas (el encabezado es la primera fila
+ * con tres celdas llenas o más); `hoja` toma la primera fila con contenido.
+ */
+export type Lector = "hoja" | "tabla" | `encabezado:${string}` | "uso-aulas" | "json" | "aspirantes" | "desercion";
 
 /** Lee un .xlsx ya descomprimido según el lector del reporte. */
 export function leerSegun(lector: Lector, archivos: Record<string, Uint8Array>): Hoja {
   if (lector === "uso-aulas") return leerUsoAulas(archivos);
+  if (lector === "aspirantes") return leerAspirantes(archivos);
+  if (lector === "desercion") return leerDesercion(archivos);
+  if (lector === "tabla") return leerXlsx(archivos, { minCeldas: 3 });
   if (lector.startsWith("encabezado:")) return leerXlsx(archivos, { encabezado: lector.slice("encabezado:".length) });
   return leerXlsx(archivos);
 }
@@ -357,13 +504,16 @@ export function origenDe(departamento: unknown): "Santander" | "Otro departament
   return normalizarColumna(departamento) === "santander" ? "Santander" : "Otro departamento";
 }
 
+/** Los conjuntos que traen la ficha del estudiante (36 columnas) y de los que se derivan el grupo etario y el origen. */
+export const CONJUNTOS_CON_FICHA = ["dv_matric", "ms_nuevos", "ms_activos"];
+
 /**
- * Añade a «Estudiantes matriculados» el grupo etario y el origen, calculados con la fecha de nacimiento y el
- * departamento ANTES de que la política los descarte. Las dos columnas nuevas no permiten saber quién es.
- * Cualquier otro conjunto pasa igual.
+ * Añade a «Estudiantes matriculados» (y a los nuevos matriculados y los activos de Master, que traen la misma ficha)
+ * el grupo etario y el origen, calculados con la fecha de nacimiento y el departamento ANTES de que la política los
+ * descarte. Las dos columnas nuevas no permiten saber quién es. Cualquier otro conjunto pasa igual.
  */
 export function derivarColumnas(conjunto: string, hoja: Hoja, periodo: string): Hoja {
-  if (conjunto !== "dv_matric" || !hoja.columnas.includes("fecha_nac")) return hoja;
+  if (!CONJUNTOS_CON_FICHA.includes(conjunto) || !hoja.columnas.includes("fecha_nac")) return hoja;
   const columnas = [...hoja.columnas, "grupo_etario", "origen"];
   return {
     columnas,

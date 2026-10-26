@@ -15,8 +15,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { unzipSync } from "fflate";
 import { supabase, readFunctionError } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
-import { FILAS_POR_LOTE, derivarColumnas, enLotes, enParalelo, huellaContenido, leerSegun, recortarPorPolitica, type Fila, type Hoja } from "./motor";
-import { lectorDe } from "./reportes";
+import { FILAS_POR_LOTE, derivarColumnas, enLotes, enParalelo, huellaContenido, leerSegun, periodoDelArchivo, recortarPorPolitica, ultimoPeriodoDe, type Fila, type Hoja } from "./motor";
+import { lectorDe, reportePorId } from "./reportes";
 import type { ResumenGrupoNotas } from "./estudio";
 import type { DatosParaPilo } from "./paraPilo";
 
@@ -371,6 +371,8 @@ export interface ResultadoCarga {
   filas: number;
   duplicada: boolean;
   periodo?: string;
+  /** false: el reporte no dice de qué periodo es y se guardó con el pedido (solo pasa cuando la plataforma recibe el periodo en la URL). */
+  confirmado?: boolean;
 }
 
 export type Avance = (texto: string, hecho: number, total: number) => void;
@@ -384,7 +386,13 @@ export async function leerArchivoExcel(archivo: File, conjunto: string): Promise
   } catch {
     throw new Error("Ese archivo no es un Excel (.xlsx). Descargue el reporte de la plataforma y no lo vuelva a guardar con otro formato.");
   }
-  return leerSegun(lectorDe(conjunto), partes);
+  const hoja = leerSegun(lectorDe(conjunto), partes);
+  // Si el reporte dice de qué periodo es (el título que arma la plataforma o la última columna de un histórico), se anota
+  // para comprobarlo contra el periodo elegido antes de guardar.
+  const confirma = reportePorId(conjunto)?.confirma;
+  if (confirma === "columnas") hoja.periodoArchivo = ultimoPeriodoDe(hoja);
+  else if (confirma) hoja.periodoArchivo = periodoDelArchivo(partes);
+  return hoja;
 }
 
 /**
@@ -399,6 +407,9 @@ export async function guardarHoja(
   politica?: Pick<Politica, "modo" | "lista">,
 ): Promise<ResultadoCarga> {
   if (hoja.filas.length === 0) throw new Error("El archivo no trae filas.");
+  if (hoja.periodoArchivo && pedido.periodo !== "permanente" && hoja.periodoArchivo !== pedido.periodo) {
+    throw new Error(`Periodo distinto del elegido: el archivo es de ${hoja.periodoArchivo} y se iba a guardar como ${pedido.periodo}. Cambie el periodo de arriba o descargue el reporte del periodo correcto.`);
+  }
   avance?.("Calculando la huella del contenido", 0, hoja.filas.length);
   // La huella es del contenido completo, antes de recortar: así «el mismo archivo» se reconoce aunque la política cambie.
   const huella = await huellaContenido(hoja);
@@ -493,8 +504,40 @@ export interface PedidoServidor {
 }
 export const cargarDesdeServidor = (p: PedidoServidor) => invocar<ResultadoCarga & { ok: boolean }>({ action: "cargar", ...p });
 /** Pide el reporte y devuelve solo los nombres de sus columnas: no guarda nada ni muestra filas. */
-export const sondearServidor = (p: Omit<PedidoServidor, "motivo">) =>
-  invocar<{ ok: boolean; periodo: string; columnas: string[]; originales: string[]; filas: number; verificado: boolean }>({ action: "sondear", ...p });
+export interface Sonda {
+  ok: boolean;
+  periodo: string;
+  abierto?: string;
+  /** El periodo que dice el archivo, si lo dice. */
+  periodoArchivo?: string | null;
+  confirmado?: boolean;
+  columnas: string[];
+  originales: string[];
+  filas: number;
+  verificado: boolean;
+  sinPolitica?: boolean;
+  /** Columnas que la política conserva y el archivo de esta sede no trajo. */
+  faltan?: string[];
+  descartadas?: string[];
+  otroReporte?: boolean;
+  avisos?: string[];
+}
+export const sondearServidor = (p: Omit<PedidoServidor, "motivo">) => invocar<Sonda>({ action: "sondear", ...p });
+
+export interface PeriodosPlataforma {
+  ok: boolean;
+  periodos: string[];
+  actual: string;
+  abierto: string;
+  aspirantes: string[];
+  deserciones: string[];
+}
+export const periodosServidor = (sede: string) => invocar<PeriodosPlataforma>({ action: "periodos", sede });
+
+/** Los periodos que la plataforma de esa sede dice tener (get_periods); una consulta por sede, nunca compartida entre sedes. */
+export function usePeriodosPlataforma(sede: string, habilitado: boolean) {
+  return useQuery({ queryKey: ["warehouse", "periodos-plataforma", sede], queryFn: () => periodosServidor(sede), enabled: habilitado, retry: false, staleTime: 30 * 60_000 });
+}
 
 export function useEstadoServidor(habilitado: boolean) {
   return useQuery({ queryKey: ["warehouse", "servidor"], queryFn: estadoServidor, enabled: habilitado, retry: false, staleTime: 60_000 });

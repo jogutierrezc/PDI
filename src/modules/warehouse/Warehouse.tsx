@@ -17,8 +17,8 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
 import { Icon } from "../../components/ui/Icon";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
-import { periodosDisponibles, SEDES } from "./conjuntos";
-import { useCobertura, usePermisosWarehouse } from "./store";
+import { mezclarPeriodos, SEDES } from "./conjuntos";
+import { useCobertura, useEstadoServidor, usePeriodosPlataforma, usePermisosWarehouse } from "./store";
 import { Tablero } from "./Tablero";
 import { Catalogo } from "./Catalogo";
 import { Cargas } from "./Cargas";
@@ -54,9 +54,15 @@ export function Warehouse() {
   const permisos = usePermisosWarehouse();
   const cobertura = useCobertura();
 
-  const periodos = useMemo(() => periodosDisponibles(), []);
-  const periodo = periodos.includes(params.get("periodo") ?? "") ? (params.get("periodo") as string) : periodos[0];
   const sede = SEDES.some((s) => s.id === params.get("sede")) ? (params.get("sede") as string) : SEDES[0].id;
+  // Los periodos salen de la plataforma de la sede elegida (get_periods) y de lo ya guardado; sin respuesta de la plataforma,
+  // los guardados y los que se calculan desde 2018b. Cada sede pide la suya: nunca se reutiliza la lista de otra.
+  const servidor = useEstadoServidor(permisos.ver);
+  const plataforma = usePeriodosPlataforma(sede, permisos.ver && Boolean(servidor.data?.configurado));
+  const guardados = useMemo(() => (cobertura.data ?? []).map((c) => c.periodo), [cobertura.data]);
+  const periodos = useMemo(() => mezclarPeriodos(plataforma.data?.periodos, guardados), [plataforma.data, guardados]);
+  const porDefecto = plataforma.data?.actual && periodos.includes(plataforma.data.actual) ? plataforma.data.actual : periodos[0];
+  const periodo = periodos.includes(params.get("periodo") ?? "") ? (params.get("periodo") as string) : porDefecto;
   const seccion = SECCIONES.find((s) => s.id === seccionParam)?.id ?? "tablero";
   const actual = SECCIONES.find((s) => s.id === seccion)!;
 
@@ -73,7 +79,7 @@ export function Warehouse() {
     params,
     ir: (destino, extra = {}) => {
       const siguiente = new URLSearchParams();
-      if (periodo !== periodos[0]) siguiente.set("periodo", periodo);
+      if (periodo !== porDefecto) siguiente.set("periodo", periodo);
       if (sede !== SEDES[0].id) siguiente.set("sede", sede);
       for (const [k, v] of Object.entries(extra)) siguiente.set(k, v);
       navigate({ pathname: destino === "tablero" ? BASE : `${BASE}/${destino}`, search: siguiente.toString() });
@@ -85,7 +91,7 @@ export function Warehouse() {
       <label className="wh-campo">
         <span className="sr-only">Periodo</span>
         <Icon name="clock" size={15} />
-        <select value={periodo} onChange={(e) => cambiar("periodo", e.target.value, periodos[0])}>
+        <select value={periodo} onChange={(e) => cambiar("periodo", e.target.value, porDefecto)}>
           {periodos.map((p) => (
             <option key={p} value={p}>
               {p}

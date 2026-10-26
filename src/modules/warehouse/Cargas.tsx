@@ -1,8 +1,8 @@
 /* Warehouse UDES · Cargas: cargar un reporte (Excel descargado o traído de la plataforma), traer varios a la vez y el historial. */
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CONJUNTOS, CORTES, PERMANENTE, SEDES, SISTEMAS, cargable, cargaPorArchivo, conjuntoPorId, pideSolo } from "./conjuntos";
+import { CONJUNTOS, CORTES, GRUPOS, PERMANENTE, SEDES, SISTEMAS, agrupar, cargable, cargaPorArchivo, conjuntoPorId, pideSolo } from "./conjuntos";
 import { reportePorId } from "./reportes";
 import type { Hoja } from "./motor";
 import {
@@ -17,6 +17,7 @@ import {
   usePoliticas,
   whKeys,
   type Cobertura,
+  type Sonda,
 } from "./store";
 import type { Contexto } from "./Warehouse";
 
@@ -44,8 +45,10 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
   const [avance, setAvance] = useState<{ texto: string; hecho: number; total: number } | null>(null);
   const [resultado, setResultado] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [sonda, setSonda] = useState<{ periodo: string; columnas: string[]; filas: number } | null>(null);
+  const [sonda, setSonda] = useState<Sonda | null>(null);
+  // Cada celda del lote es «sede|conjunto»: el resultado de un conjunto en una sede no se mezcla con el de otra.
   const [lote, setLote] = useState<Record<string, EstadoLote>>({});
+  const [sedesLote, setSedesLote] = useState<string[]>([ctx.sede]);
   const [elegidos, setElegidos] = useState<string[]>(() =>
     CONJUNTOS.filter((c) => pideSolo(c) && cargable(c) && !c.porCorte && reportePorId(c.id)?.verificado && c.tipo !== "catalogo").map((c) => c.id),
   );
@@ -119,7 +122,9 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
         tipo: "ok",
         texto: r.duplicada
           ? `La plataforma entregó lo mismo que ya estaba guardado en ${r.periodo} (versión ${r.version}).`
-          : `Traído de la plataforma: ${r.filas.toLocaleString("es-CO")} filas de ${r.periodo}, versión ${r.version}.`,
+          : `Traído de la plataforma (${nombreSede}): ${r.filas.toLocaleString("es-CO")} filas de ${r.periodo}, versión ${r.version}.${
+              r.confirmado === false ? " El reporte no dice de qué periodo es: se guardó con el pedido, sin confirmar." : ""
+            }`,
       });
     } catch (e) {
       setResultado({ tipo: "error", texto: mensajeDe(e) });
@@ -136,7 +141,7 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
     setSonda(null);
     try {
       const r = await sondearServidor({ conjunto: conjunto.id, sede, periodo, corte: corteDeCarga });
-      setSonda({ periodo: r.periodo, columnas: r.columnas, filas: r.filas });
+      setSonda(r);
     } catch (e) {
       setResultado({ tipo: "error", texto: mensajeDe(e) });
     } finally {
@@ -144,23 +149,34 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
     }
   };
 
-  /** Trae uno tras otro lo elegido: la plataforma de una sede no atiende bien varios reportes grandes a la vez. */
+  /**
+   * Trae lo elegido de las sedes marcadas. Dentro de una sede va uno tras otro (su plataforma no atiende bien varios
+   * reportes grandes a la vez); las sedes van en paralelo, cada una con su servidor y su inicio de sesión. Un fallo se anota
+   * en su celda y no detiene lo demás.
+   */
   const traerVarios = async () => {
     setOcupado(true);
     setResultado(null);
-    setLote(Object.fromEntries(elegidos.map((id) => [id, { estado: "espera", texto: "En espera" } as EstadoLote])));
-    for (const id of elegidos) {
-      setLote((l) => ({ ...l, [id]: { estado: "en curso", texto: "Pidiéndolo…" } }));
-      try {
-        const r = await cargarDesdeServidor({ conjunto: id, sede, periodo, corte: "", motivo: "" });
-        setLote((l) => ({
-          ...l,
-          [id]: r.duplicada ? { estado: "igual", texto: `Igual a lo guardado (v${r.version})` } : { estado: "ok", texto: `${r.filas.toLocaleString("es-CO")} filas · ${r.periodo} · v${r.version}` },
-        }));
-      } catch (e) {
-        setLote((l) => ({ ...l, [id]: { estado: "error", texto: mensajeDe(e) } }));
-      }
-    }
+    setLote(Object.fromEntries(sedesLote.flatMap((s) => elegidos.map((id) => [`${s}|${id}`, { estado: "espera", texto: "En espera" } as EstadoLote]))));
+    await Promise.all(
+      sedesLote.map(async (s) => {
+        for (const id of elegidos) {
+          const clave = `${s}|${id}`;
+          setLote((l) => ({ ...l, [clave]: { estado: "en curso", texto: "Pidiéndolo…" } }));
+          try {
+            const r = await cargarDesdeServidor({ conjunto: id, sede: s, periodo, corte: "", motivo: "" });
+            setLote((l) => ({
+              ...l,
+              [clave]: r.duplicada
+                ? { estado: "igual", texto: `Sin cambios (v${r.version})` }
+                : { estado: "ok", texto: `${r.filas.toLocaleString("es-CO")} filas · ${r.periodo} · v${r.version}${r.confirmado === false ? " · periodo sin confirmar" : ""}` },
+            }));
+          } catch (e) {
+            setLote((l) => ({ ...l, [clave]: { estado: "error", texto: mensajeDe(e) } }));
+          }
+        }
+      }),
+    );
     await refrescar();
     setOcupado(false);
   };
@@ -203,10 +219,14 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                     setSonda(null);
                   }}
                 >
-                  {elegibles.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre} · {SISTEMAS[c.sistema].nombre}
-                    </option>
+                  {agrupar(elegibles).map((g) => (
+                    <optgroup key={g.grupo} label={GRUPOS[g.grupo].nombre}>
+                      {g.conjuntos.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} · {SISTEMAS[c.sistema].nombre}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </label>
@@ -336,9 +356,11 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                 <p className="wh-muted">
                   {reporte.periodoVia === "ruta" || reporte.periodoVia === "consulta"
                     ? `Pide el periodo de la pantalla (${periodo}): esta plataforma deja consultar periodos anteriores.`
-                    : reporte.periodoVia === "sesion"
-                      ? "Trae el periodo que la plataforma tiene abierto; no deja pedir otro."
-                      : "Es un catálogo: no depende de un periodo."}
+                    : reporte.periodoVia === "cuerpo"
+                      ? `Pide el periodo de la pantalla (${periodo}) en el cuerpo de la petición. Si la plataforma devuelve otro, no se guarda nada${reporte.confirma ? "." : "; como el archivo no dice de qué periodo es, solo se acepta el periodo abierto de la sede."}`
+                      : reporte.periodoVia === "sesion"
+                        ? `Trae el periodo que la plataforma tiene abierto; si el de la pantalla (${periodo}) es otro, no se guarda y se avisa.`
+                        : "Es un catálogo: no depende de un periodo."}
                   {reporte.entrega === "tarea" ? " La plataforma lo genera aparte y puede tardar varios minutos." : ""}
                 </p>
                 {!reporte.verificado && (
@@ -367,8 +389,26 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                 {sonda && (
                   <div className="wh-capa">
                     <b>
-                      {sonda.filas.toLocaleString("es-CO")} filas · periodo {sonda.periodo}
+                      {sonda.filas.toLocaleString("es-CO")} filas · periodo {sonda.periodo} · {nombreSede}
                     </b>
+                    {sonda.periodoArchivo && (
+                      <p className={sonda.periodoArchivo === sonda.periodo ? "wh-nota-chica" : "wh-aviso wh-aviso--rojo"}>
+                        El archivo dice ser del periodo {sonda.periodoArchivo}
+                        {sonda.periodoArchivo === sonda.periodo ? "." : ": no coincide con el pedido, por eso no se guardaría."}
+                      </p>
+                    )}
+                    {sonda.sinPolitica && <p className="wh-aviso wh-aviso--ambar">Este conjunto no tiene política de privacidad: la base no lo guardaría.</p>}
+                    {sonda.otroReporte && <p className="wh-aviso wh-aviso--rojo">Casi ninguna columna de las que la política conserva está en este archivo: es otro reporte o tiene otra forma en esta sede.</p>}
+                    {sonda.faltan && sonda.faltan.length > 0 && !sonda.otroReporte && (
+                      <p className="wh-nota-chica">
+                        Columnas que la política espera y esta sede no trajo: <span className="wh-mono">{sonda.faltan.join(", ")}</span>
+                      </p>
+                    )}
+                    {(sonda.avisos ?? []).map((a) => (
+                      <p key={a} className="wh-aviso wh-aviso--ambar">
+                        {a}
+                      </p>
+                    ))}
                     <p className="wh-nota-chica">Columnas (así se escriben en la política):</p>
                     <code className="wh-codigo">{sonda.columnas.join(", ")}</code>
                   </div>
@@ -386,11 +426,28 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
           <div>
             <h2 id="wh-lote">Traer varios reportes del periodo</h2>
             <p className="wh-muted">
-              De {periodo} y {nombreSede}, uno tras otro. Los que fija la plataforma traen su periodo abierto. El rendimiento por corte se trae aparte, un corte a la vez.
+              De {periodo}, en las sedes marcadas. Dentro de cada sede van uno tras otro; las sedes van a la vez, cada una con su servidor, y un fallo no detiene lo demás. Los reportes que fija la plataforma
+              solo se traen si {periodo} es el periodo abierto de la sede (si no, la celda lo dice). El rendimiento por corte se trae aparte, un corte a la vez.
             </p>
+            <div className="wh-fila" role="group" aria-label="Sedes del lote">
+              {SEDES.map((s) => (
+                <label key={s.id} className="wh-campo">
+                  <input
+                    type="checkbox"
+                    checked={sedesLote.includes(s.id)}
+                    disabled={ocupado}
+                    onChange={(ev) => setSedesLote((l) => (ev.target.checked ? SEDES.map((x) => x.id).filter((x) => x === s.id || l.includes(x)) : l.filter((x) => x !== s.id)))}
+                  />
+                  <span>{s.nombre}</span>
+                </label>
+              ))}
+              <button type="button" className="button-secondary" disabled={ocupado} onClick={() => setSedesLote(SEDES.map((s) => s.id))}>
+                Todas las sedes
+              </button>
+            </div>
           </div>
-          <button type="button" className="button-primary" disabled={ocupado || elegidos.length === 0 || !servidor.data?.configurado} onClick={() => void traerVarios()}>
-            Traer {elegidos.length}
+          <button type="button" className="button-primary" disabled={ocupado || elegidos.length === 0 || sedesLote.length === 0 || !servidor.data?.configurado} onClick={() => void traerVarios()}>
+            Traer {elegidos.length} en {sedesLote.length} {sedesLote.length === 1 ? "sede" : "sedes"}
           </button>
         </div>
         <div className="wh-tabla-envuelta">
@@ -400,40 +457,57 @@ export function Cargas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                 <th scope="col">Traer</th>
                 <th scope="col">Reporte</th>
                 <th scope="col">Plataforma</th>
-                <th scope="col">Estado</th>
+                {sedesLote.map((s) => (
+                  <th key={s} scope="col">
+                    {SEDES.find((x) => x.id === s)?.nombre}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {CONJUNTOS.filter((c) => pideSolo(c) && !c.porCorte).map((c) => {
-                const r = reportePorId(c.id)!;
-                const e = lote[c.id];
-                return (
-                  <tr key={c.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        aria-label={`Traer ${c.nombre}`}
-                        checked={elegidos.includes(c.id)}
-                        disabled={ocupado || !cargable(c)}
-                        onChange={(ev) => setElegidos((l) => (ev.target.checked ? [...l, c.id] : l.filter((x) => x !== c.id)))}
-                      />
-                    </td>
-                    <td>
-                      {c.nombre}
-                      {!r.verificado && <small className="wh-muted"> · sin verificar</small>}
-                      {!cargable(c) && <small className="wh-muted"> · falta política</small>}
-                    </td>
-                    <td>{SISTEMAS[c.sistema].nombre}</td>
-                    <td>
-                      {e && (
-                        <span className="wh-etiqueta" data-t={e.estado === "ok" || e.estado === "igual" ? "ok" : e.estado === "error" ? "error" : undefined}>
-                          {e.texto}
-                        </span>
-                      )}
-                    </td>
+              {agrupar(CONJUNTOS.filter((c) => pideSolo(c) && !c.porCorte)).map((g) => (
+                <Fragment key={g.grupo}>
+                  <tr>
+                    <th scope="rowgroup" colSpan={3 + sedesLote.length} className="wh-muted">
+                      {GRUPOS[g.grupo].nombre} · {GRUPOS[g.grupo].detalle}
+                    </th>
                   </tr>
-                );
-              })}
+                  {g.conjuntos.map((c) => {
+                    const r = reportePorId(c.id)!;
+                    return (
+                      <tr key={c.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Traer ${c.nombre}`}
+                            checked={elegidos.includes(c.id)}
+                            disabled={ocupado || !cargable(c)}
+                            onChange={(ev) => setElegidos((l) => (ev.target.checked ? [...l, c.id] : l.filter((x) => x !== c.id)))}
+                          />
+                        </td>
+                        <td>
+                          {c.nombre}
+                          {!r.verificado && <small className="wh-muted"> · sin verificar</small>}
+                          {!cargable(c) && <small className="wh-muted"> · falta política</small>}
+                        </td>
+                        <td>{SISTEMAS[c.sistema].nombre}</td>
+                        {sedesLote.map((s) => {
+                          const e = lote[`${s}|${c.id}`];
+                          return (
+                            <td key={s}>
+                              {e && (
+                                <span className="wh-etiqueta" data-t={e.estado === "ok" || e.estado === "igual" ? "ok" : e.estado === "error" ? "error" : undefined} title={e.texto}>
+                                  {e.texto}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              ))}
             </tbody>
           </table>
         </div>

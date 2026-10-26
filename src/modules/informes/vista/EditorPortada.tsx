@@ -42,7 +42,7 @@ const FOTO_NUEVA = (ruta: string): FotoPortada => ({ ruta, x: 50, y: 50, zoom: 1
 
 /* ---------- Encuadre de la imagen ---------- */
 
-function Encuadre({ url, foto, aspecto, onChange }: { url: string; foto: FotoPortada; aspecto: string; onChange: (f: FotoPortada) => void }) {
+export function Encuadre({ url, foto, aspecto, onChange }: { url: string; foto: FotoPortada; aspecto: string; onChange: (f: FotoPortada) => void }) {
   const caja = useRef<HTMLDivElement>(null);
   const natural = useRef<{ w: number; h: number } | null>(null);
   const arrastre = useRef<{ x: number; y: number; p: FotoPortada } | null>(null);

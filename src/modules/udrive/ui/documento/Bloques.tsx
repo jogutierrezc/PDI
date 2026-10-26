@@ -194,7 +194,7 @@ function ContenidoBloque({ b, editable, sangria, acc }: { b: Bloque; editable: b
     case "nota":
       return <NotaEditable b={b} editable={editable} acc={acc} />;
     case "salto":
-      return <div className="ud-salto" role="separator">Salto de página</div>;
+      return <div className="ud-salto" role="separator">Salto de página{b.orientacion === "horizontal" ? " · sigue en horizontal" : b.orientacion === "vertical" ? " · sigue en vertical" : ""}</div>;
     case "referencias":
       return <ReferenciasEnHoja b={b} />;
   }

@@ -18,6 +18,7 @@ import { SIN_DATO } from "../lib/cifras";
 import type { CifraResuelta } from "../lib/cifras";
 import { colorDeTramo, describirTramos } from "../lib/calor";
 import type { BCapitulo, BDestacado, BGrafica, BImagen, BLista, BMapa, BNota, BTabla, Documento, Fuente, Portada } from "../lib/documento";
+import type { Estilo } from "../lib/estilo";
 import type { ContextoTexto } from "../lib/texto";
 import { enlaceSeguro, tramos } from "../lib/texto";
 import type { EntradaIndice, Figura } from "../lib/numeracion";
@@ -41,6 +42,10 @@ export interface CtxRender {
   recursos: Recursos;
   /** Página de cada título y figura (segunda pasada); vacío mientras se mide. */
   paginas: ReadonlyMap<string, number>;
+  /** El estilo del informe (0190). Sin él, las piezas se dibujan como siempre (estilo Clásico). */
+  estilo?: Estilo;
+  /** Número de cada capítulo («1», «1.2») cuando el estilo los numera. */
+  numeros?: ReadonlyMap<string, string>;
 }
 
 const Ctx = createContext<CtxRender | null>(null);
@@ -91,9 +96,13 @@ export function TextoVista({ texto }: { texto: string }) {
 export function CapituloVista({ b }: { b: BCapitulo }) {
   const ctx = useRender();
   const Etiqueta = (b.nivel === 1 ? "h1" : b.nivel === 2 ? "h2" : "h3") as "h1" | "h2" | "h3";
+  const numero = ctx.estilo?.texto.num ? ctx.numeros?.get(b.id) : undefined;
+  const sello = Boolean(numero) && ctx.estilo?.texto.cap === "sello" && b.nivel === 1;
+  const titulo = b.titulo.trim() || (ctx.modo === "editor" ? <span className="ud-vacio-t">Título del capítulo</span> : null);
   return (
-    <Etiqueta className="ud-pdf-cap-t" data-nivel={b.nivel} id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
-      {b.titulo.trim() || (ctx.modo === "editor" ? <span className="ud-vacio-t">Título del capítulo</span> : null)}
+    <Etiqueta className="ud-pdf-cap-t" data-nivel={b.nivel} data-sello={sello ? "true" : undefined} id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
+      {sello ? <span className="ud-cap-sello" aria-hidden="true">{numero}</span> : numero ? <span className="ud-cap-n">{numero}</span> : null}
+      {sello ? <span>{titulo}</span> : titulo}
     </Etiqueta>
   );
 }
@@ -118,7 +127,16 @@ export function NotaSuelta({ b }: { b: BNota }) {
 /* ---------- pies de figura ---------------------------------------------------------------------- */
 
 export function PieDeFigura({ fig, titulo }: { fig: Figura | undefined; titulo: string }) {
+  const ctx = useRender();
   if (!fig) return null;
+  if (ctx.estilo?.tablas.capEstilo === "apa") {
+    return (
+      <div className="ud-pdf-fcap" data-clase={fig.clase}>
+        <b>{fig.etiqueta}</b>
+        <i>{titulo.trim() ? <TextoVista texto={titulo} /> : <span className="ud-vacio-t">Sin título</span>}</i>
+      </div>
+    );
+  }
   return (
     <div className="ud-pdf-fcap" data-clase={fig.clase}>
       <b>{fig.etiqueta}.</b>{" "}
@@ -155,10 +173,10 @@ export function FiguraTabla({ b, desde = 0, hasta, primero = true, ultimo = true
   if (!b.archivoId) return <p className="ud-pdf-vacio">Elija una tabla de UDrive para este bloque.</p>;
   if (!t) return <p className="ud-pdf-vacio">{ctx.recursos.listo ? "No se pudo leer la tabla: ya no existe, está en la papelera o no tiene permiso para verla." : "Cargando la tabla…"}</p>;
   const filas = t.filas.slice(desde, hasta ?? t.filas.length);
-  const calor = filasConCalor(b, t);
+  const calor = filasConCalor(b, t) && ctx.estilo?.tablas.calor !== false;
   const leyendas = calor ? leyendasDeCalor(t) : [];
   return (
-    <div className="ud-pdf-fig" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
+    <div className="ud-pdf-fig" data-entera={primero && ultimo ? "true" : undefined} id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
       {primero ? <PieDeFigura fig={fig} titulo={tituloTabla(b, t)} /> : null}
       <table className="ud-pdf-tb" aria-label={aPlanoCorto(tituloTabla(b, t))}>
         {primero || b.repetirEncabezado ? (
@@ -238,7 +256,7 @@ export function FiguraGrafica({ b }: { b: BGrafica }) {
   if (!g) return <p className="ud-pdf-vacio">{ctx.recursos.listo ? "No se pudo leer la gráfica: ya no existe, está en la papelera o no tiene permiso para verla." : "Cargando la gráfica…"}</p>;
   const tabla = g.tabla_id ? ctx.recursos.tablas.get(g.tabla_id) : null;
   return (
-    <div className="ud-pdf-fig" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
+    <div className="ud-pdf-fig" data-entera="true" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
       <PieDeFigura fig={fig} titulo={tituloGrafica(b, g)} />
       <div className="ud-pdf-graf" style={{ width: PORCENTAJE_ANCHO[b.ancho], height: alto }}>
         {ctx.modo === "medida" ? null : tabla ? <GraficaVista tabla={{ columnas: tabla.columnas, filas: tabla.filas }} config={g.config} altura={alto} /> : <p className="ud-pdf-vacio">La tabla de esta gráfica no está disponible.</p>}
@@ -254,7 +272,7 @@ export function FiguraImagen({ b }: { b: BImagen }) {
   const fig = ctx.figuras.get(b.id);
   if (!b.archivoId) return <p className="ud-pdf-vacio">Elija una imagen de UDrive para este bloque.</p>;
   return (
-    <div className="ud-pdf-fig" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
+    <div className="ud-pdf-fig" data-entera="true" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
       <PieDeFigura fig={fig} titulo={b.titulo} />
       {im ? (
         <img className="ud-pdf-img" src={im.url} alt={b.alt.trim() || b.titulo.trim() || im.nombre} style={{ width: PORCENTAJE_ANCHO[b.ancho] }} />
@@ -270,7 +288,7 @@ export function FiguraMapa({ b }: { b: BMapa }) {
   const ctx = useRender();
   const fig = ctx.figuras.get(b.id);
   return (
-    <div className="ud-pdf-fig" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
+    <div className="ud-pdf-fig" data-entera="true" id={ctx.modo === "pdf" ? anclaDe(b.id) : undefined}>
       <PieDeFigura fig={fig} titulo={b.titulo} />
       <div style={{ width: PORCENTAJE_ANCHO[b.ancho], margin: "0 auto" }}>
         <MapaOsm lat={b.lat} lng={b.lng} zoom={b.zoom} marcadores={b.marcadores} alt={b.alt.trim() || b.titulo.trim() || "Mapa"} />
@@ -316,7 +334,7 @@ export function EntradaDeIndice({ e, pagina }: { e: EntradaIndice; pagina: numbe
   const nivel = e.nivel === 1 ? "a" : e.nivel === 2 ? "b" : "c";
   const contenido = (
     <>
-      <span className="ud-pdf-toc-t">{e.etiqueta ? <><b>{e.etiqueta}</b> </> : null}{e.texto}</span>
+      <span className="ud-pdf-toc-t">{e.etiqueta ? <><b>{e.etiqueta}</b> </> : null}{!e.etiqueta && ctx.estilo?.texto.num && ctx.numeros?.get(e.bloqueId) ? <>{ctx.numeros.get(e.bloqueId)}{" "}</> : null}{e.texto}</span>
       <i aria-hidden="true" />
       <span className="ud-pdf-toc-n">{pagina ?? "·"}</span>
     </>

@@ -109,3 +109,17 @@ export function referenciasRotas(doc: Pick<Documento, "bloques">, figuras: Reado
 
 /** Los capítulos con su nivel, para la lista de estructura del editor. */
 export const capitulos = (bloques: readonly Bloque[]): BCapitulo[] => bloques.filter((b): b is BCapitulo => b.tipo === "capitulo");
+
+/** El número de cada capítulo en su jerarquía: «1», «1.1», «1.1.1». Se usa cuando el estilo numera los capítulos. */
+export function numerarCapitulos(bloques: readonly Bloque[]): Map<string, string> {
+  const cuenta = [0, 0, 0];
+  const salida = new Map<string, string>();
+  for (const b of bloques) {
+    if (b.tipo !== "capitulo") continue;
+    const n = b.nivel - 1;
+    cuenta[n]++;
+    for (let k = n + 1; k < 3; k++) cuenta[k] = 0;
+    salida.set(b.id, cuenta.slice(0, b.nivel).map((x) => Math.max(1, x)).join("."));
+  }
+  return salida;
+}

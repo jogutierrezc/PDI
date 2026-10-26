@@ -17,6 +17,7 @@ const ICONOS: Record<TipoVisual, IconName> = {
   grafica: "chart",
   cruce: "link",
   documento: "document",
+  estilo: "layers",
   archivo: "document",
 };
 
@@ -26,6 +27,7 @@ export const NOMBRE_TIPO: Record<TipoVisual, string> = {
   grafica: "Gráfica",
   cruce: "Cruce de tablas",
   documento: "Documento",
+  estilo: "Estilo de informe",
   archivo: "Archivo",
 };
 

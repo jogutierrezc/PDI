@@ -38,6 +38,8 @@ export function errorDe(e: ErrorBase): Error {
     return new FaltaMigracion(de0188 ? "Falta aplicar la migración 0188 (documentos de UDrive)." : "Falta aplicar la migración 0187 (UDrive).");
   }
   const m = e.message ?? "Error de la base de datos";
+  // Sin 0190, el check de `tipo` rechaza los estilos de informe.
+  if (/drive_archivos_tipo_check|drive_archivos_tipo_con_estilo/.test(m)) return new FaltaMigracion("Falta aplicar la migración 0190 (estilos de informe). Los estilos de fábrica funcionan sin ella.");
   if (/drive_carpetas_nombre_uq|drive_archivos_nombre_uq/.test(m)) return new Error("Ya hay algo con ese nombre en esa carpeta.");
   if (/row-level security/i.test(m)) return new Error("No tiene permiso para hacer eso en esa carpeta.");
   if (/permission denied/i.test(m)) return new Error("No tiene permiso para hacer eso.");

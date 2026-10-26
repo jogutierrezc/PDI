@@ -19,6 +19,7 @@
    al final del informe abierto.
    ========================================================================== */
 
+import { estiloDeInformeNuevo } from "../../lib/aplicarEstilo";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -542,8 +543,11 @@ export function ImportarInforme(p: Props) {
       }
       setEstado("Creando el informe…");
       const vacio = documentoVacio("blanco");
+      const nuevoEstilo = estiloDeInformeNuevo();
       const bruto: Documento = {
         ...vacio,
+        estilo: nuevoEstilo.ref,
+        instantanea: nuevoEstilo.estilo,
         portada: { ...vacio.portada, titulo: tituloPortada.trim().slice(0, LIMITES.portada) || nombreLimpio, subtitulo: lectura?.portada?.subtitulo?.slice(0, LIMITES.portada) ?? "" },
         indices: { contenido: nTitulos >= 3, ilustraciones: idsImagen.size > 0, tablas: idsTabla.size > 0, graficas: false },
         fuentes,

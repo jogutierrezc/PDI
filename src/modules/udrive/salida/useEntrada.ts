@@ -10,6 +10,8 @@ import { useLecturasCifras } from "../datosDocumento";
 import { clavesDelDocumento, resolverCifra } from "../lib/cifras";
 import type { LecturaCifra } from "../lib/cifras";
 import type { Documento, Fuente } from "../lib/documento";
+import { estiloDelInforme, papelDe } from "../lib/estilo";
+import type { Estilo } from "../lib/estilo";
 import { contextoDe, numerarFiguras } from "../lib/numeracion";
 import { fuentesDeBibliografia } from "../lib/plan";
 import { esFigura } from "../lib/documento";
@@ -69,7 +71,31 @@ export function useEntrada(doc: Documento, o: OpcionesEntrada): EntradaConLectur
 
   const firmaCifras = useMemo(() => claves.map((k) => `${k}=${cifra(k)?.texto ?? ""}`).join("|"), [claves, cifra]);
 
-  return { doc, titulo: o.titulo, recursos, figuras, bibliografia, texto, cifra, firmaCifras, borrador: !o.aprobado, lecturas, claves, cargandoCifras: vivas.isPending && claves.length > 0 && !congelado };
+  // El estilo: la copia que guardó el informe más sus ajustes; sin nada, el Clásico (la salida de siempre).
+  const firmaEstilo = JSON.stringify([doc.instantanea ?? null, doc.ajustes ?? null]);
+  const estilo = useMemo<Estilo>(() => estiloDelInforme({ instantanea: doc.instantanea, ajustes: doc.ajustes }), [firmaEstilo]); // eslint-disable-line react-hooks/exhaustive-deps -- la firma resume el estilo
+  const papel = papelDe(doc.papel, estilo);
+  const urlDe = (id: string | undefined) => (id ? (recursos.imagenes.get(id)?.url ?? null) : null);
+
+  return {
+    doc,
+    titulo: o.titulo,
+    recursos,
+    figuras,
+    bibliografia,
+    texto,
+    cifra,
+    firmaCifras,
+    borrador: !o.aprobado,
+    estilo,
+    papel,
+    fotoUrl: urlDe(doc.portada.imagenId),
+    logoPropioUrl: urlDe(estilo.portada.logos.propioId),
+    marcaUrl: estilo.cabpie.marca.modo === "imagen" ? urlDe(estilo.cabpie.marca.imagenId) : null,
+    lecturas,
+    claves,
+    cargandoCifras: vivas.isPending && claves.length > 0 && !congelado,
+  };
 }
 
 /** Título y nota que el bloque muestra (los suyos o, vacíos, los del archivo que usa). */

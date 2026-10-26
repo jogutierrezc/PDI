@@ -6,7 +6,7 @@
    siguiente (documento por bloques) los insertará como bloques que apuntan a él.
    ========================================================================== */
 
-export type TipoItem = "archivo" | "tabla" | "grafica" | "cruce" | "documento";
+export type TipoItem = "archivo" | "tabla" | "grafica" | "cruce" | "documento" | "estilo";
 export type EstadoItem = "borrador" | "listo";
 export type RolDrive = "propietario" | "editor" | "lector";
 

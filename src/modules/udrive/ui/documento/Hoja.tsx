@@ -11,6 +11,7 @@
 
 import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import type { Documento } from "../../lib/documento";
+import { atributosEstilo, estiloDelInforme, papelDe, temaDe, variablesCss } from "../../lib/estilo";
 import { ALTO_CUERPO } from "../../lib/paginado";
 import type { AccionesBloque } from "./Bloques";
 import { BloqueEnHoja, FilaInsertar } from "./Bloques";
@@ -42,6 +43,9 @@ export function Hoja({
   acc: AccionesBloque;
   onEstimado(e: Estimado): void;
 }) {
+  // La hoja del editor toma del estilo la letra, los colores y las variantes; el reparto en páginas exacto es el de la vista previa.
+  const estilo = estiloDelInforme(doc);
+  const tema = temaDe(estilo, papelDe(doc.papel, estilo));
   const raiz = useRef<HTMLDivElement>(null);
   const alEstimar = useRef(onEstimado);
   alEstimar.current = onEstimado;
@@ -74,7 +78,7 @@ export function Hoja({
   const cortes = Array.from({ length: Math.min(400, Math.max(0, Math.ceil((medidas.alto - 76 - medidas.inicio) / ALTO_CUERPO) - 1)) }, (_, k) => k + 1);
 
   return (
-    <div ref={raiz} className="ud-hoja ud-doc" lang="es" onClick={() => acc.seleccionar(null)}>
+    <div ref={raiz} className="ud-hoja ud-doc" lang="es" style={variablesCss(estilo, tema)} {...atributosEstilo(estilo)} onClick={() => acc.seleccionar(null)}>
       <button
         type="button"
         className="ud-doc-resumen"

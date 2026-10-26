@@ -11,7 +11,7 @@ import { useState } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import { falta as faltaFuente, fuenteNueva } from "../../lib/apa";
 import { NOMBRE_BLOQUE, nuevoIdBloque } from "../../lib/documento";
-import type { AnchoFigura, Bloque, Documento, Fuente, Portada } from "../../lib/documento";
+import type { AnchoFigura, Bloque, Documento, Fuente } from "../../lib/documento";
 import { aPlano, clavesDeCifras } from "../../lib/texto";
 import { notaGrafica, notaTabla, tituloGrafica, tituloTabla } from "../../salida/Piezas";
 import type { Recursos } from "../../salida/recursos";
@@ -19,6 +19,7 @@ import type { Figura } from "../../lib/numeracion";
 import type { AccionesBloque } from "./Bloques";
 import { PanelMapa } from "./PanelMapa";
 import { PanelPilo } from "./PanelPilo";
+import { CierreDelInforme, EstiloDelInforme, PortadaDelInforme } from "../estilos/PanelesInforme";
 import { esBloqueDeTexto } from "../../datosPilo";
 import type { ContextoPilo } from "../../datosPilo";
 
@@ -40,6 +41,10 @@ interface Props {
   elegirPortada(): void;
   abrirArchivo(tipo: "tabla" | "grafica", id: string): void;
   aceptarCifras(): void;
+  /** Carpeta del informe: ahí se guardan los estilos que se crean desde él. */
+  carpetaId: string | null;
+  decir(m: string): void;
+  abrirEstilo(id: string): void;
 }
 
 export function Propiedades(p: Props) {
@@ -96,6 +101,17 @@ function PanelBloque({ doc, bloque: b, recursos, figura, editable, acc, elegirAr
             <input type="text" className="es-inp" value={b.titulo} maxLength={300} disabled={!editable} onChange={(e) => poner({ titulo: e.target.value }, `t:${b.id}`)} />
           </label>
         </>
+      ) : null}
+
+      {b.tipo === "salto" ? (
+        <label className="es-fl">
+          Orientación de lo que sigue
+          <select className="es-inp" value={b.orientacion ?? ""} disabled={!editable} onChange={(e) => poner({ orientacion: (e.target.value || undefined) as "vertical" | "horizontal" | undefined })}>
+            <option value="">La misma de antes</option>
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal (para tablas anchas)</option>
+          </select>
+        </label>
       ) : null}
 
       {b.tipo === "mapa" ? <PanelMapa b={b} editable={editable} anchos={ANCHOS} poner={poner} /> : null}
@@ -204,7 +220,7 @@ const AYUDA: Record<Bloque["tipo"], string> = {
   mapa: "Un mapa de OpenStreetMap. Se numera como «Ilustración» y lleva el pie arriba.",
   destacado: "Una idea clave en un cuadro aparte.",
   nota: "Una nota o fuente suelta.",
-  salto: "Lo que sigue empieza en hoja nueva.",
+  salto: "Lo que sigue empieza en hoja nueva. Puede pasar a horizontal para una tabla ancha.",
   referencias: "La bibliografía en estilo APA 7, generada.",
 };
 
@@ -222,29 +238,12 @@ function ResumenTexto({ texto }: { texto: string }) {
 
 /* ---------- el documento ------------------------------------------------------------------------------------ */
 
-function PanelDocumento({ doc, editable, cambiarDoc, elegirPortada, recursos, cambiosDeCifras, aceptarCifras }: Props) {
-  const poner = (c: Partial<Portada>) => cambiarDoc((d) => ({ ...d, portada: { ...d.portada, ...c } }), `portada:${Object.keys(c).join(",")}`);
-  const imagen = doc.portada.imagenId ? (recursos.nombres.get(doc.portada.imagenId) ?? "Imagen que no veo") : "";
+function PanelDocumento({ doc, editable, cambiarDoc, elegirPortada, recursos, cambiosDeCifras, aceptarCifras, carpetaId, decir, abrirEstilo }: Props) {
   return (
     <>
-      <div>
-        <h3>Portada</h3>
-        <p className="ud-sub">Va a sangre en la primera página, con el pie institucional.</p>
-      </div>
-      <label className="es-fl">Título<input type="text" className="es-inp" value={doc.portada.titulo} maxLength={300} disabled={!editable} onChange={(e) => poner({ titulo: e.target.value })} /></label>
-      <label className="es-fl">Subtítulo<input type="text" className="es-inp" value={doc.portada.subtitulo} maxLength={300} disabled={!editable} onChange={(e) => poner({ subtitulo: e.target.value })} /></label>
-      <div className="two" style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: 8 }}>
-        <label className="es-fl">Entidad<input type="text" className="es-inp" value={doc.portada.entidad} maxLength={300} disabled={!editable} onChange={(e) => poner({ entidad: e.target.value })} /></label>
-        <label className="es-fl">Año<input type="text" className="es-inp" value={doc.portada.anio} maxLength={12} disabled={!editable} onChange={(e) => poner({ anio: e.target.value })} /></label>
-      </div>
-      <div className="es-fl">
-        Imagen de portada
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <span className="es-inp" style={{ flex: 1 }}>{imagen || "Sin imagen"}</span>
-          {editable ? <button type="button" className="es-btn es-btn--sm" onClick={elegirPortada}>{imagen ? "Cambiar" : "Elegir"}</button> : null}
-          {editable && imagen ? <button type="button" className="es-btn es-btn--sm" onClick={() => cambiarDoc((d) => ({ ...d, portada: { titulo: d.portada.titulo, subtitulo: d.portada.subtitulo, entidad: d.portada.entidad, anio: d.portada.anio } }))}>Quitar</button> : null}
-        </div>
-      </div>
+      <EstiloDelInforme doc={doc} editable={editable} cambiarDoc={cambiarDoc} carpetaId={carpetaId} decir={decir} abrirEstilo={abrirEstilo} recursos={recursos} />
+      <PortadaDelInforme doc={doc} editable={editable} cambiarDoc={cambiarDoc} elegirPortada={elegirPortada} recursos={recursos} />
+      <CierreDelInforme doc={doc} editable={editable} cambiarDoc={cambiarDoc} />
 
       <div className="ud-doc-tarjeta">
         <h3>Cifras vivas</h3>

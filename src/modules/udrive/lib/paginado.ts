@@ -71,17 +71,28 @@ function altoMinimoInicial(it: ItemPaginado): number {
   return (it.cabeza ?? 0) + it.partes.slice(0, k).reduce((t, p) => t + p, 0) + (k === it.partes.length ? (it.pie ?? 0) : 0);
 }
 
-export function paginar(items: readonly ItemPaginado[], altoCuerpo: number = ALTO_CUERPO, primeraPagina: number = 1): ResultadoPaginado {
+/**
+ * Reparte las unidades en páginas. `altoCuerpo` puede ser un número o una función
+ * del índice de página (0 = la primera de esta llamada): sirve para que la primera
+ * hoja tenga menos espacio, o para tratar cada columna como una página angosta.
+ * `usadoInicial` es lo que ya ocupa lo anterior en la primera hoja; si la primera
+ * unidad no cabe en lo que queda, esa hoja se devuelve vacía y todo pasa a la siguiente.
+ */
+export function paginar(items: readonly ItemPaginado[], altoCuerpo: number | ((pagina: number) => number) = ALTO_CUERPO, primeraPagina: number = 1, usadoInicial: number = 0): ResultadoPaginado {
   const paginas: Trozo[][] = [[]];
   const paginaDe = new Map<string, number>();
-  let usado = 0;
+  let usado = usadoInicial;
+  let ocupada = usadoInicial > 0;
+  const tope = (): number => (typeof altoCuerpo === "function" ? altoCuerpo(paginas.length - 1) : altoCuerpo);
 
   const nueva = () => {
-    if (paginas[paginas.length - 1].length) paginas.push([]);
+    if (paginas[paginas.length - 1].length || ocupada) paginas.push([]);
+    ocupada = false;
     usado = 0;
   };
   const poner = (t: Trozo, marcar: boolean) => {
     paginas[paginas.length - 1].push(t);
+    ocupada = false;
     usado += t.alto;
     if (marcar) paginaDe.set(t.clave, primeraPagina + paginas.length - 1);
   };
@@ -94,11 +105,11 @@ export function paginar(items: readonly ItemPaginado[], altoCuerpo: number = ALT
     if (it.pegar && n + 1 < items.length && usado > 0) {
       const sig = items[n + 1];
       const sigNueva = sig.nuevaPagina;
-      if (!sigNueva && usado + it.alto + altoMinimoInicial(sig) > altoCuerpo) nueva();
+      if (!sigNueva && usado + it.alto + altoMinimoInicial(sig) > tope()) nueva();
     }
 
     if (!dividible(it)) {
-      if (usado > 0 && usado + it.alto > altoCuerpo) nueva();
+      if (usado > 0 && usado + it.alto > tope()) nueva();
       poner({ clave: it.clave, desde: 0, hasta: 1, primero: true, ultimo: true, alto: it.alto }, true);
       continue;
     }
@@ -110,7 +121,7 @@ export function paginar(items: readonly ItemPaginado[], altoCuerpo: number = ALT
     while (hecho < total) {
       const primero = hecho === 0;
       const cabeza = primero ? (it.cabeza ?? 0) : (it.cabezaSiguientes ?? 0);
-      const libre = altoCuerpo - usado;
+      const libre = tope() - usado;
       // Cuántas partes caben (y si caben todas, con el pie).
       let k = 0;
       let suma = cabeza;
@@ -153,5 +164,105 @@ export function paginar(items: readonly ItemPaginado[], altoCuerpo: number = ALT
     }
   }
   if (!paginas[paginas.length - 1].length && paginas.length > 1) paginas.pop();
+  return { paginas, paginaDe };
+}
+
+/* ---------- Dos columnas ---------------------------------------------------------------- */
+
+export interface ItemColumna extends ItemPaginado {
+  /** Va en columna (texto corrido). Lo demás (figuras, tablas, capítulos de nivel 1, índices) ocupa el ancho completo. */
+  col?: boolean;
+}
+
+/** Una franja de la hoja: una columna (ancho completo) o dos. `alto` es la de la más larga. */
+export interface Banda {
+  columnas: Trozo[][];
+  alto: number;
+}
+
+export interface ResultadoColumnas {
+  paginas: Banda[][];
+  paginaDe: Map<string, number>;
+}
+
+const suma = (t: readonly Trozo[]): number => t.reduce((a, x) => a + x.alto, 0);
+
+/**
+ * Como `paginar`, pero con un tramo de texto en dos columnas. Cada columna se
+ * trata como una página angosta (con las mismas reglas de viudas, huérfanas y
+ * títulos pegados) y se juntan de dos en dos. Lo que va a ancho completo corta
+ * el tramo: el texto que sigue empieza en el espacio que queda de la hoja. La
+ * última hoja del tramo no equilibra las columnas: llena primero la izquierda.
+ */
+export function paginarColumnas(items: readonly ItemColumna[], altoCuerpo: number, primeraPagina: number = 1, minimoColumnas: number = 160): ResultadoColumnas {
+  const paginas: Banda[][] = [[]];
+  const paginaDe = new Map<string, number>();
+  let usado = 0;
+  const actual = () => paginas[paginas.length - 1];
+  const numero = () => primeraPagina + paginas.length - 1;
+  const nueva = () => {
+    if (actual().length) paginas.push([]);
+    usado = 0;
+  };
+
+  let i = 0;
+  while (i < items.length) {
+    const col = Boolean(items[i].col);
+    let j = i;
+    while (j < items.length && Boolean(items[j].col) === col) j++;
+    const tramo = items.slice(i, j);
+    i = j;
+    if (tramo[0].nuevaPagina && actual().length) nueva();
+    if (col && usado > 0 && (altoCuerpo - usado < minimoColumnas || altoMinimoInicial(tramo[0]) > altoCuerpo - usado)) nueva();
+
+    if (!col) {
+      const r = paginar(tramo, altoCuerpo, numero(), usado);
+      r.paginas.forEach((trozos, n) => {
+        if (n > 0) {
+          paginas.push([]);
+          usado = 0;
+        }
+        if (!trozos.length) return;
+        const alto = suma(trozos);
+        actual().push({ columnas: [trozos], alto });
+        usado += alto;
+      });
+      r.paginaDe.forEach((v, k) => paginaDe.set(k, v));
+      // Un título que quedó al final, justo antes del texto en columnas, no se queda solo.
+      const ultimo = tramo[tramo.length - 1];
+      if (i < items.length && items[i].col && ultimo.pegar && altoCuerpo - usado < minimoColumnas * 1.6) {
+        const banda = actual()[actual().length - 1];
+        const trozos = banda?.columnas[0];
+        const t = trozos?.[trozos.length - 1];
+        if (banda && trozos && t && t.clave === ultimo.clave && t.ultimo && (actual().length > 1 || trozos.length > 1)) {
+          trozos.pop();
+          banda.alto = suma(trozos);
+          if (!trozos.length) actual().pop();
+          paginas.push([{ columnas: [[t]], alto: t.alto }]);
+          usado = t.alto;
+          paginaDe.set(t.clave, numero());
+        }
+      }
+      continue;
+    }
+
+    const resto = altoCuerpo - usado;
+    const base = numero();
+    const r = paginar(tramo, (n) => (n < 2 ? resto : altoCuerpo), 0, 0);
+    for (let q = 0; q * 2 < r.paginas.length; q++) {
+      const izq = r.paginas[q * 2] ?? [];
+      const der = r.paginas[q * 2 + 1] ?? [];
+      if (q > 0) {
+        paginas.push([]);
+        usado = 0;
+      }
+      if (!izq.length && !der.length) continue;
+      const alto = Math.max(suma(izq), suma(der));
+      actual().push({ columnas: [izq, der], alto });
+      usado += alto;
+    }
+    r.paginaDe.forEach((pseudo, k) => paginaDe.set(k, base + Math.floor(pseudo / 2)));
+  }
+  if (!actual().length && paginas.length > 1) paginas.pop();
   return { paginas, paginaDe };
 }

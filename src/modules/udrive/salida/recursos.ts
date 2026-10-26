@@ -31,6 +31,8 @@ export interface Recursos {
   imagenes: ReadonlyMap<string, { url: string; nombre: string } | null>;
   /** Nombre del archivo de UDrive (para los selectores y los avisos). */
   nombres: ReadonlyMap<string, string>;
+  /** Peso en bytes de los archivos de UDrive (para avisar de imágenes pesadas antes de imprimir). */
+  tamanos: ReadonlyMap<string, number>;
   /** ¿Ya terminó de leer todo (con éxito o sin él)? */
   listo: boolean;
 }
@@ -99,13 +101,17 @@ export function useRecursos(doc: Documento, instantanea?: Record<string, unknown
     const imagenes = new Map<string, { url: string; nombre: string } | null>();
     idsImg.forEach((id, i) => imagenes.set(id, q3[i]?.data ? { url: q3[i].data as string, nombre: archivos.data?.find((a) => a.id === id)?.nombre ?? "imagen" } : null));
     const nombres = new Map<string, string>();
-    for (const a of archivos.data ?? []) nombres.set(a.id, a.nombre);
+    const tamanos = new Map<string, number>();
+    for (const a of archivos.data ?? []) {
+      nombres.set(a.id, a.nombre);
+      if (a.tamano) tamanos.set(a.id, a.tamano);
+    }
     const pendiente = (qs: { isPending: boolean; fetchStatus: string }[]) => qs.some((q) => q.isPending && q.fetchStatus !== "idle");
     const listo = !archivos.isPending && !(vivo && (pendiente(q1) || pendiente(q2))) && !pendiente(q3);
-    return { tablas, graficas, imagenes, nombres, listo };
+    return { tablas, graficas, imagenes, nombres, tamanos, listo };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- las consultas se resumen en sus marcas de tiempo
   }, [usados, vivo, instantanea, archivos.data, archivos.isPending, q1.map((q) => q.dataUpdatedAt + q.fetchStatus).join(","), q2.map((q) => q.dataUpdatedAt + q.fetchStatus).join(","), q3.map((q) => q.dataUpdatedAt + q.fetchStatus).join(",")]);
 }
 
 /** Recursos vacíos para pintar un bloque suelto sin leer nada. */
-export const SIN_RECURSOS: Recursos = { tablas: VACIO, graficas: VACIO, imagenes: VACIO, nombres: VACIO, listo: true };
+export const SIN_RECURSOS: Recursos = { tablas: VACIO, graficas: VACIO, imagenes: VACIO, nombres: VACIO, tamanos: VACIO, listo: true };

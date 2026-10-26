@@ -17,8 +17,8 @@
   --ud-serif: Georgia, "Times New Roman", Times, serif;
   --ud-azul: #2b6cc4;
   font-family: var(--ud-serif);
-  font-size: 15px;
-  line-height: 22.5px;
+  font-size: var(--ud-fs, 15px);
+  line-height: var(--ud-lh, 22.5px);
   color: #111;
 }
 
@@ -33,8 +33,8 @@
 
 .ud-pdf-pag {
   position: relative;
-  width: 816px;
-  height: 1056px;
+  width: var(--ud-pw, 816px);
+  height: var(--ud-ph, 1056px);
   flex: none;
   background: #fff;
   overflow: hidden;
@@ -47,8 +47,8 @@
 .ud-pdf-corre,
 .ud-pdf-pie {
   position: absolute;
-  left: 72px;
-  right: 72px;
+  left: var(--ud-mx, 72px);
+  right: var(--ud-mx, 72px);
   display: flex;
   font-family: var(--ud-sans);
   font-size: 12px;
@@ -60,10 +60,10 @@
 
 .ud-pdf-cuerpo {
   position: absolute;
-  left: 72px;
-  top: 76px;
-  width: 672px;
-  height: 904px;
+  left: var(--ud-mx, 72px);
+  top: var(--ud-top, 76px);
+  width: var(--ud-bw, 672px);
+  height: var(--ud-bh, 904px);
   overflow: hidden;
 }
 
@@ -74,7 +74,7 @@
   position: absolute;
   left: -10000px;
   top: 0;
-  width: 672px;
+  width: var(--ud-bw, 672px);
   visibility: hidden;
   pointer-events: none;
 }
@@ -99,7 +99,7 @@
 /* ---- Texto ---- */
 
 .ud-pdf-p {
-  margin: 0 0 10px;
+  margin: 0 0 var(--ud-mp, 10px);
   text-align: justify;
   hyphens: auto;
   overflow-wrap: anywhere;
@@ -119,10 +119,10 @@
   hyphens: manual;
   overflow-wrap: anywhere;
 }
-.ud-pdf-cap-t[data-nivel="1"] { font-size: 26px; padding: 0 0 18px; }
-.ud-pdf-cap-t[data-nivel="2"] { font-size: 19px; padding: 14px 0 12px; }
-.ud-pdf-cap-t[data-nivel="3"] { font-size: 16px; padding: 20px 0 8px; }
-.ud-pdf-ind-t { font-size: 24px !important; }
+.ud-pdf-cap-t[data-nivel="1"] { font-size: calc(26px * var(--ud-k, 1)); padding: 0 0 18px; }
+.ud-pdf-cap-t[data-nivel="2"] { font-size: calc(19px * var(--ud-k, 1)); padding: 14px 0 12px; }
+.ud-pdf-cap-t[data-nivel="3"] { font-size: calc(16px * var(--ud-k, 1)); padding: 20px 0 8px; }
+.ud-pdf-ind-t { font-size: calc(24px * var(--ud-k, 1)) !important; }
 
 .ud-pdf-lista { margin: 0 0 10px; padding-left: 1.6em; }
 .ud-pdf-lista li { padding-bottom: 4px; text-align: justify; hyphens: auto; }
@@ -133,14 +133,14 @@
   border-left: 3px solid var(--ud-azul);
   background: #f2f7fd;
   font-style: italic;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--ud-k, 1));
   text-align: justify;
 }
 
 .ud-pdf-nota {
   margin: 6px 0 0;
-  font-size: 12.5px;
-  line-height: 18px;
+  font-size: calc(12.5px * var(--ud-k, 1));
+  line-height: calc(18px * var(--ud-k, 1));
   text-align: left;
 }
 .ud-pdf-nota b { font-weight: 700; }
@@ -162,8 +162,8 @@
 .ud-pdf-fcap {
   padding: 14px 0 6px;
   font-family: var(--ud-sans);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: calc(13px * var(--ud-k, 1));
+  line-height: calc(18px * var(--ud-k, 1));
   color: #111;
 }
 .ud-pdf-fcap b { font-weight: 700; font-style: italic; }
@@ -185,8 +185,8 @@
   width: 100%;
   border-collapse: collapse;
   font-family: var(--ud-sans);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: calc(12px * var(--ud-k, 1));
+  line-height: calc(16px * var(--ud-k, 1));
   text-align: left;
 }
 .ud-pdf-tb th {
@@ -220,8 +220,8 @@
   align-items: baseline;
   gap: 4px;
   padding: 5.6px 0;
-  font-size: 13.5px;
-  line-height: 13.5px;
+  font-size: calc(13.5px * var(--ud-k, 1));
+  line-height: calc(13.5px * var(--ud-k, 1));
   color: #111;
   text-decoration: none;
 }
@@ -243,7 +243,7 @@
 
 .ud-pdf-portada { position: absolute; inset: 0; background: #eef5fc; color: #14307a; font-family: var(--ud-sans); }
 .ud-pdf-portada-img,
-.ud-pdf-portada-arte { position: absolute; left: 0; top: 0; width: 816px; height: 990px; object-fit: cover; }
+.ud-pdf-portada-arte { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% - 66px); object-fit: cover; }
 .ud-pdf-portada-t {
   position: absolute;
   left: 56px;
@@ -283,6 +283,8 @@
   size: letter;
   margin: 0;
 }
+/* Las secciones horizontales piden su propia hoja; imprimir.ts fija el tamaño de cada una. */
+.ud-pdf-pag[data-orient="horizontal"] { page: ud-horizontal; }
 
 @media print {
   html, body { background: #fff !important; }
@@ -310,10 +312,123 @@
     box-shadow: none !important;
     margin: 0 !important;
     /* 1 px menos que la hoja Carta: el redondeo del navegador no debe fabricar una página en blanco. */
-    height: 1055px !important;
+    height: calc(var(--ud-ph, 1056px) - 1px) !important;
     break-after: page;
     page-break-after: always;
     break-inside: avoid;
   }
   body.ud-imprimiendo .ud-pdf-pag:last-child { break-after: auto; page-break-after: auto; }
 }
+
+
+/* =============================================================================
+   Estilos de informe (0190). Los valores por defecto de arriba son los del
+   estilo «Clásico»; cada variante se activa con un data-ud-* sobre .ud-doc, así
+   que un documento sin estilo sale igual que antes.
+   ========================================================================== */
+
+.ud-pdf-pag {
+  --vi-navy: #072b58;
+  --vi-ink: #16243a;
+  --vi-ink-2: #4a5a70;
+  --vi-ink-3: #5d6c80;
+  --vi-rule: #d6dee8;
+  --vi-paper: #eef3f9;
+}
+
+/* ---- Texto ---- */
+.ud-doc[data-ud-just="no"] .ud-pdf-p,
+.ud-doc[data-ud-just="no"] .ud-pdf-lista li,
+.ud-doc[data-ud-just="no"] .ud-pdf-dest { text-align: left; }
+.ud-pdf-p[data-sangria="false"] { text-indent: 0; }
+.ud-doc[data-ud-sangria="no"] .ud-pdf-p[data-sangria="true"] { text-indent: 0; }
+.ud-cap-n { margin-right: 0.45em; font-variant-numeric: tabular-nums; }
+
+/* ---- Capítulos ---- */
+.ud-doc[data-ud-cap="filete"] .ud-pdf-cap-t[data-nivel="1"],
+.ud-doc[data-ud-cap="sello"] .ud-pdf-cap-t[data-nivel="1"] { border-top: 4px solid var(--ud-acc); padding-top: 12px; font-weight: 800; }
+.ud-doc[data-ud-cap="filete"] .ud-pdf-cap-t[data-nivel="2"],
+.ud-doc[data-ud-cap="sello"] .ud-pdf-cap-t[data-nivel="2"] { border-top: 2px solid var(--ud-acc); padding-top: 10px; font-weight: 700; }
+.ud-doc[data-ud-cap="sello"] .ud-pdf-cap-t[data-nivel="1"][data-sello="true"] { display: flex; align-items: center; gap: 14px; }
+.ud-cap-sello {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.1em;
+  height: 2.1em;
+  padding: 0 0.3em;
+  background: var(--ud-acc);
+  color: #fff;
+  border-radius: 3px;
+  font-weight: 800;
+  font-size: 0.9em;
+}
+.ud-doc[data-ud-cap="sencillo"] .ud-pdf-cap-t { font-weight: 700; }
+
+/* ---- Destacados ---- */
+.ud-doc[data-ud-dest="caja"] .ud-pdf-dest { border-left: 0; border-top: 4px solid var(--ud-acc); background: #eef3f9; font-style: normal; font-weight: 600; }
+.ud-doc[data-ud-dest="filetes"] .ud-pdf-dest { border-left: 0; border-top: 2px solid var(--ud-azul); border-bottom: 2px solid var(--ud-azul); background: transparent; font-style: normal; font-weight: 600; color: var(--ud-azul); padding-left: 0; padding-right: 0; }
+.ud-doc[data-ud-dest="sangrado"] .ud-pdf-dest { border-left: 0; background: transparent; margin-left: 36px; margin-right: 36px; padding-left: 0; padding-right: 0; }
+
+/* ---- Tablas ---- */
+.ud-doc[data-ud-enc="marino"] .ud-pdf-tb th { background: #072b58; color: #fff; border: 0; padding: 5px 6px; }
+.ud-doc[data-ud-enc="acento"] .ud-pdf-tb th { background: var(--ud-acc); color: #fff; border: 0; padding: 5px 6px; }
+.ud-doc[data-ud-enc="claro"] .ud-pdf-tb th { background: transparent; color: #072b58; border-top: 2px solid #072b58; border-bottom: 2px solid #072b58; }
+.ud-doc[data-ud-bordes="horiz"] .ud-pdf-tb td { border-bottom: 1px solid #d6dee8; }
+.ud-doc[data-ud-bordes="rejilla"] .ud-pdf-tb td,
+.ud-doc[data-ud-bordes="rejilla"] .ud-pdf-tb th { border: 1px solid #c9d2df; }
+.ud-doc[data-ud-bordes="apa"] .ud-pdf-tb td { border-bottom: 0; }
+.ud-doc[data-ud-bordes="apa"] .ud-pdf-tb tbody tr:last-child td { border-bottom: 2px solid #072b58; }
+.ud-doc[data-ud-cebra="si"] .ud-pdf-tb tbody tr:nth-child(even) td { background-color: #f1f5fa; }
+.ud-doc[data-ud-dens="compacta"] .ud-pdf-tb td { padding-top: 1px; padding-bottom: 1px; }
+.ud-doc[data-ud-dens="compacta"] .ud-pdf-tb th { padding-top: 2px; padding-bottom: 2px; }
+
+/* ---- Pies de figura y notas ---- */
+.ud-doc[data-ud-capest="fuerte"] .ud-pdf-fcap b { font-style: normal; color: #072b58; }
+.ud-doc[data-ud-capest="fuerte"] .ud-pdf-fcap i { font-style: normal; }
+.ud-doc[data-ud-capest="apa"] .ud-pdf-fcap b { display: block; font-style: normal; }
+.ud-doc[data-ud-capest="apa"] .ud-pdf-fcap i { display: block; font-style: italic; }
+.ud-doc[data-ud-cappos="abajo"] .ud-pdf-fig[data-entera="true"] { display: flex; flex-direction: column; }
+.ud-doc[data-ud-cappos="abajo"] .ud-pdf-fig[data-entera="true"] > .ud-pdf-fcap { order: 5; padding: 6px 0 0; }
+.ud-doc[data-ud-cappos="abajo"] .ud-pdf-fig[data-entera="true"] > .ud-pdf-nota { order: 6; }
+.ud-doc[data-ud-nota="caja"] .ud-pdf-nota { padding: 6px 10px; background: #eef3f9; color: #4a5a70; }
+.ud-doc[data-ud-nota="texto"] .ud-pdf-nota { background: transparent; }
+
+/* ---- Bandas (una o dos columnas) ---- */
+.ud-pdf-banda { display: flow-root; }
+.ud-pdf-banda[data-cols="2"] { display: grid; grid-template-columns: var(--ud-col-w) var(--ud-col-w); column-gap: var(--ud-col-gap, 26px); align-items: start; }
+.ud-pdf-banda > .ud-pdf-col { min-width: 0; }
+.ud-pdf-u[data-col="true"] { width: var(--ud-col-w); }
+.ud-doc[data-ud-cols="2"] .ud-pdf-p { hyphens: auto; }
+
+/* ---- Cabecera y pie nuevos ---- */
+.ud-hd2 { position: absolute; left: 0; right: 0; top: 0; }
+.ud-hd2-bar { height: 34px; background: #072b58; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ud-mx, 72px); font: 600 12px/1 var(--ud-sans); }
+.ud-hd2-bar img { height: 22px; display: block; }
+.ud-hd2-band { position: relative; height: 70px; background: var(--ud-acc); padding: 0 var(--ud-mx, 72px); display: flex; align-items: center; overflow: hidden; }
+.ud-hd2-band strong { position: relative; z-index: 1; color: #fff; font: 700 22px/1.1 var(--ud-sans); max-width: 70%; }
+.ud-hd2-band img { position: absolute; right: 0; bottom: 0; height: 100%; opacity: 0.9; }
+.ud-hds { position: absolute; top: 34px; left: var(--ud-mx, 72px); right: var(--ud-mx, 72px); display: flex; justify-content: space-between; gap: 24px; padding-bottom: 6px; border-bottom: 1px solid #d6dee8; font: 600 10px/1.3 var(--ud-sans); letter-spacing: 0.05em; text-transform: uppercase; color: #5d6c80; }
+.ud-hds span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ud-ft2 { position: absolute; left: var(--ud-mx, 72px); right: var(--ud-mx, 72px); bottom: 26px; display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: baseline; padding-top: 6px; font: 500 10px/1.3 var(--ud-sans); color: #5d6c80; }
+.ud-ft2[data-filete="true"] { border-top: 1px solid #d6dee8; }
+.ud-ft2 .l { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ud-ft2 .c { text-align: center; }
+.ud-ft2 .r { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ud-ft2 b { color: #072b58; font-weight: 800; font-size: 12px; }
+
+/* ---- Marca de agua ---- */
+.ud-pdf-marca2 { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 3; overflow: hidden; }
+.ud-pdf-marca2 span { font: 800 var(--ud-marca-tam, 96px) var(--ud-sans); letter-spacing: 0.02em; color: #072b58; opacity: var(--ud-marca-op, 0.08); white-space: nowrap; }
+.ud-pdf-marca2 img { max-width: 62%; max-height: 52%; object-fit: contain; opacity: var(--ud-marca-op, 0.08); }
+
+/* ---- Cierre ---- */
+.ud-pdf-firmas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 36px; }
+.ud-pdf-firmas > div { border-top: 1.5px solid var(--ud-azul); padding-top: 8px; font-family: var(--ud-sans); font-size: calc(12px * var(--ud-k, 1)); line-height: 1.35; }
+.ud-pdf-firmas b { display: block; color: var(--ud-azul); }
+.ud-pdf-firmas span { color: #4a5a70; }
+.ud-pdf-contacto { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 22px; padding-top: 14px; border-top: 1px solid #d6dee8; font-family: var(--ud-sans); font-size: calc(12px * var(--ud-k, 1)); }
+.ud-pdf-contacto dt { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #5d6c80; }
+.ud-pdf-contacto dd { margin: 2px 0 0; font-weight: 700; color: var(--ud-azul); overflow-wrap: anywhere; }
+.ud-pdf-contacto + .ud-pdf-contacto { margin-top: 0; }
+.ud-pdf-pag > .vi-pg { position: absolute; left: 0; top: 0; }

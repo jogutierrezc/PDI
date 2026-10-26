@@ -34,7 +34,7 @@ import type { EstadoDeDocumento, Turno } from "../../datosDocumento";
 import { SIN_DATO, cifrasCambiadas, congelar } from "../../lib/cifras";
 import { ETIQUETA_ESTADO, LIMITES, archivosUsados, bajarBloque, bloqueNuevo, duplicarBloque, indiceDe, insertarBloque, moverBloque, normalizarDocumento, quitarBloque, reemplazarBloque, subirBloque, validarDocumento } from "../../lib/documento";
 import type { Bloque, Documento, ResultadoDocumento, TipoBloque } from "../../lib/documento";
-import { TITULO_INDICE, indicesActivos, referenciasRotas } from "../../lib/numeracion";
+import { TITULO_INDICE, indicesActivos, numerarCapitulos, referenciasRotas } from "../../lib/numeracion";
 import { ALTO_CUERPO } from "../../lib/paginado";
 import { puedeEditar } from "../../lib/permisos";
 import { aPlano, escapar, refsDe } from "../../lib/texto";
@@ -270,8 +270,8 @@ function Lienzo(p: LienzoProps) {
       ? "Los índices aparecerán cuando haya capítulos o figuras con título."
       : "";
   const ctx = useMemo<CtxRender>(
-    () => ({ bibliografia: entrada.bibliografia, modo: "editor", texto: entrada.texto, cifra: entrada.cifra, figuras: entrada.figuras, recursos: entrada.recursos, paginas: new Map() }),
-    [entrada.bibliografia, entrada.texto, entrada.cifra, entrada.figuras, entrada.recursos],
+    () => ({ bibliografia: entrada.bibliografia, modo: "editor", texto: entrada.texto, cifra: entrada.cifra, figuras: entrada.figuras, recursos: entrada.recursos, paginas: new Map(), estilo: entrada.estilo, numeros: entrada.estilo.texto.num ? numerarCapitulos(doc.bloques) : new Map<string, string>() }),
+    [entrada.bibliografia, entrada.texto, entrada.cifra, entrada.figuras, entrada.recursos, entrada.estilo, doc.bloques],
   );
   const cambiosCifras = useMemo(() => (aprobado ? [] : cifrasCambiadas(doc, entrada.lecturas)), [aprobado, doc, entrada.lecturas]);
   const rotas = useMemo(() => referenciasRotas(doc, entrada.figuras, refsDe), [doc, entrada.figuras]);
@@ -654,6 +654,9 @@ function Lienzo(p: LienzoProps) {
                 elegirPortada={() => setSelector({ modo: "portada" })}
                 abrirArchivo={(tipo, archivo) => void (soloLectura ? Promise.resolve(true) : vaciar()).then(() => navigate(`/admin/udrive/${tipo}/${archivo}`))}
                 aceptarCifras={aceptarCifras}
+                carpetaId={p.carpetaId}
+                decir={decir}
+                abrirEstilo={(estiloId) => void (soloLectura ? Promise.resolve(true) : vaciar()).then(() => navigate(`/admin/udrive/estilo/${estiloId}`))}
               />
             )}
           </div>
@@ -755,6 +758,8 @@ function Lienzo(p: LienzoProps) {
           rotulo={previa.rotulo}
           autoImprimir={previa.imprimir}
           autoWord={previa.word}
+          cifrasCambiadas={cambiosCifras.length}
+          alIrAlBloque={irA}
           onCerrar={() => setPrevia(null)}
         />
       ) : null}

@@ -78,3 +78,46 @@ El importador lee el archivo en el navegador (nada se sube todavía), arma un in
 **Revisar antes de crear**: lista virtualizada en orden de lectura con miniaturas, vista de tablas y título/nota editables; por elemento: incluir, cambiar de tipo, editar, unir con el anterior, partir en el cursor, subir/bajar, y pasar una tabla mal detectada a texto. Resumen de lo detectado y de lo descartado. «Reordenar con Pilo» reúne propuestas (niveles de título, palabras partidas, pies sueltos) que se aplican o no, con las mismas tareas de `pilo-informes` de antes: no hay cambios en la función edge.
 
 **Límites**: 150 páginas de PDF (con aviso), 25 MB, 30 tablas y 80 figuras por importación, 2000 bloques. PDF escaneado (sin texto): se avisa, no hay OCR. Página girada: el orden puede salir alterado (aviso).
+
+# Estilos de informe (0190)
+
+Un **estilo** es un perfil de diseño con nombre (portada, texto, tablas y gráficas, cabecera y pie, página) que se aplica a cualquier informe sin tocar su contenido. Migración `supabase/migrations/0190_udrive_estilos.sql` (requiere 0187). Propuesta aprobada: `docs/udrive/propuesta-impresion.html`.
+
+## Qué hay
+- **Modelo** (`lib/estilo.ts`): `Estilo` (JSON versionado), cuatro estilos de fábrica en código (`f:institucional`, `f:academico`, `f:ejecutivo`, `f:clasico`), `normalizarEstilo` (que es también el guardarriel: acota cada valor y nunca lanza), `temaDe` (medidas en píxeles de la hoja: papel, márgenes, cabecera, alto de línea, columnas), `variablesCss` y `atributosEstilo` (lo que el estilo pone sobre `.ud-doc`) y `avisosDeEstilo` (combinaciones que se pueden hacer pero suelen salir mal).
+- **Dónde vive un estilo propio**: un archivo de UDrive de tipo `estilo` (`drive_archivos.tipo`), con su JSON en `contenido`. Hereda carpetas, compartir por correo, permisos por árbol (`drive_rol_archivo`), papelera y mover; no hay tablas ni políticas nuevas. La migración solo amplía el `check` de `tipo` (lo busca por su definición, es idempotente) y acota el contenido a un objeto de hasta 200 KB. Las funciones de 0187 y 0188 reciben `'carpeta'` o `'archivo'` como tipo de elemento y la del documento solo actúa sobre `tipo = 'documento'`, así que ninguna lista las rompe.
+- **Qué guarda el informe** (`lib/documento.ts`, `version` sigue en 1; campos opcionales): `estilo` (`{ id, v }`), `instantanea` (copia completa del estilo al aplicarlo), `ajustes` (solo lo que este informe cambia sobre su estilo), `papel` (Carta o A4), `cierre` (mensaje, hasta 3 responsables, créditos, contacto, frase y si lleva cierre y contraportada) y, en `portada`, `autor`, `afiliacion`, `fecha`, `nota` y `foto` (encuadre: `x`, `y`, `zoom`, `ajuste` cubrir o contener, `velo`). Lo que se imprime sale siempre de la instantánea más los ajustes (`estiloDelInforme`): el informe no cambia si el estilo cambia después, no se puede leer o está aprobado. Si el estilo propio tiene una versión nueva, «Documento» avisa y ofrece Actualizar.
+- **Sin estilo = Clásico.** Un documento sin `estilo` ni `instantanea` se imprime con el estilo «Clásico UDrive», que es el CSS y las constantes de antes (Georgia 15 px, interlineado 22,5 px, márgenes 72/76 px, portada de siempre, marca diagonal roja). Las variantes nuevas solo se activan con `data-ud-*` que el Clásico no usa. Una pantalla vieja que reescriba el documento descartaría los campos nuevos: se despliega primero este código y después se usa.
+- **Por defecto**: informes nuevos (`NuevoInforme`, importar Word o PDF) parten de `ESTILO_INFORME_NUEVO` (Institucional); los existentes, de `ESTILO_SIN_ELEGIR` (Clásico). Los dos están en constantes al inicio de `lib/estilo.ts`.
+- **Logo de la Universidad obligatorio**: el modelo lo lleva en `true`, el editor no ofrece quitarlo y `normalizarEstilo` lo restituye. El monograma (3 a 4 caracteres) y el logo propio son opcionales.
+- **Contraste**: el color de acento debe dar 4,5:1 con texto blanco; el editor no lo aplica si no cumple y ofrece oscurecerlo, y el normalizador lo oscurece solo si llega uno malo. Límites: cuerpo de 9 a 12 pt, interlineado 1,3 a 1,8, márgenes 14 a 30 mm, marca de agua de 5 a 15 % (aviso sobre 10 %).
+- **Marca de agua libre**: texto (hasta 24 caracteres) o imagen de UDrive, horizontal, nunca en la portada; más «BORRADOR automático» mientras el informe no esté aprobado.
+- **Fuentes**: Montserrat y Open Sans con el cargador del boletín (`boletin/fonts.ts`); Source Serif 4 con el mismo método (`salida/fuentes.ts`); Georgia es del sistema. El paginado espera a `document.fonts` antes de medir.
+
+## Paginado y salida
+- `lib/paginado.ts`: `paginar` acepta un alto por página (función) y un espacio ya usado en la primera hoja; `paginarColumnas` reparte el texto corrido en dos columnas tratando cada una como una página angosta (con las mismas reglas de viudas, huérfanas y títulos pegados). Las tablas, figuras, índices y capítulos de nivel 1 ocupan el ancho completo y cortan el tramo. La última hoja de un tramo no equilibra las columnas.
+- `salida/PaginasPdf.tsx`: las constantes de antes (`LINEA`, `MARGEN_P`, `ALTO_CUERPO`) salen del tema. Cada **sección** (la orientación cambia con un bloque «Salto de página» de orientación horizontal) se mide y se reparte con sus propias medidas; las hojas horizontales usan la página con nombre `ud-horizontal`. Cabecera de dos niveles, sencilla o ninguna; folio al borde exterior, centrado o a la derecha; cierre y contraportada se suman al conteo.
+- `salida/Portadas.tsx`: las cinco composiciones de Informes Institucionales (mismas clases `vi-*` de `informes/vista/vista.css`, mismos helpers de `informes/vista/perfil.ts`) con los campos de UDrive. En `informes/vista/EditorPortada.tsx` solo se exportó `Encuadre`, que se reutiliza para encuadrar la foto (arrastrar, flechas, zoom).
+- `salida/imprimir.ts`: fija `@page` según el papel del informe (Carta o A4) y la página con nombre `ud-horizontal` al abrir la ventana de impresión.
+- **Revisar antes de imprimir** (`lib/revision.ts`, `ui/estilos/Revision.tsx`): figuras sin título, bloques sin archivo, tablas más anchas que la hoja (se miden en el paginado), imágenes de más de 2,5 MB, fuentes sin citar o citas sin definir, cifras vivas que cambiaron y los avisos del estilo. «Bloquea» impide abrir la impresión o bajar el Word hasta corregirlo o dejarlo así hallazgo por hallazgo.
+
+## Word con estilo
+`salida/aWord.ts` lee el estilo: familias y tamaños, colores, márgenes, papel (Carta o A4), interlineado, alineación, encabezados de tabla, cebra, bordes y mapa de calor, destacados, títulos de figura arriba o abajo, numeración de capítulos, folio exterior (encabezados de páginas pares e impares), dos columnas (por tramos: texto en dos columnas, tablas y figuras a todo el ancho) y secciones horizontales. La **portada y la contraportada** van como imagen a página completa (`salida/paginaAImagen.ts`, con `html-to-image` sobre la hoja ya paginada, a doble resolución). Si el navegador no puede dibujarlas (una imagen sin permiso CORS, una fuente que no se pudo incrustar) la portada va como texto y se avisa; la contraportada se omite con aviso.
+- Se conserva: letras y tamaños (si la computadora tiene la fuente instalada), acento, márgenes, columnas, secciones horizontales, cebra y bordes, mapa de calor, folio exterior, portada y contraportada como imagen, cierre como texto.
+- Se simplifica: la cabecera de dos niveles pasa a una línea con filete; los destacados en caja a sombreado y filete.
+- No se conserva: la marca de agua (el Word lleva «BORRADOR» en la cabecera como antes) y el dibujo de edificios.
+- El Clásico exporta el mismo Word de antes.
+
+## Pantallas
+- **Explorador**: Nuevo → «Nuevo estilo de informe» (partir de uno de fábrica o propio, con nombre y carpeta); filtro «Estilos»; un estilo se abre en `/admin/udrive/estilo/:id`, se mueve, se comparte y se borra como cualquier archivo.
+- **Editor de estilos** (`ui/estilos/EditorEstilo.tsx`, `PanelEstilo.tsx`): cinco grupos con «Más opciones» plegado y «Restablecer» por grupo; vista previa con un informe de muestra (datos de ejemplo) dibujado con el paginado real, en el papel del estilo, con portada, cierre y contraportada; vista de advertencias; se guarda solo. Un estilo de solo lectura se mira y se duplica.
+- **Informe → Documento** (`ui/estilos/PanelesInforme.tsx`): estilo (cambiar, papel, ajustes de este informe, actualizar, guardar este aspecto como estilo propio), portada (textos, foto con encuadre, velo, cubrir o contener) y cierre y contraportada.
+- La hoja continua del editor toma del estilo la letra, los colores y las variantes; el reparto exacto en páginas es el de la vista previa.
+
+## Sin la migración
+Los cuatro estilos de fábrica funcionan sin 0190. Guardar un estilo propio falla con «Falta aplicar la migración 0190 (estilos de informe)» (`datos.ts` → `errorDe`); la lista de «Mis estilos» sale vacía.
+
+## Límites conocidos
+- Dos columnas: el último tramo no equilibra las columnas y el texto en columnas se mide con un mínimo de espacio (160 px) para empezar en una hoja con otro contenido arriba.
+- `@page` con nombre (hojas horizontales) lo respetan Chrome y Edge; Firefox y Safari hay que probarlos.
+- Source Serif 4 se carga de Google Fonts como las fuentes del boletín; sin red se usa Georgia.

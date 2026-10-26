@@ -12,6 +12,8 @@
    el editor para deshacer y rehacer.
    ========================================================================== */
 
+import { ESTILO_SIN_ELEGIR, estiloDeFabrica, estiloDelInforme, normalizarAjustes, normalizarEstilo } from "./estilo";
+import type { Estilo, Papel } from "./estilo";
 import { CENTRO_INICIAL, LAT_MAX, ZOOM_MAX, ZOOM_MIN } from "./mapa";
 
 export type PlantillaId = "lineamientos" | "blanco";
@@ -47,6 +49,17 @@ export interface Fuente {
   url: string;
 }
 
+/** Cómo se encuadra la foto de portada: punto de anclaje en % (x, y), zoom de 1 a 3, ajuste y velo. */
+export interface FotoPortada {
+  x: number;
+  y: number;
+  zoom: number;
+  /** «cubrir» llena el marco (recorta); «contener» muestra la foto entera. */
+  ajuste: "cubrir" | "contener";
+  /** Opacidad del velo blanco sobre la foto, de 0 a 60 %. */
+  velo: number;
+}
+
 export interface Portada {
   titulo: string;
   subtitulo: string;
@@ -54,7 +67,39 @@ export interface Portada {
   anio: string;
   /** Id de un archivo de imagen de UDrive para la portada a sangre. */
   imagenId?: string;
+  /** Campos de los estilos nuevos (0190); todos opcionales y lo vacío no se imprime. */
+  autor?: string;
+  afiliacion?: string;
+  fecha?: string;
+  nota?: string;
+  /** Encuadre de la foto; sin él se usa el centro, sin zoom. */
+  foto?: FotoPortada;
 }
+
+export interface Firma {
+  nombre: string;
+  cargo: string;
+}
+
+/** Página de cierre y contraportada del informe (0190). Todo es opcional. */
+export interface Cierre {
+  mensaje: string;
+  firmas: Firma[];
+  creditos: string;
+  correo: string;
+  telefono: string;
+  direccion: string;
+  web: string;
+  /** Frase de la contraportada. */
+  frase: string;
+  /** Agrega la página de cierre. */
+  conCierre: boolean;
+  /** Agrega la contraportada. */
+  conContraportada: boolean;
+}
+
+export const CIERRE_VACIO: Cierre = { mensaje: "", firmas: [], creditos: "", correo: "", telefono: "", direccion: "", web: "", frase: "", conCierre: false, conContraportada: false };
+export const MAX_FIRMAS = 3;
 
 export interface Indices {
   contenido: boolean;
@@ -139,6 +184,8 @@ export interface BNota extends Base {
 }
 export interface BSalto extends Base {
   tipo: "salto";
+  /** Orientación de la sección que empieza aquí (0190). Sin valor, sigue la de antes. */
+  orientacion?: "vertical" | "horizontal";
 }
 export interface BReferencias extends Base {
   tipo: "referencias";
@@ -166,6 +213,15 @@ export interface Documento {
   vistas?: Record<string, string>;
   /** Solo en documentos aprobados: el valor de cada [[clave]] al aprobar. */
   congeladas?: Record<string, CifraCongelada>;
+  /** El estilo que se aplicó y su versión («f:academico», o el id del archivo de estilo y su `updated_at`). Sin él, el Clásico. */
+  estilo?: { id: string; v: string };
+  /** Cambios de este informe sobre su estilo (solo lo que difiere). */
+  ajustes?: Record<string, unknown>;
+  /** Copia del estilo al aplicarlo: con ella el informe sale igual aunque el estilo cambie o no se pueda leer. */
+  instantanea?: Estilo;
+  /** Papel de este informe; sin él, el del estilo (Carta por defecto). */
+  papel?: Papel;
+  cierre?: Cierre;
 }
 
 export const NOMBRE_BLOQUE: Record<TipoBloque, string> = {
@@ -307,7 +363,7 @@ function normalizarBloque(crudo: unknown, usados: Set<string>): Bloque | null {
     case "nota":
       return { id, tipo: "nota", texto: cadena(b.texto, LIMITES.nota) };
     case "salto":
-      return { id, tipo: "salto" };
+      return b.orientacion === "horizontal" || b.orientacion === "vertical" ? { id, tipo: "salto", orientacion: b.orientacion } : { id, tipo: "salto" };
     case "referencias":
       return { id, tipo: "referencias", titulo: cadena(b.titulo, LIMITES.titulo) || "Referencias" };
     default:
@@ -337,6 +393,67 @@ export interface ResultadoDocumento {
   documento: Documento;
   /** Lo que se corrigió o se descartó, en español. Vacío si el JSON ya estaba bien. */
   avisos: string[];
+}
+
+function normalizarFoto(crudo: unknown): FotoPortada {
+  const f = objeto(crudo);
+  return {
+    x: Math.round(numero(f.x, 0, 100, 50) * 10) / 10,
+    y: Math.round(numero(f.y, 0, 100, 50) * 10) / 10,
+    zoom: Math.round(numero(f.zoom, 1, 3, 1) * 100) / 100,
+    ajuste: f.ajuste === "contener" ? "contener" : "cubrir",
+    velo: Math.round(numero(f.velo, 0, 60, 0)),
+  };
+}
+
+function normalizarCierre(crudo: unknown): Cierre {
+  const c = objeto(crudo);
+  const linea = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\u0000/g, "").replace(/[ \t]+/g, " ").trim().slice(0, max) : "");
+  const bloque = (v: unknown, max: number) =>
+    typeof v === "string"
+      ? v
+          .replace(/\u0000/g, "")
+          .replace(/\r/g, "")
+          .split("\n")
+          .map((l) => l.replace(/[ \t]+/g, " ").trim())
+          .join("\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim()
+          .slice(0, max)
+      : "";
+  return {
+    mensaje: bloque(c.mensaje, 420),
+    firmas: (Array.isArray(c.firmas) ? c.firmas : [])
+      .slice(0, MAX_FIRMAS)
+      .map((x) => {
+        const o = objeto(x);
+        return { nombre: linea(o.nombre, 40), cargo: linea(o.cargo, 46) };
+      })
+      .filter((x) => x.nombre || x.cargo),
+    creditos: bloque(c.creditos, 240),
+    correo: linea(c.correo, 80),
+    telefono: linea(c.telefono, 36),
+    direccion: linea(c.direccion, 90),
+    web: linea(c.web, 80),
+    frase: linea(c.frase, 90),
+    conCierre: logico(c.conCierre, false),
+    conContraportada: logico(c.conContraportada, false),
+  };
+}
+
+/** `estilo`, `ajustes`, `instantanea`, `papel` y `cierre`: opcionales, así una pantalla vieja no pierde nada que no conozca y un documento sin ellos sale como el Clásico. */
+function extrasDeEstilo(d: Record<string, unknown>, avisos: string[]): Partial<Documento> {
+  const salida: Partial<Documento> = {};
+  const e = objeto(d.estilo);
+  if (typeof e.id === "string" && e.id.length > 0 && e.id.length <= 80) salida.estilo = { id: e.id, v: cadena(e.v, 40) };
+  else if (d.estilo !== undefined) avisos.push("Se descartó la referencia al estilo porque no era válida.");
+  if (Object.keys(objeto(d.instantanea)).length) salida.instantanea = normalizarEstilo(d.instantanea, estiloDeFabrica(ESTILO_SIN_ELEGIR));
+  const base = salida.instantanea ?? estiloDeFabrica(ESTILO_SIN_ELEGIR);
+  const aj = normalizarAjustes(d.ajustes, base);
+  if (Object.keys(aj).length) salida.ajustes = aj;
+  if (d.papel === "carta" || d.papel === "a4") salida.papel = d.papel;
+  if (Object.keys(objeto(d.cierre)).length) salida.cierre = normalizarCierre(d.cierre);
+  return salida;
 }
 
 /** Lee cualquier JSON como documento: lo que no sirve se descarta o se corrige y queda anotado en `avisos`. */
@@ -373,12 +490,18 @@ export function normalizarDocumento(crudo: unknown): ResultadoDocumento {
       entidad: cadena(p.entidad, LIMITES.portada),
       anio: cadena(p.anio, 12),
       ...(esId(p.imagenId) ? { imagenId: p.imagenId } : {}),
+      ...(typeof p.autor === "string" && p.autor.trim() ? { autor: cadena(p.autor, 90) } : {}),
+      ...(typeof p.afiliacion === "string" && p.afiliacion.trim() ? { afiliacion: cadena(p.afiliacion, 90) } : {}),
+      ...(typeof p.fecha === "string" && p.fecha.trim() ? { fecha: cadena(p.fecha, 40) } : {}),
+      ...(typeof p.nota === "string" && p.nota.trim() ? { nota: cadena(p.nota, 80) } : {}),
+      ...(p.foto && typeof p.foto === "object" ? { foto: normalizarFoto(p.foto) } : {}),
     },
     indices: { contenido: logico(ind.contenido, false), ilustraciones: logico(ind.ilustraciones, false), tablas: logico(ind.tablas, false), graficas: logico(ind.graficas, false) },
     fuentes,
     bloques,
     ...(Object.keys(vistas).length ? { vistas } : {}),
     ...(Object.keys(congeladas).length ? { congeladas } : {}),
+    ...extrasDeEstilo(d, avisos),
   };
   return { documento, avisos };
 }
@@ -448,6 +571,12 @@ export function archivosUsados(doc: Documento): { tablas: string[]; graficas: st
     if (b.tipo === "imagen" && b.archivoId) im.add(b.archivoId);
   }
   if (doc.portada.imagenId) im.add(doc.portada.imagenId);
+  // Las imágenes del estilo: logo propio y marca de agua.
+  if (doc.instantanea || doc.ajustes) {
+    const e = estiloDelInforme(doc);
+    if (e.portada.logos.propioId) im.add(e.portada.logos.propioId);
+    if (e.cabpie.marca.modo === "imagen" && e.cabpie.marca.imagenId) im.add(e.cabpie.marca.imagenId);
+  }
   return { tablas: [...t], graficas: [...g], imagenes: [...im] };
 }
 

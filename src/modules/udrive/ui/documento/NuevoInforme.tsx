@@ -12,6 +12,9 @@ import { Ventana } from "../../../../components/espacio/Ventana";
 import { useArchivos, useCarpetas, useCrearItem } from "../../datos";
 import { rutaDeCarpeta } from "../../lib/arbol";
 import type { PlantillaId } from "../../lib/documento";
+import { leerEstilo, useEstilosGuardados } from "../../datosEstilo";
+import { aplicarEstilo } from "../../lib/aplicarEstilo";
+import { ESTILO_INFORME_NUEVO, FABRICAS } from "../../lib/estilo";
 import { limpiarNombre, nombreEnUso } from "../../lib/nombres";
 import { PLANTILLAS } from "../../plantillas";
 
@@ -23,6 +26,9 @@ export function NuevoInforme({ carpetaInicial, onCerrar, decir }: { carpetaInici
   const [plantilla, setPlantilla] = useState<PlantillaId>("lineamientos");
   const [nombre, setNombre] = useState("");
   const [carpeta, setCarpeta] = useState<string | null>(carpetaInicial);
+  const [estiloId, setEstiloId] = useState(ESTILO_INFORME_NUEVO);
+  const [ocupado, setOcupado] = useState(false);
+  const { estilos } = useEstilosGuardados();
 
   const opciones = useMemo(() => {
     const vivas = (carpetas.data ?? []).filter((c) => !c.borrado_en);
@@ -42,7 +48,7 @@ export function NuevoInforme({ carpetaInicial, onCerrar, decir }: { carpetaInici
       pie={
         <>
           <span className="es-note">Puede cambiar la portada y los capítulos cuando quiera.</span>
-          <button type="submit" form="ud-f-informe" className="es-btn es-btn--pri" disabled={!limpio || repetido || crear.isPending}>
+          <button type="submit" form="ud-f-informe" className="es-btn es-btn--pri" disabled={!limpio || repetido || crear.isPending || ocupado}>
             Crear informe
           </button>
         </>
@@ -53,10 +59,17 @@ export function NuevoInforme({ carpetaInicial, onCerrar, decir }: { carpetaInici
         className="es-dbody"
         onSubmit={(e) => {
           e.preventDefault();
-          crear.mutate(
-            { tipo: "documento", nombre: limpio, carpeta, contenido: ficha.crear(limpio) },
-            { onSuccess: (id) => navigate(`/admin/udrive/documento/${id}`), onError: (er) => decir(er.message) },
-          );
+          setOcupado(true);
+          // El informe nuevo guarda el estilo elegido (y una copia suya); si no se puede leer, parte del Clásico.
+          void leerEstilo(estiloId)
+            .catch(() => null)
+            .then((r) => {
+              const contenido = r ? aplicarEstilo(ficha.crear(limpio), { id: estiloId, v: r.v }, r.estilo) : ficha.crear(limpio);
+              crear.mutate(
+                { tipo: "documento", nombre: limpio, carpeta, contenido },
+                { onSuccess: (id) => navigate(`/admin/udrive/documento/${id}`), onError: (er) => decir(er.message), onSettled: () => setOcupado(false) },
+              );
+            });
         }}
       >
         <div role="group" aria-label="Plantilla" className="ud-tarjetas-plantilla">
@@ -72,6 +85,19 @@ export function NuevoInforme({ carpetaInicial, onCerrar, decir }: { carpetaInici
           <input type="text" className="es-inp" data-foco value={nombre} maxLength={160} aria-invalid={repetido} onChange={(e) => setNombre(e.target.value)} placeholder="Lineamientos de infraestructura 2026" />
         </label>
         {repetido ? <p className="ud-aviso" data-t="error" role="alert">Ya hay algo con ese nombre en esa carpeta.</p> : null}
+        <label className="es-fl">
+          Estilo
+          <select className="es-inp" value={estiloId} onChange={(e) => setEstiloId(e.target.value)}>
+            <optgroup label="De fábrica">
+              {FABRICAS.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+            </optgroup>
+            {estilos.length ? (
+              <optgroup label="Mis estilos">
+                {estilos.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+              </optgroup>
+            ) : null}
+          </select>
+        </label>
         <label className="es-fl">
           Carpeta
           <select className="es-inp" value={carpeta ?? ""} onChange={(e) => setCarpeta(e.target.value || null)}>

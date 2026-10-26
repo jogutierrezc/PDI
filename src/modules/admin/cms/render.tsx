@@ -11,7 +11,7 @@
    aparece ya en su lugar.
    ========================================================================== */
 
-import { Fragment, useRef, type CSSProperties, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -28,7 +28,8 @@ import { AvancePlan } from "./vivos/AvancePlan";
 import { PilaresPlan } from "./vivos/PilaresPlan";
 import { EnvolturaPlaneacion, EquipoOficina, GaleriaOficina, MosaicoPortales, RecientesOficina } from "./vivos/OficinaPlaneacion";
 import { MicrositioVivo } from "./vivos/RankingSecciones";
-import { ANCHOS, destinoSeguro, estiloDe, movimientoDe, ocultoDe } from "./logica";
+import { ALINEACIONES, ANCHOS, alinearDe, destinoSeguro, estiloDe, medidaDe, movimientoDe, ocultoDe, videoEmbed } from "./logica";
+import { officePhotoUrl } from "../../planeacion/page";
 import { definicion } from "./bloques";
 import type { Ancho, Movimiento, Props } from "./tipos";
 // Estilos del tablero de indicadores (IndicatorBoard). Están acotados al contenedor .sos.
@@ -71,6 +72,10 @@ export function clasesEstilo(bloque: BloqueRender): string {
   if (bloque.tipo === "hero") partes.push(texto(bloque.props.tono) === "claro" ? "cms-fondo-claro" : "cms-fondo-marino");
   else if (!def?.sinFondo) partes.push(`cms-fondo-${fondo}`);
   if (bloque.tipo !== "ods") partes.push(`cms-espacio-${espacio}`);
+  const alinear = alinearDe(bloque.props);
+  if (alinear !== "izquierda") partes.push(`cms-alin-${alinear}`);
+  const medida = medidaDe(bloque.props);
+  if (medida !== "estrecha") partes.push(`cms-medida-${medida}`);
   return partes.join(" ");
 }
 
@@ -365,6 +370,266 @@ function Cierre({ p, navegable }: { p: Props; navegable: boolean }) {
   );
 }
 
+/* --- Imagen, carrusel y columnas: los bloques básicos de un CMS ------------------------------- */
+
+/** «16/9» → «16 / 9»; «auto» o un valor raro, sin proporción fija. */
+const proporcionDe = (v: unknown): string | undefined => (/^\d{1,2}\/\d{1,2}$/.test(texto(v)) ? texto(v).replace("/", " / ") : undefined);
+
+/** Una imagen del bucket, de /public o de una URL. Sin imagen, un marco vacío que se ve solo al editar. */
+function Imagen({ src, alt, proporcion, ajuste = "cubrir" }: { src: unknown; alt: unknown; proporcion?: unknown; ajuste?: unknown }) {
+  const url = officePhotoUrl(texto(src));
+  const ratio = proporcionDe(proporcion);
+  if (!url) {
+    return (
+      <div className="cms-img cms-img--vacia" style={{ aspectRatio: ratio ?? "16 / 9" }}>
+        Sin imagen
+      </div>
+    );
+  }
+  return (
+    <img
+      className={`cms-img${texto(ajuste) === "contener" ? " cms-img--contener" : ""}`}
+      style={ratio ? { aspectRatio: ratio } : undefined}
+      src={url}
+      alt={texto(alt)}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
+/** Envuelve el contenido en un enlace solo si la página es pública y el destino es seguro. */
+function ConEnlace({ destino, navegable, tabIndex, children }: { destino: unknown; navegable: boolean; tabIndex?: number; children: ReactNode }) {
+  const href = navegable ? destinoSeguro(destino) : null;
+  if (!href) return <>{children}</>;
+  if (href.startsWith("/")) return <Link to={href} tabIndex={tabIndex}>{children}</Link>;
+  return <a href={href} rel="noopener noreferrer" tabIndex={tabIndex}>{children}</a>;
+}
+
+function BloqueImagen({ p, navegable }: { p: Props; navegable: boolean }) {
+  return (
+    <figure className="cms-wrap cms-figura" data-in>
+      <ConEnlace destino={p.destino} navegable={navegable}>
+        <Imagen src={p.imagen} alt={p.alt} proporcion={p.proporcion} ajuste={p.ajuste} />
+      </ConEnlace>
+      {texto(p.pie) && <figcaption>{texto(p.pie)}</figcaption>}
+    </figure>
+  );
+}
+
+/** Carrusel: una imagen a la vez, con flechas y puntos. Pasa solo, salvo con movimiento reducido o con el cursor o el foco encima. */
+function Carrusel({ p, navegable }: { p: Props; navegable: boolean }) {
+  const diapositivas = lista(p.items);
+  const [actual, setActual] = useState(0);
+  const [pausa, setPausa] = useState(false);
+  const total = diapositivas.length;
+  const segundos = Math.min(20, Math.max(3, Number(p.segundos) || 6));
+  const auto = p.auto === true && total > 1 && !pausa && !reduced();
+  const indice = total === 0 ? 0 : Math.min(actual, total - 1);
+
+  useEffect(() => {
+    if (!auto) return;
+    const id = window.setInterval(() => setActual((i) => (i + 1) % total), segundos * 1000);
+    return () => window.clearInterval(id);
+  }, [auto, total, segundos, indice]);
+
+  const ir = (i: number) => setActual(((i % total) + total) % total);
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {total === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">El carrusel no tiene imágenes todavía.</p>
+      ) : (
+        <section
+          className="cms-carr"
+          aria-roledescription="carrusel"
+          aria-label={texto(p.titulo) || "Carrusel de imágenes"}
+          onPointerEnter={() => setPausa(true)}
+          onPointerLeave={() => setPausa(false)}
+          onFocus={() => setPausa(true)}
+          onBlur={() => setPausa(false)}
+        >
+          <div className="cms-carr__ventana">
+            <div className="cms-carr__pista" style={{ transform: `translateX(-${indice * 100}%)` }}>
+              {diapositivas.map((d, i) => (
+                <div
+                  className="cms-carr__lamina"
+                  key={i}
+                  role="group"
+                  aria-roledescription="diapositiva"
+                  aria-label={`${i + 1} de ${total}`}
+                  aria-hidden={i !== indice || undefined}
+                >
+                  <ConEnlace destino={d.destino} navegable={navegable} tabIndex={i === indice ? 0 : -1}>
+                    <Imagen src={d.imagen} alt={d.alt} proporcion={p.proporcion} />
+                    {(texto(d.titulo) || texto(d.texto)) && (
+                      <span className="cms-carr__pie">
+                        {texto(d.titulo) && <b>{texto(d.titulo)}</b>}
+                        {texto(d.texto) && <span>{texto(d.texto)}</span>}
+                      </span>
+                    )}
+                  </ConEnlace>
+                </div>
+              ))}
+            </div>
+          </div>
+          {total > 1 && (
+            <>
+              <button type="button" className="cms-carr__flecha cms-carr__flecha--ant" aria-label="Imagen anterior" onClick={() => ir(indice - 1)}>
+                <Icon name="chevron-down" size={18} />
+              </button>
+              <button type="button" className="cms-carr__flecha cms-carr__flecha--sig" aria-label="Imagen siguiente" onClick={() => ir(indice + 1)}>
+                <Icon name="chevron-down" size={18} />
+              </button>
+              <div className="cms-carr__puntos">
+                {diapositivas.map((_, i) => (
+                  <button key={i} type="button" aria-label={`Ir a la imagen ${i + 1}`} aria-current={i === indice || undefined} onClick={() => ir(i)} />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Video incrustado de YouTube o Vimeo. Si el enlace no es de esos sitios, no se dibuja nada salvo un aviso al editar. */
+function Video({ url, titulo, proporcion }: { url: unknown; titulo: unknown; proporcion?: unknown }) {
+  const src = videoEmbed(url);
+  if (!src) {
+    return (
+      <div className="cms-img cms-img--vacia" style={{ aspectRatio: proporcionDe(proporcion) ?? "16 / 9" }}>
+        {texto(url) ? "El enlace no es de YouTube ni de Vimeo" : "Sin video"}
+      </div>
+    );
+  }
+  return (
+    <div className="cms-video" style={{ aspectRatio: proporcionDe(proporcion) ?? "16 / 9" }}>
+      <iframe
+        src={src}
+        title={texto(titulo) || "Video"}
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
+function BloqueVideo({ p }: { p: Props }) {
+  return (
+    <figure className="cms-wrap cms-figura" data-in>
+      <Video url={p.url} titulo={p.titulo} proporcion={p.proporcion} />
+      {texto(p.pie) && <figcaption>{texto(p.pie)}</figcaption>}
+    </figure>
+  );
+}
+
+/**
+ * Secciones desplegables con <details>: se operan con teclado y lectores sin
+ * código extra. «Una a la vez» usa el atributo name, que agrupa los details.
+ * En preguntas frecuentes, la página pública declara además FAQPage para los buscadores.
+ */
+function Desplegables({ p, claveTitulo, claveTexto, faq, navegable }: { p: Props; claveTitulo: string; claveTexto: string; faq: boolean; navegable: boolean }) {
+  const grupo = useId();
+  const filas = lista(p.items).filter((it) => texto(it[claveTitulo]));
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  const unico = p.unico === true ? { name: grupo } : {};
+  const ld =
+    faq && navegable && filas.length > 0
+      ? JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: filas.map((it) => ({ "@type": "Question", name: texto(it[claveTitulo]), acceptedAnswer: { "@type": "Answer", text: texto(it[claveTexto]) } })),
+        }).replace(/</g, "\\u003c")
+      : null;
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {filas.length === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">Todavía no hay secciones.</p>
+      ) : (
+        <div className="cms-acordeon">
+          {filas.map((it, i) => (
+            <details className="cms-acordeon__item" data-in key={i} open={p.abierto === true && i === 0 ? true : undefined} {...unico}>
+              <summary>
+                <span>{texto(it[claveTitulo])}</span>
+                <Icon name="chevron-down" size={18} />
+              </summary>
+              <div className="cms-acordeon__cuerpo">{parrafos(texto(it[claveTexto]))}</div>
+            </details>
+          ))}
+        </div>
+      )}
+      {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld }} />}
+    </div>
+  );
+}
+
+/** Un elemento de una columna, según su clase. */
+function ElementoColumna({ it, navegable }: { it: Props; navegable: boolean }) {
+  const cuerpo = texto(it.texto);
+  const alinear = ALINEACIONES.find((a) => a === it.alinear);
+  const clase = alinear ? `cms-col__el cms-alin-${alinear}` : "cms-col__el";
+  switch (texto(it.elemento)) {
+    case "titulo":
+      return <h3 className={`${clase} cms-col__titulo`} data-in>{cuerpo}</h3>;
+    case "cita":
+      return <blockquote className={`${clase} cms-cita`} data-in>{cuerpo}</blockquote>;
+    case "imagen":
+      return (
+        <figure className={`${clase} cms-figura`} data-in>
+          <ConEnlace destino={it.destino} navegable={navegable}>
+            <Imagen src={it.imagen} alt={it.alt} />
+          </ConEnlace>
+          {cuerpo && <figcaption>{cuerpo}</figcaption>}
+        </figure>
+      );
+    case "video":
+      return (
+        <figure className={`${clase} cms-figura`} data-in>
+          <Video url={it.destino} titulo={cuerpo} />
+          {cuerpo && <figcaption>{cuerpo}</figcaption>}
+        </figure>
+      );
+    case "boton":
+      return (
+        <div className={clase} data-in>
+          <Boton clase="cms-boton cms-boton--solido" etiqueta={cuerpo} destino={it.destino} navegable={navegable} />
+        </div>
+      );
+    default:
+      return <div className={`${clase} cms-col__texto`} data-in>{parrafos(cuerpo)}</div>;
+  }
+}
+
+/** Una, dos o tres columnas. Un elemento cuya columna ya no existe pasa a la última, para que no se pierda. */
+function Columnas({ p, navegable }: { p: Props; navegable: boolean }) {
+  const cantidad = Math.min(3, Math.max(1, Math.round(Number(p.cantidad)) || 2));
+  const elementos = lista(p.items);
+  const columnas = Array.from({ length: cantidad }, (_, c) =>
+    elementos.filter((it) => Math.min(cantidad, Math.max(1, Math.round(Number(it.columna)) || 1)) === c + 1),
+  );
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      <div className="cms-cols" style={{ "--cms-cols": cantidad } as CSSProperties}>
+        {columnas.map((items, c) => (
+          <div className="cms-col" key={c}>
+            {items.map((it, i) => (
+              <ElementoColumna it={it} navegable={navegable} key={i} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* --- Bloques vivos: componentes reales del portal, sin copiar su contenido --------------------- */
 
 /** Tablero de indicadores de UDES Sostenible. Solo su encabezado es texto editable. */
@@ -452,6 +717,18 @@ function Contenido({ bloque, navegable }: { bloque: BloqueRender; navegable: boo
           {texto(p.boton) && <Boton clase="cms-boton cms-boton--claro" etiqueta={texto(p.boton)} destino={p.destino} navegable={navegable} datoIn />}
         </div>
       );
+    case "imagen":
+      return <BloqueImagen p={p} navegable={navegable} />;
+    case "carrusel":
+      return <Carrusel p={p} navegable={navegable} />;
+    case "columnas":
+      return <Columnas p={p} navegable={navegable} />;
+    case "video":
+      return <BloqueVideo p={p} />;
+    case "acordeon":
+      return <Desplegables p={p} claveTitulo="titulo" claveTexto="texto" faq={false} navegable={navegable} />;
+    case "preguntas":
+      return <Desplegables p={p} claveTitulo="pregunta" claveTexto="respuesta" faq navegable={navegable} />;
     case "rankings":
       return <Rankings p={p} navegable={navegable} />;
     case "informes":

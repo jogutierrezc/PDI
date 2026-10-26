@@ -20,10 +20,10 @@ import { contextFacts, leapDimensions } from "../../landing/content";
 import { DEFAULT_PAGE } from "../../planeacion/page";
 import type { Fondo, PresetMovimiento, Props } from "./tipos";
 
-export type GrupoBloque = "Portada y estructura" | "Landing" | "Planeación" | "UDES Sostenible" | "Micrositios de ranking" | "Datos en vivo";
+export type GrupoBloque = "Portada y estructura" | "Contenido básico" | "Landing" | "Planeación" | "UDES Sostenible" | "Micrositios de ranking" | "Datos en vivo";
 
 /** Los grupos del selector «Agregar bloque». Cada uno reúne tipos del mismo uso. */
-export const GRUPOS: readonly GrupoBloque[] = ["Portada y estructura", "Landing", "Planeación", "UDES Sostenible", "Micrositios de ranking", "Datos en vivo"];
+export const GRUPOS: readonly GrupoBloque[] = ["Portada y estructura", "Contenido básico", "Landing", "Planeación", "UDES Sostenible", "Micrositios de ranking", "Datos en vivo"];
 
 export interface Opcion {
   valor: string;
@@ -33,11 +33,14 @@ export interface Opcion {
 export interface Subcampo {
   clave: string;
   etiqueta: string;
-  tipo: "texto" | "area" | "enum";
+  /** «imagen»: una ruta del bucket, una ruta de /public o una URL https; el inspector deja subirla. */
+  tipo: "texto" | "area" | "enum" | "imagen";
   opciones?: Opcion[];
+  /** Solo se muestra cuando el campo `clave` de la misma fila vale alguno de `valores`. */
+  cuando?: { clave: string; valores: string[] };
 }
 
-export type TipoCampo = "texto" | "area" | "bool" | "enum" | "numero" | "lista";
+export type TipoCampo = "texto" | "area" | "imagen" | "bool" | "enum" | "numero" | "lista";
 
 export interface CampoBloque {
   clave: string;
@@ -120,6 +123,17 @@ const CAMPO_CATEGORIA: CampoBloque = {
   requerido: true,
   opciones: RANKINGS.flatMap((r) => r.categories.map((c) => ({ valor: `${r.id}/${c.id}`, etiqueta: `${r.short} · ${c.name}` }))),
 };
+
+/** Un campo de imagen: el inspector deja subir un archivo o pegar una dirección. */
+const CAMPO_IMAGEN = (clave: string, etiqueta: string): Subcampo => ({ clave, etiqueta, tipo: "imagen" });
+
+const OPCIONES_PROPORCION: Opcion[] = [
+  { valor: "auto", etiqueta: "La de la imagen" },
+  { valor: "16/9", etiqueta: "Panorámica 16:9" },
+  { valor: "21/9", etiqueta: "Muy ancha 21:9" },
+  { valor: "4/3", etiqueta: "Clásica 4:3" },
+  { valor: "1/1", etiqueta: "Cuadrada" },
+];
 
 export const BLOQUES: DefinicionBloque[] = [
   {
@@ -387,6 +401,230 @@ export const BLOQUES: DefinicionBloque[] = [
     valores: () => ({
       texto: "Escriba aquí el texto de la página. Una línea en blanco abre un párrafo nuevo.",
       cita: "",
+    }),
+  },
+  {
+    tipo: "imagen",
+    nombre: "Imagen",
+    ayuda: "Una imagen con pie opcional, proporción a elección y enlace",
+    grupo: "Contenido básico",
+    movimiento: "sube",
+    campos: [
+      CAMPO_IMAGEN("imagen", "Imagen"),
+      { clave: "alt", etiqueta: "Descripción para lectores de pantalla (vacía si es decorativa)", tipo: "texto" },
+      { clave: "pie", etiqueta: "Pie de la imagen", tipo: "texto" },
+      { clave: "destino", etiqueta: "Destino al hacer clic (/ruta o https://…)", tipo: "texto" },
+      { clave: "proporcion", etiqueta: "Proporción", tipo: "enum", opciones: OPCIONES_PROPORCION },
+      {
+        clave: "ajuste",
+        etiqueta: "Ajuste",
+        tipo: "enum",
+        opciones: [
+          { valor: "cubrir", etiqueta: "Llenar el marco (recorta)" },
+          { valor: "contener", etiqueta: "Mostrar completa" },
+        ],
+      },
+    ],
+    valores: () => ({ imagen: "", alt: "", pie: "", destino: "", proporcion: "16/9", ajuste: "cubrir" }),
+  },
+  {
+    tipo: "carrusel",
+    nombre: "Carrusel",
+    ayuda: "Imágenes que pasan una a una, con título, texto y enlace opcionales",
+    grupo: "Contenido básico",
+    movimiento: "sube",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      { clave: "proporcion", etiqueta: "Proporción", tipo: "enum", opciones: OPCIONES_PROPORCION.filter((o) => o.valor !== "auto") },
+      { clave: "auto", etiqueta: "Pasar solo", tipo: "bool" },
+      { clave: "segundos", etiqueta: "Segundos por imagen", tipo: "numero", min: 3, max: 20 },
+      {
+        clave: "items",
+        etiqueta: "Imágenes",
+        tipo: "lista",
+        subcampos: [
+          { clave: "titulo", etiqueta: "Título", tipo: "texto" },
+          CAMPO_IMAGEN("imagen", "Imagen"),
+          { clave: "alt", etiqueta: "Descripción para lectores de pantalla", tipo: "texto" },
+          { clave: "texto", etiqueta: "Texto", tipo: "area" },
+          campoDestino("destino", "Destino al hacer clic (/ruta o https://…)"),
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      proporcion: "16/9",
+      auto: true,
+      segundos: 6,
+      items: [
+        { titulo: "Primera imagen", imagen: "", alt: "", texto: "", destino: "" },
+        { titulo: "Segunda imagen", imagen: "", alt: "", texto: "", destino: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "columnas",
+    nombre: "Columnas",
+    ayuda: "Una, dos o tres columnas; cada una lleva los títulos, textos, imágenes, citas y botones que se quiera",
+    grupo: "Contenido básico",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      {
+        clave: "cantidad",
+        etiqueta: "Número de columnas",
+        tipo: "enum",
+        opciones: [
+          { valor: "1", etiqueta: "Una columna" },
+          { valor: "2", etiqueta: "Dos columnas" },
+          { valor: "3", etiqueta: "Tres columnas" },
+        ],
+      },
+      {
+        clave: "items",
+        etiqueta: "Elementos",
+        tipo: "lista",
+        subcampos: [
+          { clave: "texto", etiqueta: "Texto", tipo: "area" },
+          {
+            clave: "elemento",
+            etiqueta: "Elemento",
+            tipo: "enum",
+            opciones: [
+              { valor: "texto", etiqueta: "Párrafos" },
+              { valor: "titulo", etiqueta: "Título" },
+              { valor: "imagen", etiqueta: "Imagen (el texto es su pie)" },
+              { valor: "cita", etiqueta: "Cita destacada" },
+              { valor: "boton", etiqueta: "Botón (el texto es su rótulo)" },
+              { valor: "video", etiqueta: "Video de YouTube o Vimeo (el texto es su pie)" },
+            ],
+          },
+          {
+            clave: "columna",
+            etiqueta: "Columna",
+            tipo: "enum",
+            opciones: [
+              { valor: "1", etiqueta: "Primera" },
+              { valor: "2", etiqueta: "Segunda" },
+              { valor: "3", etiqueta: "Tercera" },
+            ],
+          },
+          { ...CAMPO_IMAGEN("imagen", "Imagen"), cuando: { clave: "elemento", valores: ["imagen"] } },
+          { clave: "alt", etiqueta: "Descripción para lectores de pantalla", tipo: "texto", cuando: { clave: "elemento", valores: ["imagen"] } },
+          { clave: "destino", etiqueta: "Destino (/ruta o https://…) o enlace del video", tipo: "texto", cuando: { clave: "elemento", valores: ["imagen", "boton", "video"] } },
+          {
+            clave: "alinear",
+            etiqueta: "Alineación de este elemento",
+            tipo: "enum",
+            opciones: [
+              { valor: "", etiqueta: "La del bloque" },
+              { valor: "izquierda", etiqueta: "Izquierda" },
+              { valor: "centro", etiqueta: "Centrada" },
+              { valor: "derecha", etiqueta: "Derecha" },
+              { valor: "justificado", etiqueta: "Justificada" },
+            ],
+          },
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      cantidad: "2",
+      items: [
+        { texto: "Primera columna", elemento: "titulo", columna: "1", imagen: "", alt: "", destino: "", alinear: "" },
+        { texto: "Escriba aquí el texto de la primera columna.", elemento: "texto", columna: "1", imagen: "", alt: "", destino: "", alinear: "" },
+        { texto: "Segunda columna", elemento: "titulo", columna: "2", imagen: "", alt: "", destino: "", alinear: "" },
+        { texto: "Escriba aquí el texto de la segunda columna.", elemento: "texto", columna: "2", imagen: "", alt: "", destino: "", alinear: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "video",
+    nombre: "Video",
+    ayuda: "Un video de YouTube o Vimeo incrustado: se pega el enlace tal como sale en el navegador",
+    grupo: "Contenido básico",
+    movimiento: "sube",
+    campos: [
+      { clave: "url", etiqueta: "Enlace del video (YouTube o Vimeo)", tipo: "texto", requerido: true },
+      { clave: "titulo", etiqueta: "Título del video (para lectores de pantalla)", tipo: "texto" },
+      { clave: "pie", etiqueta: "Pie del video", tipo: "texto" },
+      {
+        clave: "proporcion",
+        etiqueta: "Proporción",
+        tipo: "enum",
+        opciones: [
+          { valor: "16/9", etiqueta: "Panorámica 16:9" },
+          { valor: "4/3", etiqueta: "Clásica 4:3" },
+          { valor: "1/1", etiqueta: "Cuadrada" },
+        ],
+      },
+    ],
+    valores: () => ({ url: "", titulo: "", pie: "", proporcion: "16/9" }),
+  },
+  {
+    tipo: "acordeon",
+    nombre: "Acordeón",
+    ayuda: "Secciones que se abren y se cierran; cada una con su título y su texto",
+    grupo: "Contenido básico",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      { clave: "unico", etiqueta: "Abrir una sección a la vez", tipo: "bool" },
+      { clave: "abierto", etiqueta: "Mostrar la primera abierta", tipo: "bool" },
+      {
+        clave: "items",
+        etiqueta: "Secciones",
+        tipo: "lista",
+        subcampos: [
+          { clave: "titulo", etiqueta: "Título", tipo: "texto" },
+          { clave: "texto", etiqueta: "Texto (una línea en blanco abre un párrafo)", tipo: "area" },
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      unico: false,
+      abierto: false,
+      items: [
+        { titulo: "Primera sección", texto: "Escriba aquí el contenido." },
+        { titulo: "Segunda sección", texto: "Escriba aquí el contenido." },
+      ],
+    }),
+  },
+  {
+    tipo: "preguntas",
+    nombre: "Preguntas frecuentes",
+    ayuda: "Preguntas y respuestas desplegables. Los buscadores las reconocen como preguntas frecuentes",
+    grupo: "Contenido básico",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      { clave: "unico", etiqueta: "Abrir una pregunta a la vez", tipo: "bool" },
+      {
+        clave: "items",
+        etiqueta: "Preguntas",
+        tipo: "lista",
+        subcampos: [
+          { clave: "pregunta", etiqueta: "Pregunta", tipo: "texto" },
+          { clave: "respuesta", etiqueta: "Respuesta (una línea en blanco abre un párrafo)", tipo: "area" },
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "Preguntas frecuentes",
+      titulo: "Lo que más nos preguntan",
+      texto: "",
+      unico: true,
+      items: [
+        { pregunta: "¿Primera pregunta?", respuesta: "Escriba aquí la respuesta." },
+        { pregunta: "¿Segunda pregunta?", respuesta: "Escriba aquí la respuesta." },
+      ],
     }),
   },
   {

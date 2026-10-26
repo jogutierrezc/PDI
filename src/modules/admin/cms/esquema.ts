@@ -31,6 +31,7 @@ export interface EsquemaBloque {
 
 const TIPO_POR_CAMPO: Record<CampoBloque["tipo"], TipoAtributo> = {
   texto: "string",
+  imagen: "string",
   area: "text",
   bool: "boolean",
   enum: "enumeration",

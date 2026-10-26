@@ -7,7 +7,7 @@
 
 import { definicion } from "./bloques";
 import type { NodoMicrositio } from "./plantillas";
-import type { Ancho, CmsBloque, CmsPagina, Espacio, Estilo, Fondo, Movimiento, PresetMovimiento, Props } from "./tipos";
+import type { Alineacion, Ancho, CmsBloque, CmsPagina, Espacio, Estilo, Fondo, Medida, Movimiento, PresetMovimiento, Props } from "./tipos";
 
 /** Un segmento de URL: minúsculas, sin tildes, guiones entre palabras. */
 export function slugify(texto: string): string {
@@ -88,6 +88,8 @@ export const FONDOS: readonly Fondo[] = ["claro", "alterno", "marino"];
 export const ESPACIOS: readonly Espacio[] = ["compacto", "normal", "amplio"];
 export const PRESETS_MOVIMIENTO: readonly PresetMovimiento[] = ["palabras", "sube", "cascada", "zoom", "ninguna"];
 export const CURVAS: readonly string[] = ["power3.out", "power4.out", "expo.out", "back.out(1.4)", "sine.inOut"];
+export const ALINEACIONES: readonly Alineacion[] = ["izquierda", "centro", "derecha", "justificado"];
+export const MEDIDAS: readonly Medida[] = ["estrecha", "amplia", "completa"];
 export const ANCHOS: readonly Ancho[] = [4, 6, 8, 12];
 
 export const ESTILO_DEFECTO: Estilo = { fondo: "claro", espacio: "normal" };
@@ -128,6 +130,26 @@ export function movimientoDe(tipo: string, props: Props): Movimiento {
 /** ¿El bloque está oculto en el editor? La página publicada no lo muestra. */
 export function ocultoDe(props: Props): boolean {
   return props._oculto === true;
+}
+
+/** Alineación del texto del bloque; sin dato válido, a la izquierda. */
+export function alinearDe(props: Props): Alineacion {
+  return ALINEACIONES.includes(props._alinear as Alineacion) ? (props._alinear as Alineacion) : "izquierda";
+}
+
+/** Ancho de los párrafos del bloque; sin dato válido, el estrecho de siempre. */
+export function medidaDe(props: Props): Medida {
+  return MEDIDAS.includes(props._medida as Medida) ? (props._medida as Medida) : "estrecha";
+}
+
+/** Devuelve las props con la alineación dada; no modifica el original. */
+export function fijarAlinear(props: Props, alinear: Alineacion): Props {
+  return { ...props, _alinear: alinear };
+}
+
+/** Devuelve las props con la medida dada; no modifica el original. */
+export function fijarMedida(props: Props, medida: Medida): Props {
+  return { ...props, _medida: medida };
 }
 
 /** Devuelve las props con la apariencia dada; no modifica el original. */
@@ -185,6 +207,39 @@ export function planSincronizacion(existentes: BloqueExistente[], lista: LineaBl
       return !previo || !igual(previo, b);
     }),
   };
+}
+
+/**
+ * La dirección para incrustar un video de YouTube o Vimeo, a partir de lo que
+ * pegue el usuario (enlace de la barra, corto, embed, shorts o en vivo). YouTube
+ * va por youtube-nocookie.com. Cualquier otro sitio devuelve null: solo se
+ * incrusta lo que está en esta lista.
+ */
+export function videoEmbed(valor: unknown): string | null {
+  if (typeof valor !== "string") return null;
+  let url: URL;
+  try {
+    url = new URL(valor.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:") return null;
+  const host = url.hostname.replace(/^(www|m)\./, "");
+  const id11 = /^[\w-]{11}$/;
+  if (host === "youtu.be") {
+    const id = url.pathname.slice(1).split("/")[0] ?? "";
+    return id11.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+  }
+  if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    const partes = url.pathname.split("/").filter(Boolean);
+    const id = partes[0] === "watch" ? (url.searchParams.get("v") ?? "") : ["embed", "shorts", "live", "v"].includes(partes[0] ?? "") ? (partes[1] ?? "") : "";
+    return id11.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+  }
+  if (host === "vimeo.com" || host === "player.vimeo.com") {
+    const id = url.pathname.split("/").filter(Boolean).find((x) => /^\d+$/.test(x));
+    return id ? `https://player.vimeo.com/video/${id}` : null;
+  }
+  return null;
 }
 
 /** Un valor compuesto «ranking/categoria» (p. ej. «impact/o4») en sus dos ids; null si no tiene esa forma. */

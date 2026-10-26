@@ -1194,3 +1194,130 @@ a.cms-acceso:focus-visible { outline: 2px solid var(--brand-blue); outline-offse
   }
   .cms-toast { animation: none; }
 }
+
+/* --- Alineación y ancho de los párrafos (claves _alinear y _medida) ---------------------------- */
+
+.cms-celda.cms-alin-centro { text-align: center; }
+.cms-celda.cms-alin-derecha { text-align: right; }
+.cms-celda.cms-alin-centro :is(.cms-head, .cms-lede, .cms-texto__cuerpo p, .cms-cita, .cms-banda__frase, .cms-figura figcaption) { margin-inline: auto; }
+.cms-celda.cms-alin-derecha :is(.cms-head, .cms-lede, .cms-texto__cuerpo p, .cms-cita, .cms-banda__frase, .cms-figura figcaption) { margin-inline-start: auto; }
+.cms-celda.cms-alin-centro :is(.cms-cta, .cms-banda) { justify-content: center; }
+.cms-celda.cms-alin-derecha :is(.cms-cta, .cms-banda) { justify-content: flex-end; }
+.cms-celda.cms-alin-justificado :is(p, .cms-head__texto, .cms-lede, .cms-carr__pie span) {
+  text-align: justify;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+.cms-celda.cms-medida-amplia :is(.cms-head, .cms-lede, .cms-texto__cuerpo p, .cms-cita) { max-width: 90ch; }
+.cms-celda.cms-medida-completa :is(.cms-head, .cms-lede, .cms-texto__cuerpo p, .cms-cita) { max-width: none; }
+
+/* Un elemento de columna con su propia alineación. */
+.cms-col__el.cms-alin-centro { text-align: center; }
+.cms-col__el.cms-alin-derecha { text-align: right; }
+.cms-col__el.cms-alin-justificado p { text-align: justify; hyphens: auto; }
+
+/* --- Imagen, carrusel y columnas ------------------------------------------------------------- */
+
+.cms-figura { margin: 0; }
+.cms-figura a { display: block; }
+.cms-figura figcaption { margin-top: var(--space-2); max-width: var(--measure); font-size: var(--text-sm); color: var(--cms-ink2); }
+.cms-img { display: block; width: 100%; height: auto; object-fit: cover; border-radius: var(--radius-xl); background: var(--surface); }
+.cms-img--contener { object-fit: contain; }
+.cms-img--vacia {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.cms-carr { position: relative; }
+.cms-carr__ventana { overflow: hidden; border-radius: var(--radius-xl); }
+.cms-carr__pista { display: flex; transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.cms-carr__lamina { flex: none; width: 100%; min-width: 0; position: relative; }
+.cms-carr__lamina > a, .cms-carr__lamina > span { display: block; color: inherit; text-decoration: none; }
+.cms-carr__lamina .cms-img { border-radius: 0; }
+.cms-carr__pie {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  background: var(--cms-tarjeta);
+  border-top: 1px solid var(--cms-linea);
+}
+.cms-carr__pie span { font-size: var(--text-sm); color: var(--cms-ink2); }
+.cms-carr__flecha {
+  position: absolute;
+  top: 40%;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pilo-stage) 78%, transparent);
+  color: var(--pilo-stage-ink);
+  cursor: pointer;
+}
+.cms-carr__flecha--ant { left: var(--space-3); transform: rotate(90deg); }
+.cms-carr__flecha--sig { right: var(--space-3); transform: rotate(-90deg); }
+.cms-carr__puntos { display: flex; justify-content: center; gap: var(--space-2); margin-top: var(--space-3); }
+.cms-carr__puntos button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--line-strong);
+  cursor: pointer;
+}
+.cms-carr__puntos button[aria-current] { background: var(--brand-blue-strong); transform: scale(1.25); }
+.cms-carr :is(button, a):focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.cms-cols { display: grid; grid-template-columns: repeat(var(--cms-cols, 2), minmax(0, 1fr)); gap: var(--space-6); align-items: start; }
+.cms-col { display: grid; gap: var(--space-4); min-width: 0; }
+.cms-col__titulo { margin: 0; font-size: var(--text-lg); font-weight: 800; color: inherit; }
+.cms-col__texto p { margin: 0 0 var(--space-3); line-height: var(--leading-relaxed); color: var(--cms-ink2); }
+.cms-col__texto p:last-child { margin-bottom: 0; }
+.cms-col .cms-cita { margin: 0; max-width: none; }
+
+@container (max-width: 640px) {
+  .cms-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cms-carr__pista { transition: none; }
+}
+
+/* Selector de imagen del inspector. */
+.cms-imagen__vista { width: 100%; max-height: 140px; object-fit: cover; border-radius: var(--radius-xs); border: 1px solid var(--line); }
+
+/* --- Video y desplegables --------------------------------------------------------------------- */
+
+.cms-video { position: relative; width: 100%; overflow: hidden; border-radius: var(--radius-xl); background: #000; }
+.cms-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+.cms-acordeon { display: grid; gap: var(--space-2); max-width: 860px; }
+.cms-acordeon__item { border: 1px solid var(--cms-linea); border-radius: var(--radius-sm); background: var(--cms-tarjeta); }
+.cms-acordeon__item > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.cms-acordeon__item > summary::-webkit-details-marker { display: none; }
+.cms-acordeon__item > summary svg { flex: none; transition: transform 0.2s ease; }
+.cms-acordeon__item[open] > summary svg { transform: rotate(180deg); }
+.cms-acordeon__item > summary:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; border-radius: var(--radius-sm); }
+.cms-acordeon__cuerpo { padding: 0 var(--space-5) var(--space-5); color: var(--cms-ink2); line-height: var(--leading-relaxed); }
+.cms-acordeon__cuerpo p { margin: 0 0 var(--space-3); }
+.cms-acordeon__cuerpo p:last-child { margin-bottom: 0; }
+.cms-celda.cms-alin-centro .cms-acordeon,
+.cms-celda.cms-alin-derecha .cms-acordeon { margin-inline: auto; }
+.cms-celda.cms-alin-derecha .cms-acordeon { margin-inline-start: auto; margin-inline-end: 0; }
+.cms-acordeon__item > summary, .cms-acordeon__cuerpo { text-align: start; }
+@media (prefers-reduced-motion: reduce) {
+  .cms-acordeon__item > summary svg { transition: none; }
+}

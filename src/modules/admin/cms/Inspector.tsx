@@ -10,20 +10,26 @@
    anterior (texto escrito seguido).
    ========================================================================== */
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { definicion, type CampoBloque, type Subcampo } from "./bloques";
 import { codigoGsap, esquemaDeBloque, filaDeBloque } from "./esquema";
 import {
+  ALINEACIONES,
   ANCHOS,
   CURVAS,
   ESPACIOS,
   FONDOS,
+  MEDIDAS,
   PRESETS_MOVIMIENTO,
+  alinearDe,
   estadoPublicacion,
   estiloDe,
+  fijarAlinear,
   fijarEstilo,
+  fijarMedida,
   fijarMovimiento,
   fijarOculto,
+  medidaDe,
   movimientoDe,
   ocultoDe,
   type LineaBloque,
@@ -32,13 +38,17 @@ import { IconoCms } from "./iconos";
 import { ETIQUETA_ESTADO } from "./PanelPaginas";
 import { Pestanas, idPanel, idPestana, type PestanaDef } from "./Pestanas";
 import { FaltaMigracionCms, renombrarPagina, useInvalidarCms, useVersiones } from "./store";
-import type { Ancho, CmsPagina, Espacio, Fondo, PresetMovimiento, Props } from "./tipos";
+import type { Alineacion, Ancho, CmsPagina, Espacio, Fondo, Medida, PresetMovimiento, Props } from "./tipos";
+import { uploadOfficePhoto } from "../pagina/store";
+import { officePhotoUrl } from "../../planeacion/page";
 import { Icon } from "../../../components/ui/Icon";
 
 type Pestana = "bloque" | "movimiento" | "esquema" | "pagina";
 
 const ETIQUETA_FONDO: Record<Fondo, string> = { claro: "Claro", alterno: "Alterno", marino: "Marino (azul UDES)" };
 const ETIQUETA_ESPACIO: Record<Espacio, string> = { compacto: "Compacto", normal: "Normal", amplio: "Amplio" };
+const ETIQUETA_ALINEACION: Record<Alineacion, string> = { izquierda: "Izquierda", centro: "Centrado", derecha: "Derecha", justificado: "Justificado" };
+const ETIQUETA_MEDIDA: Record<Medida, string> = { estrecha: "Estrecho (lectura cómoda)", amplia: "Amplio", completa: "Todo el ancho del bloque" };
 const ETIQUETA_ANCHO: Record<Ancho, string> = { 4: "Un tercio", 6: "Mitad", 8: "Dos tercios", 12: "Completo" };
 const ETIQUETA_PRESET: Record<PresetMovimiento, string> = {
   palabras: "Palabras que suben (título)",
@@ -156,7 +166,7 @@ function Cuerpo({
             />
           ))}
           <h3 className="cms-panel__titulo">Apariencia</h3>
-          <Apariencia bloque={bloque} onActualizar={onActualizar} sinFondo={Boolean(def.sinFondo)} />
+          <Apariencia bloque={bloque} onActualizar={onActualizar} sinFondo={Boolean(def.sinFondo)} vivo={Boolean(def.vivo)} />
         </>
       )}
 
@@ -231,9 +241,57 @@ function CampoForm({
           </select>
         </label>
       );
+    case "imagen":
+      return <SelectorImagen etiqueta={campo.etiqueta} valor={texto(valor)} onCambio={(v, fusion) => onCambio(v, fusion)} onFin={onFin} />;
     case "lista":
       return <ListaEditor campo={campo} filas={lista(valor)} onCambio={onCambio} onFin={onFin} />;
   }
+}
+
+/** Una imagen: se sube un archivo (queda en el bucket «oficina», carpeta cms) o se pega una dirección. */
+function SelectorImagen({ etiqueta, valor, onCambio, onFin }: { etiqueta: string; valor: string; onCambio: (valor: string, fusion: boolean) => void; onFin: () => void }) {
+  const entrada = useRef<HTMLInputElement>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const vista = officePhotoUrl(valor);
+
+  async function subir(archivo: File | undefined) {
+    if (!archivo) return;
+    setSubiendo(true);
+    setError(null);
+    try {
+      onCambio(await uploadOfficePhoto("cms", archivo), false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir la imagen.");
+    } finally {
+      setSubiendo(false);
+      if (entrada.current) entrada.current.value = "";
+    }
+  }
+
+  return (
+    <div className="cms-campo cms-imagen">
+      <span>{etiqueta}</span>
+      {vista && <img className="cms-imagen__vista" src={vista} alt="" />}
+      <div className="cms-linea">
+        <input className="cms-input" value={valor} placeholder="Ruta, https://… o suba un archivo" onChange={(e) => onCambio(e.target.value, true)} onBlur={onFin} />
+        <button type="button" className="cms-btn" disabled={subiendo} onClick={() => entrada.current?.click()}>
+          {subiendo ? "Subiendo…" : "Subir"}
+        </button>
+        {valor && (
+          <button type="button" className="cms-btn" onClick={() => onCambio("", false)}>
+            Quitar
+          </button>
+        )}
+      </div>
+      <input ref={entrada} type="file" accept="image/jpeg,image/png,image/webp,image/avif" hidden onChange={(e) => void subir(e.target.files?.[0])} />
+      {error && (
+        <p className="cms-aviso" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function filaNueva(subcampos: Subcampo[]): Props {
@@ -321,6 +379,7 @@ function ListaEditor({
           </summary>
           <div className="cms-li__cuerpo">
             {subcampos.map((s) => {
+              if (s.cuando && !s.cuando.valores.includes(texto(fila[s.cuando.clave]))) return null;
               const valor = texto(fila[s.clave]);
               const set = (v: string, fusion: boolean) => {
                 const nuevas = filas.map((f, j) => (j === i ? { ...f, [s.clave]: v } : f));
@@ -339,6 +398,9 @@ function ListaEditor({
                     </select>
                   </label>
                 );
+              }
+              if (s.tipo === "imagen") {
+                return <SelectorImagen key={s.clave} etiqueta={s.etiqueta} valor={valor} onCambio={set} onFin={onFin} />;
               }
               if (s.tipo === "area") {
                 return (
@@ -368,10 +430,12 @@ function Apariencia({
   bloque,
   onActualizar,
   sinFondo,
+  vivo,
 }: {
   bloque: LineaBloque;
   onActualizar: InspectorProps["onActualizar"];
   sinFondo: boolean;
+  vivo: boolean;
 }) {
   const estilo = estiloDe(bloque.props);
   const oculto = ocultoDe(bloque.props);
@@ -408,6 +472,38 @@ function Apariencia({
             ))}
           </select>
         </label>
+      )}
+      {!vivo && (
+        <>
+          <label className="cms-campo">
+            <span>Alineación del texto</span>
+            <select
+              className="cms-input"
+              value={alinearDe(bloque.props)}
+              onChange={(e) => onActualizar(bloque.id, (b) => ({ ...b, props: fijarAlinear(b.props, e.target.value as Alineacion) }))}
+            >
+              {ALINEACIONES.map((a) => (
+                <option key={a} value={a}>
+                  {ETIQUETA_ALINEACION[a]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="cms-campo">
+            <span>Ancho de los párrafos</span>
+            <select
+              className="cms-input"
+              value={medidaDe(bloque.props)}
+              onChange={(e) => onActualizar(bloque.id, (b) => ({ ...b, props: fijarMedida(b.props, e.target.value as Medida) }))}
+            >
+              {MEDIDAS.map((m) => (
+                <option key={m} value={m}>
+                  {ETIQUETA_MEDIDA[m]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       )}
       <label className="cms-campo">
         <span>Ancho en la página</span>

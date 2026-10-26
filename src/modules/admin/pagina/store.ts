@@ -167,7 +167,7 @@ function safeName(name: string) {
  * sobrescriba la primera, y que el navegador siga enseñando la foto vieja
  * desde su caché.
  */
-export async function uploadOfficePhoto(folder: "galeria" | "equipo", file: File): Promise<string> {
+export async function uploadOfficePhoto(folder: "galeria" | "equipo" | "cms", file: File): Promise<string> {
   if (!ACCEPTED.includes(file.type)) {
     throw new FriendlyError(
       `«${file.name}» no es una imagen admitida. Sube un JPG, PNG, WebP o AVIF.`,

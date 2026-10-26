@@ -6,6 +6,8 @@
    reservadas del editor y viajan dentro de props, sin migraciones:
      _estilo  { fondo, espacio }        apariencia del bloque
      _mov     { preset, dur, ... }      entrada animada con GSAP
+     _alinear "izquierda" | "centro" | "derecha" | "justificado"
+     _medida  "estrecha" | "amplia" | "completa"   ancho de los párrafos
      _oculto  true                      no se muestra en la página publicada
    ========================================================================== */
 
@@ -57,6 +59,11 @@ export interface Estilo {
   fondo: Fondo;
   espacio: Espacio;
 }
+
+/** Alineación del texto de un bloque (clave reservada `_alinear`). */
+export type Alineacion = "izquierda" | "centro" | "derecha" | "justificado";
+/** Ancho que ocupan los párrafos dentro del bloque (clave reservada `_medida`). */
+export type Medida = "estrecha" | "amplia" | "completa";
 
 export type PresetMovimiento = "palabras" | "sube" | "cascada" | "zoom" | "ninguna";
 

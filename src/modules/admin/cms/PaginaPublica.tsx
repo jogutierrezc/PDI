@@ -15,6 +15,7 @@ import { supabase } from "../../../lib/supabase";
 import { PlanLayout } from "../../planeacion/PlanLayout";
 import { SostenibleLayout } from "../../sostenible/SostenibleLayout";
 import { RenderBloques, type BloqueRender } from "./render";
+import { useEstiloPortal } from "./store";
 import type { Ancho, Props } from "./tipos";
 import "./cms.css";
 
@@ -44,6 +45,8 @@ export function PaginaPublica() {
     queryFn: () => leerPublicada(portal, ruta),
     staleTime: 60_000,
   });
+  // El estilo del sitio; si no se puede leer, el aspecto de siempre.
+  const estilo = useEstiloPortal(portal).data?.estilo;
 
   if (consulta.isPending) return <Marco portal={portal} titulo=""><div className="cms-publico"><p>Cargando…</p></div></Marco>;
   if (consulta.isError) return <Marco portal={portal} titulo=""><div className="cms-publico"><p>No se pudo cargar la página.</p></div></Marco>;
@@ -63,7 +66,7 @@ export function PaginaPublica() {
   return (
     <Marco portal={portal} titulo={consulta.data.titulo}>
       <div className="cms-publico">
-        <RenderBloques bloques={bloques} navegable />
+        <RenderBloques bloques={bloques} navegable estilo={estilo} />
       </div>
     </Marco>
   );

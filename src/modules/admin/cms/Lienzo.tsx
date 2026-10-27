@@ -17,6 +17,7 @@ import { definicion } from "./bloques";
 import { BloqueVista, CeldaBloque, evitarNavegacion } from "./render";
 import { ocultoDe, type LineaBloque } from "./logica";
 import { TIPO_ARRASTRE_BLOQUE } from "./PanelIzquierdo";
+import { estiloDeMarco, familiasUsadas, useFuentes, type EstiloSitioParcial } from "./estilo";
 
 export type Accion = "subir" | "bajar" | "duplicar" | "ocultar" | "eliminar";
 export type Marca = { id: string | null; lado: "antes" | "despues" } | null;
@@ -34,10 +35,14 @@ interface LienzoProps {
   onMoverA: (id: string, destino: number) => void;
   /** Suelta un tipo de la biblioteca: lo inserta antes del índice dado. */
   onInsertar: (tipo: string, destino: number) => void;
+  /** Estilo del sitio del portal; sin él, el aspecto de siempre. */
+  estilo?: EstiloSitioParcial | null;
 }
 
-export function Lienzo({ bloques, seleccion, modo, disparo, onSeleccionar, onAccion, onMoverA, onInsertar }: LienzoProps) {
+export function Lienzo({ bloques, seleccion, modo, disparo, onSeleccionar, onAccion, onMoverA, onInsertar, estilo }: LienzoProps) {
   const editando = modo === "editar";
+  const aplicado = estiloDeMarco(estilo);
+  useFuentes(familiasUsadas(estilo, bloques));
   const [agarre, setAgarre] = useState<string | null>(null);
   const [arrastrando, setArrastrando] = useState<string | null>(null);
   const [marca, setMarca] = useState<Marca>(null);
@@ -79,7 +84,8 @@ export function Lienzo({ bloques, seleccion, modo, disparo, onSeleccionar, onAcc
 
   return (
     <div
-      className={`cms-marco${marca && marca.id === null ? " cms-marco--fin" : ""}`}
+      className={`cms-marco${marca && marca.id === null ? " cms-marco--fin" : ""}${aplicado.clase ? ` ${aplicado.clase}` : ""}`}
+      style={aplicado.style}
       onClickCapture={evitarNavegacion}
       onClick={(e) => {
         if (editando && !(e.target as Element).closest(".cms-celda")) onSeleccionar(null);

@@ -11,7 +11,7 @@
    aparece ya en su lugar.
    ========================================================================== */
 
-import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -28,9 +28,10 @@ import { AvancePlan } from "./vivos/AvancePlan";
 import { PilaresPlan } from "./vivos/PilaresPlan";
 import { EnvolturaPlaneacion, EquipoOficina, GaleriaOficina, MosaicoPortales, RecientesOficina } from "./vivos/OficinaPlaneacion";
 import { MicrositioVivo } from "./vivos/RankingSecciones";
-import { ALINEACIONES, ANCHOS, alinearDe, destinoSeguro, estiloDe, medidaDe, movimientoDe, ocultoDe, videoEmbed } from "./logica";
+import { ALINEACIONES, ALTO_HTML, ANCHOS, alinearDe, destinoSeguro, documentoHtml, estiloDe, leerCifra, medidaDe, movimientoDe, ocultoDe, videoDatos, videoMiniatura, videoUrl } from "./logica";
 import { officePhotoUrl } from "../../planeacion/page";
 import { definicion } from "./bloques";
+import { estiloDeBloque, estiloDeMarco, familiasUsadas, useFuentes, type EstiloSitioParcial } from "./estilo";
 import type { Ancho, Movimiento, Props } from "./tipos";
 // Estilos del tablero de indicadores (IndicatorBoard). Están acotados al contenedor .sos.
 import "../../sostenible/sostenible.css";
@@ -422,9 +423,13 @@ function Carrusel({ p, navegable }: { p: Props; navegable: boolean }) {
   const diapositivas = lista(p.items);
   const [actual, setActual] = useState(0);
   const [pausa, setPausa] = useState(false);
+  // Quien ve el carrusel puede detenerlo del todo (WCAG 2.2.2); la pausa por cursor o foco es aparte.
+  const [detenido, setDetenido] = useState(false);
+  const inicioX = useRef<number | null>(null);
   const total = diapositivas.length;
   const segundos = Math.min(20, Math.max(3, Number(p.segundos) || 6));
-  const auto = p.auto === true && total > 1 && !pausa && !reduced();
+  const pasaSolo = p.auto === true && total > 1 && !reduced();
+  const auto = pasaSolo && !pausa && !detenido;
   const indice = total === 0 ? 0 : Math.min(actual, total - 1);
 
   useEffect(() => {
@@ -434,6 +439,24 @@ function Carrusel({ p, navegable }: { p: Props; navegable: boolean }) {
   }, [auto, total, segundos, indice]);
 
   const ir = (i: number) => setActual(((i % total) + total) % total);
+  // Flechas del teclado en cualquier punto del carrusel; un gesto horizontal de más de 40 px en pantallas táctiles.
+  const alTeclado = (e: KeyboardEvent<HTMLElement>) => {
+    if (total < 2 || (e.target as HTMLElement).closest("input, textarea, select")) return;
+    if (e.key === "ArrowLeft") ir(indice - 1);
+    else if (e.key === "ArrowRight") ir(indice + 1);
+    else return;
+    e.preventDefault();
+  };
+  const alBajar = (e: PointerEvent) => {
+    inicioX.current = e.pointerType === "mouse" ? null : e.clientX;
+  };
+  const alSoltar = (e: PointerEvent) => {
+    const x0 = inicioX.current;
+    inicioX.current = null;
+    if (x0 === null || total < 2) return;
+    const dx = e.clientX - x0;
+    if (Math.abs(dx) > 40) ir(indice + (dx < 0 ? 1 : -1));
+  };
   const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
   return (
     <div className="cms-wrap">
@@ -445,13 +468,15 @@ function Carrusel({ p, navegable }: { p: Props; navegable: boolean }) {
           className="cms-carr"
           aria-roledescription="carrusel"
           aria-label={texto(p.titulo) || "Carrusel de imágenes"}
+          tabIndex={0}
+          onKeyDown={alTeclado}
           onPointerEnter={() => setPausa(true)}
           onPointerLeave={() => setPausa(false)}
           onFocus={() => setPausa(true)}
           onBlur={() => setPausa(false)}
         >
-          <div className="cms-carr__ventana">
-            <div className="cms-carr__pista" style={{ transform: `translateX(-${indice * 100}%)` }}>
+          <div className="cms-carr__ventana" onPointerDown={alBajar} onPointerUp={alSoltar} onPointerCancel={() => (inicioX.current = null)}>
+            <div className="cms-carr__pista" aria-live={auto ? "off" : "polite"} style={{ transform: `translateX(-${indice * 100}%)` }}>
               {diapositivas.map((d, i) => (
                 <div
                   className="cms-carr__lamina"
@@ -483,6 +508,18 @@ function Carrusel({ p, navegable }: { p: Props; navegable: boolean }) {
                 <Icon name="chevron-down" size={18} />
               </button>
               <div className="cms-carr__puntos">
+                {pasaSolo && (
+                  <button
+                    type="button"
+                    className="cms-carr__pausa"
+                    aria-label={detenido ? "Reanudar el paso automático" : "Detener el paso automático"}
+                    onClick={() => setDetenido((d) => !d)}
+                  >
+                    <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">
+                      {detenido ? <path d="M4 2.5v11l9-5.5-9-5.5Z" fill="currentColor" /> : <path d="M4 2h3v12H4zM9 2h3v12H9z" fill="currentColor" />}
+                    </svg>
+                  </button>
+                )}
                 {diapositivas.map((_, i) => (
                   <button key={i} type="button" aria-label={`Ir a la imagen ${i + 1}`} aria-current={i === indice || undefined} onClick={() => ir(i)} />
                 ))}
@@ -495,24 +532,49 @@ function Carrusel({ p, navegable }: { p: Props; navegable: boolean }) {
   );
 }
 
-/** Video incrustado de YouTube o Vimeo. Si el enlace no es de esos sitios, no se dibuja nada salvo un aviso al editar. */
-function Video({ url, titulo, proporcion }: { url: unknown; titulo: unknown; proporcion?: unknown }) {
-  const src = videoEmbed(url);
-  if (!src) {
+/**
+ * Video de YouTube o Vimeo con fachada: se ve su portada y un botón de play, y el
+ * reproductor (iframe de youtube-nocookie.com o player.vimeo.com) solo se carga al
+ * pulsar. Así la página no descarga el reproductor de nadie que no lo vea.
+ * Si el enlace no es de esos sitios, no se dibuja nada salvo un aviso al editar.
+ */
+function Video({ url, titulo, proporcion, inicio }: { url: unknown; titulo: unknown; proporcion?: unknown; inicio?: unknown }) {
+  const datos = videoDatos(url);
+  const clave = datos ? `${datos.proveedor}:${datos.id}` : "";
+  const [activo, setActivo] = useState(false);
+  const marco = useRef<HTMLIFrameElement>(null);
+  useEffect(() => setActivo(false), [clave]);
+  useEffect(() => {
+    if (activo) marco.current?.focus();
+  }, [activo]);
+  const ratio = proporcionDe(proporcion) ?? "16 / 9";
+  if (!datos) {
     return (
-      <div className="cms-img cms-img--vacia" style={{ aspectRatio: proporcionDe(proporcion) ?? "16 / 9" }}>
+      <div className="cms-img cms-img--vacia" style={{ aspectRatio: ratio }}>
         {texto(url) ? "El enlace no es de YouTube ni de Vimeo" : "Sin video"}
       </div>
     );
   }
+  const nombre = texto(titulo) || "Video";
+  if (!activo) {
+    const miniatura = videoMiniatura(datos);
+    return (
+      <div className="cms-video" style={{ aspectRatio: ratio }}>
+        {miniatura && <img className="cms-video__portada" src={miniatura} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />}
+        <button type="button" className="cms-video__play" aria-label={`Reproducir video: ${nombre}`} onClick={() => setActivo(true)}>
+          <Icon name="play" size={30} />
+        </button>
+      </div>
+    );
+  }
   return (
-    <div className="cms-video" style={{ aspectRatio: proporcionDe(proporcion) ?? "16 / 9" }}>
+    <div className="cms-video" style={{ aspectRatio: ratio }}>
       <iframe
-        src={src}
-        title={texto(titulo) || "Video"}
-        loading="lazy"
+        ref={marco}
+        src={videoUrl(datos, { inicio: Number(inicio), autoplay: true })}
+        title={nombre}
         referrerPolicy="strict-origin-when-cross-origin"
-        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         allowFullScreen
       />
     </div>
@@ -522,7 +584,7 @@ function Video({ url, titulo, proporcion }: { url: unknown; titulo: unknown; pro
 function BloqueVideo({ p }: { p: Props }) {
   return (
     <figure className="cms-wrap cms-figura" data-in>
-      <Video url={p.url} titulo={p.titulo} proporcion={p.proporcion} />
+      <Video url={p.url} titulo={p.titulo} proporcion={p.proporcion} inicio={p.inicio} />
       {texto(p.pie) && <figcaption>{texto(p.pie)}</figcaption>}
     </figure>
   );
@@ -630,6 +692,247 @@ function Columnas({ p, navegable }: { p: Props; navegable: boolean }) {
   );
 }
 
+/* --- Diseño y columnas: cuadrícula, cifras, imagen con texto y cita ---------------------------- */
+
+/** El valor del texto si está entre las opciones; si no, la primera. */
+const opcionDe = <T extends string>(v: unknown, opciones: readonly T[]): T => opciones.find((o) => o === v) ?? opciones[0];
+
+/**
+ * Cuadrícula de tarjetas. El contenedor propio (.cms-cq) hace que se reacomode
+ * por el ancho del bloque y no por el de la página: una cuadrícula en un tercio
+ * de la fila colapsa antes que una de ancho completo.
+ */
+function Cuadricula({ p, navegable }: { p: Props; navegable: boolean }) {
+  const cantidad = opcionDe(texto(p.cantidad), ["3", "1", "2", "4", "6"] as const);
+  const separacion = opcionDe(texto(p.separacion), ["media", "chica", "grande"] as const);
+  const vertical = opcionDe(texto(p.vertical), ["inicio", "centro", "fin", "estirar"] as const);
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  const celdas = lista(p.items);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {celdas.length === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">La cuadrícula no tiene celdas todavía.</p>
+      ) : (
+        <div className="cms-cq">
+          <div className={`cms-grid cms-grid--n${cantidad} cms-grid--g-${separacion} cms-grid--v-${vertical}${p.tarjeta === false ? "" : " cms-grid--tarjeta"}`}>
+            {celdas.map((it, i) => {
+              const icono = ICONOS_FRENTES[texto(it.icono)];
+              return (
+                <article className="cms-gcel" data-in key={i}>
+                  {texto(it.imagen) ? (
+                    <Imagen src={it.imagen} alt={it.alt} proporcion="16/9" />
+                  ) : (
+                    icono && (
+                      <div className="cms-eje__icono">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d={icono} />
+                        </svg>
+                      </div>
+                    )
+                  )}
+                  {texto(it.titulo) && <h3 className="cms-gcel__titulo">{texto(it.titulo)}</h3>}
+                  {texto(it.texto) && <div className="cms-gcel__texto">{parrafos(texto(it.texto))}</div>}
+                  {texto(it.boton) && <Boton clase="cms-boton cms-boton--solido cms-gcel__boton" etiqueta={texto(it.boton)} destino={it.destino} navegable={navegable} />}
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Una cifra. Con `animar` (solo en la página pública) cuenta desde cero cuando
+ * llega a la pantalla; sin eso, con movimiento reducido o si el valor no es un
+ * número, se ve el valor escrito. Al terminar siempre queda el texto exacto.
+ */
+function Contador({ valor, animar }: { valor: string; animar: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const cifra = leerCifra(valor);
+    if (!animar || !el || !cifra || reduced() || typeof IntersectionObserver === "undefined") return;
+    const formato = new Intl.NumberFormat("es-CO", { minimumFractionDigits: cifra.decimales, maximumFractionDigits: cifra.decimales });
+    let giro: gsap.core.Tween | null = null;
+    el.textContent = formato.format(0);
+    const mira = new IntersectionObserver(
+      ([e]) => {
+        if (!e?.isIntersecting) return;
+        mira.disconnect();
+        const o = { v: 0 };
+        giro = gsap.to(o, {
+          v: cifra.n,
+          duration: 1.6,
+          ease: "power2.out",
+          onUpdate: () => {
+            el.textContent = formato.format(o.v);
+          },
+          onComplete: () => {
+            el.textContent = valor;
+          },
+        });
+      },
+      { threshold: 0.4 },
+    );
+    mira.observe(el);
+    return () => {
+      mira.disconnect();
+      giro?.kill();
+      el.textContent = valor;
+    };
+  }, [valor, animar]);
+  return <span ref={ref}>{valor}</span>;
+}
+
+/** Cifras grandes con su etiqueta, en 2, 3 o 4 columnas que colapsan por el ancho del bloque. */
+function Cifras({ p, navegable }: { p: Props; navegable: boolean }) {
+  const columnas = opcionDe(texto(p.columnas), ["3", "2", "4"] as const);
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  const filas = lista(p.items);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {filas.length === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">Todavía no hay cifras.</p>
+      ) : (
+        <div className="cms-cq">
+          <ul className={`cms-cifras cms-cifras--n${columnas}`}>
+            {filas.map((it, i) => (
+              <li className="cms-cifra" data-in key={i}>
+                <b className="cms-cifra__valor">
+                  {texto(it.prefijo) && <span className="cms-cifra__afijo">{texto(it.prefijo)}</span>}
+                  <Contador valor={texto(it.valor)} animar={navegable && p.conteo === true} />
+                  {texto(it.sufijo) && <span className="cms-cifra__afijo">{texto(it.sufijo)}</span>}
+                </b>
+                {texto(it.etiqueta) && <span className="cms-cifra__etiqueta">{texto(it.etiqueta)}</span>}
+                {texto(it.nota) && <small className="cms-cifra__nota">{texto(it.nota)}</small>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {p.ilustrativo === true && (
+        <p className="cms-nota">
+          <i aria-hidden="true" />
+          Dato ilustrativo: cifras de muestra.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Imagen junto a texto: a un lado u otro, con hasta dos botones. En un bloque angosto se apilan, con la imagen primero. */
+function ImagenTexto({ p, navegable }: { p: Props; navegable: boolean }) {
+  const lado = opcionDe(texto(p.lado), ["izquierda", "derecha"] as const);
+  const vertical = opcionDe(texto(p.vertical), ["centro", "inicio", "fin"] as const);
+  return (
+    <div className="cms-wrap">
+      <div className="cms-cq">
+        <div className={`cms-it cms-it--${lado} cms-it--v-${vertical}`}>
+          <div className="cms-it__arte" data-in>
+            <Imagen src={p.imagen} alt={p.alt} proporcion={p.proporcion} />
+          </div>
+          <div className="cms-it__cuerpo">
+            {texto(p.antetitulo) && <p className="cms-eyebrow" data-in>{texto(p.antetitulo)}</p>}
+            {texto(p.titulo) && <h2 className="cms-h2" data-in>{texto(p.titulo)}</h2>}
+            {texto(p.texto) && <div className="cms-it__texto" data-in>{parrafos(texto(p.texto))}</div>}
+            {(texto(p.boton1) || texto(p.boton2)) && (
+              <div className="cms-cta" data-in>
+                {texto(p.boton1) && <Boton clase="cms-boton cms-boton--solido" etiqueta={texto(p.boton1)} destino={p.destino1} navegable={navegable} />}
+                {texto(p.boton2) && <Boton clase="cms-boton cms-boton--contorno" etiqueta={texto(p.boton2)} destino={p.destino2} navegable={navegable} />}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Cita destacada: la frase, y debajo su autor con cargo y foto opcional. */
+function CitaDestacada({ p }: { p: Props }) {
+  const foto = texto(p.imagen);
+  const autor = texto(p.autor);
+  const cargo = texto(p.cargo);
+  return (
+    <figure className="cms-wrap cms-citad" data-in>
+      <blockquote className="cms-citad__texto">
+        <p>{texto(p.texto)}</p>
+      </blockquote>
+      {(autor || cargo || foto) && (
+        <figcaption className="cms-citad__autor">
+          {foto && (
+            <span className="cms-citad__foto">
+              <Imagen src={foto} alt={p.alt} proporcion="1/1" />
+            </span>
+          )}
+          <span>
+            {autor && <b>{autor}</b>}
+            {cargo && <span>{cargo}</span>}
+          </span>
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+/* --- HTML personalizado: aislado en un marco, nunca dentro de la página ------------------------ */
+
+/**
+ * El código va en un iframe con sandbox «allow-scripts allow-popups allow-forms»
+ * y SIN allow-same-origin: el marco tiene origen opaco, así que no alcanza las
+ * cookies, el localStorage ni la sesión de Supabase de la intranet, ni el DOM de
+ * esta página. El script inyectado avisa la altura por postMessage; el mensaje se
+ * acepta solo si viene de la ventana de este marco, con origen «null» (el opaco)
+ * y con la marca de esta instancia.
+ */
+function BloqueHtml({ p, navegable }: { p: Props; navegable: boolean }) {
+  const marco = useRef<HTMLIFrameElement>(null);
+  const token = useId().replace(/\W/g, "");
+  const minimo = Math.min(ALTO_HTML.max, Math.max(ALTO_HTML.min, Number(p.alto) || ALTO_HTML.defecto));
+  const ajustar = p.ajustar !== false;
+  const [alto, setAlto] = useState(0);
+  const html = texto(p.html);
+  const css = texto(p.css);
+  const js = texto(p.js);
+  const documento = useMemo(() => documentoHtml({ html, css, js, token, ajustar }), [html, css, js, token, ajustar]);
+
+  useEffect(() => {
+    if (!ajustar) return;
+    const recibir = (e: MessageEvent) => {
+      if (e.source !== marco.current?.contentWindow || e.origin !== "null") return;
+      const d: unknown = e.data;
+      if (typeof d !== "object" || d === null) return;
+      const { cmsHtml, alto: medida } = d as { cmsHtml?: unknown; alto?: unknown };
+      if (cmsHtml !== token || typeof medida !== "number" || !Number.isFinite(medida)) return;
+      setAlto(Math.min(ALTO_HTML.tope, Math.max(0, Math.ceil(medida))));
+    };
+    window.addEventListener("message", recibir);
+    return () => window.removeEventListener("message", recibir);
+  }, [ajustar, token]);
+
+  if (!html.trim() && !css.trim() && !js.trim()) {
+    return <p className="cms-ayuda cms-r-vacio">El bloque HTML no tiene código todavía.</p>;
+  }
+  return (
+    <div className="cms-wrap">
+      <iframe
+        ref={marco}
+        className={`cms-htmlframe${navegable ? "" : " cms-htmlframe--inerte"}`}
+        title={texto(p.titulo) || "Contenido incrustado"}
+        sandbox="allow-scripts allow-popups allow-forms"
+        referrerPolicy="no-referrer"
+        loading="lazy"
+        srcDoc={documento}
+        style={{ height: ajustar ? Math.max(minimo, alto) : minimo }}
+      />
+    </div>
+  );
+}
+
 /* --- Bloques vivos: componentes reales del portal, sin copiar su contenido --------------------- */
 
 /** Tablero de indicadores de UDES Sostenible. Solo su encabezado es texto editable. */
@@ -725,6 +1028,16 @@ function Contenido({ bloque, navegable }: { bloque: BloqueRender; navegable: boo
       return <Columnas p={p} navegable={navegable} />;
     case "video":
       return <BloqueVideo p={p} />;
+    case "cuadricula":
+      return <Cuadricula p={p} navegable={navegable} />;
+    case "cifras":
+      return <Cifras p={p} navegable={navegable} />;
+    case "imagen-texto":
+      return <ImagenTexto p={p} navegable={navegable} />;
+    case "cita":
+      return <CitaDestacada p={p} />;
+    case "html":
+      return <BloqueHtml p={p} navegable={navegable} />;
     case "acordeon":
       return <Desplegables p={p} claveTitulo="titulo" claveTexto="texto" faq={false} navegable={navegable} />;
     case "preguntas":
@@ -806,8 +1119,10 @@ export function BloqueVista({
  */
 export function CeldaBloque({ bloque, className = "", children, ...resto }: { bloque: BloqueRender; children?: ReactNode } & HTMLAttributes<HTMLDivElement>) {
   const ancho = ANCHOS.includes(bloque.ancho) ? bloque.ancho : 12;
+  // El estilo propio del bloque (clave `_diseno`): variables y clases que cms.css lee.
+  const diseno = estiloDeBloque(bloque.props);
   return (
-    <div className={`cms-celda ${clasesEstilo(bloque)} ${className}`.trim()} style={{ gridColumn: `span ${ancho}` }} {...resto}>
+    <div className={`cms-celda ${clasesEstilo(bloque)} ${diseno.clase} ${className}`.replace(/\s+/g, " ").trim()} style={{ gridColumn: `span ${ancho}`, ...diseno.style }} {...resto}>
       {children}
     </div>
   );
@@ -832,17 +1147,22 @@ export function RenderBloques({
   disparo,
   auto = true,
   navegable = false,
+  estilo,
 }: {
   bloques: BloqueRender[];
   incluirOcultos?: boolean;
   disparo?: string;
   auto?: boolean;
   navegable?: boolean;
+  /** Estilo del sitio del portal; sin él, el aspecto de siempre. */
+  estilo?: EstiloSitioParcial | null;
 }) {
   const visibles = incluirOcultos ? bloques : bloques.filter((b) => !ocultoDe(b.props));
+  const marco = estiloDeMarco(estilo);
+  useFuentes(familiasUsadas(estilo, visibles));
   if (visibles.length === 0) return <p className="cms-r-vacio">Esta página todavía no tiene contenido.</p>;
   return (
-    <div className="cms-marco" onClickCapture={navegable ? undefined : evitarNavegacion}>
+    <div className={`cms-marco ${marco.clase}`.trim()} style={marco.style} onClickCapture={navegable ? undefined : evitarNavegacion}>
       <div className="cms-r-grid">
         {visibles.map((b, i) => (
           <CeldaBloque key={i} bloque={b}>

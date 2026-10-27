@@ -9,6 +9,7 @@
 
 import { useState, type DragEvent, type ReactNode } from "react";
 import { Icon, type IconName } from "../../../components/ui/Icon";
+import { useAuth } from "../../../lib/auth";
 import { BLOQUES, GRUPOS, definicion } from "./bloques";
 import { resumenDeBloque } from "./esquema";
 import { IconoCms } from "./iconos";
@@ -32,6 +33,12 @@ const ICONO_BLOQUE: Record<string, IconName> = {
   cierre: "rows",
   texto: "pen",
   cta: "link",
+  cuadricula: "grid",
+  cifras: "spark-chart",
+  "imagen-texto": "columns-view",
+  cita: "pen",
+  html: "code",
+  video: "play",
   indicadores: "chart",
   "avance-plan": "spark-chart",
   "pilares-plan": "columns-view",
@@ -86,6 +93,8 @@ export function PanelIzquierdo({ paginas, editor }: PanelIzquierdoProps) {
 }
 
 function Biblioteca({ editor }: { editor: EditorPanel }) {
+  // Los bloques reservados a la administración (HTML) no se ofrecen a quien no lo es.
+  const esAdmin = useAuth().hasRole("admin");
   const empezar = (e: DragEvent, tipo: string) => {
     e.dataTransfer.setData(TIPO_ARRASTRE_BLOQUE, tipo);
     e.dataTransfer.setData("text/plain", tipo);
@@ -99,7 +108,7 @@ function Biblioteca({ editor }: { editor: EditorPanel }) {
           : "En la vista previa no se agregan bloques. Vuelva a Editar."}
       </p>
       {GRUPOS.map((grupo) => {
-        const items = BLOQUES.filter((b) => b.grupo === grupo);
+        const items = BLOQUES.filter((b) => b.grupo === grupo && (!b.soloAdmin || esAdmin));
         if (items.length === 0) return null;
         return (
           <section key={grupo} aria-label={grupo}>

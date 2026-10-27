@@ -37,6 +37,7 @@ const TIPO_POR_CAMPO: Record<CampoBloque["tipo"], TipoAtributo> = {
   enum: "enumeration",
   numero: "integer",
   lista: "component",
+  codigo: "text",
 };
 
 function atributoDe(campo: CampoBloque | Subcampo, requerido = false): AtributoEsquema {

@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { leerPublicada, Marco } from "./PaginaPublica";
 import { RenderBloques, type BloqueRender } from "./render";
+import { useEstiloPortal } from "./store";
 import "./cms.css";
 
 const PORTAL = "sostenible";
@@ -26,6 +27,7 @@ export function SostenibleCms({ children }: { children: ReactNode }) {
     staleTime: 60_000,
     retry: false,
   });
+  const estilo = useEstiloPortal(PORTAL).data?.estilo;
 
   if (consulta.isPending) {
     return (
@@ -43,7 +45,7 @@ export function SostenibleCms({ children }: { children: ReactNode }) {
   return (
     <Marco portal={PORTAL} titulo={consulta.data.titulo}>
       <div className="cms-publico">
-        <RenderBloques bloques={bloques} navegable />
+        <RenderBloques bloques={bloques} navegable estilo={estilo} />
       </div>
     </Marco>
   );

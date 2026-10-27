@@ -20,10 +20,10 @@ import { contextFacts, leapDimensions } from "../../landing/content";
 import { DEFAULT_PAGE } from "../../planeacion/page";
 import type { Fondo, PresetMovimiento, Props } from "./tipos";
 
-export type GrupoBloque = "Portada y estructura" | "Contenido básico" | "Landing" | "Planeación" | "UDES Sostenible" | "Micrositios de ranking" | "Datos en vivo";
+export type GrupoBloque = "Portada y estructura" | "Contenido básico" | "Diseño y columnas" | "Multimedia" | "Interactivo" | "Landing" | "Planeación" | "UDES Sostenible" | "Micrositios de ranking" | "Datos en vivo";
 
 /** Los grupos del selector «Agregar bloque». Cada uno reúne tipos del mismo uso. */
-export const GRUPOS: readonly GrupoBloque[] = ["Portada y estructura", "Contenido básico", "Landing", "Planeación", "UDES Sostenible", "Micrositios de ranking", "Datos en vivo"];
+export const GRUPOS: readonly GrupoBloque[] = ["Portada y estructura", "Contenido básico", "Diseño y columnas", "Multimedia", "Interactivo", "Landing", "Planeación", "UDES Sostenible", "Micrositios de ranking", "Datos en vivo"];
 
 export interface Opcion {
   valor: string;
@@ -40,7 +40,8 @@ export interface Subcampo {
   cuando?: { clave: string; valores: string[] };
 }
 
-export type TipoCampo = "texto" | "area" | "imagen" | "bool" | "enum" | "numero" | "lista";
+/** «codigo»: texto en letra monoespaciada y sin corrección ortográfica (HTML, CSS o JS). */
+export type TipoCampo = "texto" | "area" | "imagen" | "bool" | "enum" | "numero" | "lista" | "codigo";
 
 export interface CampoBloque {
   clave: string;
@@ -54,6 +55,8 @@ export interface CampoBloque {
   max?: number;
   /** Solo para «lista»: cada elemento tiene estos campos. */
   subcampos?: Subcampo[];
+  /** Solo para «codigo»: el lenguaje que se espera, para el rótulo y la ayuda. */
+  lenguaje?: "html" | "css" | "js";
 }
 
 export interface DefinicionBloque {
@@ -66,6 +69,8 @@ export interface DefinicionBloque {
   sinFondo?: boolean;
   /** Componente vivo: el inspector explica que sus datos salen de la base. */
   vivo?: true;
+  /** Solo la administración lo agrega o lo edita (la base lo hace cumplir: migración 0200). */
+  soloAdmin?: true;
   campos: CampoBloque[];
   /** Contenido de partida y, si hace falta, claves reservadas de estilo. */
   valores: () => Props;
@@ -82,6 +87,8 @@ const OPCIONES_ICONO: Opcion[] = [
   { valor: "gente", etiqueta: "Personas y comunidad" },
   { valor: "escudo", etiqueta: "Escudo y gobernanza" },
 ];
+
+const OPCIONES_ICONO_CELDA: Opcion[] = [{ valor: "ninguno", etiqueta: "Sin icono" }, ...OPCIONES_ICONO];
 
 const OPCIONES_ACENTO: Opcion[] = [1, 2, 3, 4, 5, 6].map((n) => ({ valor: String(n), etiqueta: `Color del pilar ${n}` }));
 
@@ -430,8 +437,8 @@ export const BLOQUES: DefinicionBloque[] = [
   {
     tipo: "carrusel",
     nombre: "Carrusel",
-    ayuda: "Imágenes que pasan una a una, con título, texto y enlace opcionales",
-    grupo: "Contenido básico",
+    ayuda: "Imágenes que pasan una a una, con flechas, puntos, teclado y deslizamiento. Pasar solo es opcional y se detiene con el cursor o el foco",
+    grupo: "Multimedia",
     movimiento: "sube",
     campos: [
       ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
@@ -468,7 +475,7 @@ export const BLOQUES: DefinicionBloque[] = [
     tipo: "columnas",
     nombre: "Columnas",
     ayuda: "Una, dos o tres columnas; cada una lleva los títulos, textos, imágenes, citas y botones que se quiera",
-    grupo: "Contenido básico",
+    grupo: "Diseño y columnas",
     movimiento: "cascada",
     campos: [
       ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
@@ -545,13 +552,14 @@ export const BLOQUES: DefinicionBloque[] = [
   {
     tipo: "video",
     nombre: "Video",
-    ayuda: "Un video de YouTube o Vimeo incrustado: se pega el enlace tal como sale en el navegador",
-    grupo: "Contenido básico",
+    ayuda: "Un video de YouTube o Vimeo. Se ve su portada y el video solo se carga al pulsar play, para que la página abra rápido",
+    grupo: "Multimedia",
     movimiento: "sube",
     campos: [
-      { clave: "url", etiqueta: "Enlace del video (YouTube o Vimeo)", tipo: "texto", requerido: true },
+      { clave: "url", etiqueta: "Enlace o código del video (YouTube o Vimeo)", tipo: "texto", requerido: true },
       { clave: "titulo", etiqueta: "Título del video (para lectores de pantalla)", tipo: "texto" },
       { clave: "pie", etiqueta: "Pie del video", tipo: "texto" },
+      { clave: "inicio", etiqueta: "Empezar en el segundo (0: desde el principio)", tipo: "numero", min: 0, max: 86400 },
       {
         clave: "proporcion",
         etiqueta: "Proporción",
@@ -563,13 +571,13 @@ export const BLOQUES: DefinicionBloque[] = [
         ],
       },
     ],
-    valores: () => ({ url: "", titulo: "", pie: "", proporcion: "16/9" }),
+    valores: () => ({ url: "", titulo: "", pie: "", inicio: 0, proporcion: "16/9" }),
   },
   {
     tipo: "acordeon",
     nombre: "Acordeón",
     ayuda: "Secciones que se abren y se cierran; cada una con su título y su texto",
-    grupo: "Contenido básico",
+    grupo: "Interactivo",
     movimiento: "cascada",
     campos: [
       ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
@@ -601,7 +609,7 @@ export const BLOQUES: DefinicionBloque[] = [
     tipo: "preguntas",
     nombre: "Preguntas frecuentes",
     ayuda: "Preguntas y respuestas desplegables. Los buscadores las reconocen como preguntas frecuentes",
-    grupo: "Contenido básico",
+    grupo: "Interactivo",
     movimiento: "cascada",
     campos: [
       ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
@@ -644,6 +652,211 @@ export const BLOQUES: DefinicionBloque[] = [
       destino: "",
       _estilo: { fondo: "marino" satisfies Fondo, espacio: "normal" },
     }),
+  },
+  {
+    tipo: "cuadricula",
+    nombre: "Cuadrícula de tarjetas",
+    ayuda: "De 1 a 6 celdas por fila; cada una con icono o imagen, título, texto y botón. Se reacomoda sola en pantallas angostas",
+    grupo: "Diseño y columnas",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      {
+        clave: "cantidad",
+        etiqueta: "Celdas por fila",
+        tipo: "enum",
+        opciones: [1, 2, 3, 4, 6].map((n) => ({ valor: String(n), etiqueta: n === 1 ? "Una" : String(n) })),
+      },
+      {
+        clave: "separacion",
+        etiqueta: "Separación entre celdas",
+        tipo: "enum",
+        opciones: [
+          { valor: "chica", etiqueta: "Chica" },
+          { valor: "media", etiqueta: "Media" },
+          { valor: "grande", etiqueta: "Grande" },
+        ],
+      },
+      {
+        clave: "vertical",
+        etiqueta: "Alineación vertical de las celdas",
+        tipo: "enum",
+        opciones: [
+          { valor: "inicio", etiqueta: "Arriba" },
+          { valor: "centro", etiqueta: "Al centro" },
+          { valor: "fin", etiqueta: "Abajo" },
+          { valor: "estirar", etiqueta: "Misma altura" },
+        ],
+      },
+      { clave: "tarjeta", etiqueta: "Dibujar cada celda como tarjeta con borde", tipo: "bool" },
+      {
+        clave: "items",
+        etiqueta: "Celdas",
+        tipo: "lista",
+        subcampos: [
+          { clave: "titulo", etiqueta: "Título", tipo: "texto" },
+          { clave: "texto", etiqueta: "Texto", tipo: "area" },
+          { clave: "icono", etiqueta: "Icono (si no hay imagen)", tipo: "enum", opciones: OPCIONES_ICONO_CELDA },
+          CAMPO_IMAGEN("imagen", "Imagen"),
+          { clave: "alt", etiqueta: "Descripción de la imagen para lectores de pantalla", tipo: "texto" },
+          { clave: "boton", etiqueta: "Texto del botón (vacío: sin botón)", tipo: "texto" },
+          campoDestino("destino", "Destino del botón (/ruta o https://…)"),
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      cantidad: "3",
+      separacion: "media",
+      vertical: "inicio",
+      tarjeta: true,
+      items: [
+        { titulo: "Primera celda", texto: "Escriba aquí lo que quiera contar en esta celda.", icono: "hoja", imagen: "", alt: "", boton: "", destino: "" },
+        { titulo: "Segunda celda", texto: "Escriba aquí lo que quiera contar en esta celda.", icono: "libro", imagen: "", alt: "", boton: "", destino: "" },
+        { titulo: "Tercera celda", texto: "Escriba aquí lo que quiera contar en esta celda.", icono: "gente", imagen: "", alt: "", boton: "", destino: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "cifras",
+    nombre: "Cifras",
+    ayuda: "Números grandes con su etiqueta, en 2, 3 o 4 columnas. Pueden contar desde cero al llegar a la pantalla",
+    grupo: "Diseño y columnas",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      {
+        clave: "columnas",
+        etiqueta: "Columnas",
+        tipo: "enum",
+        opciones: [
+          { valor: "2", etiqueta: "Dos columnas" },
+          { valor: "3", etiqueta: "Tres columnas" },
+          { valor: "4", etiqueta: "Cuatro columnas" },
+        ],
+      },
+      { clave: "conteo", etiqueta: "Contar desde cero al aparecer (se omite con movimiento reducido)", tipo: "bool" },
+      { clave: "ilustrativo", etiqueta: "Mostrar la nota «Dato ilustrativo»", tipo: "bool" },
+      {
+        clave: "items",
+        etiqueta: "Cifras",
+        tipo: "lista",
+        subcampos: [
+          { clave: "valor", etiqueta: "Valor (solo número: 1.250 o 3,5)", tipo: "texto" },
+          { clave: "prefijo", etiqueta: "Antes del valor (p. ej. $ o +)", tipo: "texto" },
+          { clave: "sufijo", etiqueta: "Después del valor (p. ej. % o mil)", tipo: "texto" },
+          { clave: "etiqueta", etiqueta: "Qué mide", tipo: "texto" },
+          { clave: "nota", etiqueta: "Nota o fuente (opcional)", tipo: "texto" },
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      columnas: "3",
+      conteo: true,
+      ilustrativo: true,
+      items: [
+        { valor: "1.250", prefijo: "", sufijo: "", etiqueta: "Primera cifra: escriba qué mide", nota: "" },
+        { valor: "85", prefijo: "", sufijo: "%", etiqueta: "Segunda cifra: escriba qué mide", nota: "" },
+        { valor: "12", prefijo: "", sufijo: "", etiqueta: "Tercera cifra: escriba qué mide", nota: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "imagen-texto",
+    nombre: "Imagen con texto",
+    ayuda: "Una imagen junto a un texto con antetítulo, título y hasta dos botones. En pantallas angostas se apilan",
+    grupo: "Diseño y columnas",
+    movimiento: "cascada",
+    campos: [
+      CAMPO_IMAGEN("imagen", "Imagen"),
+      { clave: "alt", etiqueta: "Descripción para lectores de pantalla (vacía si es decorativa)", tipo: "texto" },
+      {
+        clave: "lado",
+        etiqueta: "Lado de la imagen",
+        tipo: "enum",
+        opciones: [
+          { valor: "izquierda", etiqueta: "Izquierda" },
+          { valor: "derecha", etiqueta: "Derecha" },
+        ],
+      },
+      {
+        clave: "proporcion",
+        etiqueta: "Proporción de la imagen",
+        tipo: "enum",
+        opciones: [
+          { valor: "4/3", etiqueta: "Clásica 4:3" },
+          { valor: "16/9", etiqueta: "Panorámica 16:9" },
+          { valor: "1/1", etiqueta: "Cuadrada" },
+          { valor: "3/4", etiqueta: "Vertical 3:4" },
+        ],
+      },
+      {
+        clave: "vertical",
+        etiqueta: "Alineación vertical del texto",
+        tipo: "enum",
+        opciones: [
+          { valor: "inicio", etiqueta: "Arriba" },
+          { valor: "centro", etiqueta: "Al centro" },
+          { valor: "fin", etiqueta: "Abajo" },
+        ],
+      },
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      { clave: "boton1", etiqueta: "Botón principal", tipo: "texto" },
+      campoDestino("destino1", "Destino del botón principal (/ruta o https://…)"),
+      { clave: "boton2", etiqueta: "Botón secundario", tipo: "texto" },
+      campoDestino("destino2", "Destino del botón secundario (/ruta o https://…)"),
+    ],
+    valores: () => ({
+      imagen: "",
+      alt: "",
+      lado: "izquierda",
+      proporcion: "4/3",
+      vertical: "centro",
+      antetitulo: "",
+      titulo: "Título de la sección",
+      texto: "Escriba aquí el texto que acompaña a la imagen. Una línea en blanco abre un párrafo nuevo.",
+      boton1: "",
+      destino1: "",
+      boton2: "",
+      destino2: "",
+    }),
+  },
+  {
+    tipo: "cita",
+    nombre: "Cita destacada",
+    ayuda: "Una frase grande con su autor, su cargo y, si se quiere, su foto",
+    grupo: "Contenido básico",
+    movimiento: "sube",
+    campos: [
+      { clave: "texto", etiqueta: "Cita", tipo: "area", requerido: true },
+      { clave: "autor", etiqueta: "Autor", tipo: "texto" },
+      { clave: "cargo", etiqueta: "Cargo o dependencia", tipo: "texto" },
+      CAMPO_IMAGEN("imagen", "Foto (opcional)"),
+      { clave: "alt", etiqueta: "Descripción de la foto para lectores de pantalla (vacía si basta con el nombre)", tipo: "texto" },
+    ],
+    valores: () => ({ texto: "Escriba aquí la frase que quiere destacar.", autor: "Nombre de la persona", cargo: "Cargo o dependencia", imagen: "", alt: "" }),
+  },
+  {
+    tipo: "html",
+    nombre: "HTML personalizado",
+    ayuda: "HTML, CSS y JavaScript propios, aislados en un marco. Solo la administración lo agrega y lo edita",
+    grupo: "Interactivo",
+    movimiento: "sube",
+    soloAdmin: true,
+    campos: [
+      { clave: "titulo", etiqueta: "Título del marco (lo lee el lector de pantalla)", tipo: "texto", requerido: true },
+      { clave: "html", etiqueta: "HTML", tipo: "codigo", lenguaje: "html" },
+      { clave: "css", etiqueta: "CSS", tipo: "codigo", lenguaje: "css" },
+      { clave: "js", etiqueta: "JavaScript", tipo: "codigo", lenguaje: "js" },
+      { clave: "alto", etiqueta: "Altura mínima (píxeles)", tipo: "numero", min: 80, max: 2000 },
+      { clave: "ajustar", etiqueta: "Ajustar la altura al contenido", tipo: "bool" },
+    ],
+    valores: () => ({ titulo: "Contenido incrustado", html: "", css: "", js: "", alto: 320, ajustar: true }),
   },
   /* --- Vivos: datos reales o interactivos del portal ----------------------------------- */
   {

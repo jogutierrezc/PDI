@@ -5,6 +5,17 @@
    las define el registro de bloques.ts. Las claves que empiezan por «_» son
    reservadas del editor y viajan dentro de props, sin migraciones:
      _estilo  { fondo, espacio }        apariencia del bloque
+     _diseno  { fh, fb, sh, sb, wt, lh, ls, color, bg, pad, maxw, rad }
+                                        estilo propio del bloque frente al del sitio
+                                        (ver estilo.ts; cada clave es opcional):
+                fh/fb  fuente del título y del texto (lista curada)
+                sh/sb  tamaño del título y del texto en px, { d, t, m } por dispositivo
+                       (escritorio, tableta, teléfono); el que falta se escala desde d
+                wt     peso del título (400 a 800)      lh  interlineado
+                ls     espacio entre letras del título, em
+                color  color del texto, #rrggbb         bg  fondo, #rrggbb
+                pad    espacio vertical, px             rad radio de tarjetas, px
+                maxw   «estrecho» | «medio» | «amplio» | «completo»  ancho del contenido
      _mov     { preset, dur, ... }      entrada animada con GSAP
      _alinear "izquierda" | "centro" | "derecha" | "justificado"
      _medida  "estrecha" | "amplia" | "completa"   ancho de los párrafos

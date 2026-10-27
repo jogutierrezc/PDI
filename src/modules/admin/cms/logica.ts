@@ -209,17 +209,25 @@ export function planSincronizacion(existentes: BloqueExistente[], lista: LineaBl
   };
 }
 
+export interface VideoDatos {
+  proveedor: "youtube" | "vimeo";
+  id: string;
+}
+
 /**
- * La dirección para incrustar un video de YouTube o Vimeo, a partir de lo que
- * pegue el usuario (enlace de la barra, corto, embed, shorts o en vivo). YouTube
- * va por youtube-nocookie.com. Cualquier otro sitio devuelve null: solo se
- * incrusta lo que está en esta lista.
+ * Qué video es, a partir de lo que pegue el usuario: un enlace de YouTube
+ * (barra, corto, embed, shorts o en vivo), uno de Vimeo, o solo el código del
+ * video. Se valida el sitio por su nombre exacto y el código por su forma:
+ * lo que no cumpla devuelve null y no se incrusta.
  */
-export function videoEmbed(valor: unknown): string | null {
+export function videoDatos(valor: unknown): VideoDatos | null {
   if (typeof valor !== "string") return null;
+  const v = valor.trim();
+  if (/^[\w-]{11}$/.test(v)) return { proveedor: "youtube", id: v };
+  if (/^\d{6,10}$/.test(v)) return { proveedor: "vimeo", id: v };
   let url: URL;
   try {
-    url = new URL(valor.trim());
+    url = new URL(v);
   } catch {
     return null;
   }
@@ -228,18 +236,73 @@ export function videoEmbed(valor: unknown): string | null {
   const id11 = /^[\w-]{11}$/;
   if (host === "youtu.be") {
     const id = url.pathname.slice(1).split("/")[0] ?? "";
-    return id11.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    return id11.test(id) ? { proveedor: "youtube", id } : null;
   }
   if (host === "youtube.com" || host === "youtube-nocookie.com") {
     const partes = url.pathname.split("/").filter(Boolean);
     const id = partes[0] === "watch" ? (url.searchParams.get("v") ?? "") : ["embed", "shorts", "live", "v"].includes(partes[0] ?? "") ? (partes[1] ?? "") : "";
-    return id11.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    return id11.test(id) ? { proveedor: "youtube", id } : null;
   }
   if (host === "vimeo.com" || host === "player.vimeo.com") {
     const id = url.pathname.split("/").filter(Boolean).find((x) => /^\d+$/.test(x));
-    return id ? `https://player.vimeo.com/video/${id}` : null;
+    return id ? { proveedor: "vimeo", id } : null;
   }
   return null;
+}
+
+/** La dirección del reproductor: siempre youtube-nocookie.com o player.vimeo.com. `inicio` en segundos. */
+export function videoUrl(datos: VideoDatos, opciones: { inicio?: number; autoplay?: boolean } = {}): string {
+  const inicio = Math.min(86400, Math.max(0, Math.floor(Number(opciones.inicio) || 0)));
+  if (datos.proveedor === "youtube") {
+    const q = new URLSearchParams({ rel: "0" });
+    if (inicio > 0) q.set("start", String(inicio));
+    if (opciones.autoplay) q.set("autoplay", "1");
+    return `https://www.youtube-nocookie.com/embed/${datos.id}?${q.toString()}`;
+  }
+  const q = new URLSearchParams({ dnt: "1" });
+  if (opciones.autoplay) q.set("autoplay", "1");
+  return `https://player.vimeo.com/video/${datos.id}?${q.toString()}${inicio > 0 ? `#t=${inicio}s` : ""}`;
+}
+
+/** La portada de un video de YouTube (Vimeo no ofrece una sin consultar su API). */
+export function videoMiniatura(datos: VideoDatos): string | null {
+  return datos.proveedor === "youtube" ? `https://i.ytimg.com/vi/${datos.id}/hqdefault.jpg` : null;
+}
+
+/** La dirección para incrustar el video, sin reproducción automática; null si el enlace no es de un sitio permitido. */
+export function videoEmbed(valor: unknown): string | null {
+  const datos = videoDatos(valor);
+  return datos ? videoUrl(datos) : null;
+}
+
+/**
+ * Una cifra escrita a la española («1.250», «3,5», «12») como número, con sus
+ * decimales. Si no es solo un número (p. ej. «12 mil»), null: esa cifra no cuenta.
+ */
+export function leerCifra(valor: unknown): { n: number; decimales: number } | null {
+  if (typeof valor !== "string") return null;
+  const v = valor.trim().replace(/\s/g, "");
+  if (!/^\d[\d.,]*$/.test(v)) return null;
+  const limpio = v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : /^\d{1,3}(\.\d{3})+$/.test(v) ? v.replace(/\./g, "") : v;
+  if (!/^\d+(\.\d+)?$/.test(limpio)) return null;
+  const n = Number(limpio);
+  return Number.isFinite(n) ? { n, decimales: limpio.split(".")[1]?.length ?? 0 } : null;
+}
+
+/** Límites de la altura del bloque HTML, en píxeles. */
+export const ALTO_HTML = { min: 80, max: 2000, defecto: 320, tope: 20000 } as const;
+
+/**
+ * El documento que se pinta dentro del marco aislado del bloque HTML. El
+ * código del usuario nunca se inyecta en la página: solo viaja aquí, dentro de
+ * un iframe sandbox sin allow-same-origin. Un pequeño script avisa la altura
+ * del contenido al padre por postMessage; `token` solo identifica el marco.
+ */
+export function documentoHtml({ html, css, js, token, ajustar }: { html: string; css: string; js: string; token: string; ajustar: boolean }): string {
+  const aviso = ajustar
+    ? `<script>(function(){var t=${JSON.stringify(token)};function e(){parent.postMessage({cmsHtml:t,alto:Math.ceil(document.body.getBoundingClientRect().height)},"*")}if(window.ResizeObserver)new ResizeObserver(e).observe(document.body);addEventListener("load",e);e()})()</script>`
+    : "";
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:flow-root;font-family:system-ui,sans-serif}</style><style>${css}</style></head><body>${html}${aviso}<script>${js}</script></body></html>`;
 }
 
 /** Un valor compuesto «ranking/categoria» (p. ej. «impact/o4») en sus dos ids; null si no tiene esa forma. */

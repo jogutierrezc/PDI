@@ -10,8 +10,10 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
+import { useAuth } from "../../../lib/auth";
 import { definicion } from "./bloques";
 import { IconoCms, type NombreIconoCms } from "./iconos";
+import type { EstiloSitioParcial } from "./estilo";
 import { Inspector } from "./Inspector";
 import { Lienzo, type Accion } from "./Lienzo";
 import { PanelIzquierdo } from "./PanelIzquierdo";
@@ -39,11 +41,14 @@ interface EditorBloquesProps {
   onAviso: (mensaje: string | null) => void;
   /** Avisa si hay cambios sin guardar, para que quien lo contiene no los descarte en silencio. */
   onSucio?: (sucio: boolean) => void;
+  /** Estilo del sitio del portal (cms_portales.estilo); vacío = el aspecto de siempre. */
+  estilo?: EstiloSitioParcial;
 }
 
-export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAviso, onSucio }: EditorBloquesProps) {
+export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAviso, onSucio, estilo }: EditorBloquesProps) {
   const invalidar = useInvalidarCms();
   const publicar = usePublicar();
+  const esAdmin = useAuth().hasRole("admin");
   const [hist, setHist] = useState(() => nuevoHistorial(aLineas(bloques)));
   const [guardado, setGuardado] = useState(() => JSON.stringify(aLineas(bloques)));
   const [seleccion, setSeleccion] = useState<string | null>(null);
@@ -102,6 +107,11 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
   function accion(a: Accion, id: string) {
     const i = actual.findIndex((b) => b.id === id);
     if (i < 0) return;
+    // Un bloque reservado a la administración (HTML) no se duplica ni se oculta sin ese rol: la base lo rechazaría.
+    if ((a === "duplicar" || a === "ocultar") && definicion(actual[i].tipo)?.soloAdmin && !esAdmin) {
+      onAviso("Solo la administración puede duplicar u ocultar un bloque de HTML personalizado.");
+      return;
+    }
     if (a === "subir") return i > 0 ? moverA(id, i - 1) : undefined;
     if (a === "bajar") return i < actual.length - 1 ? moverA(id, i + 2) : undefined;
     if (a === "ocultar") return actualizar(id, (b) => ({ ...b, props: fijarOculto(b.props, !ocultoDe(b.props)) }));
@@ -122,6 +132,10 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
   function insertar(tipo: string, destino?: number) {
     const def = definicion(tipo);
     if (!def) return;
+    if (def.soloAdmin && !esAdmin) {
+      onAviso(`Solo la administración puede agregar el bloque «${def.nombre}».`);
+      return;
+    }
     const nuevo: LineaBloque = { id: crypto.randomUUID(), tipo: def.tipo, ancho: 12, props: def.valores() };
     const en = Math.max(0, Math.min(actual.length, destino ?? (elegido ? idx + 1 : actual.length)));
     aplicar((lista) => [...lista.slice(0, en), nuevo, ...lista.slice(en)]);
@@ -273,7 +287,7 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
           </div>
           <div className="cms-escena">
             <div className="cms-marco-escena" style={{ maxWidth: anchoMarco }} onClickCapture={evitarNavegacion}>
-              <RenderBloques bloques={actual} disparo={`${reproPagina}-${modo}`} />
+              <RenderBloques bloques={actual} disparo={`${reproPagina}-${modo}`} estilo={estilo} />
             </div>
           </div>
         </section>
@@ -392,6 +406,7 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
                 onAccion={accion}
                 onMoverA={moverA}
                 onInsertar={insertar}
+                estilo={estilo}
               />
             )}
           </div>
@@ -413,6 +428,8 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
           onFusionFin={terminarFusion}
           onReproducir={(id) => setReproBloque((r) => ({ id, n: (r?.id === id ? r.n : 0) + 1 }))}
           onAviso={onAviso}
+          dispositivo={dispositivo}
+          sitio={estilo ?? {}}
         />
       )}
     </div>

@@ -1,8 +1,9 @@
 /* =============================================================================
    CMS Portales · inspector del bloque elegido y de la página.
 
-   Cuatro pestañas, como el prototipo aprobado: Bloque (contenido y apariencia,
-   con el formulario generado desde el registro de bloques.ts), Movimiento (la
+   Cinco pestañas, como el prototipo aprobado: Bloque (contenido y apariencia,
+   con el formulario generado desde el registro de bloques.ts), Estilo (tipografía,
+   color y forma del bloque frente al sitio, ver estilo.ts), Movimiento (la
    entrada con GSAP, su código y su reproducción), Esquema (la definición del
    bloque como componente y la fila que viaja a la base) y Página (título,
    ruta, estado e historial de versiones de solo lectura). Todo cambio pasa por
@@ -10,7 +11,7 @@
    anterior (texto escrito seguido).
    ========================================================================== */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { definicion, type CampoBloque, type Subcampo } from "./bloques";
 import { codigoGsap, esquemaDeBloque, filaDeBloque } from "./esquema";
 import {
@@ -34,6 +35,28 @@ import {
   ocultoDe,
   type LineaBloque,
 } from "./logica";
+import {
+  ANCHOS_CONTENIDO,
+  CLAVE_DISPOSITIVO,
+  FACTOR_TEXTO,
+  FACTOR_TITULO,
+  FUENTES,
+  LIMITES_DISENO,
+  PESOS_BLOQUE,
+  SITIO_DEFECTO,
+  cambiarDiseno,
+  completarEstilo,
+  contraste,
+  cuantasCambia,
+  disenoDe,
+  tamanosCompletos,
+  textoSobre,
+  titulosDelSitio,
+  type AnchoContenido,
+  type DisenoBloque,
+  type DispositivoEstilo,
+  type EstiloSitioParcial,
+} from "./estilo";
 import { IconoCms } from "./iconos";
 import { ETIQUETA_ESTADO } from "./PanelPaginas";
 import { Pestanas, idPanel, idPestana, type PestanaDef } from "./Pestanas";
@@ -42,8 +65,9 @@ import type { Alineacion, Ancho, CmsPagina, Espacio, Fondo, Medida, PresetMovimi
 import { uploadOfficePhoto } from "../pagina/store";
 import { officePhotoUrl } from "../../planeacion/page";
 import { Icon } from "../../../components/ui/Icon";
+import { useAuth } from "../../../lib/auth";
 
-type Pestana = "bloque" | "movimiento" | "esquema" | "pagina";
+type Pestana = "bloque" | "estilo" | "movimiento" | "esquema" | "pagina";
 
 const ETIQUETA_FONDO: Record<Fondo, string> = { claro: "Claro", alterno: "Alterno", marino: "Marino (azul UDES)" };
 const ETIQUETA_ESPACIO: Record<Espacio, string> = { compacto: "Compacto", normal: "Normal", amplio: "Amplio" };
@@ -80,12 +104,17 @@ interface InspectorProps {
   onFusionFin: () => void;
   onReproducir: (id: string) => void;
   onAviso: (mensaje: string | null) => void;
+  /** El dispositivo de la vista previa: los tamaños de la pestaña Estilo son los de ese dispositivo. */
+  dispositivo: DispositivoEstilo;
+  /** Estilo del sitio del portal, para mostrar de qué hereda el bloque. */
+  sitio: EstiloSitioParcial;
 }
 
-export function Inspector({ bloque, orden, pagina, puedeEditar, onActualizar, onFusionFin, onReproducir, onAviso }: InspectorProps) {
+export function Inspector({ bloque, orden, pagina, puedeEditar, onActualizar, onFusionFin, onReproducir, onAviso, dispositivo, sitio }: InspectorProps) {
   const [pestana, setPestana] = useState<Pestana>(bloque ? "bloque" : "pagina");
   const pestanas: PestanaDef<Pestana>[] = [
     { id: "bloque", etiqueta: "Bloque", icono: <IconoCms name="ajustes" size={15} /> },
+    { id: "estilo", etiqueta: "Estilo", icono: <Icon name="pen" size={15} /> },
     { id: "movimiento", etiqueta: "Movimiento", icono: <IconoCms name="movimiento" size={15} /> },
     { id: "esquema", etiqueta: "Esquema", icono: <Icon name="code" size={15} /> },
     { id: "pagina", etiqueta: "Página", icono: <Icon name="clock" size={15} /> },
@@ -106,6 +135,7 @@ export function Inspector({ bloque, orden, pagina, puedeEditar, onActualizar, on
         ) : !bloque ? (
           <p className="cms-ayuda">
             {pestana === "bloque" && "Elija un bloque en el lienzo para editar su contenido, su apariencia y su movimiento. Sin selección, la pestaña Página muestra los datos de la página."}
+            {pestana === "estilo" && "Elija un bloque para ajustar su tipografía, su color y su forma."}
             {pestana === "movimiento" && "Elija un bloque para ajustar cómo entra en pantalla."}
             {pestana === "esquema" && "Elija un bloque para ver su esquema."}
           </p>
@@ -118,6 +148,8 @@ export function Inspector({ bloque, orden, pagina, puedeEditar, onActualizar, on
             onFusionFin={onFusionFin}
             onReproducir={() => onReproducir(bloque.id)}
             onAviso={onAviso}
+            dispositivo={dispositivo}
+            sitio={sitio}
           />
         )}
       </div>
@@ -133,20 +165,30 @@ function Cuerpo({
   onFusionFin,
   onReproducir,
   onAviso,
-}: Pick<InspectorProps, "onActualizar" | "onFusionFin" | "onAviso" | "orden"> & { bloque: LineaBloque; pestana: Exclude<Pestana, "pagina">; onReproducir: () => void }) {
+  dispositivo,
+  sitio,
+}: Pick<InspectorProps, "onActualizar" | "onFusionFin" | "onAviso" | "orden" | "dispositivo" | "sitio"> & { bloque: LineaBloque; pestana: Exclude<Pestana, "pagina">; onReproducir: () => void }) {
   const def = definicion(bloque.tipo);
+  const esAdmin = useAuth().hasRole("admin");
   if (!def) return <p className="cms-aviso">Este tipo de bloque no existe en el registro. Revise la página en la base o agregue el tipo.</p>;
+  // Un bloque reservado a la administración se ve, pero solo ella lo edita (la base también lo exige).
+  const bloqueado = Boolean(def.soloAdmin) && !esAdmin;
 
   const cambiarProps = (clave: string, valor: unknown, fusion?: string) =>
     onActualizar(bloque.id, (b) => ({ ...b, props: { ...b.props, [clave]: valor } }), fusion);
 
   return (
-    <div className="cms-insp__panel">
+    <fieldset className="cms-insp__panel cms-fieldset" disabled={bloqueado}>
       <h3 className="cms-insp__titulo">
-        {pestana === "movimiento" ? `Movimiento de ${def.nombre}` : pestana === "esquema" ? `Esquema de ${def.nombre}` : def.nombre}{" "}
+        {pestana === "movimiento" ? `Movimiento de ${def.nombre}` : pestana === "estilo" ? `Estilo de ${def.nombre}` : pestana === "esquema" ? `Esquema de ${def.nombre}` : def.nombre}{" "}
         {pestana === "bloque" && <span className="cms-mono">{bloque.tipo}</span>}
       </h3>
 
+      {bloqueado && (
+        <p className="cms-nota-insp" role="note">
+          Este bloque lleva código propio. Solo la administración puede cambiarlo; usted puede verlo y moverlo.
+        </p>
+      )}
       {pestana === "bloque" && (
         <>
           {def.vivo && (
@@ -170,10 +212,12 @@ function Cuerpo({
         </>
       )}
 
+      {pestana === "estilo" && <Estilo bloque={bloque} dispositivo={dispositivo} sitio={sitio} onActualizar={onActualizar} onFin={onFusionFin} />}
+
       {pestana === "movimiento" && <Movimiento bloque={bloque} onActualizar={onActualizar} onFin={onFusionFin} onReproducir={onReproducir} />}
 
       {pestana === "esquema" && <Esquema bloque={bloque} orden={orden} onAviso={onAviso} />}
-    </div>
+    </fieldset>
   );
 }
 
@@ -204,6 +248,23 @@ function CampoForm({
         <label className="cms-campo">
           <span>{campo.etiqueta}{requerido}</span>
           <textarea className="cms-input cms-area" rows={4} value={texto(valor)} aria-required={campo.requerido} onChange={(e) => onCambio(e.target.value, true)} onBlur={onFin} />
+        </label>
+      );
+    case "codigo":
+      return (
+        <label className="cms-campo">
+          <span>{campo.etiqueta}{campo.lenguaje && <small className="cms-mono"> {campo.lenguaje.toUpperCase()}</small>}</span>
+          <textarea
+            className="cms-input cms-area cms-area--codigo"
+            rows={8}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            wrap="off"
+            value={texto(valor)}
+            onChange={(e) => onCambio(e.target.value, true)}
+            onBlur={onFin}
+          />
         </label>
       );
     case "numero":
@@ -528,6 +589,198 @@ function Apariencia({
   );
 }
 
+/* --- Estilo ------------------------------------------------------------------------------------ */
+
+const NOMBRE_DISPOSITIVO: Record<DispositivoEstilo, string> = { escritorio: "escritorio", tableta: "tableta", telefono: "teléfono" };
+const ETIQUETA_ANCHO_CONTENIDO: Record<AnchoContenido, string> = { estrecho: "Estrecho", medio: "Medio", amplio: "Amplio", completo: "Completo" };
+const TAMANOS_TITULO: [string, number][] = [["S", 28], ["M", 40], ["L", 56], ["XL", 72]];
+type Parche = Partial<Record<keyof DisenoBloque, unknown>>;
+
+/** Una propiedad del bloque: punto azul si la cambia y «Restablecer» para volver a lo del sitio. */
+function Prop({ etiqueta, cambia, onReset, children }: { etiqueta: string; cambia: boolean; onReset: () => void; children: ReactNode }) {
+  return (
+    <div className={`cms-campo cms-prop${cambia ? " cms-prop--cambia" : ""}`}>
+      <span>
+        {etiqueta}
+        {cambia && (
+          <button type="button" className="cms-prop__reset" onClick={onReset} aria-label={`Restablecer: ${etiqueta}`}>
+            Restablecer
+          </button>
+        )}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function Estilo({
+  bloque,
+  dispositivo,
+  sitio,
+  onActualizar,
+  onFin,
+}: {
+  bloque: LineaBloque;
+  dispositivo: DispositivoEstilo;
+  sitio: EstiloSitioParcial;
+  onActualizar: InspectorProps["onActualizar"];
+  onFin: () => void;
+}) {
+  const d = disenoDe(bloque.props);
+  const efectivo = completarEstilo(sitio);
+  const clave = CLAVE_DISPOSITIVO[dispositivo];
+  const nombre = NOMBRE_DISPOSITIVO[dispositivo];
+  // Cada cambio pasa por onActualizar (historial); con `fusion`, los ajustes seguidos de un mismo control son un solo paso.
+  const cambiar = (parche: Parche, fusion?: string) =>
+    onActualizar(bloque.id, (b) => ({ ...b, props: cambiarDiseno(b.props, parche) }), fusion ? `${bloque.id}:diseno:${fusion}` : undefined);
+  const quitar = (...claves: (keyof DisenoBloque)[]) => cambiar(Object.fromEntries(claves.map((k) => [k, undefined])) as Parche);
+
+  // Tamaños mostrados: el del bloque para este dispositivo (propio o escalado) o, si no cambia nada, el del sitio.
+  const sitioTitulo = titulosDelSitio(efectivo.base, efectivo.ratio).h2;
+  const factorTitulo = clave === "d" ? 1 : FACTOR_TITULO[clave];
+  const factorTexto = clave === "d" ? 1 : FACTOR_TEXTO[clave];
+  const verTitulo = tamanosCompletos(d.sh, FACTOR_TITULO, LIMITES_DISENO.sh.min, LIMITES_DISENO.sh.max)?.[clave] ?? Math.round(sitioTitulo * factorTitulo);
+  const verTexto = tamanosCompletos(d.sb, FACTOR_TEXTO, LIMITES_DISENO.sb.min, LIMITES_DISENO.sb.max)?.[clave] ?? Math.max(12, Math.round(efectivo.base * factorTexto));
+
+  const rango = (k: "lh" | "ls" | "pad" | "rad", etiqueta: string, lim: { min: number; max: number }, paso: number, valor: number, unidad: string) => (
+    <Prop etiqueta={etiqueta} cambia={d[k] !== undefined} onReset={() => quitar(k)}>
+      <div className="cms-rango">
+        <input type="range" aria-label={etiqueta} min={lim.min} max={lim.max} step={paso} value={valor} onChange={(e) => cambiar({ [k]: Number(e.target.value) }, k)} onBlur={onFin} />
+        <output>
+          {valor}
+          {unidad}
+        </output>
+      </div>
+    </Prop>
+  );
+
+  const fuente = (k: "fh" | "fb", etiqueta: string) => (
+    <Prop etiqueta={etiqueta} cambia={d[k] !== undefined} onReset={() => quitar(k)}>
+      <select className="cms-input" aria-label={etiqueta} value={d[k] ?? ""} onChange={(e) => cambiar({ [k]: e.target.value || undefined })}>
+        <option value="">Heredar del sitio</option>
+        {FUENTES.map((f) => (
+          <option key={f} value={f}>
+            {f}
+          </option>
+        ))}
+      </select>
+    </Prop>
+  );
+
+  const paleta: [string, string][] = [["Marino", efectivo.marino], ["Acento", efectivo.acento], ["Alterno", efectivo.alt], ["Blanco", "#ffffff"], ["Texto", efectivo.txt]];
+  const color = (k: "color" | "bg", etiqueta: string) => (
+    <Prop etiqueta={etiqueta} cambia={d[k] !== undefined} onReset={() => quitar(k)}>
+      <div className="cms-chips" role="group" aria-label={etiqueta}>
+        {paleta.map(([n, c]) => (
+          <button key={n} type="button" title={n} aria-label={n} aria-pressed={d[k] === c} onClick={() => cambiar({ [k]: c })} style={{ background: c, width: 26, height: 26, borderRadius: "50%" }} />
+        ))}
+        <input type="color" aria-label={`${etiqueta}, color propio`} value={d[k] ?? (k === "bg" ? "#ffffff" : efectivo.txt)} onChange={(e) => cambiar({ [k]: e.target.value }, k)} onBlur={onFin} />
+      </div>
+    </Prop>
+  );
+
+  // Contraste: solo se evalúa si el bloque cambia el color o el fondo. Con fondo propio y sin color, el texto se elige solo.
+  const tono = bloque.tipo === "hero" ? (bloque.props.tono === "claro" ? "claro" : "marino") : estiloDe(bloque.props).fondo;
+  const fondoBase = definicion(bloque.tipo)?.sinFondo ? "#ffffff" : tono === "marino" ? efectivo.marino : tono === "alterno" ? efectivo.alt : "#ffffff";
+  const fondoReal = d.bg ?? fondoBase;
+  const textoReal = d.color ?? (d.bg ? textoSobre(d.bg, efectivo.txt) : tono === "marino" ? "#ffffff" : efectivo.txt);
+  const razon = contraste(textoReal, fondoReal);
+  const pocoContraste = (d.color !== undefined || d.bg !== undefined) && razon < 4.5;
+
+  const propioDelSitio = sitio.fh || sitio.fb;
+  return (
+    <>
+      <p className="cms-nota-insp" role="note">
+        {propioDelSitio ? `Hereda del sitio: ${efectivo.fh} (títulos) y ${efectivo.fb} (texto).` : `Este portal aún no tiene estilo propio: el bloque hereda el aspecto actual (${SITIO_DEFECTO.fh}).`} Un punto azul marca lo que este
+        bloque cambia. Los tamaños son los de {nombre}; los otros dispositivos se escalan desde el escritorio.
+      </p>
+
+      <h3 className="cms-panel__titulo">Tipografía</h3>
+      {fuente("fh", "Fuente del título")}
+      {fuente("fb", "Fuente del texto")}
+      <Prop etiqueta={`Tamaño del título · ${nombre}`} cambia={d.sh !== undefined} onReset={() => quitar("sh")}>
+        <div className="cms-rango">
+          <input
+            type="range"
+            aria-label={`Tamaño del título en ${nombre}`}
+            min={LIMITES_DISENO.sh.min}
+            max={LIMITES_DISENO.sh.max}
+            step={1}
+            value={verTitulo}
+            onChange={(e) => cambiar({ sh: { ...d.sh, [clave]: Number(e.target.value) } }, `sh${clave}`)}
+            onBlur={onFin}
+          />
+          <output>{verTitulo}px</output>
+        </div>
+        <div className="cms-chips">
+          {TAMANOS_TITULO.map(([t, v]) => (
+            <button key={t} type="button" onClick={() => cambiar({ sh: { ...d.sh, [clave]: v } })}>
+              {t} · {v}
+            </button>
+          ))}
+        </div>
+      </Prop>
+      <Prop etiqueta={`Tamaño del texto · ${nombre}`} cambia={d.sb !== undefined} onReset={() => quitar("sb")}>
+        <div className="cms-rango">
+          <input
+            type="range"
+            aria-label={`Tamaño del texto en ${nombre}`}
+            min={LIMITES_DISENO.sb.min}
+            max={LIMITES_DISENO.sb.max}
+            step={1}
+            value={verTexto}
+            onChange={(e) => cambiar({ sb: { ...d.sb, [clave]: Number(e.target.value) } }, `sb${clave}`)}
+            onBlur={onFin}
+          />
+          <output>{verTexto}px</output>
+        </div>
+      </Prop>
+      <Prop etiqueta="Peso del título" cambia={d.wt !== undefined} onReset={() => quitar("wt")}>
+        <select className="cms-input" aria-label="Peso del título" value={d.wt ?? ""} onChange={(e) => cambiar({ wt: e.target.value ? Number(e.target.value) : undefined })}>
+          <option value="">Heredar del sitio</option>
+          {PESOS_BLOQUE.map((w) => (
+            <option key={w} value={w}>
+              {w}
+            </option>
+          ))}
+        </select>
+      </Prop>
+      {rango("lh", "Interlineado", LIMITES_DISENO.lh, 0.05, d.lh ?? efectivo.lh, "")}
+      {rango("ls", "Espacio entre letras del título", LIMITES_DISENO.ls, 0.005, d.ls ?? -0.02, "em")}
+
+      <h3 className="cms-panel__titulo">Color y forma</h3>
+      {color("color", "Color del texto")}
+      {color("bg", "Fondo del bloque")}
+      {pocoContraste && (
+        <p className="cms-aviso" role="status">
+          Contraste de {razon.toFixed(1)}:1 entre el texto y el fondo. Para leerse bien se pide al menos 4,5:1.
+        </p>
+      )}
+      {rango("pad", "Espacio arriba y abajo", LIMITES_DISENO.pad, 4, d.pad ?? 80, "px")}
+      <Prop etiqueta="Ancho del contenido" cambia={d.maxw !== undefined} onReset={() => quitar("maxw")}>
+        <select className="cms-input" aria-label="Ancho del contenido" value={d.maxw ?? ""} onChange={(e) => cambiar({ maxw: e.target.value || undefined })}>
+          <option value="">Heredar (ancho de la página)</option>
+          {ANCHOS_CONTENIDO.map((a) => (
+            <option key={a} value={a}>
+              {ETIQUETA_ANCHO_CONTENIDO[a]}
+            </option>
+          ))}
+        </select>
+      </Prop>
+      {rango("rad", "Esquinas de las tarjetas", LIMITES_DISENO.rad, 1, d.rad ?? efectivo.radius, "px")}
+      <p className="cms-ayuda">El espacio en píxeles reemplaza el Compacto, Normal o Amplio de la pestaña Bloque mientras esté activo.</p>
+      <button
+        type="button"
+        className="cms-btn cms-btn--ancho"
+        disabled={cuantasCambia(d) === 0}
+        onClick={() => quitar(...(Object.keys(d) as (keyof DisenoBloque)[]))}
+      >
+        Restablecer todo el estilo del bloque
+      </button>
+    </>
+  );
+}
+
 /* --- Movimiento ------------------------------------------------------------------------------- */
 
 function Movimiento({
@@ -610,7 +863,7 @@ function Esquema({ bloque, orden, onAviso }: { bloque: LineaBloque; orden: numbe
       <BloqueCodigo etiqueta="Esquema del componente" texto={esquema} onAviso={onAviso} />
       <h3 className="cms-panel__titulo">Cómo viaja a la base</h3>
       <BloqueCodigo etiqueta="Fila de cms_bloques" texto={fila} onAviso={onAviso} />
-      <p className="cms-ayuda">Las claves que empiezan por «_» (_estilo, _mov, _oculto) viajan dentro de props.</p>
+      <p className="cms-ayuda">Las claves que empiezan por «_» (_estilo, _diseno, _mov, _oculto) viajan dentro de props.</p>
     </>
   );
 }

@@ -14,6 +14,7 @@ import { describeDatabaseError, FriendlyError } from "../../../data/errors";
 import type { CmsBloque, CmsPagina, CmsPortal, CmsVersion, PortalSlug } from "./tipos";
 import { planImportacion, planSincronizacion, rutaHija, rutaOcupada, slugify, type BloqueExistente, type LineaBloque } from "./logica";
 import type { NodoMicrositio } from "./plantillas";
+import { sanearEstiloSitio, type EstiloSitioParcial } from "./estilo";
 
 /** Tabla o función ausente: PostgREST (PGRST205, PGRST202) o Postgres (42P01, 42883). */
 const MISSING = new Set(["PGRST205", "PGRST202", "42P01", "42883"]);
@@ -250,6 +251,48 @@ export function useInvalidarCms() {
 
 export function usePublicar() {
   return useMutation({ mutationFn: publicarPagina });
+}
+
+/* ---------------------------------------------------------------------------
+   Estilo del sitio por portal (cms_portales.estilo y cms_guardar_estilo, 0201).
+   Se publica al guardar (no tiene borrador). Sin la migración todo sigue con el
+   aspecto de siempre: leer nunca falla, solo avisa que no está disponible.
+   ------------------------------------------------------------------------ */
+
+export interface EstiloPortal {
+  estilo: EstiloSitioParcial;
+  /** false si no se pudo leer (p. ej. falta la migración 0201). */
+  disponible: boolean;
+}
+
+export async function leerEstiloPortal(portal: PortalSlug): Promise<EstiloPortal> {
+  const { data, error } = await supabase.from("cms_portales").select("estilo").eq("slug", portal).maybeSingle();
+  if (error || !data) return { estilo: {}, disponible: false };
+  return { estilo: sanearEstiloSitio((data as { estilo?: unknown }).estilo), disponible: true };
+}
+
+/** El estilo del portal, para la página pública y el editor. */
+export function useEstiloPortal(portal: PortalSlug | string) {
+  return useQuery({
+    queryKey: ["cms", "estilo", portal] as const,
+    queryFn: () => leerEstiloPortal(portal as PortalSlug),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function useGuardarEstilo(portal: PortalSlug) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (estilo: EstiloSitioParcial) => {
+      const { error } = await supabase.rpc("cms_guardar_estilo", { p_portal: portal, p_estilo: sanearEstiloSitio(estilo) });
+      if (error) {
+        if (MISSING.has(error.code ?? "")) throw new FriendlyError("Falta aplicar la migración 0201 para guardar el estilo del sitio.");
+        throw fallo(error);
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cms", "estilo", portal] }),
+  });
 }
 
 /* ---------------------------------------------------------------------------

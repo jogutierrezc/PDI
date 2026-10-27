@@ -18,10 +18,12 @@ import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { useAuth } from "../../../lib/auth";
 import { EditorBloques } from "./EditorBloques";
 import { EditoresCms } from "./EditoresCms";
+import { EstiloSitio } from "./EstiloSitio";
 import { arbol } from "./logica";
 import { PanelIzquierdo } from "./PanelIzquierdo";
 import { PanelPaginas } from "./PanelPaginas";
-import { FaltaMigracionCms, useBloques, usePaginas, usePortales } from "./store";
+import { FaltaMigracionCms, useBloques, useEstiloPortal, usePaginas, usePortales } from "./store";
+import type { EstiloSitioParcial } from "./estilo";
 import type { CmsPagina, PortalSlug } from "./tipos";
 import "./cms.css";
 
@@ -45,6 +47,9 @@ export function CmsPortales() {
   const puedeEditar = esPlaneacion || cmsPortales.includes(portal);
   const paginas = usePaginas(portal);
   const [seleccion, setSeleccion] = useState<string | null>(null);
+  // «Páginas» (el editor) o «Estilo del sitio» (tokens del portal).
+  const [vista, setVista] = useState<"paginas" | "estilo">("paginas");
+  const estiloPortal = useEstiloPortal(portal).data?.estilo;
   const [aviso, setAviso] = useState<{ texto: string; n: number } | null>(null);
   // El editor avisa aquí si tiene cambios sin guardar; cambiar de página o de portal pide confirmación.
   const sucio = useRef(false);
@@ -103,6 +108,7 @@ export function CmsPortales() {
               onSelect={() => {
                 if (p.slug === portal || !puedeSalir()) return;
                 setPortal(p.slug);
+                setVista("paginas");
                 setSeleccion(null);
                 setAviso(null);
               }}
@@ -120,8 +126,34 @@ export function CmsPortales() {
         </p>
       )}
 
+      {!falta && (
+        <div className="cms-seg cms-vista-sw" role="group" aria-label="Qué editar">
+          {(["paginas", "estilo"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={vista === v}
+              onClick={() => {
+                if (v !== vista && puedeSalir()) setVista(v);
+              }}
+            >
+              {v === "paginas" ? "Páginas" : "Estilo del sitio"}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="cms-editor">
-        {falta ? (
+        {vista === "estilo" && !falta ? (
+          <EstiloSitio
+            key={portal}
+            portal={portal}
+            portadaId={todas.find((p) => p.ruta === "")?.id ?? null}
+            puedeEditar={puedeEditar}
+            onAviso={mostrarAviso}
+            onSucio={marcarSucio}
+          />
+        ) : falta ? (
           <EspacioMensaje panel={panelPaginas}>
             <FaltaMigracion />
           </EspacioMensaje>
@@ -130,7 +162,7 @@ export function CmsPortales() {
             <p className="cms-vacio">Elija una página o cree una nueva para editarla.</p>
           </EspacioMensaje>
         ) : (
-          <EditorPagina key={pagina.id} pagina={pagina} puedeEditar={puedeEditar} panelPaginas={panelPaginas} onAviso={mostrarAviso} onSucio={marcarSucio} />
+          <EditorPagina key={pagina.id} pagina={pagina} puedeEditar={puedeEditar} panelPaginas={panelPaginas} onAviso={mostrarAviso} onSucio={marcarSucio} estilo={estiloPortal} />
         )}
       </div>
 
@@ -181,7 +213,9 @@ function EditorPagina({
   panelPaginas,
   onAviso,
   onSucio,
+  estilo,
 }: {
+  estilo?: EstiloSitioParcial;
   pagina: CmsPagina;
   puedeEditar: boolean;
   panelPaginas: ReactNode;
@@ -208,5 +242,5 @@ function EditorPagina({
       </EspacioMensaje>
     );
   }
-  return <EditorBloques pagina={pagina} bloques={bloques.data} puedeEditar={puedeEditar} panelPaginas={panelPaginas} onAviso={onAviso} onSucio={onSucio} />;
+  return <EditorBloques pagina={pagina} bloques={bloques.data} puedeEditar={puedeEditar} panelPaginas={panelPaginas} onAviso={onAviso} onSucio={onSucio} estilo={estilo} />;
 }

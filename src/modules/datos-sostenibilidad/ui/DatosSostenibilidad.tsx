@@ -4,11 +4,12 @@
    Los datos de sostenibilidad viven en UDrive, en la unidad de trabajo «Datos
    de Sostenibilidad», abierta a todas las personas con acceso a la pantalla:
    todas ven, edita quien tiene papel en la unidad. Tres secciones dentro del
-   marco de la intranet (AdminShell):
+   marco de la intranet (AdminShell) más los tableros (0204):
 
      /admin/datos-sostenibilidad                 Archivos: el explorador de UDrive acotado a la unidad
      /admin/datos-sostenibilidad/indicadores     el catálogo de indicadores y de dónde sale cada uno
      /admin/datos-sostenibilidad/portal          qué se publica y la vista previa de /sostenible
+     /admin/datos-sostenibilidad/tableros        tableros personalizados (lista) y /tableros/:id (el constructor)
 
    Abrir una tabla, una gráfica o un cruce usa los editores de UDrive, pero por
    rutas propias, para no sacar a nadie de aquí ni pedirle la pantalla UDrive:
@@ -31,13 +32,14 @@ import type { ContextoDrive } from "../../udrive/ui/contexto";
 import { DondeSeUsa, PanelConexion, PanelPublicar } from "./Conexion";
 import { Indicadores } from "./Indicadores";
 import { Portal } from "./Portal";
+import { Tableros } from "./Tableros";
 import { AvisoSos, ErrorSos } from "./piezas";
 import { useAccesoSos } from "./usos";
 import "../../admin/udes-en-cifras/od-admin.css";
 import "./datos-sostenibilidad.css";
 
 const BASE = "/admin/datos-sostenibilidad";
-type Seccion = "archivos" | "indicadores" | "portal";
+type Seccion = "archivos" | "indicadores" | "portal" | "tableros";
 
 export function DatosSostenibilidad() {
   const { vista, id } = useParams();
@@ -67,14 +69,14 @@ export function DatosSostenibilidad() {
     );
   }
 
-  const seccion: Seccion = vista === "indicadores" || vista === "portal" ? vista : "archivos";
+  const seccion: Seccion = vista === "indicadores" || vista === "portal" || vista === "tableros" ? vista : "archivos";
   const ir = (s: Seccion) => navigate(s === "archivos" ? BASE : `${BASE}/${s}`);
 
   return (
     <AdminShell
       section="datos-sostenibilidad"
       kicker="Datos de Sostenibilidad"
-      title={seccion === "indicadores" ? "Indicadores" : seccion === "portal" ? "Portal de sostenibilidad" : "Archivos"}
+      title={seccion === "indicadores" ? "Indicadores" : seccion === "portal" ? "Portal de sostenibilidad" : seccion === "tableros" ? "Tableros" : "Archivos"}
       description="Tablas y gráficas abiertas a toda la comunidad de la intranet, conectadas a los indicadores de UDES Sostenible."
       rail={
         <AdminRail label="Secciones">
@@ -86,6 +88,9 @@ export function DatosSostenibilidad() {
           </AdminRailTab>
           <AdminRailTab current={seccion === "portal"} onSelect={() => ir("portal")}>
             Portal de sostenibilidad
+          </AdminRailTab>
+          <AdminRailTab current={seccion === "tableros"} onSelect={() => ir("tableros")}>
+            Tableros
           </AdminRailTab>
         </AdminRail>
       }
@@ -102,6 +107,8 @@ export function DatosSostenibilidad() {
         <Indicadores acceso={acceso} />
       ) : seccion === "portal" ? (
         <Portal acceso={acceso} />
+      ) : seccion === "tableros" ? (
+        <Tableros acceso={acceso} id={id} />
       ) : (
         <ProveedorDrive value={contexto}>
           <div className="dsx-archivos">

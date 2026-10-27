@@ -18,12 +18,12 @@ function tintaSobre(hex: string): string {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? "#0d1c31" : "#fff";
 }
 
-/** El chip de color de un ODS, con su número. */
-export function FichaOds({ n }: { n: number }) {
-  const color = odsByNumber(n)?.color ?? "#5f7089";
+/** El chip de color de un ODS, con su número; sin ODS (catálogo libre), un chip neutro. */
+export function FichaOds({ n }: { n: number | null }) {
+  const color = (n !== null && odsByNumber(n)?.color) || "#5f7089";
   return (
-    <span className="dsx-ods" style={{ background: color, color: tintaSobre(color) }} role="img" aria-label={`ODS ${n}`}>
-      {n}
+    <span className="dsx-ods" style={{ background: color, color: tintaSobre(color) }} role="img" aria-label={n === null ? "Sin ODS" : `ODS ${n}`}>
+      {n ?? "·"}
     </span>
   );
 }

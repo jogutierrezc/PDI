@@ -141,8 +141,12 @@ export type TarjetaPortal = "energia" | "solar" | "agua" | "residuos" | "verde" 
 export type MejorSos = "sube" | "baja";
 export type ResumenSos = "promedio" | "suma" | "ultimo";
 
-/** Un indicador del catálogo con lo que 0202 le añade. */
-export interface IndicadorSos extends DsIndicador {
+/** Un indicador del catálogo con lo que 0202 le añade y 0204 libera (ODS opcional, etiquetas, archivado). `id` es el código libre («CAMP-01»). */
+export interface IndicadorSos extends Omit<DsIndicador, "ods"> {
+  /** Nulo = «sin ODS». */
+  ods: number | null;
+  etiquetas: string[];
+  archivado: boolean;
   mejor: MejorSos;
   resumen: ResumenSos;
   meta: number | null;
@@ -191,7 +195,7 @@ export interface PuntoSerieSos {
 /** Un indicador publicado tal como lo entrega sos_cifras_publicas(). */
 export interface CifraPublicaSos {
   id: string;
-  ods: number;
+  ods: number | null;
   nombre: string;
   unidad: string;
   mejor: MejorSos;
@@ -233,4 +237,69 @@ export interface IndicadorCalculado {
   avanceMeta: number | null;
   /** Lo que el RPC omitiría o rechazaría (columna inexistente, no numérica, sensible…). */
   avisos: string[];
+}
+
+/* ---------- Tableros personalizados (migración 0204) ------------------------------------------- */
+
+export type TipoElementoTablero = "indicador" | "grafica" | "titulo" | "texto" | "separador";
+/** Ancho en columnas de 12. */
+export type AnchoTablero = 3 | 4 | 6 | 8 | 12;
+export type EstiloElemento = "tarjeta" | "compacta" | "grande";
+
+/** Un elemento del lienzo. `ref` es el id del indicador o del archivo de la gráfica; en `texto`, `opciones.texto` es el párrafo. */
+export interface ElementoTablero {
+  id: string;
+  tipo: TipoElementoTablero;
+  ref?: string;
+  ancho: AnchoTablero;
+  titulo?: string;
+  estilo?: EstiloElemento;
+  opciones?: { texto?: string; meta?: boolean; tendencia?: boolean; fuente?: boolean };
+}
+
+/** La configuración versionada que guarda `sos_tableros.config`. */
+export interface ConfigTablero {
+  version: 1;
+  /** Campus que muestra por defecto («Todos» o uno de los del portal). */
+  campus?: string | null;
+  /** ¿Se ofrece el selector de campus a quien lo ve? */
+  selector?: boolean;
+  elementos: ElementoTablero[];
+}
+
+export interface TableroSos {
+  id: string;
+  nombre: string;
+  slug: string;
+  descripcion: string;
+  config: ConfigTablero;
+  publicado: boolean;
+  publicado_por: string | null;
+  publicado_en: string | null;
+  archivado: boolean;
+  creado_por: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Lo que la pantalla manda al guardar un tablero (con `id` se edita; sin él se crea). */
+export type TableroSosEntrada = Pick<TableroSos, "nombre" | "slug" | "descripcion" | "config"> & { id?: string };
+
+/** Lo que entrega sos_tablero_publico(): la configuración y solo los datos públicos de lo que nombra. */
+export interface TableroPublicoSos {
+  slug: string;
+  nombre: string;
+  descripcion: string;
+  campus: string | null;
+  selector: boolean;
+  elementos: ElementoTablero[];
+  cifras: CifraPublicaSos[];
+  graficas: GraficaPublicaSos[];
+}
+
+/** Un renglón de sos_tableros_publicos(). */
+export interface TableroPublicoResumen {
+  slug: string;
+  nombre: string;
+  descripcion: string;
 }

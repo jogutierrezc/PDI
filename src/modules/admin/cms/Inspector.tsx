@@ -13,6 +13,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { PROPORCIONES_COLUMNAS, definicion, type CampoBloque, type Subcampo } from "./bloques";
+import { CampoReferencia } from "./CampoReferencia";
 import { codigoGsap, esquemaDeBloque, esquemaDeContenedor, filaDeBloque, hijoDeBloque } from "./esquema";
 import {
   ALINEACIONES,
@@ -324,6 +325,8 @@ function CampoForm({
       return <SelectorImagen etiqueta={campo.etiqueta} valor={texto(valor)} onCambio={(v, fusion) => onCambio(v, fusion)} onFin={onFin} />;
     case "lista":
       return <ListaEditor campo={campo} filas={lista(valor)} onCambio={onCambio} onFin={onFin} />;
+    case "referencia":
+      return <CampoReferencia campo={campo} valor={valor} onCambio={onCambio} />;
   }
 }
 

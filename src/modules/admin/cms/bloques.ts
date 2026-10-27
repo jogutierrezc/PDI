@@ -15,7 +15,7 @@
      tienen campos los que son texto del encabezado (p. ej., indicadores).
    ========================================================================== */
 
-import { AXES, LAST, RANKINGS, YEARS, reports } from "../../sostenible/data";
+import { AXES, CAMPUSES, LAST, RANKINGS, YEARS, reports } from "../../sostenible/data";
 import { contextFacts, leapDimensions } from "../../landing/content";
 import { DEFAULT_PAGE } from "../../planeacion/page";
 import type { Fondo, PresetMovimiento, Props } from "./tipos";
@@ -41,7 +41,10 @@ export interface Subcampo {
 }
 
 /** «codigo»: texto en letra monoespaciada y sin corrección ortográfica (HTML, CSS o JS). */
-export type TipoCampo = "texto" | "area" | "imagen" | "bool" | "enum" | "numero" | "lista" | "codigo";
+export type TipoCampo = "texto" | "area" | "imagen" | "bool" | "enum" | "numero" | "lista" | "codigo" | "referencia";
+
+/** De dónde salen las opciones de un campo «referencia»: se cargan de la base al abrir el inspector. */
+export type FuenteReferencia = "indicadores" | "tableros";
 
 export interface CampoBloque {
   clave: string;
@@ -57,6 +60,10 @@ export interface CampoBloque {
   subcampos?: Subcampo[];
   /** Solo para «codigo»: el lenguaje que se espera, para el rótulo y la ayuda. */
   lenguaje?: "html" | "css" | "js";
+  /** Solo para «referencia»: qué se elige (indicadores publicados o tableros publicados). */
+  fuente?: FuenteReferencia;
+  /** Solo para «referencia»: varias elecciones, ordenables (el valor es una lista de ids); si no, un id de texto. */
+  multiple?: boolean;
 }
 
 export interface DefinicionBloque {
@@ -1257,6 +1264,51 @@ export const BLOQUES: DefinicionBloque[] = [
       },
     ],
     valores: () => ({ antetitulo: "Datos abiertos", titulo: "Las gráficas de los campus", texto: "", seccion: "" }),
+  },
+  {
+    tipo: "indicadores-sostenibilidad",
+    nombre: "Indicadores elegidos",
+    ayuda: "Los indicadores publicados del catálogo de Datos de Sostenibilidad que usted elija, en su orden, con campus fijo o selector",
+    grupo: "Datos en vivo",
+    movimiento: "sube",
+    vivo: true,
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: false })),
+      { clave: "indicadores", etiqueta: "Indicadores publicados", tipo: "referencia", fuente: "indicadores", multiple: true },
+      {
+        clave: "campus",
+        etiqueta: "Campus",
+        tipo: "enum",
+        opciones: [{ valor: "selector", etiqueta: "Selector de campus visible" }, ...CAMPUSES.map((c) => ({ valor: c, etiqueta: c === "Todos" ? "Fijo: todos los campus" : `Fijo: ${c}` }))],
+      },
+      {
+        clave: "estilo",
+        etiqueta: "Estilo de tarjeta",
+        tipo: "enum",
+        opciones: [
+          { valor: "tarjeta", etiqueta: "Tarjeta" },
+          { valor: "compacta", etiqueta: "Compacta" },
+          { valor: "lista", etiqueta: "Lista" },
+        ],
+      },
+      { clave: "meta", etiqueta: "Mostrar la meta", tipo: "bool" },
+      { clave: "tendencia", etiqueta: "Mostrar la tendencia", tipo: "bool" },
+      { clave: "fuente", etiqueta: "Mostrar la fuente", tipo: "bool" },
+    ],
+    valores: () => ({ antetitulo: "Indicadores de sostenibilidad", titulo: "", texto: "", indicadores: [], campus: "selector", estilo: "tarjeta", meta: false, tendencia: true, fuente: true }),
+  },
+  {
+    tipo: "tablero-sostenibilidad",
+    nombre: "Tablero de sostenibilidad",
+    ayuda: "Un tablero publicado desde Datos de Sostenibilidad, incrustado, con su selector de campus si lo tiene",
+    grupo: "Datos en vivo",
+    movimiento: "sube",
+    vivo: true,
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: false })),
+      { clave: "tablero", etiqueta: "Tablero publicado", tipo: "referencia", fuente: "tableros" },
+    ],
+    valores: () => ({ antetitulo: "", titulo: "", texto: "", tablero: "" }),
   },
   {
     tipo: "avance-plan",

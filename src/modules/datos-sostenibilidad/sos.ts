@@ -42,21 +42,26 @@ interface ErrorBase {
 const faltaTabla = (e: ErrorBase) =>
   ["42P01", "42703", "PGRST205", "PGRST202", "42883"].includes(e.code ?? "") || /does not exist|schema cache|could not find/i.test(e.message ?? "");
 
-/** Error legible; si falta la migración, el aviso. */
+/** Error legible; si falta la migración, el aviso (0204 si lo que falta son las etiquetas, el archivado o los tableros). */
 export function errorSos(e: ErrorBase): Error {
-  return faltaTabla(e) ? new FaltaMigracion("Falta aplicar la migración 0202 (Datos de Sostenibilidad al estilo UDrive).") : new Error(e.message ?? "Error de la base de datos");
+  if (!faltaTabla(e)) return new Error(e.message ?? "Error de la base de datos");
+  return /etiquetas|archivado|sos_tablero/i.test(e.message ?? "")
+    ? new FaltaMigracion("Falta aplicar la migración 0204 (catálogo libre y tableros de Datos de Sostenibilidad).")
+    : new FaltaMigracion("Falta aplicar la migración 0202 (Datos de Sostenibilidad al estilo UDrive).");
 }
 
-const COLUMNAS_INDICADOR =
-  "id,ods,nombre,descripcion,unidad,position,mejor,resumen,meta,decimales,publicado,tarjeta,nota";
+const COLUMNAS_BASE = "id,ods,nombre,descripcion,unidad,position,mejor,resumen,meta,decimales,publicado,tarjeta,nota";
+/** Con 0204: etiquetas y archivado. Sin ella, la lectura cae a las columnas de 0202. */
+const COLUMNAS_INDICADOR = `${COLUMNAS_BASE},etiquetas,archivado`;
 
-const sosKeys = {
+export const sosKeys = {
   all: ["sos"] as const,
   indicadores: ["sos", "indicadores"] as const,
   vinculos: ["sos", "vinculos"] as const,
   publicaciones: ["sos", "publicaciones"] as const,
   cifras: ["sos", "cifras-publicas"] as const,
   graficas: ["sos", "graficas-publicas"] as const,
+  tableros: ["sos", "tableros"] as const,
 };
 
 /* --- Lecturas ---------------------------------------------------------------------------- */
@@ -66,9 +71,14 @@ export function useIndicadoresSos() {
   return useQuery({
     queryKey: sosKeys.indicadores,
     queryFn: async (): Promise<IndicadorSos[]> => {
-      const r = await supabase.from("ds_indicadores").select(COLUMNAS_INDICADOR).order("ods").order("position").order("id");
+      let r = await supabase.from("ds_indicadores").select(COLUMNAS_INDICADOR).order("ods", { nullsFirst: false }).order("position").order("id");
+      // Sin la migración 0204 no existen etiquetas ni archivado: el catálogo sigue leyéndose como en 0202.
+      if (r.error && faltaTabla(r.error)) r = (await supabase.from("ds_indicadores").select(COLUMNAS_BASE).order("ods").order("position").order("id")) as unknown as typeof r;
       if (r.error) throw errorSos(r.error);
-      return (r.data ?? []).map((i) => ({ ...(i as unknown as IndicadorSos), meta: i.meta === null ? null : Number(i.meta) }));
+      return (r.data ?? []).map((i) => {
+        const f = i as unknown as IndicadorSos;
+        return { ...f, meta: i.meta === null ? null : Number(i.meta), etiquetas: f.etiquetas ?? [], archivado: f.archivado ?? false };
+      });
     },
   });
 }
@@ -128,17 +138,17 @@ export function useGraficasPublicas() {
 /* --- Escrituras -------------------------------------------------------------------------- */
 
 /** Lo que cambia cuando algo se publica o se vincula: catálogo, vínculos y lo público. */
-function invalidar(client: ReturnType<typeof useQueryClient>) {
+export function invalidar(client: ReturnType<typeof useQueryClient>) {
   void client.invalidateQueries({ queryKey: sosKeys.all });
   // El portal también lee la caché de las cifras reales.
   void client.invalidateQueries({ queryKey: ["sostenible"] });
 }
 
-/** Crea o edita un indicador (administración o Administra en la unidad: la RLS de 0202 lo hace cumplir). `publicado` no se toca aquí: usa usePublicarIndicador. */
+/** Crea o edita un indicador (administración o Administra en la unidad: la RLS de 0202 lo hace cumplir). `publicado` y `archivado` no se tocan aquí: usa usePublicarIndicador y useArchivarIndicador. */
 export function useGuardarIndicador() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (i: Omit<IndicadorSos, "publicado"> & { publicado?: boolean }) => {
+    mutationFn: async (i: Omit<IndicadorSos, "publicado" | "archivado"> & { publicado?: boolean; archivado?: boolean }) => {
       const fila = {
         id: i.id.trim(),
         ods: i.ods,
@@ -152,6 +162,7 @@ export function useGuardarIndicador() {
         decimales: i.decimales,
         tarjeta: i.tarjeta,
         nota: i.nota.trim(),
+        etiquetas: i.etiquetas,
       };
       const r = await supabase.from("ds_indicadores").upsert(fila, { onConflict: "id" }).select("id").single();
       if (r.error) throw errorSos(r.error);
@@ -167,6 +178,19 @@ export function usePublicarIndicador() {
   return useMutation({
     mutationFn: async (v: { id: string; publicado: boolean }) => {
       const r = await supabase.from("ds_indicadores").update({ publicado: v.publicado }).eq("id", v.id).select("id").single();
+      if (r.error) throw errorSos(r.error);
+      return r.data;
+    },
+    onSuccess: () => invalidar(client),
+  });
+}
+
+/** Archiva o restaura un indicador (Administra). Archivar lo retira del portal; los vínculos y los tableros se conservan. */
+export function useArchivarIndicador() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { id: string; archivado: boolean }) => {
+      const r = await supabase.from("ds_indicadores").update({ archivado: v.archivado }).eq("id", v.id).select("id").single();
       if (r.error) throw errorSos(r.error);
       return r.data;
     },

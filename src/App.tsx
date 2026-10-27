@@ -78,6 +78,7 @@ const StructureNormalize = lazy(() =>
   })),
 );
 const SostenibleHome = lazy(() => import("./modules/sostenible/SostenibleHome").then((m) => ({ default: m.SostenibleHome })));
+const SostenibleTablero = lazy(() => import("./modules/sostenible/SostenibleTablero").then((m) => ({ default: m.SostenibleTablero })));
 const SostenibleRanking = lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleRanking })));
 const RankingsAdmin = lazy(() => import("./modules/rankings/RankingsAdmin").then((m) => ({ default: m.RankingsAdmin })));
 const ReporteOficina = lazy(() => import("./modules/rankings/reporte/ui/ReporteOficina").then((m) => ({ default: m.ReporteOficina })));
@@ -334,6 +335,8 @@ export default function App() {
           <Route path="/sostenible/impact/boletin" element={<OdsBulletin />} />
           {/* La página de evidencia que abre el evaluador de THE: sin marco, sin menú y sin enlaces. */}
           <Route path="/sostenible/impact/evidencia/:n/:indicador" element={<OdsEvidence />} />
+          {/* Un tablero personalizado de Datos de Sostenibilidad (0204); antes de :ranking para no chocar. */}
+          <Route path="/sostenible/tablero/:slug" element={<SostenibleTablero />} />
           <Route path="/sostenible/:ranking" element={<SostenibleCms><SostenibleRanking /></SostenibleCms>} />
           <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCms><SostenibleCategory /></SostenibleCms>} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />

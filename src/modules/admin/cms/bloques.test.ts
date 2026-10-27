@@ -106,7 +106,9 @@ describe("valores de partida frente a sus campos", () => {
   it("un bloque vivo no trae campos que no sean texto de encabezado, salvo el selector de su micrositio", () => {
     // Los micrositios eligen con un selector (ranking o subcategoría) qué sección dibujan; no es contenido.
     const selectores = ["ranking", "categoria", "seccion"];
-    for (const def of BLOQUES.filter((b) => b.vivo)) {
+    // Los bloques de datos de Sostenibilidad (0204) eligen qué mostrar: referencias a la base y opciones de presentación.
+    const conSeleccion = new Set(["indicadores-sostenibilidad", "tablero-sostenibilidad"]);
+    for (const def of BLOQUES.filter((b) => b.vivo && !conSeleccion.has(b.tipo))) {
       for (const campo of def.campos) {
         const permitidos = selectores.includes(campo.clave) ? ["enum"] : ["texto", "area"];
         expect(permitidos, `${def.tipo}.${campo.clave}`).toContain(campo.tipo);

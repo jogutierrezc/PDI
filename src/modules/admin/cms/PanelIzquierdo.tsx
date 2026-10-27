@@ -49,6 +49,8 @@ const ICONO_BLOQUE: Record<string, IconName> = {
   video: "play",
   indicadores: "chart",
   "graficas-sostenibles": "chart",
+  "indicadores-sostenibilidad": "spark-chart",
+  "tablero-sostenibilidad": "grid",
   "avance-plan": "spark-chart",
   "pilares-plan": "columns-view",
   "sdg-band": "grid",

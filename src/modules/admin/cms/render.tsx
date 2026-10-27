@@ -20,6 +20,10 @@ import { odsArt } from "../../sostenible/ods-data";
 import { ALL_INDICATORS, LAST, YEARS } from "../../sostenible/data";
 import { IndicatorBoard, SdgWheel, reduced } from "../../sostenible/widgets";
 import { GraficasSostenibles } from "../../sostenible/GraficasSostenibles";
+import { IndicadoresElegidos, TableroIncrustado } from "../../sostenible/TableroSos";
+import type { EstiloTile } from "../../sostenible/TableroSos";
+import { useCifrasPublicas } from "../../datos-sostenibilidad/sos";
+import { useTableroPublico } from "../../datos-sostenibilidad/tableros";
 import type { SeccionSos } from "../../datos-sostenibilidad/tipos";
 import { CampusExplorer } from "../../landing/CampusExplorer";
 import { ResourceRoom } from "../../landing/ResourceRoom";
@@ -1359,6 +1363,40 @@ function GraficasSostenibilidad({ p }: { p: Props }) {
   );
 }
 
+/**
+ * «Indicadores elegidos»: los indicadores publicados que eligió la persona. En el editor explica lo que falta;
+ * en la página pública, sin ninguno publicado, no dibuja nada (ni el encabezado).
+ */
+function IndicadoresElegidosVivo({ p, navegable }: { p: Props; navegable: boolean }) {
+  const ids = Array.isArray(p.indicadores) ? p.indicadores.filter((x): x is string => typeof x === "string") : [];
+  const publicados = useCifrasPublicas();
+  if (navegable && !ids.some((id) => publicados.data?.some((c) => c.id === id))) return null;
+  const estilo: EstiloTile = p.estilo === "compacta" || p.estilo === "lista" ? p.estilo : "tarjeta";
+  return (
+    <div className="sos cms-vivo" style={{ "--sos-accent": "var(--pillar-2)" } as CSSProperties}>
+      <div className="cms-wrap">
+        <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />
+        <IndicadoresElegidos ids={ids} campus={texto(p.campus) || "selector"} estilo={estilo} opciones={{ meta: p.meta === true, tendencia: p.tendencia !== false, fuente: p.fuente !== false }} editor={!navegable} />
+      </div>
+    </div>
+  );
+}
+
+/** «Tablero de sostenibilidad»: un tablero publicado, incrustado. Sin él, nada en la página pública. */
+function TableroSostenibilidad({ p, navegable }: { p: Props; navegable: boolean }) {
+  const slug = texto(p.tablero);
+  const q = useTableroPublico(slug || undefined);
+  if (navegable && !q.data) return null;
+  return (
+    <div className="sos cms-vivo" style={{ "--sos-accent": "var(--pillar-2)" } as CSSProperties}>
+      <div className="cms-wrap">
+        <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />
+        <TableroIncrustado slug={slug} editor={!navegable} />
+      </div>
+    </div>
+  );
+}
+
 /* --- Columnas con contenido: un contenedor con otros bloques dentro de sus columnas ------------- */
 
 /** Lo que el lienzo del editor le presta al contenedor para que sus columnas y sus hijos se puedan editar. */
@@ -1631,6 +1669,10 @@ function Contenido({ bloque, navegable, disparo = "", auto = true, ocultos = fal
       return <IndicadoresVivo p={p} />;
     case "graficas-sostenibles":
       return <GraficasSostenibilidad p={p} />;
+    case "indicadores-sostenibilidad":
+      return <IndicadoresElegidosVivo p={p} navegable={navegable} />;
+    case "tablero-sostenibilidad":
+      return <TableroSostenibilidad p={p} navegable={navegable} />;
     case "avance-plan":
       return <AvancePlan />;
     case "pilares-plan":

@@ -139,3 +139,71 @@ Todo en `sos.ts` (hooks) y `tipos.ts` (tipos). Sin la migración, las consultas 
 - `sos_graficas_publicas()` → `[{ id, nombre, seccion, orden, fuente, actualizado, config (tipo, titulo, nota, x, series, tamano, filaCalor, ejeX, ejeY, ejeY2, min, max, tendencia, rotular), columnas: [{ clave, etiqueta, tipo }], filas: [{ <clave>: valor }] }]`.
 
 **Portal**: `sostenible/cifras-reales.ts` lee `sos_cifras_publicas()` y, mientras una tarjeta no tenga vínculo nuevo, `ds_cifras_publicas()` (0198). Con `tarjeta` reemplaza la cifra de muestra; sin ella, `IndicatorBoard nuevos` (Inicio y CMS) añade una tarjeta propia solo si hay cifra real para el campus y año elegidos. `sos_graficas_publicas()` se pinta con `sostenible/GraficasSostenibles.tsx` (página de respaldo y bloque `graficas-sostenibles` del CMS).
+
+# Catálogo libre y tableros personalizados (0204)
+
+Migración `supabase/migrations/0204_sostenibilidad_catalogo_libre_y_tableros.sql` (requiere 0178, 0198 y 0202; idempotente). **No toca** `sos_cifras_publicas()`, `sos_graficas_publicas()` ni `ds_cifras_publicas()`: los tableros las reutilizan. Sin ella, el catálogo se lee como en 0202 (sin etiquetas ni archivado) y las secciones nuevas avisan que falta aplicarla; el portal no cambia.
+
+## Catálogo libre
+
+`ds_indicadores` gana tres cambios, sin perder los cuatro indicadores sembrados ni ninguna columna de 0202:
+
+| Cambio | Detalle |
+|---|---|
+| `ods` opcional | Nulo = «sin ODS»; si viene, sigue entre 1 y 17. En la interfaz los «sin ODS» salen en su propio grupo, al final. |
+| `id` es el código libre | Único por catálogo («CAMP-01», «7.2»). Letras, números, punto, guion y guion bajo, hasta 40 (no se cambió el nombre de la columna para no romper `sos_vinculos`, `ds_respuestas` ni el portal). |
+| `etiquetas text[]` | Temas libres («Campus», «Energía»), hasta 12. |
+| `archivado boolean` | Se archiva en vez de borrar: archivar **despublica** (disparador) y conserva vínculos y tableros. Restaurar lo devuelve al catálogo activo, sin publicar. |
+
+Quién escribe no cambió: administración y **Administra** de la unidad (`ds_indicadores_sos_admin`). La pantalla Indicadores suma búsqueda, filtros (ODS, etiqueta, estado: activos, conectados, sin datos, publicados, archivados, todos), etiquetas con sugerencias, descripción y «Archivar / Restaurar». Crear un indicador no exige tabla: se conecta después.
+
+Tipos: `IndicadorSos` ahora trae `ods: number | null`, `etiquetas: string[]`, `archivado: boolean` (y `CifraPublicaSos.ods` puede ser nulo). Hooks nuevos o ajustados en `sos.ts`: `useGuardarIndicador` (guarda también `etiquetas`; no toca `publicado` ni `archivado`), `useArchivarIndicador()` → `mutate({ id, archivado })`.
+
+## Tableros
+
+`sos_tableros`: `id`, `nombre`, `slug` (único, `a-z0-9-`), `descripcion`, `config jsonb`, `publicado`, `publicado_por/en`, `archivado`, `creado_por`, fechas.
+
+`config` (versionada, validada por `sos_tablero_config_ok`):
+
+```
+{ "version": 1, "campus": "Todos" | "Bucaramanga" | …, "selector": true|false,
+  "elementos": [ { "id", "tipo": "indicador"|"grafica"|"titulo"|"texto"|"separador",
+                   "ref" (id del indicador o del archivo de la gráfica),
+                   "ancho": 3|4|6|8|12 (de 12 columnas), "titulo"?, "estilo"?: "tarjeta"|"compacta"|"grande",
+                   "opciones"?: { "texto" } } ] }       // máximo 60 elementos
+```
+
+### Permisos (la base los hace cumplir; la pantalla los refleja)
+
+| Acción | Quién |
+|---|---|
+| Ver | Toda persona que pasa `sos_entra()` |
+| Crear y editar | Papel **Crea** o más en la unidad de Sostenibilidad (la administración general cuenta), o quien creó el tablero |
+| Publicar / retirar | **Crea** o más (el mismo criterio que publicar una gráfica); el disparador `sos_tableros_guardia` lo exige aunque se actualice solo esa columna |
+| Archivar y borrar | Quien lo creó o **Administra** la unidad. Archivar despublica |
+| Cambiar el enlace | No con el tablero publicado |
+
+### Lectura pública (anon y authenticated, `SECURITY DEFINER`, `search_path` fijo)
+
+- `sos_tablero_publico(p_slug)` → `{ slug, nombre, descripcion, campus, selector, elementos, cifras, graficas }` o `null` si no existe, no está publicado o está archivado. `cifras` y `graficas` salen de `sos_cifras_publicas()` y `sos_graficas_publicas()` filtradas por los ids que el tablero nombra: **un indicador o gráfica no publicado se omite aunque el tablero lo nombre** (también de `elementos`). Nunca filas crudas, tablas ni usuarios.
+- `sos_tableros_publicos()` → `[{ slug, nombre, descripcion }]` de los publicados.
+
+### Hooks (`tableros.ts`, mismo estilo que `sos.ts`; sin la migración las lecturas de la intranet fallan con `FaltaMigracion`)
+
+| Hook | Devuelve / hace |
+|---|---|
+| `useTableros()` | `TableroSos[]` que ve la persona (archivados incluidos) |
+| `useGuardarTablero()` | `mutate({ id?, nombre, slug, descripcion, config })` crea (sin `id`) o edita; no toca `publicado` ni `archivado`; avisa si el enlace ya existe |
+| `usePublicarTablero()` | `mutate({ id, publicado })` |
+| `useArchivarTablero()` | `mutate({ id, archivado })` |
+| `useBorrarTablero()` | `mutate(id)` (la pantalla solo lo ofrece con los archivados) |
+| `useTableroPublico(slug)` | `TableroPublicoSos \| null`. Pública; sin migración, sin red o sin tablero, `null` |
+| `useTablerosPublicos()` | `TableroPublicoResumen[]` (el CMS la usa para elegir) |
+| `useIndicadoresPublicados()` | `CifraPublicaSos[]` de lo que hoy ve el público (el CMS los lista); falla visible si falta la migración |
+| `configDe(crudo)`, `slugDe(nombre)`, `urlTablero(slug)` | ayudas puras |
+
+### Pantallas
+
+- **Tableros** (`/admin/datos-sostenibilidad/tableros`, `ui/Tableros.tsx`): lista (estado, enlace, duplicar, copiar enlace, archivar, ver archivados) y constructor (`/tableros/:id`): metadatos, campus de apertura y selector de campus, «Agregar elemento», orden por arrastre, botones o Alt + flechas, ancho, título propio y estilo por elemento, interruptor «Publicado en el portal» y enlace copiable. La **vista previa** usa los mismos componentes del portal (`sostenible/TableroSos.tsx`: `TileCuerpo`, `GraficaSos`) con datos que `ui/vistaPrevia.ts` calcula en el navegador a partir de lo publicado; lo que no saldría se ve como aviso («no está publicado y no saldrá», «sin datos»).
+- **Portal público**: `/sostenible/tablero/:slug` (`sostenible/SostenibleTablero.tsx`, dentro de `SostenibleLayout`; 404 amable si no existe o no está publicado).
+- **CMS** (grupo «Datos en vivo», aditivos y compatibles con estilo del sitio, `_diseno` y «Columnas con contenido»): `indicadores-sostenibilidad` («Indicadores elegidos»: indicadores publicados en orden, campus fijo o selector, estilo tarjeta/compacta/lista, meta, tendencia y fuente) y `tablero-sostenibilidad` («Tablero de sostenibilidad»: un tablero publicado, incrustado). Ambos usan el campo nuevo `referencia` del inspector (`cms/CampoReferencia.tsx`), que carga las opciones de la base con estado de carga, vacío y error. En el editor muestran qué falta; en la página pública, sin nada publicado, no dibujan nada.

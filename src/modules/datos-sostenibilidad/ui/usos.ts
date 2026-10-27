@@ -23,7 +23,9 @@ export function useAccesoSos() {
   const unidades = useUnidades();
   const { hasRole } = useAuth();
   const unidad = unidades.data?.find((u) => u.nombre === NOMBRE_UNIDAD_SOS && !u.archivada_en);
-  return { unidades, unidad, administra: hasRole("admin") || unidad?.mi_rol === "admin" };
+  // «Crea» o más en la unidad (o administración): crea y publica tableros y publica gráficas.
+  const crea = hasRole("admin") || unidad?.mi_rol === "admin" || unidad?.mi_rol === "creador";
+  return { unidades, unidad, administra: hasRole("admin") || unidad?.mi_rol === "admin", crea };
 }
 
 /** Las tablas y gráficas vivas de la unidad (sin papelera). */

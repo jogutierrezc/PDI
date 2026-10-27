@@ -12,15 +12,18 @@
    ========================================================================== */
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { definicion, type CampoBloque, type Subcampo } from "./bloques";
-import { codigoGsap, esquemaDeBloque, filaDeBloque } from "./esquema";
+import { PROPORCIONES_COLUMNAS, definicion, type CampoBloque, type Subcampo } from "./bloques";
+import { codigoGsap, esquemaDeBloque, esquemaDeContenedor, filaDeBloque, hijoDeBloque } from "./esquema";
 import {
   ALINEACIONES,
   ANCHOS,
   CURVAS,
   ESPACIOS,
+  COLUMNAS_CONTENEDOR,
   FONDOS,
   MEDIDAS,
+  SEPARACIONES_CONTENEDOR,
+  VERTICALES_CONTENEDOR,
   PRESETS_MOVIMIENTO,
   alinearDe,
   estadoPublicacion,
@@ -31,6 +34,8 @@ import {
   fijarMovimiento,
   fijarOculto,
   medidaDe,
+  cambiarColumnas,
+  contenedorDe,
   movimientoDe,
   ocultoDe,
   type LineaBloque,
@@ -95,8 +100,10 @@ const lista = (v: unknown): Props[] =>
 
 interface InspectorProps {
   bloque: LineaBloque | null;
-  /** Posición del bloque en la página (para la fila del esquema). */
+  /** Posición del bloque en la página (para la fila del esquema) o en su columna, si está dentro de unas columnas. */
   orden: number;
+  /** El bloque elegido está dentro de una columna: no tiene ancho propio y su esquema es el de un bloque anidado. */
+  anidado?: boolean;
   pagina: CmsPagina;
   puedeEditar: boolean;
   onActualizar: (id: string, cambio: (b: LineaBloque) => LineaBloque, clave?: string) => void;
@@ -110,7 +117,7 @@ interface InspectorProps {
   sitio: EstiloSitioParcial;
 }
 
-export function Inspector({ bloque, orden, pagina, puedeEditar, onActualizar, onFusionFin, onReproducir, onAviso, dispositivo, sitio }: InspectorProps) {
+export function Inspector({ bloque, orden, anidado = false, pagina, puedeEditar, onActualizar, onFusionFin, onReproducir, onAviso, dispositivo, sitio }: InspectorProps) {
   const [pestana, setPestana] = useState<Pestana>(bloque ? "bloque" : "pagina");
   const pestanas: PestanaDef<Pestana>[] = [
     { id: "bloque", etiqueta: "Bloque", icono: <IconoCms name="ajustes" size={15} /> },
@@ -143,6 +150,7 @@ export function Inspector({ bloque, orden, pagina, puedeEditar, onActualizar, on
           <Cuerpo
             bloque={bloque}
             orden={orden}
+            anidado={anidado}
             pestana={pestana}
             onActualizar={onActualizar}
             onFusionFin={onFusionFin}
@@ -160,6 +168,7 @@ export function Inspector({ bloque, orden, pagina, puedeEditar, onActualizar, on
 function Cuerpo({
   bloque,
   orden,
+  anidado,
   pestana,
   onActualizar,
   onFusionFin,
@@ -167,7 +176,7 @@ function Cuerpo({
   onAviso,
   dispositivo,
   sitio,
-}: Pick<InspectorProps, "onActualizar" | "onFusionFin" | "onAviso" | "orden" | "dispositivo" | "sitio"> & { bloque: LineaBloque; pestana: Exclude<Pestana, "pagina">; onReproducir: () => void }) {
+}: Pick<InspectorProps, "onActualizar" | "onFusionFin" | "onAviso" | "orden" | "dispositivo" | "sitio"> & { bloque: LineaBloque; anidado: boolean; pestana: Exclude<Pestana, "pagina">; onReproducir: () => void }) {
   const def = definicion(bloque.tipo);
   const esAdmin = useAuth().hasRole("admin");
   if (!def) return <p className="cms-aviso">Este tipo de bloque no existe en el registro. Revise la página en la base o agregue el tipo.</p>;
@@ -198,17 +207,26 @@ function Cuerpo({
                 : "Este bloque muestra datos en vivo del portal. Se puede mover, ocultar o quitar; su contenido sale de la base."}
             </p>
           )}
-          {def.campos.map((campo) => (
-            <CampoForm
-              key={campo.clave}
-              campo={campo}
-              valor={bloque.props[campo.clave]}
-              onCambio={(valor, fusion) => cambiarProps(campo.clave, valor, fusion ? `${bloque.id}:${campo.clave}` : undefined)}
-              onFin={onFusionFin}
-            />
-          ))}
+          {anidado && (
+            <p className="cms-nota-insp" role="note">
+              Este bloque va dentro de una columna: ocupa su ancho. Para moverlo a otra columna, arrástrelo o use los botones de su barra en el lienzo.
+            </p>
+          )}
+          {bloque.tipo === "contenedor" ? (
+            <SeccionContenedor bloque={bloque} onActualizar={onActualizar} onAviso={onAviso} />
+          ) : (
+            def.campos.map((campo) => (
+              <CampoForm
+                key={campo.clave}
+                campo={campo}
+                valor={bloque.props[campo.clave]}
+                onCambio={(valor, fusion) => cambiarProps(campo.clave, valor, fusion ? `${bloque.id}:${campo.clave}` : undefined)}
+                onFin={onFusionFin}
+              />
+            ))
+          )}
           <h3 className="cms-panel__titulo">Apariencia</h3>
-          <Apariencia bloque={bloque} onActualizar={onActualizar} sinFondo={Boolean(def.sinFondo)} vivo={Boolean(def.vivo)} />
+          <Apariencia bloque={bloque} onActualizar={onActualizar} sinFondo={Boolean(def.sinFondo)} vivo={Boolean(def.vivo)} anidado={anidado} />
         </>
       )}
 
@@ -216,7 +234,7 @@ function Cuerpo({
 
       {pestana === "movimiento" && <Movimiento bloque={bloque} onActualizar={onActualizar} onFin={onFusionFin} onReproducir={onReproducir} />}
 
-      {pestana === "esquema" && <Esquema bloque={bloque} orden={orden} onAviso={onAviso} />}
+      {pestana === "esquema" && <Esquema bloque={bloque} orden={orden} anidado={anidado} onAviso={onAviso} />}
     </fieldset>
   );
 }
@@ -485,6 +503,77 @@ function ListaEditor({
   );
 }
 
+/* --- Columnas con contenido: número de columnas, proporción, separación y alineación -------------- */
+
+const ETIQUETA_SEPARACION: Record<(typeof SEPARACIONES_CONTENEDOR)[number], string> = { chica: "Chica", media: "Media", grande: "Grande" };
+const ETIQUETA_VERTICAL: Record<(typeof VERTICALES_CONTENEDOR)[number], string> = { inicio: "Arriba", centro: "Al centro", fin: "Abajo", estirar: "Estirar" };
+
+function SeccionContenedor({ bloque, onActualizar, onAviso }: { bloque: LineaBloque; onActualizar: InspectorProps["onActualizar"]; onAviso: (m: string | null) => void }) {
+  const c = contenedorDe(bloque.props);
+  const poner = (clave: string, valor: string) => onActualizar(bloque.id, (b) => ({ ...b, props: { ...b.props, [clave]: valor } }));
+  // Con 2 o 3 columnas se ofrecen las proporciones que encajan; con otro número, solo columnas iguales.
+  const proporciones = Object.entries(PROPORCIONES_COLUMNAS).filter(([, d]) => d.partes.length === c.columnas);
+  const total = c.items.reduce((n, x) => n + x.bloques.length, 0);
+  function cambiar(n: number) {
+    const r = cambiarColumnas(bloque.props, n);
+    onActualizar(bloque.id, (b) => ({ ...b, props: cambiarColumnas(b.props, n).props }));
+    if (r.reubicados > 0) onAviso(`Las columnas que sobraban tenían ${r.reubicados} ${r.reubicados === 1 ? "bloque" : "bloques"}: pasaron al final de la última columna.`);
+  }
+  return (
+    <>
+      <p className="cms-nota-insp" role="note">
+        {total === 0
+          ? "Arrastre bloques desde la pestaña Bloques hasta una columna, o use «Agregar bloque» dentro de ella."
+          : `Tiene ${total} ${total === 1 ? "bloque" : "bloques"} en ${c.columnas} ${c.columnas === 1 ? "columna" : "columnas"}. Elija uno en el lienzo para editarlo.`}
+      </p>
+      <label className="cms-campo">
+        <span>Columnas</span>
+        <select className="cms-input" value={String(c.columnas)} onChange={(e) => cambiar(Number(e.target.value))}>
+          {COLUMNAS_CONTENEDOR.map((n) => (
+            <option key={n} value={n}>
+              {n === 1 ? "Una columna" : `${n} columnas`}
+            </option>
+          ))}
+        </select>
+      </label>
+      {proporciones.length > 0 && (
+        <label className="cms-campo">
+          <span>Proporción</span>
+          <select className="cms-input" value={c.proporcion} onChange={(e) => poner("proporcion", e.target.value)}>
+            <option value="iguales">Columnas iguales</option>
+            {proporciones.map(([valor, d]) => (
+              <option key={valor} value={valor}>
+                {d.etiqueta}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label className="cms-campo">
+        <span>Separación entre columnas</span>
+        <select className="cms-input" value={c.separacion} onChange={(e) => poner("separacion", e.target.value)}>
+          {SEPARACIONES_CONTENEDOR.map((v) => (
+            <option key={v} value={v}>
+              {ETIQUETA_SEPARACION[v]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="cms-campo">
+        <span>Alineación vertical</span>
+        <select className="cms-input" value={c.vertical} onChange={(e) => poner("vertical", e.target.value)}>
+          {VERTICALES_CONTENEDOR.map((v) => (
+            <option key={v} value={v}>
+              {ETIQUETA_VERTICAL[v]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="cms-ayuda">Con 900 px o más se ven las columnas elegidas, de 600 a 899 px dos (con seis, tres) y por debajo una sola. El fondo y el espacio se eligen en Apariencia y en la pestaña Estilo.</p>
+    </>
+  );
+}
+
 /* --- Apariencia ------------------------------------------------------------------------------- */
 
 function Apariencia({
@@ -492,11 +581,13 @@ function Apariencia({
   onActualizar,
   sinFondo,
   vivo,
+  anidado,
 }: {
   bloque: LineaBloque;
   onActualizar: InspectorProps["onActualizar"];
   sinFondo: boolean;
   vivo: boolean;
+  anidado: boolean;
 }) {
   const estilo = estiloDe(bloque.props);
   const oculto = ocultoDe(bloque.props);
@@ -566,16 +657,18 @@ function Apariencia({
           </label>
         </>
       )}
-      <label className="cms-campo">
-        <span>Ancho en la página</span>
-        <select className="cms-input" value={bloque.ancho} onChange={(e) => onActualizar(bloque.id, (b) => ({ ...b, ancho: Number(e.target.value) as Ancho }))}>
-          {ANCHOS.map((a) => (
-            <option key={a} value={a}>
-              {ETIQUETA_ANCHO[a]}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!anidado && (
+        <label className="cms-campo">
+          <span>Ancho en la página</span>
+          <select className="cms-input" value={bloque.ancho} onChange={(e) => onActualizar(bloque.id, (b) => ({ ...b, ancho: Number(e.target.value) as Ancho }))}>
+            {ANCHOS.map((a) => (
+              <option key={a} value={a}>
+                {ETIQUETA_ANCHO[a]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="cms-switch">
         <span>Ocultar en la página publicada</span>
         <input
@@ -851,18 +944,19 @@ function Movimiento({
 
 /* --- Esquema ---------------------------------------------------------------------------------- */
 
-function Esquema({ bloque, orden, onAviso }: { bloque: LineaBloque; orden: number; onAviso: (m: string | null) => void }) {
+function Esquema({ bloque, orden, anidado, onAviso }: { bloque: LineaBloque; orden: number; anidado: boolean; onAviso: (m: string | null) => void }) {
   const def = definicion(bloque.tipo);
   if (!def) return null;
-  const esquema = JSON.stringify(esquemaDeBloque(def), null, 2);
-  const fila = JSON.stringify(filaDeBloque(bloque, orden), null, 2);
+  const esquema = JSON.stringify(def.tipo === "contenedor" ? esquemaDeContenedor(def) : esquemaDeBloque(def), null, 2);
+  const fila = JSON.stringify(anidado ? hijoDeBloque(bloque) : filaDeBloque(bloque, orden), null, 2);
   return (
     <>
       <p className="cms-nota-insp">Así se declara el bloque, como un componente de Strapi. El formulario del inspector se genera a partir de esta descripción.</p>
       <h3 className="cms-panel__titulo">Componente</h3>
       <BloqueCodigo etiqueta="Esquema del componente" texto={esquema} onAviso={onAviso} />
       <h3 className="cms-panel__titulo">Cómo viaja a la base</h3>
-      <BloqueCodigo etiqueta="Fila de cms_bloques" texto={fila} onAviso={onAviso} />
+      <BloqueCodigo etiqueta={anidado ? "Bloque anidado" : "Fila de cms_bloques"} texto={fila} onAviso={onAviso} />
+      {anidado && <p className="cms-ayuda">Un bloque dentro de una columna no tiene fila propia: viaja dentro de props.items[columna].bloques del bloque de columnas.</p>}
       <p className="cms-ayuda">Las claves que empiezan por «_» (_estilo, _diseno, _mov, _oculto) viajan dentro de props.</p>
     </>
   );

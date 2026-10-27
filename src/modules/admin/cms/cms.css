@@ -384,6 +384,9 @@
   border: 1px solid transparent;
   border-radius: var(--radius-xs);
 }
+/* Los bloques de una columna cuelgan, sangrados, de su bloque de columnas. */
+.cms-capa__columna { display: grid; gap: var(--space-1); margin-left: var(--space-4); padding-left: var(--space-2); border-left: 2px solid var(--line); }
+.cms-capa__columna > small { padding: 0 var(--space-3); color: var(--ink-muted); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-caps); }
 .cms-capa[aria-current="true"] {
   background: var(--brand-blue-soft);
   border-color: color-mix(in srgb, var(--brand-blue) 45%, transparent);
@@ -621,6 +624,14 @@
   --cms-linea: var(--line);
   --cms-tarjeta: var(--surface);
 }
+/* Un bloque dentro de una columna: deja ver el fondo y el color de la columna (los fondos propios, más abajo, ganan). */
+.cms-celda--hijo {
+  color: inherit;
+  --cms-ink2: inherit;
+  --cms-acento: inherit;
+  --cms-linea: inherit;
+  --cms-tarjeta: inherit;
+}
 .cms-celda--editable { cursor: pointer; }
 .cms-celda--editable:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
 @media (hover: hover) and (pointer: fine) {
@@ -712,6 +723,7 @@
 
 .cms-marco {
   container-type: inline-size;
+  container-name: cms-marco;
   position: relative;
   background: var(--page);
   color: var(--ink);
@@ -740,6 +752,21 @@
 .cms-espacio-compacto { padding-block: var(--space-7); }
 .cms-espacio-normal { padding-block: var(--space-10); }
 .cms-espacio-amplio { padding-block: var(--space-12); }
+
+/* Un hijo con fondo propio vuelve a calcular su texto; sin él, hereda el de la columna. */
+.cms-celda--hijo.cms-fondo-claro,
+.cms-celda--hijo.cms-fondo-alterno {
+  color: var(--cms-c-txt, var(--ink));
+  --cms-ink2: var(--ink-secondary);
+  --cms-acento: var(--cms-c-acento, var(--brand-blue-strong));
+  --cms-linea: var(--line);
+  --cms-tarjeta: var(--surface);
+}
+/* Espacio vertical de un hijo: más ceñido que el de un bloque de la página, que va a todo lo ancho. */
+.cms-celda--hijo.cms-espacio-compacto { padding-block: var(--space-2); }
+.cms-celda--hijo.cms-espacio-normal { padding-block: var(--space-4); }
+.cms-celda--hijo.cms-espacio-amplio { padding-block: var(--space-7); }
+.cms-celda--hijo .cms-wrap { width: min(var(--cms-maxw, 100%), 100%); }
 
 .cms-bloque-vista { min-width: 0; }
 .cms-wrap {
@@ -1716,6 +1743,96 @@ a.cms-acceso:focus-visible { outline: 2px solid var(--brand-blue); outline-offse
   .cms-cm { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
 }
 
+
+/* --- Columnas con contenido (bloque «contenedor») ---------------------------------------------------
+   El bloque mide su propio ancho (container query «cms-cont»), no la ventana: 900 px o más, las columnas
+   elegidas; de 600 a 899, dos (tres si eran seis; con dos se conserva la proporción); menos de 600, una.
+   Las columnas se apilan en orden de lectura. Cada columna es a su vez contenedor: lo que lleva dentro
+   se reacomoda por el ancho de su columna. */
+.cms-cont-cq { container: cms-cont / inline-size; }
+.cms-cont {
+  display: grid;
+  grid-template-columns: var(--cms-fr, repeat(2, minmax(0, 1fr)));
+  gap: var(--cms-gap, var(--space-6));
+  align-items: start;
+}
+.cms-cont--g-chica { --cms-gap: var(--space-3); }
+.cms-cont--g-grande { --cms-gap: var(--space-10); }
+.cms-cont--v-centro { align-items: center; }
+.cms-cont--v-fin { align-items: end; }
+.cms-cont--v-estirar { align-items: stretch; }
+.cms-cont__col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  container-type: inline-size;
+}
+@container cms-cont (max-width: 899px) {
+  .cms-cont--n3, .cms-cont--n4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cms-cont--n6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container cms-cont (max-width: 599px) {
+  .cms-cont { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .cms-cont__col:empty { display: none; }
+}
+
+/* Edición: columna como zona de suelta, columna vacía, selector, indicador y barra del hijo. */
+.cms-cont__col:has(> .cms-celda--editable), .cms-cont__col:has(> .cms-cont__vacia) {
+  min-height: 56px;
+  outline: 1px dashed color-mix(in srgb, var(--brand-blue) 35%, transparent);
+  outline-offset: 4px;
+  border-radius: var(--radius-xs);
+}
+.cms-cont__col--sobre {
+  outline: 2px dashed var(--brand-blue) !important;
+  background: color-mix(in srgb, var(--brand-blue) 7%, transparent);
+}
+.cms-cont__vacia {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: 96px;
+  padding: var(--space-4);
+  border-radius: var(--radius-xs);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+.cms-cont__vacia p { margin: 0; }
+.cms-cont__mas {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--brand-blue-strong);
+  font: 600 var(--text-xs)/1 var(--font-sans);
+  cursor: pointer;
+}
+.cms-cont__mas:hover { background: var(--brand-blue-soft); }
+.cms-celda--hijo .cms-celda__barra { top: calc(var(--space-2) + 28px); left: var(--space-2); right: auto; max-width: calc(100% - 2 * var(--space-2)); flex-wrap: wrap; }
+.cms-celda--hijo.cms-celda--marca-antes::before,
+.cms-celda--hijo.cms-celda--marca-despues::before { height: 4px; }
+.cms-celda--hijo.cms-celda--editable[draggable="true"] { cursor: grabbing; opacity: 0.55; }
+
+.cms-selector { display: grid; gap: var(--space-2); max-height: 320px; overflow-y: auto; padding: var(--space-3); border: 1px solid var(--line-strong); border-radius: var(--radius-xs); background: var(--surface); color: var(--ink); text-align: left; cursor: default; }
+.cms-selector__cabecera { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); }
+.cms-selector__grupo { margin: var(--space-2) 0 var(--space-1); font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-muted); }
+.cms-selector__lista { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.cms-selector__item { width: 100%; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--ink); font: 500 var(--text-xs)/1.4 var(--font-sans); text-align: left; cursor: pointer; }
+.cms-selector__item:hover, .cms-selector__item:focus-visible { background: var(--brand-blue-soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .cms-cont__col { transition: background-color var(--dur-base) var(--ease-out); }
+}
+
 /* Columnas desiguales: las fracciones llegan en --cms-fr desde una tabla fija (render.tsx). */
 .cms-dc { display: grid; grid-template-columns: var(--cms-fr, minmax(0, 6fr) minmax(0, 4fr)); gap: var(--space-7); align-items: start; }
 .cms-dc__col { display: grid; gap: var(--space-3); align-content: start; min-width: 0; }
@@ -1743,10 +1860,10 @@ a.cms-acceso:focus-visible { outline: 2px solid var(--brand-blue); outline-offse
    teléfono hasta 560px. */
 
 .cms-celda { --cms-hs: var(--cms-hs-d); --cms-bs: var(--cms-bs-d); }
-@container (max-width: 900px) {
+@container cms-marco (max-width: 900px) {
   .cms-celda { --cms-hs: var(--cms-hs-t); --cms-bs: var(--cms-bs-t); }
 }
-@container (max-width: 560px) {
+@container cms-marco (max-width: 560px) {
   .cms-celda { --cms-hs: var(--cms-hs-m); --cms-bs: var(--cms-bs-m); }
 }
 

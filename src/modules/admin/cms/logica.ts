@@ -5,7 +5,7 @@
    así se prueba sin base y la intranet y el portal público la comparten.
    ========================================================================== */
 
-import { definicion } from "./bloques";
+import { PROPORCIONES_COLUMNAS, definicion } from "./bloques";
 import type { NodoMicrositio } from "./plantillas";
 import type { Alineacion, Ancho, CmsBloque, CmsPagina, Espacio, Estilo, Fondo, Medida, Movimiento, PresetMovimiento, Props } from "./tipos";
 
@@ -397,4 +397,259 @@ export function mapaOsm(latitud: unknown, longitud: unknown, zoom: unknown): { i
     incrustado: `https://www.openstreetmap.org/export/embed.html?bbox=${caja}&layer=mapnik&marker=${f(lat)},${f(lon)}`,
     enlace: `https://www.openstreetmap.org/?mlat=${f(lat)}&mlon=${f(lon)}#map=${z}/${f(lat)}/${f(lon)}`,
   };
+}
+
+/* --- Columnas con contenido (bloque «contenedor») ------------------------------------------------
+   Un contenedor guarda sus bloques anidados dentro de sus propias props (sin migrar nada):
+   { columnas, proporcion, separacion, vertical, items: [{ id, bloques: [{ id, tipo, props }] }] }.
+   Un hijo es un bloque normal sin `ancho`. Máximo un nivel: un contenedor no contiene otro, y
+   «html» (o cualquier tipo soloAdmin) no se anida jamás. Todo lo que se lee pasa por
+   contenedorDe: lo que no cumple se descarta, así lo guardado a mano o por otro camino no se pinta. */
+
+export const COLUMNAS_CONTENEDOR: readonly number[] = [1, 2, 3, 4, 6];
+export const SEPARACIONES_CONTENEDOR = ["media", "chica", "grande"] as const;
+export const VERTICALES_CONTENEDOR = ["inicio", "centro", "fin", "estirar"] as const;
+/** Topes del anidado: hijos por columna (solo al agregar), hijos en total y bytes de las props del contenedor. */
+export const TOPE_HIJOS = { columna: 20, total: 60, bytes: 400_000 } as const;
+/** Separa el id del contenedor del id del hijo en la selección y en los data-id del lienzo. */
+export const ID_SEP = "/";
+
+export interface HijoContenedor {
+  id: string;
+  tipo: string;
+  props: Props;
+}
+
+export interface ColumnaContenedor {
+  /** Posicional («c1», «c2»…): identifica la columna dentro del contenedor. */
+  id: string;
+  bloques: HijoContenedor[];
+}
+
+export interface ContenedorLeido {
+  columnas: number;
+  /** Clave de PROPORCIONES_COLUMNAS (con tantas partes como columnas) o «iguales». */
+  proporcion: string;
+  separacion: (typeof SEPARACIONES_CONTENEDOR)[number];
+  vertical: (typeof VERTICALES_CONTENEDOR)[number];
+  items: ColumnaContenedor[];
+}
+
+/** ¿Este tipo puede ir dentro de una columna? No: contenedores, «html» ni los reservados a la administración. */
+export function tipoAnidable(tipo: unknown): tipo is string {
+  if (typeof tipo !== "string" || tipo === "contenedor" || tipo === "html") return false;
+  const def = definicion(tipo);
+  return Boolean(def) && !def?.soloAdmin;
+}
+
+/** Id de un hijo para la selección: «<contenedor>/<hijo>». Los uuid no llevan «/». */
+export const idHijo = (contenedor: string, hijo: string): string => `${contenedor}${ID_SEP}${hijo}`;
+
+export function partirId(id: string): { contenedor: string; hijo: string } | null {
+  const i = id.indexOf(ID_SEP);
+  return i > 0 && i < id.length - 1 ? { contenedor: id.slice(0, i), hijo: id.slice(i + 1) } : null;
+}
+
+/**
+ * Lo que dicen las props de un contenedor, validado y normalizado. Descarta hijos de tipo
+ * desconocido o prohibido, ids repetidos y lo que pase de los topes. Las columnas que sobran
+ * (un contenedor con menos columnas que `items`) se pliegan en la última: no se pierde contenido.
+ */
+export function contenedorDe(props: Props): ContenedorLeido {
+  const n = Math.round(Number(props.columnas));
+  const columnas = COLUMNAS_CONTENEDOR.includes(n) ? n : 2;
+  const clave = typeof props.proporcion === "string" ? props.proporcion : "";
+  const proporcion = Object.prototype.hasOwnProperty.call(PROPORCIONES_COLUMNAS, clave) && PROPORCIONES_COLUMNAS[clave]!.partes.length === columnas ? clave : "iguales";
+  const separacion = SEPARACIONES_CONTENEDOR.find((s) => s === props.separacion) ?? "media";
+  const vertical = VERTICALES_CONTENEDOR.find((v) => v === props.vertical) ?? "inicio";
+
+  const grupos: unknown[][] = Array.from({ length: columnas }, () => []);
+  (Array.isArray(props.items) ? props.items : []).forEach((col, i) => {
+    if (esObjeto(col) && Array.isArray(col.bloques)) grupos[Math.min(i, columnas - 1)]!.push(...col.bloques);
+  });
+
+  const vistos = new Set<string>();
+  let total = 0;
+  let bytes = 0;
+  const items = grupos.map(
+    (crudos, c): ColumnaContenedor => ({
+      id: `c${c + 1}`,
+      bloques: crudos.flatMap((crudo, j): HijoContenedor[] => {
+        if (!esObjeto(crudo) || total >= TOPE_HIJOS.total || !tipoAnidable(crudo.tipo)) return [];
+        const hijoProps = esObjeto(crudo.props) ? crudo.props : {};
+        const propio = typeof crudo.id === "string" && crudo.id.length > 0 && crudo.id.length <= 64 && !crudo.id.includes(ID_SEP);
+        const id = propio ? (crudo.id as string) : `h${c}-${j}`;
+        if (vistos.has(id)) return [];
+        bytes += JSON.stringify(hijoProps).length;
+        if (bytes > TOPE_HIJOS.bytes) return [];
+        vistos.add(id);
+        total += 1;
+        return [{ id, tipo: crudo.tipo, props: hijoProps }];
+      }),
+    }),
+  );
+  return { columnas, proporcion, separacion, vertical, items };
+}
+
+/** Todos los hijos de los contenedores de una lista (ya validados): para cargar sus fuentes, por ejemplo. */
+export function hijosPlanos(bloques: readonly { tipo: string; props: Props }[]): HijoContenedor[] {
+  return bloques.flatMap((b) => (b.tipo === "contenedor" ? contenedorDe(b.props).items.flatMap((c) => c.bloques) : []));
+}
+
+const conItems = (b: LineaBloque, items: ColumnaContenedor[]): LineaBloque => ({ ...b, props: { ...b.props, items } });
+const clonar = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+const acotar = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v));
+
+/**
+ * Cambia el número de columnas sin perder hijos: al reducir, los de las columnas sobrantes pasan
+ * al final de la última (`reubicados` los cuenta, para avisarlo); al aumentar se añaden vacías.
+ * Una proporción que ya no encaja con el número de columnas vuelve a «iguales».
+ */
+export function cambiarColumnas(props: Props, columnas: number): { props: Props; reubicados: number } {
+  if (!COLUMNAS_CONTENEDOR.includes(columnas)) return { props, reubicados: 0 };
+  const c = contenedorDe(props);
+  const items = c.items.slice(0, columnas).map((x) => ({ ...x }));
+  const extra = c.items.slice(columnas).flatMap((x) => x.bloques);
+  if (extra.length > 0) items[columnas - 1] = { ...items[columnas - 1]!, bloques: [...items[columnas - 1]!.bloques, ...extra] };
+  while (items.length < columnas) items.push({ id: `c${items.length + 1}`, bloques: [] });
+  const proporcion = c.proporcion !== "iguales" && PROPORCIONES_COLUMNAS[c.proporcion]!.partes.length === columnas ? c.proporcion : "iguales";
+  return { props: { ...props, columnas: String(columnas), proporcion, items }, reubicados: extra.length };
+}
+
+/** Copia de las props de un contenedor con ids nuevos para cada hijo (duplicar el bloque no repite ids). */
+export function reidentificarContenedor(props: Props, nuevoId: () => string): Props {
+  const c = contenedorDe(props);
+  const items = c.items.map((col) => ({ ...col, bloques: col.bloques.map((h) => ({ id: nuevoId(), tipo: h.tipo, props: clonar(h.props) })) }));
+  return { ...clonar(props), items };
+}
+
+export interface UbicacionHijo {
+  /** Posición del contenedor en la lista de la página. */
+  contenedor: number;
+  columna: number;
+  indice: number;
+  /** Hijos que tiene su columna. */
+  total: number;
+  columnas: number;
+}
+
+/** Dónde está un hijo (por su id compuesto); null si no existe. */
+export function ubicarHijo(lista: readonly LineaBloque[], id: string): UbicacionHijo | null {
+  const p = partirId(id);
+  if (!p) return null;
+  const ci = lista.findIndex((b) => b.id === p.contenedor && b.tipo === "contenedor");
+  if (ci < 0) return null;
+  const c = contenedorDe(lista[ci]!.props);
+  for (let columna = 0; columna < c.items.length; columna += 1) {
+    const indice = c.items[columna]!.bloques.findIndex((h) => h.id === p.hijo);
+    if (indice >= 0) return { contenedor: ci, columna, indice, total: c.items[columna]!.bloques.length, columnas: c.columnas };
+  }
+  return null;
+}
+
+/** El bloque de primer nivel o el hijo con ese id; el hijo sale como una línea con su id compuesto y ancho 12. */
+export function resolverBloque(lista: readonly LineaBloque[], id: string): LineaBloque | null {
+  const u = ubicarHijo(lista, id);
+  if (!u) return lista.find((b) => b.id === id) ?? null;
+  const h = contenedorDe(lista[u.contenedor]!.props).items[u.columna]!.bloques[u.indice]!;
+  return { id, tipo: h.tipo, ancho: 12, props: h.props };
+}
+
+/** Aplica un cambio a un bloque de primer nivel o a un hijo; de un hijo solo se guardan sus props. */
+export function actualizarBloque(lista: LineaBloque[], id: string, cambio: (b: LineaBloque) => LineaBloque): LineaBloque[] {
+  const u = ubicarHijo(lista, id);
+  if (!u) return lista.map((b) => (b.id === id ? cambio(b) : b));
+  const actual = resolverBloque(lista, id)!;
+  const nuevo = cambio(actual);
+  if (nuevo.props === actual.props) return lista;
+  const c = contenedorDe(lista[u.contenedor]!.props);
+  const items = c.items.map((col, k) => (k === u.columna ? { ...col, bloques: col.bloques.map((h, j) => (j === u.indice ? { ...h, props: nuevo.props } : h)) } : col));
+  return lista.map((b, i) => (i === u.contenedor ? conItems(b, items) : b));
+}
+
+/** A dónde va un bloque: a la página (antes del índice) o a una columna de un contenedor (antes del índice). */
+export type DestinoBloque = { contenedor: null; indice: number } | { contenedor: string; columna: number; indice: number };
+
+export interface ResultadoColocar {
+  lista: LineaBloque[];
+  /** Id con el que queda el bloque (compuesto si quedó en una columna); null si no se hizo nada. */
+  id: string | null;
+  /** Por qué no se pudo, para mostrarlo. */
+  aviso?: string;
+}
+
+function rechazoColumna(tipo: string): string | null {
+  if (tipo === "contenedor") return "Unas columnas no pueden ir dentro de otras columnas.";
+  if (!tipoAnidable(tipo)) return `«${definicion(tipo)?.nombre ?? tipo}» no se puede poner dentro de una columna.`;
+  return null;
+}
+
+/** Inserta un bloque (nuevo, o ya sacado de su sitio) en el destino. */
+export function insertarBloque(lista: LineaBloque[], bloque: LineaBloque, destino: DestinoBloque): ResultadoColocar {
+  if (destino.contenedor === null) {
+    const en = acotar(destino.indice, 0, lista.length);
+    return { lista: [...lista.slice(0, en), bloque, ...lista.slice(en)], id: bloque.id };
+  }
+  const motivo = rechazoColumna(bloque.tipo);
+  if (motivo) return { lista, id: null, aviso: motivo };
+  const ci = lista.findIndex((b) => b.id === destino.contenedor && b.tipo === "contenedor");
+  if (ci < 0) return { lista, id: null };
+  const c = contenedorDe(lista[ci]!.props);
+  const columna = acotar(destino.columna, 0, c.columnas - 1);
+  const destinoCol = c.items[columna]!.bloques;
+  if (destinoCol.length >= TOPE_HIJOS.columna) return { lista, id: null, aviso: `Una columna admite hasta ${TOPE_HIJOS.columna} bloques.` };
+  if (c.items.reduce((n, x) => n + x.bloques.length, 0) >= TOPE_HIJOS.total) return { lista, id: null, aviso: `Unas columnas admiten hasta ${TOPE_HIJOS.total} bloques en total.` };
+  const en = acotar(destino.indice, 0, destinoCol.length);
+  const hijo: HijoContenedor = { id: bloque.id, tipo: bloque.tipo, props: bloque.props };
+  const items = c.items.map((x, k) => (k === columna ? { ...x, bloques: [...x.bloques.slice(0, en), hijo, ...x.bloques.slice(en)] } : x));
+  return { lista: lista.map((b, i) => (i === ci ? conItems(b, items) : b)), id: idHijo(destino.contenedor, bloque.id) };
+}
+
+interface Extraido {
+  lista: LineaBloque[];
+  bloque: LineaBloque;
+  origen: { contenedor: string | null; columna: number; indice: number };
+}
+
+function extraer(lista: LineaBloque[], id: string): Extraido | null {
+  const u = ubicarHijo(lista, id);
+  if (!u) {
+    const i = lista.findIndex((b) => b.id === id);
+    if (i < 0) return null;
+    return { lista: lista.filter((_, k) => k !== i), bloque: lista[i]!, origen: { contenedor: null, columna: 0, indice: i } };
+  }
+  const cont = lista[u.contenedor]!;
+  const c = contenedorDe(cont.props);
+  const h = c.items[u.columna]!.bloques[u.indice]!;
+  const items = c.items.map((col, k) => (k === u.columna ? { ...col, bloques: col.bloques.filter((_, j) => j !== u.indice) } : col));
+  return {
+    lista: lista.map((b, i) => (i === u.contenedor ? conItems(b, items) : b)),
+    bloque: { id: h.id, tipo: h.tipo, ancho: 12, props: h.props },
+    origen: { contenedor: cont.id, columna: u.columna, indice: u.indice },
+  };
+}
+
+/** Quita un bloque de primer nivel o un hijo. */
+export function quitarBloque(lista: LineaBloque[], id: string): LineaBloque[] {
+  return extraer(lista, id)?.lista ?? lista;
+}
+
+/**
+ * Mueve un bloque de primer nivel o un hijo a otro sitio (página o columna). Si el destino no lo
+ * admite, no toca nada y explica por qué. El índice es «antes de» en la lista como está ahora.
+ * Un hijo que sale a la página queda con ancho 12.
+ */
+export function moverBloque(lista: LineaBloque[], id: string, destino: DestinoBloque): ResultadoColocar {
+  const q = extraer(lista, id);
+  if (!q) return { lista, id: null };
+  if (destino.contenedor !== null) {
+    const motivo = rechazoColumna(q.bloque.tipo);
+    if (motivo) return { lista, id: null, aviso: motivo };
+  }
+  const mismo = q.origen.contenedor === destino.contenedor && (destino.contenedor === null || q.origen.columna === destino.columna);
+  let indice = destino.indice;
+  if (mismo && indice > q.origen.indice) indice -= 1;
+  if (mismo && indice === q.origen.indice) return { lista, id };
+  const r = insertarBloque(q.lista, q.bloque, { ...destino, indice });
+  return r.id === null ? { lista, id: null, aviso: r.aviso } : r;
 }

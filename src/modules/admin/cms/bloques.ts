@@ -1173,6 +1173,51 @@ export const BLOQUES: DefinicionBloque[] = [
       ],
     }),
   },
+  {
+    tipo: "contenedor",
+    nombre: "Columnas con contenido",
+    ayuda: "Columnas donde se sueltan y apilan otros bloques (video, cifras, imagen con texto, botones…). Se arrastran desde la biblioteca o desde la página. En marcos angostos las columnas se apilan",
+    grupo: "Diseño y columnas",
+    // Cada bloque de adentro trae su propia entrada: el contenedor no anima encima de ellos.
+    movimiento: "ninguna",
+    // Los bloques anidados (`items`) no son un campo del formulario: se arman en el lienzo y viajan dentro de las props (ver contenedorDe en logica.ts).
+    campos: [
+      {
+        clave: "columnas",
+        etiqueta: "Columnas",
+        tipo: "enum",
+        opciones: [1, 2, 3, 4, 6].map((n) => ({ valor: String(n), etiqueta: n === 1 ? "Una columna" : `${n} columnas` })),
+      },
+      {
+        clave: "proporcion",
+        etiqueta: "Proporción (con 2 o 3 columnas)",
+        tipo: "enum",
+        opciones: [{ valor: "iguales", etiqueta: "Columnas iguales" }, ...Object.entries(PROPORCIONES_COLUMNAS).map(([valor, d]) => ({ valor, etiqueta: d.etiqueta }))],
+      },
+      {
+        clave: "separacion",
+        etiqueta: "Separación entre columnas",
+        tipo: "enum",
+        opciones: [
+          { valor: "chica", etiqueta: "Chica" },
+          { valor: "media", etiqueta: "Media" },
+          { valor: "grande", etiqueta: "Grande" },
+        ],
+      },
+      {
+        clave: "vertical",
+        etiqueta: "Alineación vertical",
+        tipo: "enum",
+        opciones: [
+          { valor: "inicio", etiqueta: "Arriba" },
+          { valor: "centro", etiqueta: "Al centro" },
+          { valor: "fin", etiqueta: "Abajo" },
+          { valor: "estirar", etiqueta: "Estirar" },
+        ],
+      },
+    ],
+    valores: () => ({ columnas: "2", proporcion: "iguales", separacion: "media", vertical: "inicio" }),
+  },
   /* --- Vivos: datos reales o interactivos del portal ----------------------------------- */
   {
     tipo: "indicadores",

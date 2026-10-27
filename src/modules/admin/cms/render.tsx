@@ -11,7 +11,7 @@
    aparece ya en su lugar.
    ========================================================================== */
 
-import { Fragment, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, createContext, useContext, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -30,10 +30,11 @@ import { AvancePlan } from "./vivos/AvancePlan";
 import { PilaresPlan } from "./vivos/PilaresPlan";
 import { EnvolturaPlaneacion, EquipoOficina, GaleriaOficina, MosaicoPortales, RecientesOficina } from "./vivos/OficinaPlaneacion";
 import { MicrositioVivo } from "./vivos/RankingSecciones";
-import { ALINEACIONES, ALTO_HTML, ANCHOS, alinearDe, destinoSeguro, documentoHtml, estiloDe, leerCifra, mapaOsm, medidaDe, movimientoDe, ocultoDe, videoDatos, videoMiniatura, videoUrl } from "./logica";
+import { ALINEACIONES, ALTO_HTML, ANCHOS, FONDOS, alinearDe, contenedorDe, destinoSeguro, documentoHtml, estiloDe, leerCifra, mapaOsm, medidaDe, hijosPlanos, idHijo, movimientoDe, ocultoDe, videoDatos, videoMiniatura, videoUrl, type HijoContenedor } from "./logica";
 import { initialsOf, officePhotoUrl } from "../../planeacion/page";
 import { PROPORCIONES_COLUMNAS, definicion } from "./bloques";
 import { IconoCms } from "./iconos";
+import { SelectorBloque } from "./SelectorBloque";
 import { estiloDeBloque, estiloDeMarco, familiasUsadas, useFuentes, type EstiloSitioParcial } from "./estilo";
 import type { Ancho, Movimiento, Props } from "./tipos";
 // Estilos del tablero de indicadores (IndicatorBoard). Están acotados al contenedor .sos.
@@ -41,6 +42,8 @@ import "../../sostenible/sostenible.css";
 
 /** Un bloque tal como se dibuja: sin ids ni fechas. */
 export interface BloqueRender {
+  /** Solo lo usa el editor (el contenedor identifica a sus hijos con él); la página publicada no lo trae. */
+  id?: string;
   tipo: string;
   ancho: Ancho;
   props: Props;
@@ -69,12 +72,15 @@ const lista = (v: unknown): Props[] =>
  * su tono (así la celda cubre también el espacio vertical); la cinta de ODS
  * trae su propio fondo y no lleva espacio.
  */
-export function clasesEstilo(bloque: BloqueRender): string {
+export function clasesEstilo(bloque: BloqueRender, anidado = false): string {
   const def = definicion(bloque.tipo);
   const { fondo, espacio } = estiloDe(bloque.props);
   const partes: string[] = [];
+  // Dentro de una columna, el fondo solo se pinta si el bloque lo eligió: si no, deja ver el de la columna.
+  const e = bloque.props._estilo;
+  const fondoPropio = typeof e === "object" && e !== null && FONDOS.includes((e as Props).fondo as (typeof FONDOS)[number]);
   if (bloque.tipo === "hero") partes.push(texto(bloque.props.tono) === "claro" ? "cms-fondo-claro" : "cms-fondo-marino");
-  else if (!def?.sinFondo) partes.push(`cms-fondo-${fondo}`);
+  else if (!def?.sinFondo && (!anidado || fondoPropio)) partes.push(`cms-fondo-${fondo}`);
   if (bloque.tipo !== "ods") partes.push(`cms-espacio-${espacio}`);
   const alinear = alinearDe(bloque.props);
   if (alinear !== "izquierda") partes.push(`cms-alin-${alinear}`);
@@ -1353,9 +1359,154 @@ function GraficasSostenibilidad({ p }: { p: Props }) {
   );
 }
 
+/* --- Columnas con contenido: un contenedor con otros bloques dentro de sus columnas ------------- */
+
+/** Lo que el lienzo del editor le presta al contenedor para que sus columnas y sus hijos se puedan editar. */
+export interface EdicionHijo {
+  className: string;
+  atributos: HTMLAttributes<HTMLDivElement> & { "data-id"?: string };
+  /** Etiqueta y barra de acciones del hijo elegido. */
+  barra: ReactNode;
+}
+export interface EdicionContenedores {
+  seleccion: string | null;
+  celdaHijo(d: { contenedor: string; columna: number; columnas: number; indice: number; total: number; hijo: HijoContenedor }): EdicionHijo;
+  /** Clase y atributos (arrastrar y soltar) de la columna como zona de suelta. */
+  zona(contenedor: string, columna: number, columnas: number, total: number): { className: string; atributos: HTMLAttributes<HTMLDivElement> };
+  agregar(contenedor: string, columna: number, indice: number, tipo: string): void;
+  /** Disparo de la entrada animada de un hijo (por su id compuesto). */
+  disparo(id: string): string;
+}
+/** Solo el lienzo en modo edición lo provee; la vista previa y la página pública dibujan sin él. */
+export const EdicionCtx = createContext<EdicionContenedores | null>(null);
+
+function CeldaHijo({
+  contenedor,
+  columna,
+  columnas,
+  indice,
+  total,
+  hijo,
+  navegable,
+  disparo,
+  auto,
+  ocultos,
+}: {
+  contenedor: string | undefined;
+  columna: number;
+  columnas: number;
+  indice: number;
+  total: number;
+  hijo: HijoContenedor;
+  navegable: boolean;
+  disparo: string;
+  auto: boolean;
+  ocultos: boolean;
+}) {
+  const ed = useContext(EdicionCtx);
+  const id = idHijo(contenedor ?? "", hijo.id);
+  const bloque: BloqueRender = { id, tipo: hijo.tipo, ancho: 12, props: hijo.props };
+  const e = ed && contenedor ? ed.celdaHijo({ contenedor, columna, columnas, indice, total, hijo }) : null;
+  return (
+    <CeldaBloque bloque={bloque} anidado className={e?.className} {...e?.atributos}>
+      {e?.barra}
+      <BloqueVista bloque={bloque} disparo={ed && contenedor ? ed.disparo(id) : disparo} auto={auto} navegable={navegable} incluirOcultos={ocultos} />
+    </CeldaBloque>
+  );
+}
+
+function ColumnaContenedor({
+  contenedor,
+  columna,
+  columnas,
+  hijos,
+  navegable,
+  disparo,
+  auto,
+  ocultos,
+}: {
+  contenedor: string | undefined;
+  columna: number;
+  columnas: number;
+  hijos: HijoContenedor[];
+  navegable: boolean;
+  disparo: string;
+  auto: boolean;
+  ocultos: boolean;
+}) {
+  const ed = useContext(EdicionCtx);
+  const [eligiendo, setEligiendo] = useState(false);
+  const edita = Boolean(ed && contenedor);
+  // En el editor se ven todos (los ocultos, atenuados); en la página, solo los visibles.
+  const visibles = edita || ocultos ? hijos : hijos.filter((h) => !ocultoDe(h.props));
+  const zona = edita ? ed!.zona(contenedor!, columna, columnas, visibles.length) : null;
+  // «+ Agregar bloque» sale cuando la columna está vacía o cuando el contenedor (o uno de sus hijos) está elegido.
+  const elegido = edita && ed!.seleccion !== null && (ed!.seleccion === contenedor || ed!.seleccion.startsWith(`${contenedor}/`));
+  return (
+    <div
+      className={`cms-cont__col${zona?.className ? ` ${zona.className}` : ""}`}
+      role={edita ? "group" : undefined}
+      aria-label={edita ? `Columna ${columna + 1} de ${columnas}${visibles.length === 0 ? ", vacía" : `, ${visibles.length} ${visibles.length === 1 ? "bloque" : "bloques"}`}` : undefined}
+      {...zona?.atributos}
+    >
+      {visibles.map((h, j) => (
+        <CeldaHijo key={h.id} contenedor={contenedor} columna={columna} columnas={columnas} indice={j} total={visibles.length} hijo={h} navegable={navegable} disparo={disparo} auto={auto} ocultos={ocultos} />
+      ))}
+      {edita && eligiendo && (
+        <SelectorBloque
+          onElegir={(tipo) => {
+            setEligiendo(false);
+            ed!.agregar(contenedor!, columna, visibles.length, tipo);
+          }}
+          onCerrar={() => setEligiendo(false)}
+        />
+      )}
+      {edita && !eligiendo && visibles.length === 0 && (
+        <div className="cms-cont__vacia">
+          <p>Suelte aquí un bloque</p>
+          <button type="button" className="cms-btn cms-btn--chico" onClick={() => setEligiendo(true)}>
+            <Icon name="plus" size={14} />
+            Agregar bloque
+          </button>
+        </div>
+      )}
+      {edita && !eligiendo && visibles.length > 0 && elegido && (
+        <button type="button" className="cms-cont__mas" onClick={() => setEligiendo(true)}>
+          <Icon name="plus" size={14} />
+          Agregar bloque
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Columnas con contenido. La cuadrícula responde al ancho del propio bloque (container query
+ * «cms-cont», no a la ventana): con 900 px o más, las columnas elegidas; entre 600 y 899, dos
+ * (tres si eran seis; con dos columnas se conserva la proporción); por debajo de 600, una sola,
+ * en el orden de lectura. Cada columna es además un contenedor, así que lo que va dentro se
+ * reacomoda por el ancho de su columna.
+ */
+function Contenedor({ id, p, navegable, disparo, auto, ocultos }: { id: string | undefined; p: Props; navegable: boolean; disparo: string; auto: boolean; ocultos: boolean }) {
+  const c = useMemo(() => contenedorDe(p), [p]);
+  const partes = c.proporcion !== "iguales" ? PROPORCIONES_COLUMNAS[c.proporcion]!.partes : null;
+  const plantilla = partes ? partes.map((n) => `minmax(0, ${n}fr)`).join(" ") : `repeat(${c.columnas}, minmax(0, 1fr))`;
+  return (
+    <div className="cms-wrap">
+      <div className="cms-cont-cq">
+        <div className={`cms-cont cms-cont--n${c.columnas} cms-cont--g-${c.separacion} cms-cont--v-${c.vertical}`} style={{ "--cms-fr": plantilla } as CSSProperties}>
+          {c.items.map((col, i) => (
+            <ColumnaContenedor key={col.id} contenedor={id} columna={i} columnas={c.columnas} hijos={col.bloques} navegable={navegable} disparo={disparo} auto={auto} ocultos={ocultos} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* --- Un bloque -------------------------------------------------------------------------------- */
 
-function Contenido({ bloque, navegable }: { bloque: BloqueRender; navegable: boolean }): ReactNode {
+function Contenido({ bloque, navegable, disparo = "", auto = true, ocultos = false }: { bloque: BloqueRender; navegable: boolean; disparo?: string; auto?: boolean; ocultos?: boolean }): ReactNode {
   const p = bloque.props;
   switch (bloque.tipo) {
     case "hero": {
@@ -1458,6 +1609,8 @@ function Contenido({ bloque, navegable }: { bloque: BloqueRender; navegable: boo
       return <ContactoMapa p={p} navegable={navegable} />;
     case "columnas-desiguales":
       return <ColumnasDesiguales p={p} navegable={navegable} />;
+    case "contenedor":
+      return <Contenedor id={bloque.id} p={p} navegable={navegable} disparo={disparo} auto={auto} ocultos={ocultos} />;
     case "acordeon":
       return <Desplegables p={p} claveTitulo="titulo" claveTexto="texto" faq={false} navegable={navegable} />;
     case "preguntas":
@@ -1519,18 +1672,21 @@ export function BloqueVista({
   disparo = "",
   auto = true,
   navegable = false,
+  incluirOcultos = false,
 }: {
   bloque: BloqueRender;
   disparo?: string;
   auto?: boolean;
   /** Solo la página pública convierte los botones en enlaces. */
   navegable?: boolean;
+  /** Los bloques ocultos dentro de unas columnas también se dibujan (el editor los atenúa por su cuenta). */
+  incluirOcultos?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEntrada(ref, bloque.tipo, movimientoDe(bloque.tipo, bloque.props), disparo, auto);
   return (
     <div ref={ref} className="cms-bloque-vista">
-      <Contenido bloque={bloque} navegable={navegable} />
+      <Contenido bloque={bloque} navegable={navegable} disparo={disparo} auto={auto} ocultos={incluirOcultos} />
     </div>
   );
 }
@@ -1539,12 +1695,22 @@ export function BloqueVista({
  * La celda de un bloque en la cuadrícula de 12 columnas: su ancho y su fondo y
  * espacio. Los hijos (por ejemplo, la barra del editor) van dentro de la celda.
  */
-export function CeldaBloque({ bloque, className = "", children, ...resto }: { bloque: BloqueRender; children?: ReactNode } & HTMLAttributes<HTMLDivElement>) {
+export function CeldaBloque({
+  bloque,
+  className = "",
+  anidado = false,
+  children,
+  ...resto
+}: { bloque: BloqueRender; children?: ReactNode; /** Un hijo de unas columnas: ocupa su columna, no la cuadrícula de 12. */ anidado?: boolean } & HTMLAttributes<HTMLDivElement>) {
   const ancho = ANCHOS.includes(bloque.ancho) ? bloque.ancho : 12;
   // El estilo propio del bloque (clave `_diseno`): variables y clases que cms.css lee.
   const diseno = estiloDeBloque(bloque.props);
   return (
-    <div className={`cms-celda ${clasesEstilo(bloque)} ${diseno.clase} ${className}`.replace(/\s+/g, " ").trim()} style={{ gridColumn: `span ${ancho}`, ...diseno.style }} {...resto}>
+    <div
+      className={`cms-celda${anidado ? " cms-celda--hijo" : ""} ${clasesEstilo(bloque, anidado)} ${diseno.clase} ${className}`.replace(/\s+/g, " ").trim()}
+      style={anidado ? diseno.style : { gridColumn: `span ${ancho}`, ...diseno.style }}
+      {...resto}
+    >
       {children}
     </div>
   );
@@ -1581,14 +1747,14 @@ export function RenderBloques({
 }) {
   const visibles = incluirOcultos ? bloques : bloques.filter((b) => !ocultoDe(b.props));
   const marco = estiloDeMarco(estilo);
-  useFuentes(familiasUsadas(estilo, visibles));
+  useFuentes(familiasUsadas(estilo, [...visibles, ...hijosPlanos(visibles)]));
   if (visibles.length === 0) return <p className="cms-r-vacio">Esta página todavía no tiene contenido.</p>;
   return (
     <div className={`cms-marco ${marco.clase}`.trim()} style={marco.style} onClickCapture={navegable ? undefined : evitarNavegacion}>
       <div className="cms-r-grid">
         {visibles.map((b, i) => (
           <CeldaBloque key={i} bloque={b}>
-            <BloqueVista bloque={b} disparo={disparo} auto={auto} navegable={navegable} />
+            <BloqueVista bloque={b} disparo={disparo} auto={auto} navegable={navegable} incluirOcultos={incluirOcultos} />
           </CeldaBloque>
         ))}
       </div>

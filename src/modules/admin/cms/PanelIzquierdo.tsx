@@ -7,13 +7,13 @@
    elegida solo hay árbol.
    ========================================================================== */
 
-import { useState, type DragEvent, type ReactNode } from "react";
+import { Fragment, useState, type DragEvent, type ReactNode } from "react";
 import { Icon, type IconName } from "../../../components/ui/Icon";
 import { useAuth } from "../../../lib/auth";
 import { BLOQUES, GRUPOS, definicion } from "./bloques";
 import { resumenDeBloque } from "./esquema";
 import { IconoCms } from "./iconos";
-import { ocultoDe, type LineaBloque } from "./logica";
+import { contenedorDe, idHijo, ocultoDe, type LineaBloque } from "./logica";
 import { Pestanas, idPanel, idPestana, type PestanaDef } from "./Pestanas";
 
 /** Tipo de dato que lleva un bloque arrastrado desde la biblioteca. */
@@ -45,6 +45,7 @@ const ICONO_BLOQUE: Record<string, IconName> = {
   banner: "layers",
   "contacto-mapa": "pin",
   "columnas-desiguales": "columns",
+  contenedor: "columns-view",
   video: "play",
   indicadores: "chart",
   "graficas-sostenibles": "chart",
@@ -105,6 +106,9 @@ function Biblioteca({ editor }: { editor: EditorPanel }) {
   const esAdmin = useAuth().hasRole("admin");
   const empezar = (e: DragEvent, tipo: string) => {
     e.dataTransfer.setData(TIPO_ARRASTRE_BLOQUE, tipo);
+    // En dragover solo se leen los nombres de los datos: el tipo viaja también en uno, para que una columna
+    // pueda rechazar de entrada lo que no admite (cursor de «no se puede soltar»).
+    e.dataTransfer.setData(`${TIPO_ARRASTRE_BLOQUE}.${tipo}`, "1");
     e.dataTransfer.setData("text/plain", tipo);
     e.dataTransfer.effectAllowed = "copy";
   };
@@ -112,7 +116,7 @@ function Biblioteca({ editor }: { editor: EditorPanel }) {
     <>
       <p className="cms-ayuda">
         {editor.puedeAgregar
-          ? "Clic para agregar después del bloque elegido, o arrastre hasta el lienzo."
+          ? "Clic para agregar después del bloque elegido, o arrastre hasta el lienzo o hasta una columna."
           : "En la vista previa no se agregan bloques. Vuelva a Editar."}
       </p>
       {GRUPOS.map((grupo) => {
@@ -148,34 +152,56 @@ function Biblioteca({ editor }: { editor: EditorPanel }) {
   );
 }
 
+/** Una fila de la lista de capas: la de un bloque de la página o la de uno que va dentro de una columna. */
+function Capa({ editor, id, tipo, props }: { editor: EditorPanel; id: string; tipo: string; props: LineaBloque["props"] }) {
+  const nombre = definicion(tipo)?.nombre ?? `Tipo ${tipo}`;
+  const oculto = ocultoDe(props);
+  return (
+    <li className={`cms-capa${oculto ? " is-oculta" : ""}`} aria-current={editor.seleccion === id ? "true" : undefined}>
+      <button type="button" className="cms-capa__elegir" onClick={() => editor.onElegir(id)}>
+        <b>
+          {nombre}
+          {oculto && <span className="cms-sr"> (oculto)</span>}
+        </b>
+        <small>{resumenDeBloque(props) || "—"}</small>
+      </button>
+      <button
+        type="button"
+        className="cms-ib"
+        aria-label={`${oculto ? "Mostrar" : "Ocultar"} ${nombre}`}
+        title={oculto ? "Mostrar en la página" : "Ocultar en la página"}
+        onClick={() => editor.onOcultar(id)}
+      >
+        <Icon name={oculto ? "eye-off" : "eye"} size={16} />
+      </button>
+    </li>
+  );
+}
+
 function Capas({ editor }: { editor: EditorPanel }) {
   if (editor.bloques.length === 0) return <p className="cms-ayuda">Esta página no tiene bloques todavía.</p>;
   return (
     <ul className="cms-capas">
-      {editor.bloques.map((b) => {
-        const nombre = definicion(b.tipo)?.nombre ?? `Tipo ${b.tipo}`;
-        const oculto = ocultoDe(b.props);
-        return (
-          <li key={b.id} className={`cms-capa${oculto ? " is-oculta" : ""}`} aria-current={editor.seleccion === b.id ? "true" : undefined}>
-            <button type="button" className="cms-capa__elegir" onClick={() => editor.onElegir(b.id)}>
-              <b>
-                {nombre}
-                {oculto && <span className="cms-sr"> (oculto)</span>}
-              </b>
-              <small>{resumenDeBloque(b.props) || "—"}</small>
-            </button>
-            <button
-              type="button"
-              className="cms-ib"
-              aria-label={`${oculto ? "Mostrar" : "Ocultar"} ${nombre}`}
-              title={oculto ? "Mostrar en la página" : "Ocultar en la página"}
-              onClick={() => editor.onOcultar(b.id)}
-            >
-              <Icon name={oculto ? "eye-off" : "eye"} size={16} />
-            </button>
-          </li>
-        );
-      })}
+      {editor.bloques.map((b) => (
+        <Fragment key={b.id}>
+          <Capa editor={editor} id={b.id} tipo={b.tipo} props={b.props} />
+          {b.tipo === "contenedor" &&
+            contenedorDe(b.props).items.map((col, c, todas) =>
+              col.bloques.length === 0 ? null : (
+                <li key={col.id} className="cms-capa__columna">
+                  <small>
+                    Columna {c + 1} de {todas.length}
+                  </small>
+                  <ul className="cms-capas cms-capas--hijos">
+                    {col.bloques.map((h) => (
+                      <Capa key={h.id} editor={editor} id={idHijo(b.id, h.id)} tipo={h.tipo} props={h.props} />
+                    ))}
+                  </ul>
+                </li>
+              ),
+            )}
+        </Fragment>
+      ))}
     </ul>
   );
 }

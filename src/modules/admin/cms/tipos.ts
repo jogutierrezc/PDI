@@ -20,6 +20,17 @@
      _alinear "izquierda" | "centro" | "derecha" | "justificado"
      _medida  "estrecha" | "amplia" | "completa"   ancho de los párrafos
      _oculto  true                      no se muestra en la página publicada
+
+   Bloque «contenedor» (Columnas con contenido): sus bloques anidados viajan dentro de
+   sus propias props, sin tabla ni migración nuevas (cms_publicar los copia tal cual):
+     columnas    "1" | "2" | "3" | "4" | "6"      (se lee también como número)
+     proporcion  "iguales" o una clave de PROPORCIONES_COLUMNAS con tantas partes como columnas
+     separacion  "chica" | "media" | "grande"
+     vertical    "inicio" | "centro" | "fin" | "estirar"
+     items       [{ id, bloques: [{ id, tipo, props }] }]   una entrada por columna
+   Un hijo es un bloque normal (mismo registro, mismas claves reservadas) sin `ancho`.
+   Un nivel como máximo: no hay contenedores dentro, ni «html» ni tipos soloAdmin. La
+   lectura validada es contenedorDe (logica.ts); la base lo refuerza (migración 0203).
    ========================================================================== */
 
 export type PortalSlug = "landing" | "planeacion" | "sostenible";

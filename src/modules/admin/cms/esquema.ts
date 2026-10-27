@@ -7,7 +7,7 @@
    ========================================================================== */
 
 import type { CampoBloque, DefinicionBloque, Subcampo } from "./bloques";
-import type { LineaBloque } from "./logica";
+import { partirId, type LineaBloque } from "./logica";
 import type { Movimiento, Props } from "./tipos";
 
 type TipoAtributo = "string" | "text" | "boolean" | "enumeration" | "integer" | "component";
@@ -69,6 +69,40 @@ export function esquemaDeBloque(def: DefinicionBloque): EsquemaBloque {
     info: { displayName: def.nombre, description: def.ayuda, group: def.grupo, live: Boolean(def.vivo) },
     attributes,
   };
+}
+
+/**
+ * El esquema de «Columnas con contenido»: el de siempre más `items`, la lista de columnas, cada una
+ * con su lista de bloques anidados (cualquier tipo anidable del registro). Aparte de esquemaDeBloque
+ * para que éste siga siendo un atributo por campo del registro.
+ */
+export function esquemaDeContenedor(def: DefinicionBloque): EsquemaBloque {
+  const base = esquemaDeBloque(def);
+  return {
+    ...base,
+    attributes: {
+      ...base.attributes,
+      items: {
+        type: "component",
+        repeatable: true,
+        component: `cms.${def.tipo}-columna`,
+        attributes: {
+          id: { type: "string" },
+          bloques: {
+            type: "component",
+            repeatable: true,
+            component: "cms.bloque-anidado",
+            attributes: { id: { type: "string", required: true }, tipo: { type: "string", required: true }, props: { type: "text" } },
+          },
+        },
+      },
+    },
+  };
+}
+
+/** Un bloque anidado tal como viaja dentro de las props de su contenedor (sin `ancho`: ocupa la columna). */
+export function hijoDeBloque(linea: LineaBloque): { id: string; tipo: string; props: Props } {
+  return { id: partirId(linea.id)?.hijo ?? linea.id, tipo: linea.tipo, props: linea.props };
 }
 
 /** La fila de `cms_bloques` tal como se escribe al guardar: las claves «_» viajan dentro de `props`. */

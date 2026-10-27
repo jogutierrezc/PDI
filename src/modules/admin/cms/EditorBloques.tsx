@@ -18,7 +18,24 @@ import { Inspector } from "./Inspector";
 import { Lienzo, type Accion } from "./Lienzo";
 import { PanelIzquierdo } from "./PanelIzquierdo";
 import { cambiar as cambiarHistorial, cortarFusion, deshacer, nuevoHistorial, rehacer } from "./historial";
-import { fijarOculto, ocultoDe, type BloqueExistente, type LineaBloque } from "./logica";
+import {
+  actualizarBloque,
+  contenedorDe,
+  fijarOculto,
+  idHijo,
+  insertarBloque,
+  moverBloque,
+  ocultoDe,
+  partirId,
+  quitarBloque,
+  reidentificarContenedor,
+  resolverBloque,
+  tipoAnidable,
+  ubicarHijo,
+  type BloqueExistente,
+  type DestinoBloque,
+  type LineaBloque,
+} from "./logica";
 import { RenderBloques, evitarNavegacion } from "./render";
 import { plantillaPortada } from "./plantillas";
 import { aLineas, sincronizarBloques, useInvalidarCms, usePublicar } from "./store";
@@ -58,6 +75,8 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
   const [reproPagina, setReproPagina] = useState(0);
   const [reproBloque, setReproBloque] = useState<{ id: string; n: number } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // Lo que se dice a quien usa lector de pantalla cuando un bloque cambia de sitio sin ratón.
+  const [anuncio, setAnuncio] = useState("");
   // Cargar el diseño actual reemplaza el borrador: si ya hay bloques, se pide confirmación aquí mismo.
   const [confirmarCarga, setConfirmarCarga] = useState(false);
   const confirmarRef = useRef<HTMLButtonElement>(null);
@@ -68,8 +87,10 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
   const actual = hist.actual;
   const actualJson = useMemo(() => JSON.stringify(actual), [actual]);
   const sucio = actualJson !== guardado;
-  const idx = actual.findIndex((b) => b.id === seleccion);
-  const elegido = idx >= 0 ? actual[idx] : null;
+  // La selección es el id de un bloque de la página o «<contenedor>/<hijo>» si está dentro de unas columnas.
+  const ubic = seleccion ? ubicarHijo(actual, seleccion) : null;
+  const idx = seleccion && !ubic ? actual.findIndex((b) => b.id === seleccion) : -1;
+  const elegido = seleccion ? resolverBloque(actual, seleccion) : null;
   const editando = puedeEditar && modo === "editar";
   const anchoMarco = DISPOSITIVOS.find((d) => d.id === dispositivo)?.ancho ?? 1180;
   const disparoDe = (id: string) => `${reproPagina}-${modo}-${reproBloque?.id === id ? reproBloque.n : 0}`;
@@ -80,21 +101,30 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
   const aplicar = (fn: (lista: LineaBloque[]) => LineaBloque[], clave?: string) =>
     setHist((h) => cambiarHistorial(h, fn(h.actual), clave));
 
-  const actualizar = (id: string, cambio: (b: LineaBloque) => LineaBloque, clave?: string) =>
-    aplicar((lista) => lista.map((b) => (b.id === id ? cambio(b) : b)), clave);
+  const actualizar = (id: string, cambio: (b: LineaBloque) => LineaBloque, clave?: string) => aplicar((lista) => actualizarBloque(lista, id, cambio), clave);
 
-  /** Mueve el bloque para que quede antes del índice `destino` (de la lista actual). */
-  const moverA = (id: string, destino: number) =>
-    aplicar((lista) => {
-      const desde = lista.findIndex((b) => b.id === id);
-      if (desde < 0) return lista;
-      const pos = destino > desde ? destino - 1 : destino;
-      if (pos === desde) return lista;
-      const copia = [...lista];
-      const [mover] = copia.splice(desde, 1);
-      copia.splice(pos, 0, mover);
-      return copia;
-    });
+  const anunciar = (texto: string) => setAnuncio(texto);
+
+  /**
+   * Mueve un bloque de la página o un hijo a la página o a una columna. Si el destino no lo admite
+   * (HTML o columnas dentro de una columna) avisa y no cambia nada. La selección sigue al bloque.
+   */
+  function mover(id: string, destino: DestinoBloque, decir?: string) {
+    const r = moverBloque(actual, id, destino);
+    if (r.aviso) {
+      onAviso(r.aviso);
+      anunciar(r.aviso);
+      return;
+    }
+    if (r.id === null || r.lista === actual) return;
+    aplicar((lista) => moverBloque(lista, id, destino).lista);
+    if (seleccion === id) setSeleccion(r.id);
+    if (decir) anunciar(decir);
+    mostrar(r.id);
+  }
+
+  /** Mueve el bloque para que quede antes del índice `destino` de la página (de la lista actual). */
+  const moverA = (id: string, destino: number) => mover(id, { contenedor: null, indice: destino });
 
   /** Lleva el bloque a la vista cuando se elige desde un panel (no al hacer clic en el lienzo, donde ya se ve). */
   function mostrar(id: string) {
@@ -105,27 +135,82 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
   }
 
   function accion(a: Accion, id: string) {
-    const i = actual.findIndex((b) => b.id === id);
-    if (i < 0) return;
+    const bloque = resolverBloque(actual, id);
+    if (!bloque) return;
     // Un bloque reservado a la administración (HTML) no se duplica ni se oculta sin ese rol: la base lo rechazaría.
-    if ((a === "duplicar" || a === "ocultar") && definicion(actual[i].tipo)?.soloAdmin && !esAdmin) {
+    if ((a === "duplicar" || a === "ocultar") && definicion(bloque.tipo)?.soloAdmin && !esAdmin) {
       onAviso("Solo la administración puede duplicar u ocultar un bloque de HTML personalizado.");
       return;
     }
-    if (a === "subir") return i > 0 ? moverA(id, i - 1) : undefined;
-    if (a === "bajar") return i < actual.length - 1 ? moverA(id, i + 2) : undefined;
     if (a === "ocultar") return actualizar(id, (b) => ({ ...b, props: fijarOculto(b.props, !ocultoDe(b.props)) }));
+
+    const u = ubicarHijo(actual, id);
+    if (u) return accionHijo(a, id, bloque, u);
+
+    const i = actual.findIndex((b) => b.id === id);
+    if (a === "subir") return i > 0 ? mover(id, { contenedor: null, indice: i - 1 }, `Bloque movido a la posición ${i} de ${actual.length}.`) : undefined;
+    if (a === "bajar") return i < actual.length - 1 ? mover(id, { contenedor: null, indice: i + 2 }, `Bloque movido a la posición ${i + 2} de ${actual.length}.`) : undefined;
     if (a === "duplicar") {
-      const copia: LineaBloque = { ...actual[i], id: crypto.randomUUID(), props: JSON.parse(JSON.stringify(actual[i].props)) as Props };
+      // Un contenedor se copia con sus bloques de adentro, cada uno con su id nuevo.
+      const props = bloque.tipo === "contenedor" ? reidentificarContenedor(bloque.props, () => crypto.randomUUID()) : (JSON.parse(JSON.stringify(bloque.props)) as Props);
+      const copia: LineaBloque = { ...bloque, id: crypto.randomUUID(), props };
       aplicar((lista) => [...lista.slice(0, i + 1), copia, ...lista.slice(i + 1)]);
       setSeleccion(copia.id);
       mostrar(copia.id);
       return;
     }
+    if (a !== "eliminar") return;
     // eliminar: la selección pasa al vecino de la misma posición.
     const resto = actual.filter((b) => b.id !== id);
     aplicar((lista) => lista.filter((b) => b.id !== id));
     setSeleccion(resto[Math.min(i, resto.length - 1)]?.id ?? null);
+  }
+
+  /** Acciones de un bloque que está dentro de una columna. */
+  function accionHijo(a: Accion, id: string, bloque: LineaBloque, u: NonNullable<ReturnType<typeof ubicarHijo>>) {
+    const cid = actual[u.contenedor]!.id;
+    const aqui = { contenedor: cid, columna: u.columna };
+    if (a === "subir") return u.indice > 0 ? mover(id, { ...aqui, indice: u.indice - 1 }, `Bloque movido a la posición ${u.indice} de ${u.total} en la columna ${u.columna + 1}.`) : undefined;
+    if (a === "bajar") return u.indice < u.total - 1 ? mover(id, { ...aqui, indice: u.indice + 2 }, `Bloque movido a la posición ${u.indice + 2} de ${u.total} en la columna ${u.columna + 1}.`) : undefined;
+    if (a === "columna-ant") return u.columna > 0 ? mover(id, { contenedor: cid, columna: u.columna - 1, indice: u.indice }, `Bloque movido a la columna ${u.columna} de ${u.columnas}.`) : undefined;
+    if (a === "columna-sig") return u.columna < u.columnas - 1 ? mover(id, { contenedor: cid, columna: u.columna + 1, indice: u.indice }, `Bloque movido a la columna ${u.columna + 2} de ${u.columnas}.`) : undefined;
+    if (a === "sacar") return mover(id, { contenedor: null, indice: u.contenedor + 1 }, "Bloque fuera de las columnas, debajo de ellas.");
+    if (a === "duplicar") {
+      const copia: LineaBloque = { ...bloque, id: crypto.randomUUID(), props: JSON.parse(JSON.stringify(bloque.props)) as Props };
+      const r = insertarBloque(actual, copia, { ...aqui, indice: u.indice + 1 });
+      if (r.id === null) return r.aviso ? onAviso(r.aviso) : undefined;
+      aplicar((lista) => insertarBloque(lista, copia, { ...aqui, indice: u.indice + 1 }).lista);
+      setSeleccion(r.id);
+      mostrar(r.id);
+      return;
+    }
+    if (a !== "eliminar") return;
+    // La selección pasa al hermano de la columna; si no queda ninguno, al contenedor.
+    const quedan = contenedorDe(quitarBloque(actual, id)[u.contenedor]!.props).items[u.columna]!.bloques.map((h) => idHijo(cid, h.id));
+    aplicar((lista) => quitarBloque(lista, id));
+    setSeleccion(quedan[Math.min(u.indice, quedan.length - 1)] ?? cid);
+    anunciar("Bloque eliminado de la columna.");
+  }
+
+  /** Inserta un bloque nuevo en una columna (suelta desde la biblioteca o «Agregar bloque» de la columna). */
+  function insertarEnColumna(tipo: string, contenedor: string, columna: number, indice: number) {
+    const def = definicion(tipo);
+    if (!def) return;
+    if (!tipoAnidable(tipo)) {
+      onAviso(`«${def.nombre}» no se puede poner dentro de una columna.`);
+      return;
+    }
+    const nuevo: LineaBloque = { id: crypto.randomUUID(), tipo: def.tipo, ancho: 12, props: def.valores() };
+    const destino: DestinoBloque = { contenedor, columna, indice };
+    const r = insertarBloque(actual, nuevo, destino);
+    if (r.id === null) {
+      if (r.aviso) onAviso(r.aviso);
+      return;
+    }
+    aplicar((lista) => insertarBloque(lista, nuevo, destino).lista);
+    setSeleccion(r.id);
+    mostrar(r.id);
+    anunciar(`Bloque «${def.nombre}» agregado a la columna ${columna + 1}.`);
   }
 
   /** Inserta un bloque nuevo del tipo dado antes del índice (o después del elegido, o al final). */
@@ -136,8 +221,14 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
       onAviso(`Solo la administración puede agregar el bloque «${def.nombre}».`);
       return;
     }
+    // Con un bloque de una columna elegido, el nuevo va después de él en la misma columna (si cabe en una columna).
+    if (destino === undefined && ubic && tipoAnidable(tipo)) {
+      insertarEnColumna(tipo, actual[ubic.contenedor]!.id, ubic.columna, ubic.indice + 1);
+      return;
+    }
     const nuevo: LineaBloque = { id: crypto.randomUUID(), tipo: def.tipo, ancho: 12, props: def.valores() };
-    const en = Math.max(0, Math.min(actual.length, destino ?? (elegido ? idx + 1 : actual.length)));
+    const despuesDe = ubic ? ubic.contenedor : idx;
+    const en = Math.max(0, Math.min(actual.length, destino ?? (despuesDe >= 0 ? despuesDe + 1 : actual.length)));
     aplicar((lista) => [...lista.slice(0, en), nuevo, ...lista.slice(en)]);
     setSeleccion(nuevo.id);
     mostrar(nuevo.id);
@@ -198,7 +289,14 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
         return;
       }
       if (!seleccion) return;
-      if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      const dentro = partirId(seleccion) !== null;
+      if (e.altKey && e.shiftKey && e.key === "ArrowUp" && dentro) {
+        e.preventDefault();
+        accion("sacar", seleccion);
+      } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight") && dentro) {
+        e.preventDefault();
+        accion(e.key === "ArrowLeft" ? "columna-ant" : "columna-sig", seleccion);
+      } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
         accion(e.key === "ArrowUp" ? "subir" : "bajar", seleccion);
       } else if (e.key === "Delete") {
@@ -406,14 +504,20 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
                 onAccion={accion}
                 onMoverA={moverA}
                 onInsertar={insertar}
+                onMoverAColumna={(id, contenedor, columna, indice) => mover(id, { contenedor, columna, indice })}
+                onInsertarEnColumna={insertarEnColumna}
                 estilo={estilo}
               />
             )}
           </div>
         </div>
 
+        <p className="cms-sr" role="status" aria-live="polite">
+          {anuncio}
+        </p>
+
         <div className="cms-pista">
-          <p>Alt + flechas mueve el bloque elegido, Supr lo elimina, Esc suelta la selección, Ctrl+Z deshace y Ctrl+Shift+Z rehace.</p>
+          <p>Alt + flechas mueve el bloque elegido (dentro de unas columnas, Alt + izquierda o derecha lo pasa a otra columna y Alt + Mayús + arriba lo saca), Supr lo elimina, Esc suelta la selección, Ctrl+Z deshace y Ctrl+Shift+Z rehace.</p>
           {esPortada && actual.length > 0 && <p>Lo que se publica aquí todavía no reemplaza la página real del portal: se ve en {rutaPublica}.</p>}
         </div>
       </section>
@@ -421,7 +525,8 @@ export function EditorBloques({ pagina, bloques, puedeEditar, panelPaginas, onAv
       {editando && (
         <Inspector
           bloque={elegido}
-          orden={Math.max(idx, 0)}
+          orden={ubic ? ubic.indice : Math.max(idx, 0)}
+          anidado={ubic !== null}
           pagina={pagina}
           puedeEditar={puedeEditar}
           onActualizar={actualizar}

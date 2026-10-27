@@ -20,10 +20,10 @@ import { contextFacts, leapDimensions } from "../../landing/content";
 import { DEFAULT_PAGE } from "../../planeacion/page";
 import type { Fondo, PresetMovimiento, Props } from "./tipos";
 
-export type GrupoBloque = "Portada y estructura" | "Contenido básico" | "Diseño y columnas" | "Multimedia" | "Interactivo" | "Landing" | "Planeación" | "UDES Sostenible" | "Micrositios de ranking" | "Datos en vivo";
+export type GrupoBloque = "Portada y estructura" | "Contenido básico" | "Diseño y columnas" | "Multimedia" | "Interactivo" | "Personas y contacto" | "Landing" | "Planeación" | "UDES Sostenible" | "Micrositios de ranking" | "Datos en vivo";
 
 /** Los grupos del selector «Agregar bloque». Cada uno reúne tipos del mismo uso. */
-export const GRUPOS: readonly GrupoBloque[] = ["Portada y estructura", "Contenido básico", "Diseño y columnas", "Multimedia", "Interactivo", "Landing", "Planeación", "UDES Sostenible", "Micrositios de ranking", "Datos en vivo"];
+export const GRUPOS: readonly GrupoBloque[] = ["Portada y estructura", "Contenido básico", "Diseño y columnas", "Multimedia", "Interactivo", "Personas y contacto", "Landing", "Planeación", "UDES Sostenible", "Micrositios de ranking", "Datos en vivo"];
 
 export interface Opcion {
   valor: string;
@@ -140,6 +140,29 @@ const OPCIONES_PROPORCION: Opcion[] = [
   { valor: "21/9", etiqueta: "Muy ancha 21:9" },
   { valor: "4/3", etiqueta: "Clásica 4:3" },
   { valor: "1/1", etiqueta: "Cuadrada" },
+];
+
+/**
+ * Proporciones de «columnas-desiguales»: la clave es el valor guardado y los números
+ * son las fracciones de cada columna. render.tsx las usa para armar la cuadrícula,
+ * así que ningún texto escrito por una persona llega al CSS.
+ */
+export const PROPORCIONES_COLUMNAS: Record<string, { etiqueta: string; partes: number[] }> = {
+  "60-40": { etiqueta: "Dos columnas 60 / 40", partes: [6, 4] },
+  "70-30": { etiqueta: "Dos columnas 70 / 30", partes: [7, 3] },
+  "30-70": { etiqueta: "Dos columnas 30 / 70", partes: [3, 7] },
+  "40-60": { etiqueta: "Dos columnas 40 / 60", partes: [4, 6] },
+  "50-25-25": { etiqueta: "Tres columnas 50 / 25 / 25", partes: [2, 1, 1] },
+  "25-50-25": { etiqueta: "Tres columnas 25 / 50 / 25", partes: [1, 2, 1] },
+  "25-25-50": { etiqueta: "Tres columnas 25 / 25 / 50", partes: [1, 1, 2] },
+  "60-20-20": { etiqueta: "Tres columnas 60 / 20 / 20", partes: [3, 1, 1] },
+  "20-60-20": { etiqueta: "Tres columnas 20 / 60 / 20", partes: [1, 3, 1] },
+};
+
+const OPCIONES_ALTO_BANNER: Opcion[] = [
+  { valor: "baja", etiqueta: "Baja" },
+  { valor: "media", etiqueta: "Media" },
+  { valor: "alta", etiqueta: "Alta" },
 ];
 
 export const BLOQUES: DefinicionBloque[] = [
@@ -776,6 +799,15 @@ export const BLOQUES: DefinicionBloque[] = [
       CAMPO_IMAGEN("imagen", "Imagen"),
       { clave: "alt", etiqueta: "Descripción para lectores de pantalla (vacía si es decorativa)", tipo: "texto" },
       {
+        clave: "disposicion",
+        etiqueta: "Disposición",
+        tipo: "enum",
+        opciones: [
+          { valor: "lado", etiqueta: "Imagen al lado del texto" },
+          { valor: "centrada", etiqueta: "Imagen arriba y texto centrado debajo" },
+        ],
+      },
+      {
         clave: "lado",
         etiqueta: "Lado de la imagen",
         tipo: "enum",
@@ -814,6 +846,7 @@ export const BLOQUES: DefinicionBloque[] = [
     valores: () => ({
       imagen: "",
       alt: "",
+      disposicion: "lado",
       lado: "izquierda",
       proporcion: "4/3",
       vertical: "centro",
@@ -857,6 +890,288 @@ export const BLOQUES: DefinicionBloque[] = [
       { clave: "ajustar", etiqueta: "Ajustar la altura al contenido", tipo: "bool" },
     ],
     valores: () => ({ titulo: "Contenido incrustado", html: "", css: "", js: "", alto: 320, ajustar: true }),
+  },
+  /* --- Personas, tiempo y contacto: bloques de la tanda F --------------------------------------- */
+  {
+    tipo: "linea-tiempo",
+    nombre: "Línea de tiempo",
+    ayuda: "Hitos con fecha, título, texto e imagen opcional. Vertical alternada (una columna en el teléfono) u horizontal desplazable",
+    grupo: "Contenido básico",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      {
+        clave: "orientacion",
+        etiqueta: "Orientación",
+        tipo: "enum",
+        opciones: [
+          { valor: "vertical", etiqueta: "Vertical" },
+          { valor: "horizontal", etiqueta: "Horizontal (se desplaza de lado)" },
+        ],
+      },
+      {
+        clave: "items",
+        etiqueta: "Hitos",
+        tipo: "lista",
+        subcampos: [
+          { clave: "titulo", etiqueta: "Título", tipo: "texto" },
+          { clave: "fecha", etiqueta: "Fecha o año", tipo: "texto" },
+          { clave: "texto", etiqueta: "Texto", tipo: "area" },
+          CAMPO_IMAGEN("imagen", "Imagen (opcional)"),
+          { clave: "alt", etiqueta: "Descripción de la imagen para lectores de pantalla", tipo: "texto" },
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      orientacion: "vertical",
+      items: [
+        { titulo: "Fundación de la institución", fecha: "Año", texto: "Escriba aquí qué ocurrió y por qué marcó el rumbo de la universidad.", imagen: "", alt: "" },
+        { titulo: "Apertura de un nuevo campus", fecha: "Año", texto: "Escriba aquí qué ocurrió y por qué marcó el rumbo de la universidad.", imagen: "", alt: "" },
+        { titulo: "Acreditación institucional", fecha: "Año", texto: "Escriba aquí qué ocurrió y por qué marcó el rumbo de la universidad.", imagen: "", alt: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "equipo",
+    nombre: "Equipo",
+    ayuda: "Personas con foto, nombre, cargo, correo (texto que se copia con un clic) y enlace opcional, en 2, 3 o 4 por fila",
+    grupo: "Personas y contacto",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      {
+        clave: "columnas",
+        etiqueta: "Personas por fila",
+        tipo: "enum",
+        opciones: [
+          { valor: "2", etiqueta: "Dos" },
+          { valor: "3", etiqueta: "Tres" },
+          { valor: "4", etiqueta: "Cuatro" },
+        ],
+      },
+      {
+        clave: "foto",
+        etiqueta: "Forma de la foto",
+        tipo: "enum",
+        opciones: [
+          { valor: "redonda", etiqueta: "Redonda" },
+          { valor: "cuadrada", etiqueta: "Cuadrada" },
+        ],
+      },
+      {
+        clave: "items",
+        etiqueta: "Personas",
+        tipo: "lista",
+        subcampos: [
+          { clave: "nombre", etiqueta: "Nombre", tipo: "texto" },
+          { clave: "cargo", etiqueta: "Cargo o dependencia", tipo: "texto" },
+          CAMPO_IMAGEN("imagen", "Foto (sin foto se muestran las iniciales)"),
+          { clave: "correo", etiqueta: "Correo (opcional)", tipo: "texto" },
+          campoDestino("enlace", "Enlace al perfil (opcional: /ruta o https://…)"),
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      columnas: "3",
+      foto: "redonda",
+      items: [
+        { nombre: "Nombre y apellido", cargo: "Cargo o dependencia", imagen: "", correo: "", enlace: "" },
+        { nombre: "Nombre y apellido", cargo: "Cargo o dependencia", imagen: "", correo: "", enlace: "" },
+        { nombre: "Nombre y apellido", cargo: "Cargo o dependencia", imagen: "", correo: "", enlace: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "testimonios",
+    nombre: "Testimonios",
+    ayuda: "Citas de varias personas con su cargo y foto opcional, en cuadrícula o en un carrusel sencillo con flechas y puntos",
+    grupo: "Personas y contacto",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      {
+        clave: "modo",
+        etiqueta: "Presentación",
+        tipo: "enum",
+        opciones: [
+          { valor: "cuadricula", etiqueta: "Cuadrícula" },
+          { valor: "carrusel", etiqueta: "Carrusel (uno a la vez)" },
+        ],
+      },
+      {
+        clave: "items",
+        etiqueta: "Testimonios",
+        tipo: "lista",
+        subcampos: [
+          { clave: "nombre", etiqueta: "Nombre", tipo: "texto" },
+          { clave: "cargo", etiqueta: "Cargo, programa o año de egreso", tipo: "texto" },
+          { clave: "texto", etiqueta: "Testimonio", tipo: "area" },
+          CAMPO_IMAGEN("imagen", "Foto (opcional)"),
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      modo: "cuadricula",
+      items: [
+        { nombre: "Nombre de la persona", cargo: "Egresada, programa y año", texto: "Escriba aquí lo que esta persona cuenta de su experiencia en la universidad.", imagen: "" },
+        { nombre: "Nombre de la persona", cargo: "Estudiante, programa y semestre", texto: "Escriba aquí lo que esta persona cuenta de su experiencia en la universidad.", imagen: "" },
+        { nombre: "Nombre de la persona", cargo: "Docente, facultad", texto: "Escriba aquí lo que esta persona cuenta de su experiencia en la universidad.", imagen: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "pestanas",
+    nombre: "Pestañas",
+    ayuda: "Contenido en pestañas: cada una con su título, texto, imagen y botón. Se recorren con las flechas, Inicio y Fin",
+    grupo: "Interactivo",
+    movimiento: "sube",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      { clave: "inicial", etiqueta: "Pestaña que se abre primero (1 es la primera)", tipo: "numero", min: 1, max: 12 },
+      {
+        clave: "items",
+        etiqueta: "Pestañas",
+        tipo: "lista",
+        subcampos: [
+          { clave: "pestana", etiqueta: "Nombre de la pestaña", tipo: "texto" },
+          { clave: "titulo", etiqueta: "Título del contenido", tipo: "texto" },
+          { clave: "texto", etiqueta: "Texto (una línea en blanco abre un párrafo)", tipo: "area" },
+          CAMPO_IMAGEN("imagen", "Imagen (opcional)"),
+          { clave: "alt", etiqueta: "Descripción de la imagen para lectores de pantalla", tipo: "texto" },
+          { clave: "boton", etiqueta: "Texto del botón (vacío: sin botón)", tipo: "texto" },
+          campoDestino("destino", "Destino del botón (/ruta o https://…)"),
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      inicial: 1,
+      items: [
+        { pestana: "Pregrado", titulo: "Programas de pregrado", texto: "Escriba aquí qué ofrece la universidad en pregrado.", imagen: "", alt: "", boton: "", destino: "" },
+        { pestana: "Posgrado", titulo: "Programas de posgrado", texto: "Escriba aquí qué ofrece la universidad en posgrado.", imagen: "", alt: "", boton: "", destino: "" },
+        { pestana: "Educación continua", titulo: "Cursos y diplomados", texto: "Escriba aquí qué ofrece la universidad en educación continua.", imagen: "", alt: "", boton: "", destino: "" },
+      ],
+    }),
+  },
+  {
+    tipo: "banner",
+    nombre: "Banner",
+    ayuda: "Franja de ancho completo con imagen de fondo, velo oscuro que asegura el contraste del texto, título, texto y hasta dos botones",
+    grupo: "Multimedia",
+    movimiento: "sube",
+    sinFondo: true,
+    campos: [
+      CAMPO_IMAGEN("imagen", "Imagen de fondo"),
+      { clave: "titulo", etiqueta: "Título", tipo: "texto", requerido: true },
+      { clave: "texto", etiqueta: "Texto", tipo: "area" },
+      { clave: "boton1", etiqueta: "Botón principal", tipo: "texto" },
+      campoDestino("destino1", "Destino del botón principal (/ruta o https://…)"),
+      { clave: "boton2", etiqueta: "Botón secundario", tipo: "texto" },
+      campoDestino("destino2", "Destino del botón secundario (/ruta o https://…)"),
+      { clave: "velo", etiqueta: "Opacidad del velo oscuro (65 a 90 %; con menos no se garantiza el contraste)", tipo: "numero", min: 65, max: 90 },
+      { clave: "altura", etiqueta: "Altura", tipo: "enum", opciones: OPCIONES_ALTO_BANNER },
+      {
+        clave: "alineacion",
+        etiqueta: "Alineación del texto",
+        tipo: "enum",
+        opciones: [
+          { valor: "izquierda", etiqueta: "Izquierda" },
+          { valor: "centro", etiqueta: "Centrada" },
+          { valor: "derecha", etiqueta: "Derecha" },
+        ],
+      },
+    ],
+    valores: () => ({
+      imagen: "",
+      titulo: "Título del banner",
+      texto: "Una frase que invite a conocer más.",
+      boton1: "",
+      destino1: "",
+      boton2: "",
+      destino2: "",
+      velo: 72,
+      altura: "media",
+      alineacion: "izquierda",
+    }),
+  },
+  {
+    tipo: "contacto-mapa",
+    nombre: "Contacto con mapa",
+    ayuda: "Dirección, teléfono, correo y horario junto a un mapa de OpenStreetMap. Teléfono y correo se copian con un clic. Sin claves de API",
+    grupo: "Personas y contacto",
+    movimiento: "sube",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      { clave: "direccion", etiqueta: "Dirección", tipo: "area" },
+      { clave: "telefono", etiqueta: "Teléfono", tipo: "texto" },
+      { clave: "correo", etiqueta: "Correo", tipo: "texto" },
+      { clave: "horario", etiqueta: "Horario de atención", tipo: "area" },
+      { clave: "latitud", etiqueta: "Latitud del mapa (p. ej. 7.1397; vacía: sin mapa)", tipo: "texto" },
+      { clave: "longitud", etiqueta: "Longitud del mapa (p. ej. -73.1217)", tipo: "texto" },
+      { clave: "zoom", etiqueta: "Acercamiento del mapa (10 lejos, 19 cerca)", tipo: "numero", min: 10, max: 19 },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "Dónde encontrarnos",
+      texto: "",
+      direccion: "Calle 70 No. 55-210\nBucaramanga, Santander",
+      telefono: "(607) 651 6500",
+      correo: "info@udes.edu.co",
+      horario: "Lunes a viernes, de 7:00 a. m. a 12:00 m. y de 2:00 a 6:00 p. m.",
+      latitud: "7.1397",
+      longitud: "-73.1217",
+      zoom: 16,
+    }),
+  },
+  {
+    tipo: "columnas-desiguales",
+    nombre: "Columnas desiguales",
+    ayuda: "Dos o tres columnas con proporciones a elección (70/30, 60/40, 50/25/25…); cada una con título, texto, imagen y botón. En marcos angostos pasan a una sola columna",
+    grupo: "Diseño y columnas",
+    movimiento: "cascada",
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: undefined })),
+      {
+        clave: "proporcion",
+        etiqueta: "Proporción (define cuántas columnas hay)",
+        tipo: "enum",
+        opciones: Object.entries(PROPORCIONES_COLUMNAS).map(([valor, d]) => ({ valor, etiqueta: d.etiqueta })),
+      },
+      {
+        clave: "items",
+        etiqueta: "Columnas, en orden (las que sobran no se muestran)",
+        tipo: "lista",
+        subcampos: [
+          { clave: "titulo", etiqueta: "Título", tipo: "texto" },
+          { clave: "texto", etiqueta: "Texto (una línea en blanco abre un párrafo)", tipo: "area" },
+          CAMPO_IMAGEN("imagen", "Imagen (opcional)"),
+          { clave: "alt", etiqueta: "Descripción de la imagen para lectores de pantalla", tipo: "texto" },
+          { clave: "boton", etiqueta: "Texto del botón (vacío: sin botón)", tipo: "texto" },
+          campoDestino("destino", "Destino del botón (/ruta o https://…)"),
+        ],
+      },
+    ],
+    valores: () => ({
+      antetitulo: "",
+      titulo: "",
+      texto: "",
+      proporcion: "60-40",
+      items: [
+        { titulo: "Columna principal", texto: "Escriba aquí el contenido principal de la sección.", imagen: "", alt: "", boton: "", destino: "" },
+        { titulo: "Columna de apoyo", texto: "Escriba aquí un dato, un contacto o un enlace complementario.", imagen: "", alt: "", boton: "", destino: "" },
+      ],
+    }),
   },
   /* --- Vivos: datos reales o interactivos del portal ----------------------------------- */
   {

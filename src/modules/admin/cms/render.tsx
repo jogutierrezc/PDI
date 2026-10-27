@@ -28,9 +28,10 @@ import { AvancePlan } from "./vivos/AvancePlan";
 import { PilaresPlan } from "./vivos/PilaresPlan";
 import { EnvolturaPlaneacion, EquipoOficina, GaleriaOficina, MosaicoPortales, RecientesOficina } from "./vivos/OficinaPlaneacion";
 import { MicrositioVivo } from "./vivos/RankingSecciones";
-import { ALINEACIONES, ALTO_HTML, ANCHOS, alinearDe, destinoSeguro, documentoHtml, estiloDe, leerCifra, medidaDe, movimientoDe, ocultoDe, videoDatos, videoMiniatura, videoUrl } from "./logica";
-import { officePhotoUrl } from "../../planeacion/page";
-import { definicion } from "./bloques";
+import { ALINEACIONES, ALTO_HTML, ANCHOS, alinearDe, destinoSeguro, documentoHtml, estiloDe, leerCifra, mapaOsm, medidaDe, movimientoDe, ocultoDe, videoDatos, videoMiniatura, videoUrl } from "./logica";
+import { initialsOf, officePhotoUrl } from "../../planeacion/page";
+import { PROPORCIONES_COLUMNAS, definicion } from "./bloques";
+import { IconoCms } from "./iconos";
 import { estiloDeBloque, estiloDeMarco, familiasUsadas, useFuentes, type EstiloSitioParcial } from "./estilo";
 import type { Ancho, Movimiento, Props } from "./tipos";
 // Estilos del tablero de indicadores (IndicatorBoard). Están acotados al contenedor .sos.
@@ -828,10 +829,12 @@ function Cifras({ p, navegable }: { p: Props; navegable: boolean }) {
 function ImagenTexto({ p, navegable }: { p: Props; navegable: boolean }) {
   const lado = opcionDe(texto(p.lado), ["izquierda", "derecha"] as const);
   const vertical = opcionDe(texto(p.vertical), ["centro", "inicio", "fin"] as const);
+  // «lado» es la disposición de siempre; las páginas guardadas antes de existir «centrada» no traen el campo.
+  const centrada = texto(p.disposicion) === "centrada";
   return (
     <div className="cms-wrap">
       <div className="cms-cq">
-        <div className={`cms-it cms-it--${lado} cms-it--v-${vertical}`}>
+        <div className={`cms-it cms-it--${lado} cms-it--v-${vertical}${centrada ? " cms-it--centrada" : ""}`}>
           <div className="cms-it__arte" data-in>
             <Imagen src={p.imagen} alt={p.alt} proporcion={p.proporcion} />
           </div>
@@ -876,6 +879,394 @@ function CitaDestacada({ p }: { p: Props }) {
         </figcaption>
       )}
     </figure>
+  );
+}
+
+/* --- Personas, tiempo y contacto: línea de tiempo, equipo, testimonios, pestañas, banner, mapa ---- */
+
+/** Un valor que se puede copiar con un clic (teléfono, correo). Sigue siendo texto: se selecciona y se lee como cualquier otro. */
+function Copiable({ valor, etiqueta }: { valor: string; etiqueta: string }) {
+  const [copiado, setCopiado] = useState(false);
+  useEffect(() => {
+    if (!copiado) return;
+    const id = window.setTimeout(() => setCopiado(false), 1800);
+    return () => window.clearTimeout(id);
+  }, [copiado]);
+  const copiar = () => {
+    // Sin permiso del portapapeles (o sin https) simplemente no pasa nada: el texto sigue ahí para copiarlo a mano.
+    const r = navigator.clipboard?.writeText(valor);
+    r?.then(() => setCopiado(true), () => undefined);
+  };
+  return (
+    <span className="cms-copia">
+      <span className="cms-copia__valor">{valor}</span>
+      <button type="button" className="cms-copia__boton" onClick={copiar} aria-label={`Copiar ${etiqueta}: ${valor}`}>
+        <IconoCms name="copiar" size={14} />
+      </button>
+      {copiado && (
+        <span className="cms-copia__ok" aria-hidden="true">
+          Copiado
+        </span>
+      )}
+      <span className="sr-only" role="status">
+        {copiado ? `${etiqueta} copiado` : ""}
+      </span>
+    </span>
+  );
+}
+
+/** La foto de una persona, redonda o cuadrada. Con `iniciales`, sin foto se dibujan sus iniciales; si no, nada. */
+function Avatar({ src, nombre, forma, iniciales = false }: { src: unknown; nombre: string; forma: "redonda" | "cuadrada"; iniciales?: boolean }) {
+  const hay = Boolean(texto(src));
+  if (!hay && !iniciales) return null;
+  return (
+    <span className={`cms-avatar cms-avatar--${forma}`}>
+      {hay ? (
+        <Imagen src={src} alt="" proporcion="1/1" />
+      ) : (
+        <span className="cms-avatar__ini" aria-hidden="true">
+          {initialsOf(nombre)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Línea de tiempo: hitos con fecha. Vertical (alternada en un marco ancho, una columna en uno angosto) u horizontal desplazable. */
+function LineaTiempo({ p }: { p: Props }) {
+  const orientacion = opcionDe(texto(p.orientacion), ["vertical", "horizontal"] as const);
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  const hitos = lista(p.items);
+  const hito = (it: Props, i: number) => (
+    <li className="cms-lt__hito" data-in key={i}>
+      {texto(it.fecha) && <span className="cms-lt__fecha">{texto(it.fecha)}</span>}
+      {texto(it.titulo) && <h3 className="cms-lt__titulo">{texto(it.titulo)}</h3>}
+      {texto(it.texto) && <div className="cms-lt__texto">{parrafos(texto(it.texto))}</div>}
+      {texto(it.imagen) && (
+        <div className="cms-lt__imagen">
+          <Imagen src={it.imagen} alt={it.alt} proporcion="16/9" />
+        </div>
+      )}
+    </li>
+  );
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {hitos.length === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">La línea de tiempo no tiene hitos todavía.</p>
+      ) : (
+        <div className="cms-cq">
+          {orientacion === "horizontal" ? (
+            // Región con nombre y foco: así quien usa teclado puede desplazarla con las flechas.
+            <ol className="cms-lt cms-lt--horizontal" role="region" aria-label={texto(p.titulo) || "Línea de tiempo"} tabIndex={0}>
+              {hitos.map(hito)}
+            </ol>
+          ) : (
+            <ol className="cms-lt cms-lt--vertical">{hitos.map(hito)}</ol>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Equipo: personas en 2, 3 o 4 por fila. El correo es texto copiable, no un enlace mailto. */
+function Equipo({ p, navegable }: { p: Props; navegable: boolean }) {
+  const columnas = opcionDe(texto(p.columnas), ["3", "2", "4"] as const);
+  const forma = opcionDe(texto(p.foto), ["redonda", "cuadrada"] as const);
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  const personas = lista(p.items);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {personas.length === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">El equipo no tiene personas todavía.</p>
+      ) : (
+        <div className="cms-cq">
+          <ul className={`cms-equipo cms-equipo--n${columnas}`}>
+            {personas.map((it, i) => (
+              <li className="cms-persona" data-in key={i}>
+                <span className={`cms-persona__foto cms-persona__foto--${forma}`}>
+                  <Avatar src={it.imagen} nombre={texto(it.nombre)} forma={forma} iniciales />
+                </span>
+                {texto(it.nombre) && <h3 className="cms-persona__nombre">{texto(it.nombre)}</h3>}
+                {texto(it.cargo) && <p className="cms-persona__cargo">{texto(it.cargo)}</p>}
+                {texto(it.correo) && <Copiable valor={texto(it.correo)} etiqueta="correo" />}
+                {destinoSeguro(it.enlace) && (
+                  <Boton clase="cms-persona__enlace" etiqueta="Ver perfil" destino={it.enlace} navegable={navegable} icono={<Icon name="arrow-right" size={15} />} />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Una cita con su autor, dentro de la cuadrícula o del carrusel de testimonios. */
+function Testimonio({ it }: { it: Props }) {
+  const nombre = texto(it.nombre);
+  const cargo = texto(it.cargo);
+  return (
+    <figure className="cms-test">
+      <blockquote className="cms-test__texto">
+        <p>{texto(it.texto)}</p>
+      </blockquote>
+      {(nombre || cargo || texto(it.imagen)) && (
+        <figcaption className="cms-test__autor">
+          <Avatar src={it.imagen} nombre={nombre} forma="redonda" />
+          <span>
+            {nombre && <b>{nombre}</b>}
+            {cargo && <span>{cargo}</span>}
+          </span>
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+/** Testimonios en cuadrícula o en carrusel sencillo: una cita a la vez, sin pasar sola, con flechas, puntos y teclado. */
+function Testimonios({ p }: { p: Props }) {
+  const modo = opcionDe(texto(p.modo), ["cuadricula", "carrusel"] as const);
+  const citas = lista(p.items).filter((it) => texto(it.texto));
+  const total = citas.length;
+  const [actual, setActual] = useState(0);
+  const indice = total === 0 ? 0 : Math.min(actual, total - 1);
+  const ir = (i: number) => setActual(((i % total) + total) % total);
+  // Las flechas del teclado funcionan desde cualquier botón del carrusel.
+  const alTeclado = (e: KeyboardEvent<HTMLElement>) => {
+    if (total < 2) return;
+    if (e.key === "ArrowLeft") ir(indice - 1);
+    else if (e.key === "ArrowRight") ir(indice + 1);
+    else return;
+    e.preventDefault();
+  };
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {total === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">Todavía no hay testimonios.</p>
+      ) : modo === "cuadricula" || total === 1 ? (
+        <ul className="cms-tests">
+          {citas.map((it, i) => (
+            <li data-in key={i}>
+              <Testimonio it={it} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <section className="cms-testc" aria-roledescription="carrusel" aria-label={texto(p.titulo) || "Testimonios"} onKeyDown={alTeclado} data-in>
+          <div className="cms-testc__ventana">
+            <div className="cms-testc__pista" aria-live="polite" style={{ transform: `translateX(-${indice * 100}%)` }}>
+              {citas.map((it, i) => (
+                <div className="cms-testc__lamina" key={i} role="group" aria-roledescription="diapositiva" aria-label={`${i + 1} de ${total}`} aria-hidden={i !== indice || undefined}>
+                  <Testimonio it={it} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="cms-testc__ctl">
+            <button type="button" className="cms-testc__flecha" aria-label="Testimonio anterior" onClick={() => ir(indice - 1)}>
+              <Icon name="arrow-left" size={18} />
+            </button>
+            <div className="cms-testc__puntos">
+              {citas.map((_, i) => (
+                <button key={i} type="button" aria-label={`Ir al testimonio ${i + 1}`} aria-current={i === indice || undefined} onClick={() => ir(i)} />
+              ))}
+            </div>
+            <button type="button" className="cms-testc__flecha" aria-label="Testimonio siguiente" onClick={() => ir(indice + 1)}>
+              <Icon name="arrow-right" size={18} />
+            </button>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Pestañas con el patrón ARIA tablist / tab / tabpanel: una sola pestaña en el orden
+ * del teclado (tabindex móvil), flechas izquierda y derecha, Inicio y Fin para recorrerlas,
+ * y el panel visible es el de la pestaña elegida. La inicial la fija el campo «inicial».
+ */
+function BloquePestanas({ p, navegable }: { p: Props; navegable: boolean }) {
+  const base = useId();
+  const paneles = lista(p.items).filter((it) => texto(it.pestana) || texto(it.titulo));
+  const total = paneles.length;
+  const inicial = Math.min(Math.max(total - 1, 0), Math.max(0, Math.round(Number(p.inicial)) - 1 || 0));
+  const [elegida, setElegida] = useState<number | null>(null);
+  // Si quien edita cambia la pestaña inicial, se ve de inmediato.
+  useEffect(() => setElegida(null), [inicial]);
+  const activa = Math.min(Math.max(total - 1, 0), elegida ?? inicial);
+  const botones = useRef<(HTMLButtonElement | null)[]>([]);
+  const alTeclado = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    let j: number;
+    if (e.key === "ArrowRight") j = (i + 1) % total;
+    else if (e.key === "ArrowLeft") j = (i - 1 + total) % total;
+    else if (e.key === "Home") j = 0;
+    else if (e.key === "End") j = total - 1;
+    else return;
+    e.preventDefault();
+    setElegida(j);
+    botones.current[j]?.focus();
+  };
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      {total === 0 ? (
+        <p className="cms-ayuda cms-r-vacio">Todavía no hay pestañas.</p>
+      ) : (
+        <div className="cms-pestanas" data-in>
+          <div className="cms-pestanas__lista" role="tablist" aria-label={texto(p.titulo) || "Contenido por pestañas"}>
+            {paneles.map((it, i) => (
+              <button
+                key={i}
+                ref={(el) => {
+                  botones.current[i] = el;
+                }}
+                type="button"
+                role="tab"
+                id={`${base}-t${i}`}
+                aria-selected={i === activa}
+                aria-controls={`${base}-p${i}`}
+                tabIndex={i === activa ? 0 : -1}
+                className="cms-pestanas__tab"
+                onClick={() => setElegida(i)}
+                onKeyDown={(e) => alTeclado(e, i)}
+              >
+                {texto(it.pestana) || texto(it.titulo)}
+              </button>
+            ))}
+          </div>
+          {paneles.map((it, i) => {
+            const imagen = texto(it.imagen);
+            return (
+              <div key={i} role="tabpanel" id={`${base}-p${i}`} aria-labelledby={`${base}-t${i}`} tabIndex={0} hidden={i !== activa} className="cms-pestanas__panel">
+                <div className="cms-cq">
+                  <div className={imagen ? "cms-it cms-it--izquierda cms-it--v-inicio" : undefined}>
+                    {imagen && (
+                      <div className="cms-it__arte">
+                        <Imagen src={imagen} alt={it.alt} proporcion="4/3" />
+                      </div>
+                    )}
+                    <div className="cms-it__cuerpo">
+                      {texto(it.titulo) && <h3 className="cms-col__titulo">{texto(it.titulo)}</h3>}
+                      {texto(it.texto) && <div className="cms-it__texto">{parrafos(texto(it.texto))}</div>}
+                      {texto(it.boton) && <Boton clase="cms-boton cms-boton--solido" etiqueta={texto(it.boton)} destino={it.destino} navegable={navegable} />}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Banner de ancho completo. La imagen va debajo de un velo del color marino con opacidad
+ * entre 65 y 90 %: con 65 % hasta una foto totalmente blanca deja el texto blanco sobre
+ * 4,6:1 de contraste. El texto es siempre claro, nunca depende de la foto, y sin imagen
+ * el fondo es el mismo marino.
+ */
+function Banner({ p, navegable }: { p: Props; navegable: boolean }) {
+  const altura = opcionDe(texto(p.altura), ["media", "baja", "alta"] as const);
+  const alineacion = opcionDe(texto(p.alineacion), ["izquierda", "centro", "derecha"] as const);
+  const velo = Math.min(90, Math.max(65, Number(p.velo) || 72));
+  const imagen = officePhotoUrl(texto(p.imagen));
+  return (
+    <section className={`cms-banner cms-banner--${altura} cms-banner--${alineacion}`}>
+      {imagen && <img className="cms-banner__img" src={imagen} alt="" loading="lazy" decoding="async" />}
+      <div className="cms-banner__velo" style={{ opacity: velo / 100 }} aria-hidden="true" />
+      <div className="cms-wrap cms-banner__cuerpo">
+        {texto(p.titulo) && <h2 className="cms-h2" data-in>{texto(p.titulo)}</h2>}
+        {texto(p.texto) && <p className="cms-lede" data-in>{texto(p.texto)}</p>}
+        {(texto(p.boton1) || texto(p.boton2)) && (
+          <div className="cms-cta" data-in>
+            {texto(p.boton1) && <Boton clase="cms-boton cms-boton--claro" etiqueta={texto(p.boton1)} destino={p.destino1} navegable={navegable} />}
+            {texto(p.boton2) && <Boton clase="cms-boton cms-boton--contorno" etiqueta={texto(p.boton2)} destino={p.destino2} navegable={navegable} />}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Contacto junto a un mapa de OpenStreetMap (solo su marco de incrustación, sin claves). Teléfono y correo, copiables. */
+function ContactoMapa({ p, navegable }: { p: Props; navegable: boolean }) {
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  const mapa = mapaOsm(p.latitud, p.longitud, p.zoom);
+  const direccion = texto(p.direccion);
+  const filas: { clave: string; rotulo: string; valor: ReactNode }[] = [];
+  if (direccion.trim()) filas.push({ clave: "dir", rotulo: "Dirección", valor: parrafos(direccion) });
+  if (texto(p.telefono)) filas.push({ clave: "tel", rotulo: "Teléfono", valor: <Copiable valor={texto(p.telefono)} etiqueta="teléfono" /> });
+  if (texto(p.correo)) filas.push({ clave: "cor", rotulo: "Correo", valor: <Copiable valor={texto(p.correo)} etiqueta="correo" /> });
+  if (texto(p.horario).trim()) filas.push({ clave: "hor", rotulo: "Horario", valor: parrafos(texto(p.horario)) });
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      <div className="cms-cq">
+        <div className={`cms-cm${mapa ? "" : " cms-cm--sin-mapa"}`}>
+          <dl className="cms-cm__datos" data-in>
+            {filas.map((f) => (
+              <div className="cms-cm__fila" key={f.clave}>
+                <dt>{f.rotulo}</dt>
+                <dd>{f.valor}</dd>
+              </div>
+            ))}
+          </dl>
+          {mapa ? (
+            <div className="cms-cm__mapa" data-in>
+              <iframe
+                className={navegable ? undefined : "cms-cm__marco--inerte"}
+                src={mapa.incrustado}
+                title={`Mapa de ubicación${direccion.trim() ? `: ${direccion.split("\n")[0]?.trim()}` : ""}`}
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              />
+              {navegable && (
+                <a className="cms-cm__grande" href={mapa.enlace} target="_blank" rel="noopener noreferrer">
+                  Ver el mapa más grande
+                </a>
+              )}
+            </div>
+          ) : (
+            !navegable && <p className="cms-ayuda cms-r-vacio">Escriba una latitud entre -90 y 90 y una longitud entre -180 y 180 para mostrar el mapa.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Dos o tres columnas con proporciones elegibles. En un marco angosto pasan a una sola, en el mismo orden. */
+function ColumnasDesiguales({ p, navegable }: { p: Props; navegable: boolean }) {
+  const clave = PROPORCIONES_COLUMNAS[texto(p.proporcion)] ? texto(p.proporcion) : "60-40";
+  const partes = PROPORCIONES_COLUMNAS[clave]!.partes;
+  const columnas = lista(p.items).slice(0, partes.length);
+  const conCabecera = texto(p.antetitulo) || texto(p.titulo) || texto(p.texto);
+  return (
+    <div className="cms-wrap">
+      {conCabecera && <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />}
+      <div className="cms-cq">
+        <div className="cms-dc" style={{ "--cms-fr": partes.map((n) => `minmax(0, ${n}fr)`).join(" ") } as CSSProperties}>
+          {columnas.map((it, i) => (
+            <article className="cms-dc__col" data-in key={i}>
+              {texto(it.imagen) && <Imagen src={it.imagen} alt={it.alt} proporcion="16/9" />}
+              {texto(it.titulo) && <h3 className="cms-col__titulo">{texto(it.titulo)}</h3>}
+              {texto(it.texto) && <div className="cms-col__texto">{parrafos(texto(it.texto))}</div>}
+              {texto(it.boton) && <Boton clase="cms-boton cms-boton--solido cms-dc__boton" etiqueta={texto(it.boton)} destino={it.destino} navegable={navegable} />}
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1038,6 +1429,20 @@ function Contenido({ bloque, navegable }: { bloque: BloqueRender; navegable: boo
       return <CitaDestacada p={p} />;
     case "html":
       return <BloqueHtml p={p} navegable={navegable} />;
+    case "linea-tiempo":
+      return <LineaTiempo p={p} />;
+    case "equipo":
+      return <Equipo p={p} navegable={navegable} />;
+    case "testimonios":
+      return <Testimonios p={p} />;
+    case "pestanas":
+      return <BloquePestanas p={p} navegable={navegable} />;
+    case "banner":
+      return <Banner p={p} navegable={navegable} />;
+    case "contacto-mapa":
+      return <ContactoMapa p={p} navegable={navegable} />;
+    case "columnas-desiguales":
+      return <ColumnasDesiguales p={p} navegable={navegable} />;
     case "acordeon":
       return <Desplegables p={p} claveTitulo="titulo" claveTexto="texto" faq={false} navegable={navegable} />;
     case "preguntas":

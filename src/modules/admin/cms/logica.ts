@@ -366,3 +366,35 @@ export function destinoSeguro(valor: unknown): string | null {
     return null;
   }
 }
+
+/* --- Mapa de OpenStreetMap (bloque «contacto-mapa») ---------------------------------------------- */
+
+/** Una coordenada escrita a mano («7.1397» o «7,1397») como número dentro de ±`limite`; si no lo es, null. */
+export function coordenadaDe(valor: unknown, limite: number): number | null {
+  const t = typeof valor === "number" ? String(valor) : typeof valor === "string" ? valor.trim().replace(",", ".") : "";
+  if (!/^-?\d{1,3}(\.\d{1,8})?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && Math.abs(n) <= limite ? n : null;
+}
+
+/**
+ * Las direcciones del mapa para una latitud y una longitud: el marco incrustado
+ * (solo openstreetmap.org/export/embed.html, con bbox y marcador calculados aquí)
+ * y el enlace al mapa grande. Si las coordenadas no son números en rango, null:
+ * ningún texto escrito por una persona llega a la dirección.
+ */
+export function mapaOsm(latitud: unknown, longitud: unknown, zoom: unknown): { incrustado: string; enlace: string } | null {
+  const lat = coordenadaDe(latitud, 90);
+  const lon = coordenadaDe(longitud, 180);
+  if (lat === null || lon === null) return null;
+  const z = Math.min(19, Math.max(10, Math.round(Number(zoom)) || 16));
+  // Medio ancho del recuadro: una vez y media el ancho de una baldosa a ese acercamiento.
+  const dLon = (360 / 2 ** z) * 1.5;
+  const dLat = dLon * 0.75 * Math.cos((lat * Math.PI) / 180);
+  const f = (n: number) => n.toFixed(6);
+  const caja = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map((n, i) => f(Math.max(i % 2 === 0 ? -180 : -90, Math.min(i % 2 === 0 ? 180 : 90, n)))).join(",");
+  return {
+    incrustado: `https://www.openstreetmap.org/export/embed.html?bbox=${caja}&layer=mapnik&marker=${f(lat)},${f(lon)}`,
+    enlace: `https://www.openstreetmap.org/?mlat=${f(lat)}&mlon=${f(lon)}#map=${z}/${f(lat)}/${f(lon)}`,
+  };
+}

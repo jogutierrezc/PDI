@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../../admin/udes-en-cifras/ui";
-import { useProfiles } from "../../tableros/store";
+import { SelectorPersona } from "../../admin/components/SelectorPersona";
 import { useGuardarMiembro, useMiembros, useQuitarMiembro } from "../datos";
 import type { DsOficina } from "../tipos";
 
@@ -21,7 +21,6 @@ export const ROL_TEXTO: Record<"gestor" | "colaborador", string> = {
 export function EquipoOficina({ oficina }: { oficina: DsOficina }) {
   const id = oficina.oficina_id;
   const miembros = useMiembros(id);
-  const perfiles = useProfiles();
   const guardar = useGuardarMiembro(id);
   const quitar = useQuitarMiembro(id);
   const [invitando, setInvitando] = useState(false);
@@ -29,7 +28,6 @@ export function EquipoOficina({ oficina }: { oficina: DsOficina }) {
   const [rol, setRol] = useState<"gestor" | "colaborador">("colaborador");
 
   const mios = useMemo(() => new Set((miembros.data ?? []).map((m) => m.user_id)), [miembros.data]);
-  const candidatos = (perfiles.data ?? []).filter((p) => !mios.has(p.id)).slice(0, 200);
 
   return (
     <Panel
@@ -53,18 +51,7 @@ export function EquipoOficina({ oficina }: { oficina: DsOficina }) {
             guardar.mutate({ user_id: persona, rol }, { onSuccess: () => { setInvitando(false); setPersona(""); } });
           }}
         >
-          <label className="admin-field">
-            <span>Quién</span>
-            <select value={persona} onChange={(e) => setPersona(e.target.value)} required>
-              <option value="">Elija a alguien…</option>
-              {candidatos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} · {p.email}
-                  {p.unit ? ` · ${p.unit}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectorPersona value={persona} onChange={setPersona} excluir={mios} />
           <label className="admin-field">
             <span>Papel</span>
             <select value={rol} onChange={(e) => setRol(e.target.value as "gestor" | "colaborador")}>

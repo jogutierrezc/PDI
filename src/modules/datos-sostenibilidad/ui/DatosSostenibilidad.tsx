@@ -4,7 +4,8 @@
    Como Mis Tableros y el resto de la intranet, no como Programas en Cifras
    (que vive en su marco de pantalla completa): aquí se entra por el lanzador,
    se elige la oficina —UDES Verde, Planeación Institucional…— y se trabaja en
-   dos secciones: los libros de datos y el equipo. Pertenecer a ds_miembros
+   tres secciones: los libros de datos, el equipo y (solo la administración) el
+   catálogo de indicadores. Pertenecer a ds_miembros
    (0178) es el permiso; Planeación observa sin editar.
    ========================================================================== */
 
@@ -20,10 +21,11 @@ import type { DsOficina } from "../tipos";
 import { ExploradorLibros } from "./ExploradorLibros";
 import { EditorLibro } from "./EditorLibro";
 import { EquipoOficina } from "./EquipoOficina";
+import { CatalogoIndicadores } from "./CatalogoIndicadores";
 import "../../admin/udes-en-cifras/od-admin.css";
 import "./datos-sostenibilidad.css";
 
-type Seccion = "libros" | "equipo";
+type Seccion = "libros" | "equipo" | "catalogo";
 
 export function DatosSostenibilidad() {
   const yo = useYo();
@@ -108,6 +110,11 @@ export function DatosSostenibilidad() {
               Equipo
             </AdminRailTab>
           )}
+          {admin && (
+            <AdminRailTab current={seccion === "catalogo"} onSelect={() => setQuery({ seccion: "catalogo", libro: null })}>
+              Indicadores
+            </AdminRailTab>
+          )}
         </AdminRail>
       }
       actions={
@@ -132,7 +139,9 @@ export function DatosSostenibilidad() {
         </p>
       )}
 
-      {seccion === "equipo" ? (
+      {seccion === "catalogo" && admin ? (
+        <CatalogoIndicadores />
+      ) : seccion === "equipo" ? (
         <EquipoOficina oficina={actual} />
       ) : libroAbierto ? (
         <EditorLibro yo={yo.data!} oficina={actual} libroId={libroAbierto} onCerrar={() => setQuery({ libro: null })} />

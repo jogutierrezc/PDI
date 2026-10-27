@@ -1364,3 +1364,20 @@
     transition-duration: 0.01ms;
   }
 }
+
+/* Procedencia de la cifra en cada tarjeta: fuente y evidencia si es real, rótulo si es de muestra. */
+.sos-tile__src {
+  display: block;
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.sos-tile__ilus {
+  font-weight: 600;
+}
+
+.sos-tile__src a {
+  color: inherit;
+  text-decoration: underline;
+}

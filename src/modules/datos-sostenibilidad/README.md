@@ -69,8 +69,23 @@ Todo lo que depende de una oficina recibe `oficina` (uuid de `units`). Sin la mi
 | `EditorLibro.tsx` | Tres pestañas: **Filas** (grilla de celdas tipadas, errores pintados, «siguiente error», pegar desde Excel con o sin reemplazo, guardar por lotes), **Columnas** (añadir, tipo, obligatoria, opciones; la clave de una existente no se toca), **Responde a** (conectar el libro a un indicador con `autoMap`, ver lo que falta, desconectar). |
 | `EquipoOficina.tsx` | El equipo de la oficina: añadir gestor o colaborador del directorio de la intranet, quitar. Del gestor o de la administración. |
 
+## El portal lee los libros (paquete B, migración 0198)
+
+`ds_cifras_publicas()` (security definer, ejecutable por `anon` y `authenticated`) devuelve `{"13.2": [{valor, periodo, campus, fuente, evidencia}, ...]}` con las filas de los libros en estado **listo** conectados a un indicador, leídas con el mapa de `ds_respuestas`. Omite las filas sin número o sin periodo y no entrega oficinas, usuarios ni libros en borrador.
+
+En el portal (`sostenible/cifras-reales.ts`):
+
+- `useCifrasReales()` consume la función con react-query; sin migración, sin red o sin datos devuelve vacío y el portal queda como estaba.
+- `IND_DE_DS` es la equivalencia explícita indicador del catálogo → tarjeta del portal (`IndKey`). Hoy solo `13.2 → solar` («Energía con bajas emisiones» ↔ «Energía renovable»). El resto no tiene equivalencia clara y sigue siendo de muestra; al añadir indicadores al catálogo se mapean ahí.
+- El periodo se lee como el primer año de cuatro cifras que sea una edición del portal (2022 a 2025; «2024-1» vale 2024). El campus vacío o «Institucional» es **Todos**; un campus que no sea uno de los del portal se omite. Con varias filas del mismo campus y año gana la última.
+- `IndicatorBoard` (y con él el inicio, los rankings y el bloque «indicadores» del CMS) usa la cifra real si existe para ese indicador, campus y año, con su fuente y evidencia; si no, la de muestra, marcada «Dato ilustrativo» en la tarjeta. La nota inferior solo aparece si alguna tarjeta es de muestra. Con cifra real, la gráfica y el cambio usan solo los años que tienen cifra real.
+
+## Catálogo de indicadores (solo administración)
+
+Sección **Indicadores** en el riel de `/admin/datos-sostenibilidad`, visible solo para `admin`: crea y edita indicadores de los 17 ODS (`useGuardarIndicador`). La RLS de 0178 ya basta (`ds_indicadores_admin`: todo para `admin`); 0198 solo añade una restricción mínima al id. No hay borrado: quitar un indicador borraría en cascada las conexiones de los libros.
+
 ## Dudas abiertas
 
-- El catálogo solo trae los indicadores del ODS 13: cuando UDES Verde y Planeación definan el marco completo (los 17 ODS del THE), la administración los siembra en `ds_indicadores` (y el espejo `INDICADORES_DS` se actualiza con ellos).
+- La equivalencia `13.2 → solar` es aproximada (bajas emisiones no es lo mismo que renovable); si UDES Verde prefiere no mapearla, se quita de `IND_DE_DS`.
+- Las tarjetas del portal (energía, agua, residuos…) no tienen indicador en el catálogo; la administración debe crearlos y mapearlos para que dejen de ser de muestra.
 - Las oficinas son unidades del organigrama (`units`): UDES Verde y Planeación Institucional tienen que existir como unidades; las crea la administración en Mis Tableros.
-- La lectura que UDES Sostenible haría de estos libros (alimentar las cifras del portal ODS desde `ds_respuestas`) no está en este paquete: primero los libros deben existir.

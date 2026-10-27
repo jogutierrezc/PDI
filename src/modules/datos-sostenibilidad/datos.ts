@@ -117,6 +117,23 @@ export function useIndicadores() {
   });
 }
 
+/** Crea o edita un indicador del catálogo (solo la administración: lo hace cumplir la RLS de 0178). */
+export function useGuardarIndicador() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (i: DsIndicador) => {
+      const r = await supabase
+        .from("ds_indicadores")
+        .upsert({ id: i.id.trim(), ods: i.ods, nombre: i.nombre.trim(), descripcion: i.descripcion.trim(), unidad: i.unidad.trim(), position: i.position }, { onConflict: "id" })
+        .select("id")
+        .single();
+      if (r.error) throw errorDe(r.error);
+      return r.data;
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: dsKeys.indicadores }),
+  });
+}
+
 /** Las carpetas: las dos fijas del módulo y las de la oficina. */
 export function useCarpetas(oficina: string | undefined) {
   return useQuery({

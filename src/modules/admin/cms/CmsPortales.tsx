@@ -17,6 +17,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { useAuth } from "../../../lib/auth";
 import { EditorBloques } from "./EditorBloques";
+import { EditoresCms } from "./EditoresCms";
 import { arbol } from "./logica";
 import { PanelIzquierdo } from "./PanelIzquierdo";
 import { PanelPaginas } from "./PanelPaginas";
@@ -29,10 +30,19 @@ const AVISO_SALIDA = "Hay cambios sin guardar en esta página. Si sigue, se pier
 const MS_AVISO = 5000;
 
 export function CmsPortales() {
-  const { hasRole } = useAuth();
-  const puedeEditar = hasRole("planeacion");
+  const { hasRole, cmsPortales } = useAuth();
+  // Planeación y administración editan todos los portales; un editor designado (0199) solo los suyos.
+  const esPlaneacion = hasRole("planeacion");
+  const esAdmin = hasRole("admin");
   const portales = usePortales();
-  const [portal, setPortal] = useState<PortalSlug>("sostenible");
+  const permitidos = useMemo(
+    () => (portales.data ?? []).filter((p) => esPlaneacion || cmsPortales.includes(p.slug)),
+    [portales.data, esPlaneacion, cmsPortales],
+  );
+  const [elegido, setPortal] = useState<PortalSlug>("sostenible");
+  // Si el portal elegido no es de esta persona, se abre el primero que sí.
+  const portal: PortalSlug = permitidos.some((p) => p.slug === elegido) ? elegido : (permitidos[0]?.slug ?? elegido);
+  const puedeEditar = esPlaneacion || cmsPortales.includes(portal);
   const paginas = usePaginas(portal);
   const [seleccion, setSeleccion] = useState<string | null>(null);
   const [aviso, setAviso] = useState<{ texto: string; n: number } | null>(null);
@@ -86,7 +96,7 @@ export function CmsPortales() {
       description="Las páginas de la landing, de Planeación y de UDES Sostenible. Cada página puede tener micrositios."
       rail={
         <AdminRail label="Portales">
-          {(portales.data ?? []).map((p) => (
+          {permitidos.map((p) => (
             <AdminRailTab
               key={p.slug}
               current={portal === p.slug}
@@ -103,7 +113,7 @@ export function CmsPortales() {
         </AdminRail>
       }
     >
-      {!puedeEditar && <ReadOnlyNotice>Su rol permite consultar las páginas. Editarlas y publicarlas es de Planeación y de la administración.</ReadOnlyNotice>}
+      {!puedeEditar && <ReadOnlyNotice>Su rol permite consultar las páginas. Editarlas y publicarlas es de Planeación, de la administración y de quien esta designe editor del portal.</ReadOnlyNotice>}
       {portal === "planeacion" && (
         <p className="cms-aviso cms-aviso--suave">
           La portada de Planeación se sigue escribiendo en «Página de la oficina». Lo que aquí se crea son páginas nuevas del portal.
@@ -123,6 +133,8 @@ export function CmsPortales() {
           <EditorPagina key={pagina.id} pagina={pagina} puedeEditar={puedeEditar} panelPaginas={panelPaginas} onAviso={mostrarAviso} onSucio={marcarSucio} />
         )}
       </div>
+
+      {esAdmin && !falta && <EditoresCms portales={portales.data ?? []} portalInicial={portal} />}
 
       {/* La zona existe siempre: así los lectores de pantalla anuncian el aviso cuando aparece. */}
       <div className="cms-toast-zona" role="status" aria-live="polite">

@@ -18,20 +18,20 @@ import { RenderBloques, type BloqueRender } from "./render";
 import type { Ancho, Props } from "./tipos";
 import "./cms.css";
 
-interface Contenido {
+export interface Contenido {
   titulo: string;
   ruta: string;
   bloques: { tipo: string; ancho: Ancho; props: Props }[];
 }
 
-async function leerPublicada(portal: string, ruta: string): Promise<Contenido | null> {
+export async function leerPublicada(portal: string, ruta: string): Promise<Contenido | null> {
   const { data, error } = await supabase.rpc("cms_leer_publicada", { p_portal: portal, p_ruta: ruta });
   if (error) throw new Error(error.message);
   return (data as Contenido | null) ?? null;
 }
 
 /** El marco del portal: sostenible suma su barra de rankings a la de Planeación. */
-function Marco({ portal, titulo, children }: { portal: string; titulo: string; children: ReactNode }) {
+export function Marco({ portal, titulo, children }: { portal: string; titulo: string; children: ReactNode }) {
   if (portal === "sostenible") return <SostenibleLayout title={titulo}>{children}</SostenibleLayout>;
   return <PlanLayout title={titulo ? `${titulo} | Planeación Institucional` : "Planeación Institucional"}>{children}</PlanLayout>;
 }

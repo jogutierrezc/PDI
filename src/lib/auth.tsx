@@ -106,6 +106,8 @@ export interface AuthContextValue {
   inProgramasEnCifras: boolean;
   /** ¿Es gestor o colaborador de una oficina (ds_miembros, 0178)? */
   inDatosSostenibilidad: boolean;
+  /** Portales del CMS que edita por designación (cms_editores, 0199); Planeación y administración editan todos sin estar aquí. */
+  cmsPortales: string[];
 }
 
 /**
@@ -150,7 +152,7 @@ export function gmNivelDe(profile: Profile | null, access: AccessScope | null): 
  */
 export function screenVisible(
   screen: AdminScreen,
-  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide; inInternacionalizacion?: boolean; inProgramasEnCifras?: boolean; inDatosSostenibilidad?: boolean },
+  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide; inInternacionalizacion?: boolean; inProgramasEnCifras?: boolean; inDatosSostenibilidad?: boolean; cmsPortales?: string[] },
 ): boolean {
   const { profile, access, inAnyUnit, impactoSide } = who;
   if (!profile?.is_active) return false;
@@ -179,7 +181,8 @@ export function screenVisible(
   // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
   if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion && listed;
   // CMS Portales: planeación y la administración, según el rol; el rol de acceso debe marcar la pantalla.
-  if (screen === "cms") return RANK[profile.role] >= RANK.planeacion && listed;
+  // CMS: Planeación y la administración, o quien la administración designó editor de algún portal (cms_editores, 0199).
+  if (screen === "cms") return (RANK[profile.role] >= RANK.planeacion && listed) || (who.cmsPortales ?? []).length > 0;
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor
   // en int_miembros, 0151) ES el permiso, como en la base; Planeación y la administración, siempre (0166).
   if (screen === "internacionalizacion") return Boolean(who.inInternacionalizacion) || (listed && RANK[profile.role] >= RANK.planeacion);
@@ -243,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [inInternacionalizacion, setInInternacionalizacion] = useState(false);
   const [inProgramasEnCifras, setInProgramasEnCifras] = useState(false);
   const [inDatosSostenibilidad, setInDatosSostenibilidad] = useState(false);
+  const [cmsPortales, setCmsPortales] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -268,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       internacionalizacion = false,
       programasEnCifras = false,
       datosSostenibilidad = false,
+      portalesCms: string[] = [],
     ) => {
       if (mine !== ticket.current) return;
       // Releer el perfil sin cambios no debe repintar toda la intranet.
@@ -278,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setInInternacionalizacion(internacionalizacion);
       setInProgramasEnCifras(programasEnCifras);
       setInDatosSostenibilidad(datosSostenibilidad);
+      setCmsPortales((previous) => (previous.join() === portalesCms.join() ? previous : portalesCms));
     };
 
     if (!userId) {
@@ -357,7 +363,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const ds = await supabase.from("ds_miembros").select("id").eq("user_id", person.id).limit(1);
     const inDs = !ds.error && (ds.data ?? []).length > 0;
 
-    publish(person, scope, rows.length > 0, side, inIntl, inPc, inDs);
+    // Editores del CMS: sin la migración 0199 la consulta falla y queda vacío.
+    const cms = await supabase.from("cms_editores").select("portal").eq("user_id", person.id);
+    const portalesCms = cms.error ? [] : (cms.data ?? []).map((f) => f.portal as string).sort();
+
+    publish(person, scope, rows.length > 0, side, inIntl, inPc, inDs, portalesCms);
   }, []);
 
   useEffect(() => {
@@ -445,8 +455,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Espejo de has_screen(): la pantalla de usuarios siempre pide administración,
   // y un perfil sin rol de acceso ve lo de siempre.
   const canSee = useCallback(
-    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad }),
-    [profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad],
+    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad, cmsPortales }),
+    [profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad, cmsPortales],
   );
 
   const reachesReport = useCallback(
@@ -482,12 +492,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
       puedeGestionarInformes: gestionaInformes,
-      inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad,
+      inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad, cmsPortales,
     }),
     [
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit, gestionaInformes,
-      inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad,
+      inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad, cmsPortales,
     ],
   );
 

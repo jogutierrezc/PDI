@@ -14,6 +14,8 @@ import { useGSAP } from "@gsap/react";
 import { Modal } from "../../components/ui/Modal";
 import { CAMPUSES, INDICATORS, SDG, YEARS, fmt, indicatorChange, indicatorValue } from "./data";
 import type { Campus, IndKey } from "./data";
+import { cifraReal, seriesReal, useCifrasReales } from "./cifras-reales";
+import type { CifrasReales } from "./cifras-reales";
 
 gsap.registerPlugin(useGSAP);
 
@@ -181,28 +183,55 @@ function Spark({ values }: { values: number[] }) {
   );
 }
 
-function Tile({ k, campus, yearIndex }: { k: IndKey; campus: Campus; yearIndex: number }) {
+/** La tarjeta usa la cifra real del campus y año elegidos si existe; si no, la de muestra (y lo dice). */
+function Tile({ k, campus, yearIndex, reales }: { k: IndKey; campus: Campus; yearIndex: number; reales: CifrasReales }) {
   const ind = INDICATORS[k];
-  const series = YEARS.map((_, i) => indicatorValue(k, campus, i));
-  const value = series[yearIndex];
-  const { pct, good } = indicatorChange(k, campus, yearIndex);
+  const real = cifraReal(reales, k, campus, yearIndex);
+  const puntos = seriesReal(reales, k, campus);
+  const sample = YEARS.map((_, i) => indicatorValue(k, campus, i));
+  const series = real ? puntos.map((p) => p.valor) : sample;
+  const value = real ? real.valor : sample[yearIndex];
+  // Con cifra real, el cambio es frente a la primera edición que tenga cifra real.
+  const first = real ? puntos[0].valor : 0;
+  const pct = real ? (first ? ((value - first) / first) * 100 : 0) : indicatorChange(k, campus, yearIndex).pct;
+  const good = real ? (ind.higherIsBetter ? pct >= 0 : pct <= 0) : indicatorChange(k, campus, yearIndex).good;
+  const desde = real ? YEARS[puntos[0].yearIndex] : YEARS[0];
   const bar = ind.max ? Math.min(100, (value / ind.max) * 100) : null;
   return (
-    <div className="sos-tile">
+    <div className="sos-tile" data-real={real ? "si" : "no"}>
       <span className="sos-tile__name">{ind.name}</span>
       <span className="sos-tile__value">
         <Num value={value} decimals={ind.decimals} />
         <small>{ind.unit}</small>
       </span>
-      <span className="sos-delta" data-good={good}>
-        {pct >= 0 ? "▲" : "▼"} {fmt(Math.abs(pct))}% desde {YEARS[0]}
-      </span>
+      {real && puntos.length < 2 ? null : (
+        <span className="sos-delta" data-good={good}>
+          {pct >= 0 ? "▲" : "▼"} {fmt(Math.abs(pct))}% desde {desde}
+        </span>
+      )}
       {bar !== null && (
         <div className="sos-bar" aria-hidden="true">
           <i style={{ width: `${bar}%` }} />
         </div>
       )}
-      <Spark values={series} />
+      {series.length > 1 && <Spark values={series} />}
+      {real ? (
+        (real.fuente || real.evidencia) && (
+          <small className="sos-tile__src">
+            {real.fuente ? `Fuente: ${real.fuente}` : ""}
+            {real.fuente && real.evidencia ? " · " : ""}
+            {real.evidencia && /^https?:\/\//i.test(real.evidencia) ? (
+              <a href={real.evidencia} target="_blank" rel="noreferrer">
+                Evidencia
+              </a>
+            ) : (
+              real.evidencia
+            )}
+          </small>
+        )
+      ) : (
+        <small className="sos-tile__src sos-tile__ilus">Dato ilustrativo</small>
+      )}
     </div>
   );
 }
@@ -225,6 +254,8 @@ export function IndicatorBoard({ keys }: { keys: IndKey[] }) {
   const [campus, setCampus] = useState<Campus>("Todos");
   const [yearIndex, setYearIndex] = useState(YEARS.length - 1);
   const scope = useRef<HTMLDivElement>(null);
+  const reales = useCifrasReales();
+  const todasReales = keys.every((k) => cifraReal(reales, k, campus, yearIndex));
   useDrawLines(scope, [campus, keys.join()]);
   useGSAP(
     () => {
@@ -241,13 +272,15 @@ export function IndicatorBoard({ keys }: { keys: IndKey[] }) {
       </div>
       <div className="sos-ind">
         {keys.map((k) => (
-          <Tile key={k} k={k} campus={campus} yearIndex={yearIndex} />
+          <Tile key={k} k={k} campus={campus} yearIndex={yearIndex} reales={reales} />
         ))}
       </div>
-      <p className="sos-note">
-        <i aria-hidden="true" />
-        Dato ilustrativo: valores de muestra hasta cargar los oficiales de cada oficina.
-      </p>
+      {!todasReales && (
+        <p className="sos-note">
+          <i aria-hidden="true" />
+          Dato ilustrativo: las tarjetas marcadas son valores de muestra hasta cargar los oficiales de cada oficina.
+        </p>
+      )}
     </div>
   );
 }

@@ -206,6 +206,9 @@ const Correos = lazy(() =>
 const CmsPortales = lazy(() =>
   import("./modules/admin/cms/CmsPortales").then((m) => ({ default: m.CmsPortales })),
 );
+const SostenibleCms = lazy(() =>
+  import("./modules/admin/cms/SostenibleCms").then((m) => ({ default: m.SostenibleCms })),
+);
 const PaginaPublica = lazy(() =>
   import("./modules/admin/cms/PaginaPublica").then((m) => ({ default: m.PaginaPublica })),
 );
@@ -324,15 +327,15 @@ export default function App() {
           <Route path="/tableros/:unidad/:tablero" element={<BoardPage />} />
           {/* Las páginas publicadas desde CMS Portales (0174). La portada es /portales/:portal y los micrositios, /portales/:portal/ruta/hija. */}
           <Route path="/portales/:portal/*" element={<PaginaPublica />} />
-          <Route path="/sostenible" element={<SostenibleHome />} />
+          <Route path="/sostenible" element={<SostenibleCms><SostenibleHome /></SostenibleCms>} />
           <Route path="/sostenible/impact/informes" element={<OdsPortal />} />
           <Route path="/sostenible/impact/informes/ods/:n" element={<OdsReport />} />
           <Route path="/sostenible/impact/rector" element={<OdsRector />} />
           <Route path="/sostenible/impact/boletin" element={<OdsBulletin />} />
           {/* La página de evidencia que abre el evaluador de THE: sin marco, sin menú y sin enlaces. */}
           <Route path="/sostenible/impact/evidencia/:n/:indicador" element={<OdsEvidence />} />
-          <Route path="/sostenible/:ranking" element={<SostenibleRanking />} />
-          <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCategory />} />
+          <Route path="/sostenible/:ranking" element={<SostenibleCms><SostenibleRanking /></SostenibleCms>} />
+          <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCms><SostenibleCategory /></SostenibleCms>} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />
           <Route path="/datos-abiertos/observatorio" element={<ObservatoryHub />} />
           <Route path="/datos-abiertos/observatorio/:tema" element={<ObservatoryTopic />} />
@@ -731,7 +734,7 @@ export default function App() {
           <Route
             path="/admin/cms"
             element={
-              <RequireRole minimum="planeacion" screen="cms">
+              <RequireRole minimum="consulta" screen="cms">
                 <CmsPortales />
               </RequireRole>
             }

@@ -251,3 +251,49 @@ export function useInvalidarCms() {
 export function usePublicar() {
   return useMutation({ mutationFn: publicarPagina });
 }
+
+/* ---------------------------------------------------------------------------
+   Editores por portal (cms_editores, 0199). Los nombra solo la administración.
+   ------------------------------------------------------------------------ */
+
+export interface CmsEditor {
+  id: string;
+  user_id: string;
+  portal: PortalSlug;
+}
+
+const clavesEditores = ["cms", "editores"] as const;
+
+export function useEditores(activo: boolean) {
+  return useQuery({
+    queryKey: clavesEditores,
+    enabled: activo,
+    queryFn: async (): Promise<CmsEditor[]> => {
+      const { data, error } = await supabase.from("cms_editores").select("id,user_id,portal").order("created_at");
+      if (error) throw fallo(error);
+      return (data ?? []) as CmsEditor[];
+    },
+  });
+}
+
+export function useGuardarEditor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { user_id: string; portal: PortalSlug }) => {
+      const { error } = await supabase.from("cms_editores").insert(v);
+      if (error) throw fallo(error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: clavesEditores }),
+  });
+}
+
+export function useQuitarEditor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("cms_editores").delete().eq("id", id);
+      if (error) throw fallo(error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: clavesEditores }),
+  });
+}

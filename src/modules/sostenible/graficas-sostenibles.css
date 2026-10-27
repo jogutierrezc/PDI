@@ -120,6 +120,37 @@
   border-radius: 3px;
 }
 
+/* Selector de años o periodos de la gráfica (cuando quien la publicó lo activó). */
+.sos-gf__filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-secondary);
+}
+
+.sos-gf__filtro select,
+.sos-gf__filtro button {
+  min-height: 32px;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.sos-gf__filtro button {
+  cursor: pointer;
+}
+
+.sos-gf__filtro select:focus-visible,
+.sos-gf__filtro button:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
 .sos-gf__vacia {
   margin: 0;
   font-size: var(--text-sm);

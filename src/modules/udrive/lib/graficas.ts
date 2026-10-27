@@ -7,8 +7,12 @@
    ========================================================================== */
 
 import type { ColumnaUd, ConfigGrafica, TablaDatos, TipoGrafica, Valor } from "../tipos";
+import { agregacionDe, agregacionSugerida, agregar, agruparPorRotulo, filasEnOrden, filasFiltradas, hayAgrupacion, leerAgregacion, leerAgruparFecha, leerFiltroFecha, resumenFiltro, rotulo } from "./agrupar";
 import { regresionLineal, tendenciaPorPosicion } from "./regresion";
 import { esNumerica, numeroDe, textoNumero } from "./valores";
+
+// El filtro y la agrupación viven en ./agrupar; se reexporta rotulo aquí para quien ya lo importa de este archivo.
+export { rotulo } from "./agrupar";
 
 /** La paleta institucional fija; las gráficas no dejan elegir otros colores. Contraste ≥ 3:1 sobre blanco (gráficos). */
 export const PALETA = ["#1f5fbf", "#0b7481", "#0a2d63", "#b67a0c", "#6b3fa0", "#12833a", "#b42b2a", "#5f7089"] as const;
@@ -85,6 +89,11 @@ export function configInicial(tipo: TipoGrafica, tabla: TablaDatos | null): Conf
     max: null,
     tendencia: tipo === "linea",
     rotular: tipo === "linea" ? "ultimo" : "ninguno",
+    // Las gráficas nuevas parten agrupando los rótulos repetidos (dispersión y burbujas dibujan un punto por fila).
+    agrupar: tipo === "dispersion" || tipo === "burbujas" ? "ninguno" : agregacionSugerida(cols.find((c) => c.clave === series[0]?.clave)),
+    agruparFecha: "ninguno",
+    filtroFecha: null,
+    filtroInteractivo: false,
   };
 }
 
@@ -104,13 +113,8 @@ export function falta(tabla: TablaDatos | null, c: ConfigGrafica): string {
   if (c.tipo === "calor" && !col(c.filaCalor)) return "Elija la columna de las filas del mapa de calor.";
   if (esCombinada(c.tipo) && c.series.length < 2) return "Una gráfica combinada necesita dos series.";
   if (fichaDe(c.tipo).maxSeries === 1 && c.series.length > 1) return "Este tipo de gráfica usa una sola serie.";
+  if (resumenFiltro(tabla, c).activo && !filasFiltradas(tabla, c).length) return "El filtro de fechas no deja ninguna fila: amplíe el rango.";
   return "";
-}
-
-/** El valor de una celda como rótulo de categoría. */
-export function rotulo(v: Valor | undefined): string {
-  if (v === null || v === undefined || v === "") return "(sin dato)";
-  return typeof v === "number" ? textoNumero(v) : String(v);
 }
 
 export interface SerieDatos {
@@ -126,8 +130,24 @@ export interface DatosCategoricos {
   series: SerieDatos[];
 }
 
+/**
+ * Los datos de las gráficas por categorías. Primero el filtro de fecha; después, si se pidió agrupar,
+ * una categoría por rótulo con la agregación de cada serie (fechas en orden cronológico). Sin agrupar,
+ * una categoría por fila, como siempre.
+ */
 export function datosCategoricos(tabla: TablaDatos, c: ConfigGrafica): DatosCategoricos {
-  const xs = tabla.filas.map((f) => rotulo(f.datos[c.x]));
+  const filas = filasFiltradas(tabla, c);
+  if (hayAgrupacion(tabla, c)) {
+    const grupos = agruparPorRotulo(filas, tabla, c);
+    const series = c.series.map((s, i) => {
+      const col = tabla.columnas.find((x) => x.clave === s.clave);
+      const agg = agregacionDe(c, s, col);
+      const valores = grupos.map((g) => agregar(agg, (agg === "ultimo" ? filasEnOrden(g.filas, tabla, c) : g.filas).map((f) => numeroDe(f.datos[s.clave]))));
+      return { clave: s.clave, etiqueta: col?.etiqueta ?? s.clave, color: s.color ?? i, eje: s.eje ?? "izquierdo", valores };
+    });
+    return { categorias: grupos.map((g) => g.rotulo), series };
+  }
+  const xs = filas.map((f) => rotulo(f.datos[c.x]));
   // Si un rótulo se repite (dos filas con el mismo periodo), se distingue para no mezclar barras.
   const visto = new Map<string, number>();
   const categorias = xs.map((x) => {
@@ -137,7 +157,7 @@ export function datosCategoricos(tabla: TablaDatos, c: ConfigGrafica): DatosCate
   });
   const series = c.series.map((s, i) => {
     const col = tabla.columnas.find((x) => x.clave === s.clave);
-    return { clave: s.clave, etiqueta: col?.etiqueta ?? s.clave, color: s.color ?? i, eje: s.eje ?? "izquierdo", valores: tabla.filas.map((f) => numeroDe(f.datos[s.clave])) };
+    return { clave: s.clave, etiqueta: col?.etiqueta ?? s.clave, color: s.color ?? i, eje: s.eje ?? "izquierdo", valores: filas.map((f) => numeroDe(f.datos[s.clave])) };
   });
   return { categorias, series };
 }
@@ -156,7 +176,7 @@ export function datosDispersion(tabla: TablaDatos, c: ConfigGrafica): { puntos: 
   const nombre = tabla.columnas.find((col) => !esNumerica(col));
   const puntos: PuntoXY[] = [];
   let omitidos = 0;
-  tabla.filas.forEach((f, i) => {
+  filasFiltradas(tabla, c).forEach((f, i) => {
     const x = numeroDe(f.datos[c.x]);
     const y = numeroDe(f.datos[ycl]);
     const r = c.tipo === "burbujas" && c.tamano ? numeroDe(f.datos[c.tamano]) : null;
@@ -176,26 +196,35 @@ export interface CeldaCalor {
   valor: number;
 }
 
-/** Mapa de calor: valor por cruce de columna (X) y fila. Si el cruce se repite, se promedia. */
+/**
+ * Mapa de calor: valor por cruce de columna (X) y fila. Si el cruce se repite se combina con la agregación
+ * pedida; sin agrupar, se promedia (como siempre). Con fechas agrupadas, las columnas son los periodos en orden cronológico.
+ */
 export function datosCalor(tabla: TablaDatos, c: ConfigGrafica): { celdas: CeldaCalor[]; columnas: string[]; filas: string[] } {
   const vcl = c.series[0]?.clave ?? "";
-  const acumulado = new Map<string, { suma: number; n: number; columna: string; fila: string }>();
-  const columnas: string[] = [];
+  const agrupado = hayAgrupacion(tabla, c);
+  const serie = c.series[0];
+  const agg = agrupado && serie ? agregacionDe(c, serie, tabla.columnas.find((x) => x.clave === vcl)) : "promedio";
+  const base = filasFiltradas(tabla, c).filter((f) => numeroDe(f.datos[vcl]) !== null);
+  const grupos = agrupado ? agruparPorRotulo(base, tabla, c) : null;
+  const rotuloColumna = new Map<string, string>();
+  grupos?.forEach((g) => g.filas.forEach((f) => rotuloColumna.set(f.id, g.rotulo)));
+  const acumulado = new Map<string, { valores: number[]; columna: string; fila: string }>();
+  const columnas: string[] = grupos ? grupos.map((g) => g.rotulo) : [];
   const filas: string[] = [];
-  for (const f of tabla.filas) {
-    const col = rotulo(f.datos[c.x]);
+  for (const f of grupos ? grupos.flatMap((g) => filasEnOrden(g.filas, tabla, c)) : base) {
+    const col = rotuloColumna.get(f.id) ?? rotulo(f.datos[c.x]);
     const fila = rotulo(f.datos[c.filaCalor ?? ""]);
     const v = numeroDe(f.datos[vcl]);
     if (v === null) continue;
     if (!columnas.includes(col)) columnas.push(col);
     if (!filas.includes(fila)) filas.push(fila);
     const k = `${fila}\u0001${col}`;
-    const a = acumulado.get(k) ?? { suma: 0, n: 0, columna: col, fila };
-    a.suma += v;
-    a.n += 1;
+    const a = acumulado.get(k) ?? { valores: [], columna: col, fila };
+    a.valores.push(v);
     acumulado.set(k, a);
   }
-  const celdas = [...acumulado.entries()].map(([k, a]) => ({ id: k, columna: a.columna, fila: a.fila, valor: a.suma / a.n }));
+  const celdas = [...acumulado.entries()].map(([k, a]) => ({ id: k, columna: a.columna, fila: a.fila, valor: agregar(agg, a.valores) ?? 0 }));
   return { celdas, columnas, filas };
 }
 
@@ -211,11 +240,18 @@ export interface Porcion {
 /** Torta y dona: solo valores positivos; las demás filas se omiten. */
 export function datosPorciones(tabla: TablaDatos, c: ConfigGrafica): { porciones: Porcion[]; total: number; omitidas: number } {
   const v = c.series[0]?.clave ?? "";
-  const base = tabla.filas
-    .map((f) => ({ id: f.id, nombre: rotulo(f.datos[c.x]), valor: numeroDe(f.datos[v]) }))
-    .filter((p): p is { id: string; nombre: string; valor: number } => p.valor !== null && p.valor > 0);
+  const filas = filasFiltradas(tabla, c);
+  let candidatas: { id: string; nombre: string; valor: number | null }[];
+  if (hayAgrupacion(tabla, c) && c.series[0]) {
+    // Las filas con el mismo nombre forman una sola porción.
+    const agg = agregacionDe(c, c.series[0], tabla.columnas.find((x) => x.clave === v));
+    candidatas = agruparPorRotulo(filas, tabla, c).map((g) => ({ id: g.filas[0].id, nombre: g.rotulo, valor: agregar(agg, (agg === "ultimo" ? filasEnOrden(g.filas, tabla, c) : g.filas).map((f) => numeroDe(f.datos[v]))) }));
+  } else {
+    candidatas = filas.map((f) => ({ id: f.id, nombre: rotulo(f.datos[c.x]), valor: numeroDe(f.datos[v]) }));
+  }
+  const base = candidatas.filter((p): p is { id: string; nombre: string; valor: number } => p.valor !== null && p.valor > 0);
   const total = base.reduce((s, p) => s + p.valor, 0);
-  return { porciones: base.map((p, i) => ({ ...p, color: i, parte: total ? p.valor / total : 0 })), total, omitidas: tabla.filas.length - base.length };
+  return { porciones: base.map((p, i) => ({ ...p, color: i, parte: total ? p.valor / total : 0 })), total, omitidas: candidatas.length - base.length };
 }
 
 /** La tendencia lineal de la primera serie (un valor por categoría, nulo donde no se puede). */
@@ -258,18 +294,22 @@ export function descripcionAccesible(tabla: TablaDatos, c: ConfigGrafica): { eti
   const etiqueta = `${ficha.nombre}: ${titulo}`;
   if (falta(tabla, c)) return { etiqueta, descripcion: "" };
   const fmt = (n: number) => textoNumero(Math.round(n * 100) / 100);
+  // Si hay filtro de fecha, la descripción lo dice: los números ya son los de las filas que quedan.
+  const filtro = resumenFiltro(tabla, c);
+  const nota = filtro.activo ? ` Filtrada por fecha: ${filtro.quedan} de ${filtro.total} filas${filtro.desde ? `, de ${filtro.desde} a ${filtro.hasta}` : ""}.` : "";
+  const con = (r: { etiqueta: string; descripcion: string }) => ({ ...r, descripcion: r.descripcion + nota });
   if (c.tipo === "dispersion" || c.tipo === "burbujas") {
     const { puntos } = datosDispersion(tabla, c);
-    return { etiqueta, descripcion: `${puntos.length} puntos. ${nombreDe(tabla.columnas, c.x)} en el eje horizontal y ${nombreDe(tabla.columnas, c.series[0]?.clave)} en el vertical.` };
+    return con({ etiqueta, descripcion: `${puntos.length} puntos. ${nombreDe(tabla.columnas, c.x)} en el eje horizontal y ${nombreDe(tabla.columnas, c.series[0]?.clave)} en el vertical.` });
   }
   if (c.tipo === "calor") {
     const { celdas, columnas, filas } = datosCalor(tabla, c);
     const v = celdas.map((x) => x.valor);
-    return { etiqueta, descripcion: `${filas.length} filas por ${columnas.length} columnas. Valores de ${fmt(Math.min(...v))} a ${fmt(Math.max(...v))}.` };
+    return con({ etiqueta, descripcion: `${filas.length} filas por ${columnas.length} columnas. Valores de ${fmt(Math.min(...v))} a ${fmt(Math.max(...v))}.` });
   }
   if (c.tipo === "torta" || c.tipo === "dona") {
     const { porciones, total } = datosPorciones(tabla, c);
-    return { etiqueta, descripcion: `Total ${fmt(total)}. ${porciones.map((p) => `${p.nombre}: ${fmt(p.valor)} (${fmt(p.parte * 100)} %)`).join("; ")}.` };
+    return con({ etiqueta, descripcion: `Total ${fmt(total)}. ${porciones.map((p) => `${p.nombre}: ${fmt(p.valor)} (${fmt(p.parte * 100)} %)`).join("; ")}.` });
   }
   const d = datosCategoricos(tabla, c);
   const partes = d.series.map((s) => {
@@ -281,7 +321,7 @@ export function descripcionAccesible(tabla: TablaDatos, c: ConfigGrafica): { eti
     const menor = validos.reduce((a, b) => (b.v < a.v ? b : a));
     return `${s.etiqueta}: de ${fmt(primero.v)} en ${d.categorias[primero.i]} a ${fmt(ultimo.v)} en ${d.categorias[ultimo.i]}; el mayor, ${fmt(mayor.v)} en ${d.categorias[mayor.i]}, y el menor, ${fmt(menor.v)} en ${d.categorias[menor.i]}.`;
   });
-  return { etiqueta, descripcion: partes.join(" ") };
+  return con({ etiqueta, descripcion: partes.join(" ") });
 }
 
 const nombreDe = (cols: readonly ColumnaUd[], clave: string | undefined): string => cols.find((c) => c.clave === clave)?.etiqueta ?? "";
@@ -319,7 +359,9 @@ export function tintaSobre(fondo: string): string {
 export function cambiarTipo(c: ConfigGrafica, tipo: TipoGrafica, tabla: TablaDatos): ConfigGrafica {
   const nuevo = configInicial(tipo, tabla);
   const xy = (t: TipoGrafica) => t === "dispersion" || t === "burbujas";
-  const base: ConfigGrafica = { ...nuevo, titulo: c.titulo, nota: c.nota };
+  // El filtro de fecha pasa de un tipo a otro; la agrupación también, salvo desde o hacia dispersión y burbujas.
+  const filtro = c.filtroFecha && tabla.columnas.some((k) => k.clave === c.filtroFecha?.columna) ? c.filtroFecha : null;
+  const base: ConfigGrafica = { ...nuevo, titulo: c.titulo, nota: c.nota, filtroFecha: filtro, filtroInteractivo: filtro ? c.filtroInteractivo === true : false };
   if (xy(c.tipo) || xy(tipo) || !tabla.columnas.some((k) => k.clave === c.x)) return base;
   const ficha = fichaDe(tipo);
   let series = c.series.filter((s) => tabla.columnas.some((k) => k.clave === s.clave)).slice(0, ficha.maxSeries);
@@ -335,6 +377,8 @@ export function cambiarTipo(c: ConfigGrafica, tipo: TipoGrafica, tabla: TablaDat
     ejeY: c.ejeY,
     ejeY2: esCombinada(tipo) ? (c.ejeY2 || (tabla.columnas.find((k) => k.clave === series[1]?.clave)?.etiqueta ?? "")) : "",
     tendencia: tipo === "linea" ? c.tendencia : false,
+    agrupar: c.agrupar ?? "ninguno",
+    agruparFecha: c.agruparFecha ?? "ninguno",
   };
 }
 
@@ -346,7 +390,7 @@ export function normalizarConfig(crudo: unknown, tabla: TablaDatos | null): Conf
   const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
   const txt = (v: unknown, def: string) => (typeof v === "string" ? v : def);
   const series = Array.isArray(o.series)
-    ? o.series.filter((s): s is NonNullable<ConfigGrafica["series"]>[number] => typeof s === "object" && s !== null && typeof s.clave === "string").map((s, i) => ({ clave: s.clave, color: typeof s.color === "number" ? s.color : i, eje: s.eje === "derecho" ? ("derecho" as const) : ("izquierdo" as const) }))
+    ? o.series.filter((s): s is NonNullable<ConfigGrafica["series"]>[number] => typeof s === "object" && s !== null && typeof s.clave === "string").map((s, i) => ({ clave: s.clave, color: typeof s.color === "number" ? s.color : i, eje: s.eje === "derecho" ? ("derecho" as const) : ("izquierdo" as const), ...(leerAgregacion(s.agrupar) ? { agrupar: leerAgregacion(s.agrupar) } : {}) }))
     : base.series;
   return {
     tipo,
@@ -363,5 +407,10 @@ export function normalizarConfig(crudo: unknown, tabla: TablaDatos | null): Conf
     max: num(o.max),
     tendencia: o.tendencia === true,
     rotular: o.rotular === "todos" || o.rotular === "ninguno" ? o.rotular : o.rotular === "ultimo" ? "ultimo" : base.rotular,
+    // Lo guardado antes de la agrupación se lee como «ninguno»: se ve exactamente igual que antes.
+    agrupar: leerAgregacion(o.agrupar) ?? "ninguno",
+    agruparFecha: leerAgruparFecha(o.agruparFecha),
+    filtroFecha: leerFiltroFecha(o.filtroFecha),
+    filtroInteractivo: o.filtroInteractivo === true,
   };
 }

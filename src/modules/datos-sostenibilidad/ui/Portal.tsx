@@ -33,7 +33,7 @@ const NO_PUBLICABLES = new Set(["dispersion", "burbujas"]);
 
 /** Las columnas que usa una gráfica (las que la base entrega y revisa). */
 function columnasUsadas(c: ConfigGrafica): string[] {
-  return [...new Set([c.x, ...c.series.map((s) => s.clave), c.tamano, c.filaCalor].filter((k): k is string => Boolean(k)))];
+  return [...new Set([c.x, ...c.series.map((s) => s.clave), c.tamano, c.filaCalor, c.filtroFecha && c.filtroFecha.modo !== "todo" ? c.filtroFecha.columna : null].filter((k): k is string => Boolean(k)))];
 }
 
 export function Portal({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {

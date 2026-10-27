@@ -127,6 +127,33 @@ export interface SerieGrafica {
   color: number;
   /** En las combinadas: ¿va al eje derecho? */
   eje?: "izquierdo" | "derecho";
+  /** Cómo se combinan las filas con el mismo rótulo en esta serie; si falta, manda `ConfigGrafica.agrupar`. */
+  agrupar?: Agregacion;
+}
+
+/** Cómo se combinan las filas que repiten el mismo rótulo del eje X. «ninguno» deja una barra o punto por fila (con sufijo «(2)»). */
+export type Agregacion = "ninguno" | "suma" | "promedio" | "minimo" | "maximo" | "conteo" | "ultimo";
+
+/** Cómo se agrupan las fechas del eje X cuando es una columna de fecha. */
+export type AgruparFecha = "ninguno" | "dia" | "mes" | "trimestre" | "anio";
+
+/**
+ * Filtro por fecha de las filas que entran a la gráfica (antes de agrupar y de calcular nada).
+ * La columna es de tipo fecha o un número que hace de año o periodo.
+ * - «todo»: sin filtrar (conserva la columna elegida).
+ * - «rango»: de `desde` a `hasta`, ambos incluidos; uno vacío deja ese extremo abierto. Fechas AAAA-MM-DD o el número del periodo.
+ * - «ultimos»: los últimos `n` días, meses o años, contados desde el dato MÁS RECIENTE de la tabla (se actualiza solo al crecer).
+ *   En una columna numérica son los últimos `n` periodos y la unidad no cuenta.
+ * - «anio»: solo el año del dato más reciente (en una columna numérica, el último periodo).
+ * Las filas sin fecha válida quedan fuera cuando hay un filtro activo.
+ */
+export interface FiltroFecha {
+  columna: string;
+  modo: "todo" | "rango" | "ultimos" | "anio";
+  desde: string | null;
+  hasta: string | null;
+  n: number;
+  unidad: "dias" | "meses" | "anios";
 }
 
 export interface ConfigGrafica {
@@ -147,6 +174,16 @@ export interface ConfigGrafica {
   max: number | null;
   tendencia: boolean;
   rotular: "ninguno" | "ultimo" | "todos";
+  /**
+   * Aditivos (migración 0207 los lleva al portal). Lo guardado sin estos campos se lee como «ninguno»,
+   * sin filtro y sin selector: se ve igual que antes. Las gráficas nuevas parten con `agrupar` activo.
+   */
+  /** Agregación global de filas con el mismo rótulo (cada serie puede tener la suya). */
+  agrupar?: Agregacion;
+  agruparFecha?: AgruparFecha;
+  filtroFecha?: FiltroFecha | null;
+  /** Portal: quien mira la gráfica puede cambiar el rango de años o periodos. */
+  filtroInteractivo?: boolean;
 }
 
 export interface ContenidoGrafica {

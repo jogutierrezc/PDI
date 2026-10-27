@@ -12,6 +12,7 @@ import { CATALOGO, PALETA, cambiarTipo, esCombinada, fichaDe } from "../lib/graf
 import { esNumerica, aNumeroEs, textoNumero } from "../lib/valores";
 import type { ConfigGrafica, SerieGrafica, TablaDatos, TipoGrafica } from "../tipos";
 import { GraficaVista } from "./GraficaVista";
+import { PanelAgrupacion } from "./PanelAgrupacion";
 import { Icon } from "../../../components/ui/Icon";
 import { useEffect, useState } from "react";
 
@@ -99,6 +100,7 @@ export function PanelDatos({ tabla, config, editable, onChange }: { tabla: Tabla
           </select>
         </label>
       ) : null}
+      <PanelAgrupacion tabla={tabla} config={config} editable={editable} onChange={onChange} />
     </>
   );
 }

@@ -9,13 +9,14 @@
    la migración, no dibuja nada: la página queda como estaba.
    ========================================================================== */
 
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import type { FocusEvent, MouseEvent } from "react";
 import { SECCIONES_SOS, useGraficasPublicas } from "../datos-sostenibilidad/sos";
 import type { GraficaPublicaSos, SeccionSos } from "../datos-sostenibilidad/tipos";
+import { filtroDePeriodos, periodosActivos, periodosDisponibles } from "../udrive/lib/agrupar";
 import { colorDe, datosCategoricos, normalizarConfig, rangoDeEje } from "../udrive/lib/graficas";
 import { textoNumero } from "../udrive/lib/valores";
-import type { TablaDatos, TipoColumna } from "../udrive/tipos";
+import type { ConfigGrafica, TablaDatos, TipoColumna } from "../udrive/tipos";
 import "./graficas-sostenibles.css";
 
 const TIPOS_COLUMNA: readonly string[] = ["texto", "numero", "porcentaje", "fecha", "lista"];
@@ -47,16 +48,51 @@ interface Globo {
 const W = 640;
 const H = 300;
 
-/** El dibujo: barras (agrupadas si hay varias series) o líneas, con ejes, leyenda y globo. */
+/**
+ * La gráfica con su selector de años o periodos (solo si quien la publicó lo activó). La lógica de filtro y
+ * agrupación es la misma de UDrive; si la base no entrega los campos nuevos, se dibuja sin agrupar ni filtrar.
+ */
 function Dibujo({ g }: { g: GraficaPublicaSos }) {
-  const caja = useRef<HTMLDivElement>(null);
-  const [globo, setGlobo] = useState<Globo | null>(null);
   const tabla = useMemo(() => tablaDe(g), [g]);
   const config = useMemo(() => normalizarConfig(g.config, tabla), [g.config, tabla]);
+  const [elegido, setElegido] = useState<{ desde: number; hasta: number } | null>(null);
+  const periodos = useMemo(() => (config.filtroInteractivo ? periodosDisponibles(tabla, config) : []), [tabla, config]);
+  const base = useMemo(() => periodosActivos(tabla, config), [tabla, config]);
+  const vista = useMemo<ConfigGrafica>(() => {
+    const f = elegido ? filtroDePeriodos(tabla, config, elegido.desde, elegido.hasta) : null;
+    return f ? { ...config, filtroFecha: f } : config;
+  }, [tabla, config, elegido]);
+  const id = useId();
+  const actual = elegido ?? base ?? (periodos.length ? { desde: periodos[0].valor, hasta: periodos[periodos.length - 1].valor } : null);
+
+  return (
+    <>
+      {periodos.length > 1 && actual ? (
+        <div className="sos-gf__filtro" role="group" aria-label="Años que muestra la gráfica">
+          <label htmlFor={id + "d"}>Desde</label>
+          <select id={id + "d"} value={actual.desde} onChange={(e) => setElegido({ desde: Number(e.target.value), hasta: Math.max(Number(e.target.value), actual.hasta) })}>
+            {periodos.map((p) => <option key={p.valor} value={p.valor}>{p.texto}</option>)}
+          </select>
+          <label htmlFor={id + "h"}>hasta</label>
+          <select id={id + "h"} value={actual.hasta} onChange={(e) => setElegido({ desde: Math.min(Number(e.target.value), actual.desde), hasta: Number(e.target.value) })}>
+            {periodos.map((p) => <option key={p.valor} value={p.valor}>{p.texto}</option>)}
+          </select>
+          {elegido ? <button type="button" onClick={() => setElegido(null)}>Restablecer</button> : null}
+        </div>
+      ) : null}
+      <Lienzo g={g} tabla={tabla} config={vista} />
+    </>
+  );
+}
+
+/** El dibujo: barras (agrupadas si hay varias series) o líneas, con ejes, leyenda y globo. */
+function Lienzo({ g, tabla, config }: { g: GraficaPublicaSos; tabla: TablaDatos; config: ConfigGrafica }) {
+  const caja = useRef<HTMLDivElement>(null);
+  const [globo, setGlobo] = useState<Globo | null>(null);
   const { categorias, series } = useMemo(() => datosCategoricos(tabla, config), [tabla, config]);
   const lineas = COMO_LINEAS.has(config.tipo);
 
-  if (!series.length || !categorias.length) return <p className="sos-gf__vacia">Esta gráfica no tiene datos para dibujar.</p>;
+  if (!series.length || !categorias.length) return <p className="sos-gf__vacia" role="status">{config.filtroFecha && config.filtroFecha.modo !== "todo" ? "No hay datos en ese periodo." : "Esta gráfica no tiene datos para dibujar."}</p>;
 
   const m = { l: 52, r: 16, t: 14, b: categorias.length > 6 ? 62 : 38 };
   const iw = W - m.l - m.r;

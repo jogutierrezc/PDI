@@ -75,7 +75,7 @@ export function useDatosPublicados(raiz: string | undefined) {
       if (!tabla) continue;
       const config = normalizarConfig(fuente?.config, tabla);
       if (NO_PUBLICABLES.has(config.tipo)) continue;
-      const usadas = [...new Set([config.x, ...config.series.map((s) => s.clave), config.tamano, config.filaCalor].filter((k): k is string => Boolean(k)))];
+      const usadas = [...new Set([config.x, ...config.series.map((s) => s.clave), config.tamano, config.filaCalor, config.filtroFecha && config.filtroFecha.modo !== "todo" ? config.filtroFecha.columna : null].filter((k): k is string => Boolean(k)))];
       if (usadas.some((k) => { const c = tabla.columnas.find((x) => x.clave === k); return c ? columnaSensible(c) : false; })) continue;
       salida.push({
         id: g.id,

@@ -203,9 +203,19 @@ export function useGuardarVinculo() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (v: VinculoSosEntrada) => {
-      const r = await supabase.from("sos_vinculos").upsert(v, { onConflict: "indicador_id" }).select("id").single();
+      // Función de la base (0206): comprueba papel, unidad y columnas con mensajes claros,
+      // en vez del «violates row-level security policy» del upsert directo.
+      const r = await supabase.rpc("sos_guardar_vinculo", {
+        p_indicador: v.indicador_id,
+        p_archivo: v.archivo_id,
+        p_valor: v.col_valor,
+        p_periodo: v.col_periodo,
+        p_campus: v.col_campus ?? null,
+        p_filtro_col: v.filtro_col ?? null,
+        p_filtro_valor: v.filtro_valor ?? null,
+      });
       if (r.error) throw errorSos(r.error);
-      return r.data;
+      return { id: r.data as string };
     },
     onSuccess: () => invalidar(client),
   });

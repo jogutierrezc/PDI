@@ -30,7 +30,7 @@ import {
 } from "../sos";
 import type { IndicadorSos, SeccionSos } from "../tipos";
 import { parpadear } from "./movimiento";
-import { AvisoSos, ErrorSos, FichaOds, Interruptor, textoCifra } from "./piezas";
+import { AvisoSos, Campo, ErrorSos, Interruptor, textoCifra } from "./piezas";
 import { useAccesoSos, useArchivosSos, useTablaDeGraficas } from "./usos";
 
 const BASE = "/admin/datos-sostenibilidad";
@@ -47,14 +47,16 @@ export function proponer(tabla: TablaDatos): { valor: string; periodo: string; c
 
 /** El valor de un indicador conectado; parpadea en verde cuando cambia (no la primera vez). */
 function ValorVivo({ texto }: { texto: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const capa = useRef<HTMLSpanElement>(null);
   const antes = useRef(texto);
   useEffect(() => {
-    if (antes.current !== texto) parpadear(ref.current);
+    const cambio = antes.current !== texto;
     antes.current = texto;
+    if (cambio) return parpadear(capa.current, 0.8);
   }, [texto]);
   return (
-    <span ref={ref} className="dsx-valor">
+    <span className="dsx-valor dsx-num">
+      <span ref={capa} className="dsx-flash dsx-flash--ok" aria-hidden="true" />
       {texto}
     </span>
   );
@@ -133,7 +135,7 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
             <div className="dsx-camino" aria-label="Tabla, indicador, portal">
               <span>Tabla</span>
               <Icon name="arrow-right" size={13} />
-              <span>ODS {ind.ods}</span>
+              <span>{ind.ods === null ? "Sin ODS" : `ODS ${ind.ods}`}</span>
               <Icon name="arrow-right" size={13} />
               <span>{ind.publicado ? "Portal" : "Sin publicar"}</span>
             </div>
@@ -150,7 +152,7 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
               <AvisoSos key={a}>{a}</AvisoSos>
             ))}
             {puede && !(ind.publicado && !administra) ? (
-              <button type="button" className="es-btn es-btn--sm es-btn--ghost" disabled={quitar.isPending} onClick={() => quitar.mutate(ind.id, { onError: (e) => setMensaje({ t: "error", texto: e.message }) })}>
+              <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" disabled={quitar.isPending} onClick={() => quitar.mutate(ind.id, { onError: (e) => setMensaje({ t: "error", texto: e.message }) })}>
                 Quitar la conexión
               </button>
             ) : null}
@@ -161,58 +163,62 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
 
       {puede ? (
         <>
-          <label className="es-fl">
-            Conectar columna a
-            <select className="es-inp" value={indicador} onChange={(e) => elegir(e.target.value)} disabled={inds.isPending}>
-              <option value="">Elegir indicador</option>
-              {lista.map((i: IndicadorSos) => (
-                <option key={i.id} value={i.id}>
-                  {i.id} · {i.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Campo etiqueta="Conectar columna a">
+            {(c) => (
+              <select {...c} className="dsx-inp" value={indicador} onChange={(e) => elegir(e.target.value)} disabled={inds.isPending}>
+                <option value="">Elegir indicador</option>
+                {lista.map((i: IndicadorSos) => (
+                  <option key={i.id} value={i.id}>
+                    {i.id} · {i.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Campo>
           {elegido ? (
             <>
-              <label className="es-fl">
-                Columna del valor
-                <select className="es-inp" value={valor} onChange={(e) => setValor(e.target.value)}>
-                  <option value="">Elegir columna</option>
-                  {tabla.columnas.filter(esNumerica).map((c) => (
-                    <option key={c.clave} value={c.clave}>
-                      {c.etiqueta}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="es-fl">
-                Columna del periodo
-                <select className="es-inp" value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
-                  <option value="">Elegir columna</option>
-                  {tabla.columnas.filter((c) => c.clave !== valor).map((c) => (
-                    <option key={c.clave} value={c.clave}>
-                      {c.etiqueta}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="es-fl">
-                Columna del campus (si el dato es por campus)
-                <select className="es-inp" value={campus} onChange={(e) => setCampus(e.target.value)}>
-                  <option value="">Ninguna: cifra institucional</option>
-                  {tabla.columnas.filter((c) => c.clave !== valor && c.clave !== periodo).map((c) => (
-                    <option key={c.clave} value={c.clave}>
-                      {c.etiqueta}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Campo etiqueta="Columna del valor">
+                {(c) => (
+                  <select {...c} className="dsx-inp" value={valor} onChange={(e) => setValor(e.target.value)}>
+                    <option value="">Elegir columna</option>
+                    {tabla.columnas.filter(esNumerica).map((col) => (
+                      <option key={col.clave} value={col.clave}>
+                        {col.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Campo>
+              <Campo etiqueta="Columna del periodo">
+                {(c) => (
+                  <select {...c} className="dsx-inp" value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
+                    <option value="">Elegir columna</option>
+                    {tabla.columnas.filter((col) => col.clave !== valor).map((col) => (
+                      <option key={col.clave} value={col.clave}>
+                        {col.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Campo>
+              <Campo etiqueta="Columna del campus (si el dato es por campus)">
+                {(c) => (
+                  <select {...c} className="dsx-inp" value={campus} onChange={(e) => setCampus(e.target.value)}>
+                    <option value="">Ninguna: cifra institucional</option>
+                    {tabla.columnas.filter((col) => col.clave !== valor && col.clave !== periodo).map((col) => (
+                      <option key={col.clave} value={col.clave}>
+                        {col.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Campo>
               {actual && actual.archivo_id !== id ? <AvisoSos>Hoy sale de «{nombreDe(actual.archivo_id)}»; conectarlo aquí lo cambia.</AvisoSos> : null}
               {bloqueado ? <AvisoSos>Este indicador ya está en el portal: cambiar su tabla lo decide quien administra la unidad.</AvisoSos> : null}
               {avisos.map((a) => (
                 <AvisoSos key={a}>{a}</AvisoSos>
               ))}
-              <button type="button" className="es-btn es-btn--pri" disabled={!valor || !periodo || avisos.length > 0 || bloqueado || guardar.isPending} onClick={conectar}>
+              <button type="button" className="dsx-btn dsx-btn--pri" disabled={!valor || !periodo || avisos.length > 0 || bloqueado || guardar.isPending} onClick={conectar}>
                 <Icon name="link" size={16} />
                 {guardar.isPending ? "Conectando…" : "Conectar"}
               </button>
@@ -253,17 +259,17 @@ export function PanelPublicar({ id, editable }: { id: string; editable: boolean 
       <Interruptor marcado={Boolean(fila?.publicado)} disabled={!puede || pubs.isPending || publicar.isPending} onChange={(v) => poner({ publicado: v })} titulo={puede ? undefined : "Publicar pide el papel Puede crear sobre la gráfica"}>
         Mostrar en /sostenible
       </Interruptor>
-      <label className="es-fl">
-        Sección de la página
-        <select className="es-inp" value={seccion} disabled={!puede || pubs.isPending} onChange={(e) => poner({ seccion: e.target.value as SeccionSos })}>
-          {SECCIONES_SOS.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.etiqueta}
-            </option>
-          ))}
-        </select>
-        <span className="dsx-tenue">Las mismas secciones del Observatorio.</span>
-      </label>
+      <Campo etiqueta="Sección de la página" ayuda="Las mismas secciones del Observatorio.">
+        {(c) => (
+          <select {...c} className="dsx-inp" value={seccion} disabled={!puede || pubs.isPending} onChange={(e) => poner({ seccion: e.target.value as SeccionSos })}>
+            {SECCIONES_SOS.map((sec) => (
+              <option key={sec.id} value={sec.id}>
+                {sec.etiqueta}
+              </option>
+            ))}
+          </select>
+        )}
+      </Campo>
       {error ? <AvisoSos tipo="error">{error}</AvisoSos> : null}
       {!puede ? <p className="dsx-tenue">Publicar pide el papel Puede crear sobre la gráfica.</p> : null}
       <p className="dsx-tenue">

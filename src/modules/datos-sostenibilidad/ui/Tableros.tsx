@@ -13,7 +13,7 @@
    (/tableros/:id). Movimiento: lo de movimiento.ts, nada por teclado.
    ========================================================================== */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, KeyboardEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
@@ -23,8 +23,9 @@ import { TableroVista, campusValido } from "../../sostenible/TableroSos";
 import "../../sostenible/sostenible.css";
 import { configDe, slugDe, urlTablero, useArchivarTablero, useBorrarTablero, useGuardarTablero, usePublicarTablero, useTableros } from "../tableros";
 import type { AnchoTablero, ConfigTablero, ElementoTablero, EstiloElemento, TableroSos, TipoElementoTablero } from "../tipos";
-import { cambiar, entrar } from "./movimiento";
-import { AvisoSos, ErrorSos, Interruptor } from "./piezas";
+import { Modal } from "./Modal";
+import { asentarLugares, capturarLugares, entrar, entradaPorTeclado, nacerMenu } from "./movimiento";
+import { AvisoSos, Campo, Cargando, ErrorSos, Interruptor, Vacio } from "./piezas";
 import { useAccesoSos } from "./usos";
 import { useDatosPublicados } from "./vistaPrevia";
 
@@ -79,7 +80,7 @@ function Lista({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {
   const archivar = useArchivarTablero();
   const borrar = useBorrarTablero();
   const raiz = useRef<HTMLDivElement>(null);
-  const [nombre, setNombre] = useState<string | null>(null);
+  const [nuevo, setNuevo] = useState(false);
   const [verArchivados, setVerArchivados] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
@@ -90,17 +91,18 @@ function Lista({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {
   const puede = (t: TableroSos) => acceso.administra || t.creado_por === profile?.id;
 
   useEffect(() => {
-    if (q.isSuccess) entrar(raiz.current, ".dsx-tab-card");
+    if (q.isSuccess) return entrar(raiz.current, ".dsx-tab-card");
   }, [q.isSuccess]);
 
-  const crear = () => {
-    const n = (nombre ?? "").trim();
-    if (!n) return setError("Escriba un nombre para el tablero.");
-    setError(null);
-    guardar.mutate(
-      { nombre: n, slug: slugLibre(slugDe(n), usados), descripcion: "", config: configDe(null) },
-      { onSuccess: (t) => navigate(`${BASE}/${t.id}`), onError: (e) => setError(e.message) },
-    );
+  /** Crea el tablero y abre el constructor; devuelve el mensaje si algo falla (la ventana sigue abierta). */
+  const crear = async (nombre: string, descripcion: string): Promise<string | null> => {
+    try {
+      const t = await guardar.mutateAsync({ nombre, slug: slugLibre(slugDe(nombre), usados), descripcion, config: configDe(null) });
+      navigate(`${BASE}/${t.id}`);
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "No se pudo crear el tablero.";
+    }
   };
 
   const duplicar = (t: TableroSos) => {
@@ -122,12 +124,9 @@ function Lista({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {
   return (
     <div ref={raiz} className="dsx-pagina">
       <div className="dsx-cab">
-        <div>
-          <h2>Tableros</h2>
-          <p className="dsx-sub">Arme tableros con indicadores y gráficas del portal, publíquelos con su propio enlace o muéstrelos en el CMS de Sostenibilidad.</p>
-        </div>
+        <p className="dsx-lead">Arme tableros con indicadores y gráficas del portal, publíquelos con su propio enlace o muéstrelos en el CMS de Sostenibilidad.</p>
         {acceso.crea ? (
-          <button type="button" className="es-btn es-btn--pri" aria-expanded={nombre !== null} onClick={() => setNombre(nombre === null ? "" : null)}>
+          <button type="button" className="dsx-btn dsx-btn--pri" onClick={() => setNuevo(true)}>
             <Icon name="plus" size={16} />
             Nuevo tablero
           </button>
@@ -135,33 +134,11 @@ function Lista({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {
       </div>
       {!acceso.crea ? <AvisoSos>Ve los tableros en solo lectura: crearlos y publicarlos pide el papel Crea o más en la unidad Datos de Sostenibilidad.</AvisoSos> : null}
 
-      {nombre !== null && acceso.crea ? (
-        <form
-          className="dsx-form"
-          aria-label="Nuevo tablero"
-          onSubmit={(e) => {
-            e.preventDefault();
-            crear();
-          }}
-        >
-          <label className="es-fl">
-            Nombre del tablero
-            <input className="es-inp" autoFocus value={nombre} maxLength={120} placeholder="Por ejemplo, Campus verde 2025" onChange={(e) => setNombre(e.target.value)} />
-          </label>
-          <div className="dsx-form__pie">
-            <button type="submit" className="es-btn es-btn--pri" disabled={guardar.isPending}>
-              {guardar.isPending ? "Creando…" : "Crear y abrir"}
-            </button>
-            <button type="button" className="es-btn" onClick={() => setNombre(null)}>
-              Cancelar
-            </button>
-          </div>
-        </form>
-      ) : null}
+      {nuevo && acceso.crea ? <NuevoTablero pendiente={guardar.isPending} onCrear={crear} onCerrar={() => setNuevo(false)} /> : null}
 
       {q.error ? <ErrorSos error={q.error} /> : null}
       {error ? <AvisoSos tipo="error">{error}</AvisoSos> : null}
-      {q.isPending ? <p className="admin-loading">Cargando los tableros…</p> : null}
+      {q.isPending ? <Cargando texto="Cargando los tableros…" /> : null}
 
       {q.isSuccess ? (
         <Interruptor marcado={verArchivados} onChange={setVerArchivados}>
@@ -170,42 +147,52 @@ function Lista({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {
       ) : null}
 
       {q.isSuccess && !visibles.length ? (
-        <div className="es-empty">
-          <b>{verArchivados ? "No hay tableros archivados" : "Todavía no hay tableros"}</b>
-          <span>{verArchivados ? "Aquí aparecen los que archive." : acceso.crea ? "Cree el primero con «Nuevo tablero»." : "Quien tenga el papel Crea o más en la unidad puede crear el primero."}</span>
-        </div>
+        <Vacio
+          icono="grid"
+          titulo={verArchivados ? "No hay tableros archivados" : "Todavía no hay tableros"}
+          accion={
+            !verArchivados && acceso.crea ? (
+              <button type="button" className="dsx-btn dsx-btn--pri" onClick={() => setNuevo(true)}>
+                <Icon name="plus" size={16} />
+                Nuevo tablero
+              </button>
+            ) : undefined
+          }
+        >
+          {verArchivados ? "Aquí aparecen los que archive." : acceso.crea ? "Cree el primero: solo necesita un nombre." : "Quien tenga el papel Crea o más en la unidad puede crear el primero."}
+        </Vacio>
       ) : null}
 
       <div className="dsx-tab-lista">
         {visibles.map((t) => (
           <article key={t.id} className="dsx-tab-card" aria-label={t.nombre}>
             <div className="dsx-tab-card__cab">
-              <h3>{t.nombre}</h3>
+              <h2>{t.nombre}</h2>
               <span className="dsx-chip" data-t={t.archivado ? "aviso" : t.publicado ? "ok" : undefined}>
                 {t.archivado ? "Archivado" : t.publicado ? "Publicado" : "Borrador"}
               </span>
             </div>
             {t.descripcion ? <p className="dsx-sub">{t.descripcion}</p> : null}
-            <small className="dsx-tenue">
+            <p className="dsx-tenue">
               <span className="dsx-mono">/sostenible/tablero/{t.slug}</span> · {t.config.elementos.length} {t.config.elementos.length === 1 ? "elemento" : "elementos"} · editado {fecha(t.updated_at)}
-            </small>
+            </p>
             <div className="dsx-tab-card__acciones">
-              <Link className="es-btn es-btn--sm" to={`${BASE}/${t.id}`}>
+              <Link className="dsx-btn dsx-btn--sm" to={`${BASE}/${t.id}`}>
                 <Icon name="pen" size={14} />
                 {puede(t) || acceso.crea ? "Editar" : "Ver"}
               </Link>
               {acceso.crea ? (
-                <button type="button" className="es-btn es-btn--sm es-btn--ghost" disabled={guardar.isPending} onClick={() => duplicar(t)}>
+                <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" disabled={guardar.isPending} onClick={() => duplicar(t)}>
                   Duplicar
                 </button>
               ) : null}
               {t.publicado ? (
                 <>
-                  <button type="button" className="es-btn es-btn--sm es-btn--ghost" onClick={() => void copiar(t)}>
+                  <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" onClick={() => void copiar(t)}>
                     <Icon name="link" size={14} />
                     {copiado === t.id ? "Enlace copiado" : "Copiar enlace"}
                   </button>
-                  <a className="es-btn es-btn--sm es-btn--ghost" href={`/sostenible/tablero/${t.slug}`} target="_blank" rel="noreferrer">
+                  <a className="dsx-btn dsx-btn--sm dsx-btn--ghost" href={`/sostenible/tablero/${t.slug}`} target="_blank" rel="noreferrer">
                     <Icon name="external" size={14} />
                     Ver en el portal
                   </a>
@@ -214,7 +201,7 @@ function Lista({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {
               {puede(t) ? (
                 <button
                   type="button"
-                  className="es-btn es-btn--sm es-btn--ghost"
+                  className="dsx-btn dsx-btn--sm dsx-btn--ghost"
                   disabled={archivar.isPending}
                   onClick={() => {
                     setError(null);
@@ -227,7 +214,7 @@ function Lista({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) {
               {t.archivado && puede(t) ? (
                 <button
                   type="button"
-                  className="es-btn es-btn--sm es-btn--ghost dsx-peligro"
+                  className="dsx-btn dsx-btn--sm dsx-btn--ghost dsx-peligro"
                   disabled={borrar.isPending}
                   onClick={() => {
                     if (!window.confirm(`¿Borrar «${t.nombre}» para siempre? Esto no se puede deshacer.`)) return;
@@ -262,12 +249,14 @@ function Constructor({ id, acceso }: { id: string; acceso: ReturnType<typeof use
   const q = useTableros();
   const t = q.data?.find((x) => x.id === id);
   if (q.error) return <ErrorSos error={q.error} />;
-  if (q.isPending) return <p className="admin-loading">Abriendo el tablero…</p>;
+  if (q.isPending) return <Cargando texto="Abriendo el tablero…" />;
   if (!t)
     return (
       <div className="dsx-pagina">
-        <AvisoSos>No encuentro ese tablero. Puede que lo hayan borrado o que no tenga acceso.</AvisoSos>
-        <Link className="es-btn" to={BASE}>
+        <Vacio icono="alert" titulo="No encuentro ese tablero">
+          Puede que lo hayan borrado o que no tenga acceso.
+        </Vacio>
+        <Link className="dsx-btn" to={BASE}>
           <Icon name="arrow-left" size={14} />
           Volver a los tableros
         </Link>
@@ -286,6 +275,8 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
   const archivar = useArchivarTablero();
   const datos = useDatosPublicados(acceso.unidad?.carpeta_raiz);
   const raiz = useRef<HTMLDivElement>(null);
+  const listaEls = useRef<HTMLOListElement>(null);
+  const lugares = useRef<Map<string, number> | null>(null);
 
   const inicial = useMemo<Borrador>(() => ({ nombre: t.nombre, slug: t.slug, descripcion: t.descripcion, config: t.config }), [t]);
   const [b, setB] = useState<Borrador>(inicial);
@@ -303,20 +294,27 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
   const editable = puedeEditar && !t.archivado;
   const els = b.config.elementos;
 
-  useEffect(() => {
-    entrar(raiz.current);
-  }, []);
+  useEffect(() => entrar(raiz.current), []);
+
+  // Reordenar con el puntero: cada elemento se asienta en su lugar nuevo (FLIP corto). Con teclado, al instante.
+  useLayoutEffect(() => {
+    const antes = lugares.current;
+    lugares.current = null;
+    if (antes) return asentarLugares(listaEls.current, antes);
+  }, [b.config.elementos]);
 
   const cambiarConfig = (f: (c: ConfigTablero) => ConfigTablero) => setB((x) => ({ ...x, config: f(x.config) }));
   const cambiarEl = (elId: string, cambio: Partial<ElementoTablero>) => cambiarConfig((c) => ({ ...c, elementos: c.elementos.map((e) => (e.id === elId ? { ...e, ...cambio } : e)) }));
-  const mover = (de: number, a: number) =>
+  const mover = (de: number, a: number) => {
+    if (a < 0 || a >= els.length || de === a) return;
+    if (!entradaPorTeclado()) lugares.current = capturarLugares(listaEls.current);
     cambiarConfig((c) => {
-      if (a < 0 || a >= c.elementos.length || de === a) return c;
       const lista = [...c.elementos];
       const [x] = lista.splice(de, 1);
       lista.splice(a, 0, x!);
       return { ...c, elementos: lista };
     });
+  };
 
   /* --- Lo que se puede elegir y lo que el público vería --- */
   const catalogo = datos.catalogo;
@@ -436,9 +434,10 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
       <div className="dsx-cab">
         <div>
           <Link className="dsx-enlace" to={BASE}>
-            ← Tableros
+            <Icon name="arrow-left" size={13} />
+            Tableros
           </Link>
-          <h2>{b.nombre || "Tablero sin nombre"}</h2>
+          <h2 className="dsx-cab__t">{b.nombre || "Tablero sin nombre"}</h2>
           <p className="dsx-sub">
             <span className="dsx-mono">/sostenible/tablero/{b.slug}</span>
           </p>
@@ -454,7 +453,7 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
             </span>
           )}
           {editable ? (
-            <button type="button" className="es-btn es-btn--pri" disabled={!sucio || guardar.isPending} onClick={guardarAhora}>
+            <button type="button" className="dsx-btn dsx-btn--pri" disabled={!sucio || guardar.isPending} onClick={guardarAhora}>
               {guardar.isPending ? "Guardando…" : "Guardar"}
             </button>
           ) : null}
@@ -509,8 +508,8 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
 
         {/* --- Los controles --- */}
         <div className="dsx-tab-ctl">
-          <div className="dsx-tarjeta">
-            <b>Publicación</b>
+          <section className="dsx-tarjeta" aria-labelledby="dsx-t-pub">
+            <h2 id="dsx-t-pub">Publicación</h2>
             <Interruptor
               marcado={t.publicado}
               disabled={!acceso.crea || sucio || t.archivado || publicar.isPending}
@@ -525,12 +524,12 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
             {sucio && !t.publicado ? <p className="dsx-tenue">Guarde los cambios para poder publicar.</p> : null}
             {t.publicado ? (
               <div className="dsx-tab-enlace">
-                <input className="es-inp dsx-mono" readOnly value={url} aria-label="Enlace público del tablero" onFocus={(e) => e.currentTarget.select()} />
-                <button type="button" className="es-btn es-btn--sm" onClick={() => void copiar()}>
+                <input className="dsx-inp dsx-mono" readOnly value={url} aria-label="Enlace público del tablero" onFocus={(e) => e.currentTarget.select()} />
+                <button type="button" className="dsx-btn dsx-btn--sm" onClick={() => void copiar()}>
                   <Icon name="link" size={14} />
                   {copiado ? "Copiado" : "Copiar"}
                 </button>
-                <a className="es-btn es-btn--sm es-btn--ghost" href={`/sostenible/tablero/${t.slug}`} target="_blank" rel="noreferrer">
+                <a className="dsx-btn dsx-btn--sm dsx-btn--ghost" href={`/sostenible/tablero/${t.slug}`} target="_blank" rel="noreferrer">
                   <Icon name="external" size={14} />
                   Abrir
                 </a>
@@ -541,7 +540,7 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
             {puedeArchivar ? (
               <button
                 type="button"
-                className="es-btn es-btn--sm es-btn--ghost"
+                className="dsx-btn dsx-btn--sm dsx-btn--ghost"
                 disabled={archivar.isPending || (sucio && !t.archivado)}
                 onClick={() => {
                   setError(null);
@@ -551,18 +550,18 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
                 {t.archivado ? "Restaurar el tablero" : "Archivar el tablero"}
               </button>
             ) : null}
-          </div>
+          </section>
 
           <fieldset className="dsx-tab-fs" disabled={lectura}>
             <legend className="dsx-sr">Datos del tablero</legend>
-            <label className="es-fl">
+            <label className="dsx-fl">
               Nombre
-              <input className="es-inp" value={b.nombre} maxLength={120} onChange={(e) => setB((x) => ({ ...x, nombre: e.target.value }))} />
+              <input className="dsx-inp" value={b.nombre} maxLength={120} onChange={(e) => setB((x) => ({ ...x, nombre: e.target.value }))} />
             </label>
-            <label className="es-fl">
+            <label className="dsx-fl">
               Enlace
               <input
-                className="es-inp dsx-mono"
+                className="dsx-inp dsx-mono"
                 value={b.slug}
                 maxLength={60}
                 disabled={t.publicado}
@@ -570,13 +569,13 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
               />
               <span className="dsx-tenue">{t.publicado ? "Retire el tablero para cambiar su enlace." : "Minúsculas, números y guiones."}</span>
             </label>
-            <label className="es-fl">
+            <label className="dsx-fl">
               Descripción (opcional)
-              <input className="es-inp" value={b.descripcion} maxLength={400} onChange={(e) => setB((x) => ({ ...x, descripcion: e.target.value }))} />
+              <input className="dsx-inp" value={b.descripcion} maxLength={400} onChange={(e) => setB((x) => ({ ...x, descripcion: e.target.value }))} />
             </label>
-            <label className="es-fl">
+            <label className="dsx-fl">
               Campus con que abre
-              <select className="es-inp" value={campusValido(b.config.campus)} onChange={(e) => cambiarConfig((c) => ({ ...c, campus: e.target.value }))}>
+              <select className="dsx-inp" value={campusValido(b.config.campus)} onChange={(e) => cambiarConfig((c) => ({ ...c, campus: e.target.value }))}>
                 {CAMPUSES.map((c) => (
                   <option key={c} value={c}>
                     {c === "Todos" ? "Todos los campus" : c}
@@ -589,35 +588,20 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
             </Interruptor>
           </fieldset>
 
-          <div className="dsx-tarjeta">
+          <section className="dsx-tarjeta" aria-labelledby="dsx-t-els">
             <div className="dsx-tab-cab2">
-              <b>Elementos ({els.length})</b>
+              <h2 id="dsx-t-els">
+                Elementos <span className="dsx-num dsx-tenue">({els.length})</span>
+              </h2>
               {editable ? (
-                <details className="dsx-tab-menu">
-                  <summary className="es-btn es-btn--sm es-btn--pri">
-                    <Icon name="plus" size={14} />
-                    Agregar elemento
-                  </summary>
-                  <div className="dsx-tab-menu__lista" role="menu">
-                    {(Object.keys(TIPOS) as TipoElementoTablero[]).map((tipo) => (
-                      <button
-                        key={tipo}
-                        type="button"
-                        role="menuitem"
-                        onClick={(e) => {
-                          e.currentTarget.closest("details")?.removeAttribute("open");
-                          if (tipo === "indicador" || tipo === "grafica") {
-                            setAgregando(tipo);
-                            setRefElegida("");
-                          } else agregar(tipo);
-                        }}
-                      >
-                        <Icon name={TIPOS[tipo].icono} size={14} />
-                        {TIPOS[tipo].etiqueta}
-                      </button>
-                    ))}
-                  </div>
-                </details>
+                <MenuAgregar
+                  onElegir={(tipo) => {
+                    if (tipo === "indicador" || tipo === "grafica") {
+                      setAgregando(tipo);
+                      setRefElegida("");
+                    } else agregar(tipo);
+                  }}
+                />
               ) : null}
             </div>
 
@@ -635,13 +619,14 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
             ) : null}
 
             {!els.length ? <p className="dsx-tenue">Sin elementos. Agregue indicadores, gráficas, títulos o textos.</p> : null}
-            <ol className="dsx-tab-els" aria-label="Elementos del tablero, en orden">
+            <ol className="dsx-tab-els" ref={listaEls} aria-label="Elementos del tablero, en orden">
               {els.map((e, i) => {
                 const aviso = e.tipo === "indicador" || e.tipo === "grafica" ? avisoDe(e) : null;
                 return (
                   <li
                     key={e.id}
                     id={`dsx-el-${e.id}`}
+                    data-flip={e.id}
                     className="dsx-tab-el"
                     data-sel={seleccion === e.id ? "" : undefined}
                     data-arrastrando={arrastrado === e.id ? "" : undefined}
@@ -686,7 +671,7 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
                       <legend className="dsx-sr">Opciones de {nombreDe(e)}</legend>
                       <label>
                         <span>Ancho</span>
-                        <select className="es-inp" value={e.ancho} onChange={(ev) => cambiarEl(e.id, { ancho: Number(ev.target.value) as AnchoTablero })}>
+                        <select className="dsx-inp" value={e.ancho} onChange={(ev) => cambiarEl(e.id, { ancho: Number(ev.target.value) as AnchoTablero })}>
                           {ANCHOS.map((a) => (
                             <option key={a.id} value={a.id}>
                               {a.etiqueta}
@@ -697,7 +682,7 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
                       {e.tipo === "indicador" ? (
                         <label>
                           <span>Estilo</span>
-                          <select className="es-inp" value={e.estilo ?? "tarjeta"} onChange={(ev) => cambiarEl(e.id, { estilo: ev.target.value as EstiloElemento })}>
+                          <select className="dsx-inp" value={e.estilo ?? "tarjeta"} onChange={(ev) => cambiarEl(e.id, { estilo: ev.target.value as EstiloElemento })}>
                             {ESTILOS.map((s) => (
                               <option key={s.id} value={s.id}>
                                 {s.etiqueta}
@@ -709,13 +694,13 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
                       {e.tipo !== "separador" ? (
                         <label className="dsx-tab-el__ancha">
                           <span>{e.tipo === "titulo" ? "Texto del título" : "Título propio (opcional)"}</span>
-                          <input className="es-inp" value={e.titulo ?? ""} maxLength={200} placeholder={e.tipo === "indicador" || e.tipo === "grafica" ? "Usa el nombre original" : ""} onChange={(ev) => cambiarEl(e.id, { titulo: ev.target.value })} />
+                          <input className="dsx-inp" value={e.titulo ?? ""} maxLength={200} placeholder={e.tipo === "indicador" || e.tipo === "grafica" ? "Usa el nombre original" : ""} onChange={(ev) => cambiarEl(e.id, { titulo: ev.target.value })} />
                         </label>
                       ) : null}
                       {e.tipo === "texto" ? (
                         <label className="dsx-tab-el__ancha">
                           <span>Texto</span>
-                          <textarea className="es-inp" rows={4} maxLength={2000} value={e.opciones?.texto ?? ""} onChange={(ev) => cambiarEl(e.id, { opciones: { ...e.opciones, texto: ev.target.value } })} />
+                          <textarea className="dsx-inp" rows={4} maxLength={2000} value={e.opciones?.texto ?? ""} onChange={(ev) => cambiarEl(e.id, { opciones: { ...e.opciones, texto: ev.target.value } })} />
                         </label>
                       ) : null}
                     </fieldset>
@@ -724,7 +709,7 @@ function Editor({ t, acceso }: { t: TableroSos; acceso: ReturnType<typeof useAcc
               })}
             </ol>
             {editable && els.length > 1 ? <p className="dsx-tenue">Reordene arrastrando, con los botones, o con Alt + flecha arriba o abajo.</p> : null}
-          </div>
+          </section>
         </div>
       </div>
     </div>
@@ -752,16 +737,12 @@ function AgregarRef({
   onAgregar: () => void;
   onCancelar: () => void;
 }) {
-  const caja = useRef<HTMLDivElement>(null);
   const opciones = tipo === "indicador" ? indicadores : graficas;
-  useEffect(() => {
-    if (caja.current) cambiar(caja.current);
-  }, []);
   return (
-    <div ref={caja} className="dsx-tab-agregar">
-      <label className="es-fl">
+    <div className="dsx-tab-agregar">
+      <label className="dsx-fl">
         {tipo === "indicador" ? "Indicador del catálogo" : "Gráfica de la unidad"}
-        <select className="es-inp" value={valor} onChange={(e) => onValor(e.target.value)}>
+        <select className="dsx-inp" value={valor} onChange={(e) => onValor(e.target.value)}>
           <option value="">{cargando ? "Cargando…" : opciones.length ? "Elija uno" : tipo === "indicador" ? "No hay indicadores en el catálogo" : "No hay gráficas en la unidad"}</option>
           {opciones.map((o) => (
             <option key={o.id} value={o.id}>
@@ -771,13 +752,124 @@ function AgregarRef({
         </select>
       </label>
       <div className="dsx-form__pie">
-        <button type="button" className="es-btn es-btn--sm es-btn--pri" disabled={!valor} onClick={onAgregar}>
+        <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--pri" disabled={!valor} onClick={onAgregar}>
           Agregar
         </button>
-        <button type="button" className="es-btn es-btn--sm" onClick={onCancelar}>
+        <button type="button" className="dsx-btn dsx-btn--sm" onClick={onCancelar}>
           Cancelar
         </button>
       </div>
     </div>
+  );
+}
+
+/* ---------- El menú «Agregar elemento»: nace en su botón ------------------------------------------------ */
+
+function MenuAgregar({ onElegir }: { onElegir: (t: TipoElementoTablero) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const envoltura = useRef<HTMLDivElement>(null);
+  const lista = useRef<HTMLDivElement>(null);
+  const boton = useRef<HTMLButtonElement>(null);
+  const idLista = useId();
+
+  useEffect(() => {
+    if (!abierto) return;
+    lista.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+    const fin = nacerMenu(lista.current, "100% 0");
+    const fuera = (e: PointerEvent) => {
+      if (!envoltura.current?.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("pointerdown", fuera);
+    return () => {
+      fin();
+      document.removeEventListener("pointerdown", fuera);
+    };
+  }, [abierto]);
+
+  const alTeclear = (e: KeyboardEvent<HTMLDivElement>) => {
+    const items = [...(lista.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setAbierto(false);
+      boton.current?.focus();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+    } else if (e.key === "Tab") setAbierto(false);
+  };
+
+  return (
+    <div className="dsx-tab-menu" ref={envoltura} onKeyDown={alTeclear}>
+      <button ref={boton} type="button" className="dsx-btn dsx-btn--sm dsx-btn--pri" aria-haspopup="menu" aria-expanded={abierto} aria-controls={abierto ? idLista : undefined} onClick={() => setAbierto((a) => !a)}>
+        <Icon name="plus" size={14} />
+        Agregar elemento
+      </button>
+      {abierto ? (
+        <div id={idLista} ref={lista} className="dsx-tab-menu__lista" role="menu" aria-label="Qué agregar">
+          {(Object.keys(TIPOS) as TipoElementoTablero[]).map((tipo) => (
+            <button
+              key={tipo}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setAbierto(false);
+                boton.current?.focus();
+                onElegir(tipo);
+              }}
+            >
+              <Icon name={TIPOS[tipo].icono} size={14} />
+              {TIPOS[tipo].etiqueta}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ---------- Nuevo tablero, en una ventana emergente ------------------------------------------------------- */
+
+function NuevoTablero({ pendiente, onCrear, onCerrar }: { pendiente: boolean; onCrear: (nombre: string, descripcion: string) => Promise<string | null>; onCerrar: () => void }) {
+  const [nombre, setNombre] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [tocado, setTocado] = useState(false);
+  const [falla, setFalla] = useState<string | null>(null);
+  const errNombre = nombre.trim() ? null : "Escriba un nombre para el tablero.";
+
+  const enviar = async (): Promise<boolean> => {
+    setTocado(true);
+    setFalla(null);
+    if (errNombre) {
+      window.setTimeout(() => document.querySelector<HTMLElement>("dialog [aria-invalid='true']")?.focus(), 0);
+      return false;
+    }
+    // Al crear, la pantalla pasa al constructor: no hace falta cerrar la ventana por separado.
+    const mensaje = await onCrear(nombre.trim(), descripcion.trim());
+    if (mensaje) setFalla(mensaje);
+    return false;
+  };
+
+  return (
+    <Modal
+      titulo="Nuevo tablero"
+      descripcion="Póngale nombre; después agrega indicadores y gráficas en el constructor."
+      sucio={Boolean(nombre.trim() || descripcion.trim())}
+      onCerrar={onCerrar}
+      onEnviar={enviar}
+      principal="Crear y abrir"
+      pendiente={pendiente}
+      textoPendiente="Creando…"
+    >
+      <div className="dsx-form__basico">
+        <Campo etiqueta="Nombre del tablero" error={tocado ? errNombre : null}>
+          {(p) => <input {...p} data-foco="" className="dsx-inp" value={nombre} maxLength={120} placeholder="Por ejemplo, Campus verde 2025" autoComplete="off" onChange={(e) => setNombre(e.target.value)} onBlur={() => setTocado(true)} />}
+        </Campo>
+        <Campo etiqueta="Descripción" opcional>
+          {(p) => <input {...p} className="dsx-inp" value={descripcion} maxLength={400} placeholder="Para qué sirve este tablero" autoComplete="off" onChange={(e) => setDescripcion(e.target.value)} />}
+        </Campo>
+      </div>
+      {falla ? <AvisoSos tipo="error">{falla}</AvisoSos> : null}
+    </Modal>
   );
 }

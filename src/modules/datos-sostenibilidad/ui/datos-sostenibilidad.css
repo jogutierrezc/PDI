@@ -5,13 +5,28 @@
    oscuro de la intranet funcionan sin reglas aparte. El explorador y los
    editores son los de UDrive (espacio.css, udrive.css); aquí va lo propio:
    el marco del explorador incrustado, el catálogo de indicadores, el
-   recorrido del portal con su vista previa y los paneles que se suman a los
-   editores. Prefijo dsx-.
+   recorrido del portal con su vista previa, los tableros, la ventana
+   emergente y los paneles que se suman a los editores. Prefijo dsx-.
+
+   Botones y campos (dsx-btn, dsx-inp, dsx-fl): antes se usaban es-btn / es-inp
+   de espacio.css, cuyas variables (--es-accent, --es-line-2…) solo existen bajo
+   el selector .es. Dentro de AdminShell no hay ancestro .es, y el botón
+   principal se quedaba sin fondo, borde ni color. Estos usan solo tokens
+   globales, así se ven igual dentro de AdminShell y dentro de los editores de
+   UDrive (donde sí hay .es).
 
    Movimiento: lo anima movimiento.ts (GSAP). Aquí solo hay transiciones cortas
    de color y de transform, el hover solo en punteros finos y la escala .97 al
    pulsar; con movimiento reducido no queda desplazamiento.
    ========================================================================== */
+
+.dsx-pagina,
+.dsx-modal,
+.dsx-panel {
+  /* Superficies del navegador acordes a la paleta: caret, casillas, barras de desplazamiento. */
+  accent-color: var(--brand-blue);
+  caret-color: var(--brand-blue);
+}
 
 .dsx-sr {
   position: absolute;
@@ -28,7 +43,8 @@
 }
 
 .dsx-tenue {
-  color: var(--ink-muted);
+  margin: 0;
+  color: var(--ink-secondary);
   font-size: var(--text-xs);
 }
 
@@ -38,8 +54,20 @@
 
 .dsx-sub {
   margin: 2px 0 0;
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-sm);
+}
+
+.dsx-lead {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.dsx-peligro {
+  color: color-mix(in srgb, var(--status-risk) 80%, var(--ink));
 }
 
 /* --- Archivos: el explorador de UDrive dentro del marco de la intranet ------------ */
@@ -57,7 +85,460 @@
   border-radius: var(--radius-md);
 }
 
-/* --- Piezas ---------------------------------------------------------------------- */
+/* =============================================================================
+   Botones
+   ========================================================================== */
+
+.dsx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.dsx-btn svg {
+  flex: none;
+}
+
+.dsx-btn--pri {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue);
+  color: var(--ink-on-accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.dsx-btn--sm {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+
+.dsx-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-secondary);
+  box-shadow: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dsx-btn:hover:not(:disabled) {
+    border-color: var(--brand-blue);
+    background: var(--surface-3);
+  }
+
+  .dsx-btn--pri:hover:not(:disabled) {
+    border-color: var(--brand-blue-strong);
+    background: var(--brand-blue-strong);
+  }
+
+  .dsx-btn--ghost:hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--surface-3);
+    color: var(--ink);
+  }
+}
+
+.dsx-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.dsx-btn:focus-visible,
+.dsx-ib:focus-visible,
+.dsx-mas__btn:focus-visible,
+.dsx-sug:focus-visible,
+.dsx-ods-op:focus-visible,
+.dsx-enlace:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+.dsx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Cargando: el botón conserva su tamaño, muestra el giro y no recibe clics. */
+.dsx-btn[aria-busy="true"] {
+  pointer-events: none;
+}
+
+.dsx-giro {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: dsx-gira 0.7s linear infinite;
+}
+
+@keyframes dsx-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Botón de solo icono. */
+.dsx-ib {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.dsx-ib:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.dsx-ib:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dsx-ib:hover:not(:disabled) {
+    background: var(--surface-3);
+    color: var(--ink);
+  }
+}
+
+.dsx-ico-arriba {
+  transform: rotate(180deg);
+}
+
+/* En pantallas táctiles, objetivos más grandes. */
+@media (pointer: coarse) {
+  .dsx-btn {
+    min-height: 42px;
+  }
+
+  .dsx-btn--sm {
+    min-height: 38px;
+  }
+
+  .dsx-ib {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* =============================================================================
+   Campos
+   ========================================================================== */
+
+.dsx-inp {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+textarea.dsx-inp {
+  resize: vertical;
+  min-height: 72px;
+  line-height: var(--leading-normal);
+}
+
+.dsx-inp::placeholder {
+  color: color-mix(in srgb, var(--ink-secondary) 85%, var(--surface));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dsx-inp:hover:not(:disabled):not(:focus) {
+    border-color: color-mix(in srgb, var(--brand-blue) 45%, var(--line-strong));
+  }
+}
+
+.dsx-inp:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+.dsx-inp[aria-invalid="true"] {
+  border-color: var(--status-risk);
+}
+
+.dsx-inp:disabled {
+  background: var(--surface-3);
+  color: var(--ink-secondary);
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  /* 16 px: el teléfono no acerca la pantalla al enfocar un campo. */
+  .dsx-inp {
+    font-size: 16px;
+  }
+}
+
+/* Un campo: etiqueta arriba (mismo peso en todos), ayuda y error debajo. */
+.dsx-fl {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dsx-fl > label,
+.dsx-fl > legend {
+  padding: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.dsx-fl--grupo > legend {
+  margin-bottom: 6px;
+}
+
+.dsx-fl__rotulo {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.dsx-fl__op {
+  color: var(--ink-secondary);
+  font-weight: 400;
+}
+
+.dsx-fl__valor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.dsx-fl__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: color-mix(in srgb, var(--status-risk) 80%, var(--ink));
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.dsx-fl__error svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* Sugerencias bajo un campo: pastillas que rellenan o agregan. */
+.dsx-sugs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dsx-sug {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.dsx-sug:active {
+  transform: scale(0.97);
+}
+
+.dsx-sug[aria-pressed="true"] {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dsx-sug:hover {
+    border-color: var(--brand-blue);
+    color: var(--brand-blue-strong);
+  }
+}
+
+@media (pointer: coarse) {
+  .dsx-sug {
+    min-height: 34px;
+  }
+}
+
+/* Opciones excluyentes en una tira. */
+.dsx-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+}
+
+.dsx-seg[data-ancho] {
+  display: flex;
+}
+
+.dsx-seg__op {
+  position: relative;
+  display: flex;
+}
+
+.dsx-seg[data-ancho] .dsx-seg__op {
+  flex: 1 1 auto;
+}
+
+.dsx-seg__op input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dsx-seg__op span {
+  display: block;
+  flex: 1;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.dsx-seg__op input:checked + span {
+  background: var(--brand-blue-soft);
+  box-shadow: inset 0 0 0 1px var(--brand-blue);
+  color: var(--brand-blue-strong);
+}
+
+.dsx-seg__op input:active + span {
+  transform: scale(0.97);
+}
+
+.dsx-seg__op input:focus-visible + span {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dsx-seg__op input:not(:checked):hover + span {
+    background: var(--surface-3);
+    color: var(--ink);
+  }
+}
+
+/* Las 17 fichas de ODS. */
+.dsx-ods-sel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.dsx-ods-op {
+  display: inline-grid;
+  place-items: center;
+  padding: 2px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink-secondary);
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.dsx-ods-op .dsx-ods {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: var(--text-sm);
+}
+
+.dsx-ods-op:active {
+  transform: scale(0.97);
+}
+
+.dsx-ods-op[aria-pressed="true"] {
+  border-color: var(--ink);
+}
+
+.dsx-ods-op--sin {
+  min-height: 38px;
+  margin-right: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.dsx-ods-op--sin[aria-pressed="true"] {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dsx-ods-op:not([aria-pressed="true"]):hover {
+    border-color: var(--line-strong);
+  }
+}
+
+/* =============================================================================
+   Piezas
+   ========================================================================== */
 
 .dsx-ods {
   display: inline-grid;
@@ -68,6 +549,7 @@
   border-radius: 10px;
   font-weight: 700;
   font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
 }
 
 .dsx-chip {
@@ -86,13 +568,13 @@
 .dsx-chip[data-t="ok"] {
   background: var(--status-done-soft);
   border-color: transparent;
-  color: var(--status-done);
+  color: color-mix(in srgb, var(--status-done) 70%, var(--ink));
 }
 
 .dsx-chip[data-t="aviso"] {
   background: var(--status-pending-soft);
   border-color: transparent;
-  color: var(--status-pending);
+  color: color-mix(in srgb, var(--status-pending) 55%, var(--ink));
 }
 
 .dsx-chip[data-t="acento"] {
@@ -101,29 +583,41 @@
   color: var(--brand-blue-strong);
 }
 
+/* Aviso en una franja; con acción y cierre si hacen falta. */
 .dsx-aviso {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-start;
   margin: 0;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: var(--radius-xs);
   background: var(--status-pending-soft);
   color: var(--ink);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 
-.dsx-aviso svg {
+.dsx-aviso > svg {
   flex: none;
-  margin-top: 1px;
+  margin-top: 2px;
   color: var(--status-pending);
+}
+
+.dsx-aviso__txt {
+  flex: 1;
+  min-width: 0;
+}
+
+.dsx-aviso .dsx-btn,
+.dsx-aviso .dsx-ib {
+  flex: none;
+  margin-block: -4px;
 }
 
 .dsx-aviso[data-t="error"] {
   background: var(--status-risk-soft);
 }
 
-.dsx-aviso[data-t="error"] svg {
+.dsx-aviso[data-t="error"] > svg {
   color: var(--status-risk);
 }
 
@@ -131,8 +625,100 @@
   background: var(--status-done-soft);
 }
 
-.dsx-aviso[data-t="ok"] svg {
+.dsx-aviso[data-t="ok"] > svg {
   color: var(--status-done);
+}
+
+@media (max-width: 520px) {
+  .dsx-aviso {
+    flex-wrap: wrap;
+  }
+
+  .dsx-aviso__txt {
+    flex-basis: calc(100% - 30px);
+  }
+}
+
+/* Estados vacío y falta de migración: un trazo, un título, qué hacer. */
+.dsx-vacio {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: var(--space-8) var(--space-5);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.dsx-vacio > svg {
+  color: var(--ink-secondary);
+}
+
+.dsx-vacio b {
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+.dsx-vacio > span {
+  max-width: 52ch;
+}
+
+.dsx-vacio .dsx-btn {
+  margin-top: var(--space-2);
+}
+
+.dsx-vacio[data-t="migracion"] {
+  border-style: solid;
+  border-color: transparent;
+  background: var(--status-pending-soft);
+}
+
+.dsx-vacio[data-t="migracion"] > svg {
+  color: var(--status-pending);
+}
+
+/* Cargando: filas fantasma con la forma de lo que viene. */
+.dsx-cargando {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dsx-esqueleto {
+  display: block;
+  height: 64px;
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  animation: dsx-pulso 1.4s ease-in-out infinite;
+}
+
+.dsx-esqueleto:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.dsx-esqueleto:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+@keyframes dsx-pulso {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Capa de destello: vive en opacidad 0; movimiento.ts la enciende y la apaga. */
+.dsx-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--brand-blue) 20%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dsx-flash--ok {
+  background: color-mix(in srgb, var(--status-done) 32%, transparent);
 }
 
 .dsx-medidor {
@@ -157,13 +743,19 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
+  min-height: 28px;
   font-size: var(--text-sm);
   cursor: pointer;
 }
 
+.dsx-switch__txt {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .dsx-switch[data-disabled] {
-  cursor: default;
+  cursor: not-allowed;
   opacity: 0.55;
 }
 
@@ -183,7 +775,8 @@
   width: 36px;
   height: 20px;
   border-radius: var(--radius-pill);
-  background: var(--line-strong);
+  /* El apagado se distingue del fondo (3:1 como mínimo). */
+  background: var(--ink-muted);
   transition: background-color var(--dur-fast) var(--ease-out);
 }
 
@@ -208,19 +801,33 @@
   transform: translateX(16px);
 }
 
+.dsx-switch input:active:not(:disabled) + .dsx-switch__trk::after {
+  transform: scale(0.94);
+}
+
+.dsx-switch input:checked:active:not(:disabled) + .dsx-switch__trk::after {
+  transform: translateX(16px) scale(0.94);
+}
+
 .dsx-switch input:focus-visible + .dsx-switch__trk {
   outline: 2px solid var(--brand-blue);
   outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .dsx-switch {
+    min-height: 40px;
+  }
 }
 
 /* --- Los paneles que se suman a los editores y al detalle del explorador ----------- */
 
 .dsx-panel {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   align-content: start;
-  padding-bottom: 14px;
-  margin-bottom: 4px;
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-1);
   border-bottom: 1px solid var(--line);
 }
 
@@ -236,24 +843,31 @@
 
 .dsx-tarjeta {
   display: grid;
-  gap: 4px;
-  padding: 12px;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
-  margin-bottom: 12px;
 }
 
 .dsx-panel .dsx-tarjeta {
   margin-bottom: 0;
 }
 
+.dsx-tarjeta > h2 {
+  margin: 0;
+  font-family: "Montserrat", var(--font-display);
+  font-size: var(--text-base);
+}
+
 .dsx-camino {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 4px;
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-xs);
 }
 
@@ -270,6 +884,7 @@
 }
 
 .dsx-valor {
+  position: relative;
   display: inline-block;
   margin: 0 -5px;
   padding: 0 5px;
@@ -277,7 +892,6 @@
   color: var(--brand-blue-strong);
   font-size: var(--text-md);
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 .dsx-uso {
@@ -310,52 +924,61 @@
 }
 
 .dsx-enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--brand-blue-strong);
   font-size: var(--text-xs);
   font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .dsx-enlace:focus-visible {
-  outline: 2px solid var(--brand-blue);
-  outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* --- Indicadores ---------------------------------------------------------------------- */
+/* =============================================================================
+   Páginas: título lo da AdminShell; aquí, qué hacer ahora y el contenido
+   ========================================================================== */
 
 .dsx-pagina {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-6);
   max-width: 1120px;
   margin-inline: auto;
 }
 
 .dsx-cab {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-3) var(--space-6);
 }
 
-.dsx-cab h2 {
+.dsx-cab__t {
   margin: 0;
+  font-family: "Montserrat", var(--font-display);
   font-size: var(--text-xl);
   letter-spacing: var(--tracking-tight);
 }
 
+/* --- Indicadores ---------------------------------------------------------------------- */
+
 .dsx-grupo {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .dsx-grupo__t {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-  color: var(--ink-secondary);
-  font-size: var(--text-sm);
+  margin: 0;
+  color: var(--ink);
+  font-family: "Montserrat", var(--font-display);
+  font-size: var(--text-base);
 }
 
 .dsx-grupo__t .dsx-ods {
@@ -365,9 +988,18 @@
   font-size: var(--text-xs);
 }
 
-.dsx-ind {
+.dsx-ind-lista {
   display: grid;
-  grid-template-columns: auto minmax(0, 1.1fr) minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dsx-ind {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-3) var(--space-4);
@@ -387,17 +1019,24 @@
 .dsx-ind__nombre,
 .dsx-ind__dato {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
-.dsx-ind__nombre b {
+.dsx-ind__t {
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
-.dsx-ind small {
-  color: var(--ink-muted);
+.dsx-ind__sub {
+  color: var(--ink-secondary);
   font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.dsx-ind__cifra {
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .dsx-ind__dato .dsx-chip {
@@ -407,49 +1046,328 @@
 .dsx-ind__acciones {
   display: grid;
   justify-items: end;
+  gap: var(--space-2);
+}
+
+.dsx-ind__botones {
+  display: inline-flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
+  justify-content: flex-end;
+}
+
+.dsx-ind[data-archivado] {
+  border-style: dashed;
+  background: var(--surface-2);
+  box-shadow: none;
 }
 
 @media (max-width: 760px) {
   .dsx-ind {
     grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
   }
 
   .dsx-ind__dato,
   .dsx-ind__acciones {
     grid-column: 1 / -1;
-    justify-items: start;
+  }
+
+  .dsx-ind__acciones {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--line-faint);
   }
 }
 
-.dsx-form {
+.dsx-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dsx-filtros__q {
+  flex: 1 1 240px;
+}
+
+.dsx-filtros label:not(.dsx-filtros__q) {
+  flex: 0 1 190px;
+}
+
+@media (max-width: 520px) {
+  .dsx-filtros label:not(.dsx-filtros__q) {
+    flex: 1 1 100%;
+  }
+}
+
+.dsx-etqs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Etiquetas: la caja se comporta como un campo; el input de dentro no dibuja el suyo. */
+.dsx-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 4px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.dsx-etiquetas:focus-within {
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+.dsx-etiquetas .dsx-inp {
+  flex: 1 1 140px;
+  min-height: 28px;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dsx-etiquetas .dsx-inp:focus-visible {
+  border: 0;
+  box-shadow: none;
+}
+
+.dsx-chip--etq {
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+}
+
+button.dsx-chip--etq {
+  cursor: pointer;
+}
+
+.dsx-chip--etq button {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dsx-chip--etq button:focus-visible,
+button.dsx-chip--etq:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button.dsx-chip--etq:hover,
+  .dsx-chip--etq button:hover {
+    border-color: var(--brand-blue);
+    color: var(--brand-blue-strong);
+  }
+}
+
+/* =============================================================================
+   Ventana emergente
+   ========================================================================== */
+
+.dsx-modal {
+  position: fixed;
+  inset: 0;
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--line);
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.dsx-modal:not([open]) {
+  display: none;
+}
+
+.dsx-modal::backdrop {
+  background: transparent;
+}
+
+/* El velo es un div propio (no ::backdrop) para poder fundirlo con GSAP. */
+.dsx-modal__velo {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 14, 26, 0.56);
+}
+
+.dsx-modal__caja {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(480px, calc(100% - 24px));
+  max-height: min(calc(100dvh - 24px), 780px);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.dsx-modal__caja[data-ancho] {
+  width: min(600px, calc(100% - 24px));
+}
+
+.dsx-modal__cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6) var(--space-3);
+}
+
+.dsx-modal__cab h2 {
+  margin: 0;
+  font-family: "Montserrat", var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.dsx-modal__cuerpo {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+  padding: var(--space-2) var(--space-6) var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.dsx-modal__pie {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--line);
   background: var(--surface-2);
 }
 
-.dsx-form h3 {
-  margin: 0;
-  font-size: var(--text-md);
+@media (max-width: 520px) {
+  .dsx-modal__caja {
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .dsx-modal__cab {
+    padding: var(--space-4) var(--space-4) var(--space-2);
+  }
+
+  .dsx-modal__cuerpo {
+    padding-inline: var(--space-4);
+  }
+
+  .dsx-modal__pie {
+    padding-inline: var(--space-4);
+  }
+
+  .dsx-modal__pie .dsx-btn {
+    flex: 1;
+  }
 }
 
-.dsx-form__rejilla {
+/* El formulario de la ventana: lo mínimo arriba, lo avanzado plegado. */
+.dsx-form__basico {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
-.dsx-form__ancha {
+.dsx-mas {
+  border-top: 1px solid var(--line);
+}
+
+.dsx-mas__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dsx-mas__btn svg {
+  flex: none;
+  transform: rotate(-90deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.dsx-mas__btn[aria-expanded="true"] svg {
+  transform: none;
+}
+
+.dsx-mas__btn .dsx-tenue {
+  font-weight: 400;
+}
+
+.dsx-mas__cuerpo {
+  display: grid;
+  gap: var(--space-5);
+  padding-top: var(--space-2);
+}
+
+.dsx-form__grupo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.dsx-form__grupo + .dsx-form__grupo {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line-faint);
+}
+
+.dsx-fl[data-ancho] {
   grid-column: 1 / -1;
 }
 
-.dsx-form__pie {
+@media (max-width: 520px) {
+  .dsx-form__grupo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.dsx-codigo {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
-  flex-wrap: wrap;
 }
 
 /* --- Portal: el recorrido y la vista previa --------------------------------------------- */
@@ -494,22 +1412,34 @@
   color: var(--brand-blue-strong);
 }
 
+.dsx-paso b {
+  font-size: var(--text-base);
+}
+
 .dsx-paso small {
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-xs);
 }
 
+/* El conector es una pista tenue; su luz (la i) la enciende movimiento.ts. */
 .dsx-conector {
   flex: 0 0 28px;
   height: 2px;
   border-radius: 2px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.dsx-conector i {
+  display: block;
+  height: 100%;
   background: linear-gradient(90deg, var(--brand-blue), var(--status-done));
 }
 
 @media (max-width: 820px) {
   .dsx-recorrido {
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
   }
 
   .dsx-conector {
@@ -520,7 +1450,7 @@
 .dsx-dividido {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
-  gap: var(--space-5);
+  gap: var(--space-6);
   align-items: start;
 }
 
@@ -528,6 +1458,12 @@
   .dsx-dividido {
     grid-template-columns: 1fr;
   }
+}
+
+.dsx-lado {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .dsx-barra {
@@ -558,16 +1494,20 @@
   padding: 9px 14px;
   border-bottom: 1px solid var(--line);
   background: var(--surface-3);
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
 }
 
 .dsx-navegador__url span {
   flex: 1;
+  min-width: 0;
   padding: 2px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--surface);
   font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dsx-previa {
@@ -595,8 +1535,13 @@
 .dsx-previa__nota {
   margin: 0;
   padding: var(--space-5);
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-sm);
+}
+
+.dsx-previa .dsx-vacio,
+.dsx-previa .dsx-cargando {
+  margin: var(--space-5);
 }
 
 .dsx-previa .sos-ind {
@@ -606,7 +1551,21 @@
 .dsx-publica {
   display: grid;
   gap: var(--space-2);
-  margin-top: var(--space-2);
+}
+
+.dsx-publica + .dsx-publica {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-faint);
+}
+
+.dsx-publica h3 {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .dsx-publica .dsx-switch {
@@ -616,7 +1575,7 @@
 .dsx-revision {
   display: grid;
   gap: var(--space-2);
-  margin: var(--space-2) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -640,119 +1599,12 @@
   color: var(--status-pending);
 }
 
-/* --- Movimiento reducido: sin desplazamiento ni transiciones largas ------------------- */
-
-@media (prefers-reduced-motion: reduce) {
-  .dsx-switch__trk::after {
-    transition: none;
-  }
-}
-
-/* --- Catálogo libre: filtros, etiquetas y archivados (0204) ----------------------------- */
-
-.dsx-filtros {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.dsx-filtros__q {
-  flex: 1 1 240px;
-}
-
-.dsx-filtros select,
-.dsx-filtros input {
-  width: 100%;
-}
-
-.dsx-filtros label:not(.dsx-filtros__q) {
-  flex: 0 1 190px;
-}
-
-.dsx-etqs,
-.dsx-etiquetas {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.dsx-etiquetas {
-  padding: 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-xs);
-  background: var(--surface);
-}
-
-.dsx-etiquetas input {
-  flex: 1 1 140px;
-  min-width: 0;
-  border: 0;
-  box-shadow: none;
-  background: transparent;
-}
-
-.dsx-chip--etq {
-  cursor: default;
-  font: inherit;
-  font-size: var(--text-xs);
-}
-
-button.dsx-chip--etq {
-  cursor: pointer;
-}
-
-.dsx-chip--etq button {
-  display: inline-grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  margin-right: -6px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.dsx-chip--etq button:focus-visible,
-button.dsx-chip--etq:focus-visible {
-  outline: 2px solid var(--brand-blue);
-  outline-offset: 2px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  button.dsx-chip--etq:hover,
-  .dsx-chip--etq button:hover {
-    border-color: var(--brand-blue);
-    color: var(--brand-blue-strong);
-  }
-}
-
-.dsx-ind[data-archivado] {
-  opacity: 0.72;
-  border-style: dashed;
-}
-
-.dsx-ind__botones {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  justify-content: flex-end;
-}
-
-/* --- Tableros (0204) --------------------------------------------------------------------- */
-
-.dsx-peligro {
-  color: var(--status-risk);
-}
+/* --- Tableros --------------------------------------------------------------------------- */
 
 .dsx-tab-lista {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .dsx-tab-card {
@@ -780,8 +1632,9 @@ button.dsx-chip--etq:focus-visible {
   gap: var(--space-2);
 }
 
-.dsx-tab-card__cab h3 {
+.dsx-tab-card__cab h2 {
   margin: 0;
+  font-family: "Montserrat", var(--font-display);
   font-size: var(--text-md);
   overflow-wrap: anywhere;
 }
@@ -792,6 +1645,10 @@ button.dsx-chip--etq:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
+}
+
+.dsx-tab-card__acciones {
+  margin-top: var(--space-2);
 }
 
 .dsx-dividido--ancho {
@@ -807,19 +1664,14 @@ button.dsx-chip--etq:focus-visible {
 .dsx-previa__desc {
   margin: 0;
   max-width: 60ch;
-  opacity: 0.85;
   font-size: var(--text-sm);
 }
 
 .dsx-tab-ctl {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
   align-content: start;
   min-width: 0;
-}
-
-.dsx-tab-ctl .dsx-tarjeta {
-  margin-bottom: 0;
 }
 
 .dsx-tab-fs {
@@ -827,7 +1679,7 @@ button.dsx-chip--etq:focus-visible {
   gap: var(--space-3);
   min-width: 0;
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -855,17 +1707,15 @@ button.dsx-chip--etq:focus-visible {
   gap: var(--space-2);
 }
 
+.dsx-tab-cab2 h2 {
+  margin: 0;
+  font-family: "Montserrat", var(--font-display);
+  font-size: var(--text-base);
+}
+
+/* El menú «Agregar elemento» nace en su botón (origen arriba a la derecha). */
 .dsx-tab-menu {
   position: relative;
-}
-
-.dsx-tab-menu > summary {
-  list-style: none;
-  cursor: pointer;
-}
-
-.dsx-tab-menu > summary::-webkit-details-marker {
-  display: none;
 }
 
 .dsx-tab-menu__lista {
@@ -873,7 +1723,7 @@ button.dsx-chip--etq:focus-visible {
   right: 0;
   z-index: 5;
   display: grid;
-  min-width: 190px;
+  min-width: 200px;
   margin-top: 4px;
   padding: 4px;
   border: 1px solid var(--line-strong);
@@ -886,7 +1736,8 @@ button.dsx-chip--etq:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 8px 10px;
+  min-height: 36px;
+  padding: 6px 10px;
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
@@ -904,17 +1755,23 @@ button.dsx-chip--etq:focus-visible {
 
 @media (hover: hover) and (pointer: fine) {
   .dsx-tab-menu__lista button:hover {
-    background: var(--surface-2);
+    background: var(--surface-3);
   }
 }
 
 .dsx-tab-agregar {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-3);
   border: 1px dashed var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
+}
+
+.dsx-form__pie {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .dsx-tab-els {
@@ -952,14 +1809,16 @@ button.dsx-chip--etq:focus-visible {
 
 .dsx-tab-el__asa {
   display: inline-flex;
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   cursor: grab;
 }
 
+/* El tipo (Indicador, Gráfica…) queda bajo el nombre, en voz baja. */
 .dsx-tab-el__nombre {
   flex: 1;
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column-reverse;
   font-size: var(--text-sm);
   font-weight: 600;
   overflow: hidden;
@@ -968,11 +1827,9 @@ button.dsx-chip--etq:focus-visible {
 }
 
 .dsx-tab-el__nombre small {
-  color: var(--ink-muted);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 400;
 }
 
 .dsx-tab-el__botones {
@@ -980,48 +1837,10 @@ button.dsx-chip--etq:focus-visible {
   flex: none;
 }
 
-.dsx-ib {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--ink-secondary);
-  cursor: pointer;
-  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease;
-}
-
-.dsx-ib:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.dsx-ib:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.dsx-ib:focus-visible {
-  outline: 2px solid var(--brand-blue);
-  outline-offset: 1px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .dsx-ib:hover:not(:disabled) {
-    background: var(--surface-2);
-  }
-}
-
-.dsx-ico-arriba {
-  transform: rotate(180deg);
-}
-
 .dsx-tab-el__campos {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: var(--space-3) var(--space-2);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -1030,9 +1849,10 @@ button.dsx-chip--etq:focus-visible {
 
 .dsx-tab-el__campos label {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
   font-size: var(--text-xs);
+  font-weight: 600;
   color: var(--ink-secondary);
 }
 
@@ -1046,10 +1866,33 @@ button.dsx-chip--etq:focus-visible {
   grid-column: 1 / -1;
 }
 
+@media (max-width: 520px) {
+  .dsx-tab-el__campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- Movimiento reducido: sin desplazamiento ni transiciones largas ------------------- */
+
 @media (prefers-reduced-motion: reduce) {
+  .dsx-switch__trk::after,
   .dsx-ib,
+  .dsx-btn,
+  .dsx-sug,
+  .dsx-seg__op span,
+  .dsx-ods-op,
+  .dsx-mas__btn svg,
   .dsx-tab-el,
   .dsx-tab-card {
     transition: none;
+  }
+
+  .dsx-esqueleto {
+    animation: none;
+  }
+
+  /* El giro se queda quieto: el texto «Guardando…» ya lo dice. */
+  .dsx-giro {
+    animation: none;
   }
 }

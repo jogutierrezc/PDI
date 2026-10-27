@@ -33,7 +33,7 @@ import { DondeSeUsa, PanelConexion, PanelPublicar } from "./Conexion";
 import { Indicadores } from "./Indicadores";
 import { Portal } from "./Portal";
 import { Tableros } from "./Tableros";
-import { AvisoSos, ErrorSos } from "./piezas";
+import { AvisoSos, Cargando, ErrorSos } from "./piezas";
 import { useAccesoSos } from "./usos";
 import "../../admin/udes-en-cifras/od-admin.css";
 import "./datos-sostenibilidad.css";
@@ -96,7 +96,7 @@ export function DatosSostenibilidad() {
       }
     >
       {acceso.unidades.isPending ? (
-        <p className="admin-loading">Buscando la unidad de Datos de Sostenibilidad…</p>
+        <Cargando texto="Buscando la unidad de Datos de Sostenibilidad…" />
       ) : acceso.unidades.error ? (
         <ErrorSos error={acceso.unidades.error} />
       ) : !acceso.unidad ? (

@@ -9,34 +9,57 @@
    hace cumplir). Se archiva en vez de borrar para no romper vínculos ni
    tableros. Un indicador sin tabla se marca como ilustrativo: el portal no
    inventa cifras.
+
+   Crear y editar viven en una ventana emergente (Modal): arriba lo mínimo
+   —nombre y unidad— y lo avanzado plegado en «Más opciones». El código se
+   genera solo desde el nombre.
    ========================================================================== */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { useArchivos } from "../../udrive/datos";
 import { INDICATORS } from "../../sostenible/data";
+import { odsByNumber } from "../../sostenible/ods-data";
 import { calcularIndicador, useArchivarIndicador, useGuardarIndicador, useGuardarVinculo, useIndicadoresSos, usePublicarIndicador, useVinculos } from "../sos";
 import type { IndicadorSos, MejorSos, ResumenSos, TarjetaPortal, VinculoSos } from "../tipos";
 import { proponer } from "./Conexion";
-import { cambiar, crecerMedidores, entrar } from "./movimiento";
-import { AvisoSos, ErrorSos, FichaOds, Interruptor, Medidor, textoCifra } from "./piezas";
+import { Modal } from "./Modal";
+import { crecerMedidores, entrar, parpadear } from "./movimiento";
+import { AvisoSos, Campo, Cargando, ErrorSos, FichaOds, Grupo, Interruptor, Medidor, Segmentado, Vacio, textoCifra } from "./piezas";
 import { useAccesoSos, useArchivosSos, useTablasDe } from "./usos";
 
 const TARJETAS = Object.keys(INDICATORS) as TarjetaPortal[];
-const RESUMENES: { id: ResumenSos; etiqueta: string }[] = [
-  { id: "promedio", etiqueta: "Promedio de los campus" },
-  { id: "suma", etiqueta: "Suma de los campus" },
-  { id: "ultimo", etiqueta: "Último valor" },
+const RESUMENES: { id: ResumenSos; etiqueta: string; ayuda: string }[] = [
+  { id: "promedio", etiqueta: "Promedio de los campus", ayuda: "Con los campus de un año saca el promedio. Sirve para porcentajes y tasas." },
+  { id: "suma", etiqueta: "Suma de los campus", ayuda: "Suma los campus de un año. Sirve para totales, como árboles sembrados." },
+  { id: "ultimo", etiqueta: "Último valor", ayuda: "Toma el dato más reciente sin combinar campus." },
 ];
 const resumenTexto = (r: ResumenSos) => RESUMENES.find((x) => x.id === r)?.etiqueta.toLowerCase() ?? r;
 
+/** Unidades que se sugieren al escribir la unidad. */
+const UNIDADES = ["%", "kWh", "m³", "t CO₂", "personas"];
 /** Temas que se sugieren al etiquetar; se suman a los que ya usa el catálogo. */
 const ETIQUETAS_SUGERIDAS = ["Campus", "Energía", "Agua", "Residuos", "Biodiversidad", "Movilidad", "Comunidad", "Clima", "Gobernanza"];
 const TOPE_ETIQUETAS = 12;
 const CODIGO_OK = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
 
 const sinTildes = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+/** El código sale del nombre: «Árboles sembrados» → ARBOLES-SEMBRADOS; si ya existe, se le suma -2, -3… */
+function codigoDe(nombre: string, existentes: IndicadorSos[]): string {
+  const base = sinTildes(nombre)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toUpperCase()
+    .slice(0, 28)
+    .replace(/-+$/, "");
+  if (!base) return "";
+  const usados = new Set(existentes.map((i) => i.id.toLowerCase()));
+  let c = base;
+  for (let n = 2; usados.has(c.toLowerCase()); n++) c = `${base}-${n}`;
+  return c;
+}
 
 type Estado = "activos" | "conectado" | "sin-datos" | "publicado" | "archivado" | "todos";
 const ESTADOS: { id: Estado; etiqueta: string }[] = [
@@ -47,10 +70,14 @@ const ESTADOS: { id: Estado; etiqueta: string }[] = [
   { id: "archivado", etiqueta: "Archivados" },
   { id: "todos", etiqueta: "Todos" },
 ];
+const FILTRO_INICIAL = { q: "", ods: "", etiqueta: "", estado: "activos" as Estado };
 
 type Borrador = Omit<IndicadorSos, "publicado" | "archivado" | "meta" | "position" | "ods"> & { meta: string; origen: string; ods: string };
 
+/* Valores por defecto sensatos: mejor si sube, se resume como promedio. */
 const BORRADOR_NUEVO: Borrador = { id: "", ods: "", nombre: "", descripcion: "", unidad: "", mejor: "sube", resumen: "promedio", meta: "", decimales: 0, tarjeta: null, nota: "", etiquetas: [], origen: "" };
+
+type Aviso = { tipo: "ok" | "aviso"; texto: string; accion?: { texto: string; onClick: () => void } };
 
 /* ---------- La pantalla ---------------------------------------------------------------------------- */
 
@@ -61,9 +88,11 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
   const publicar = usePublicarIndicador();
   const archivar = useArchivarIndicador();
   const raiz = useRef<HTMLDivElement>(null);
-  const [formulario, setFormulario] = useState<{ abierto: boolean; editando: string | null }>({ abierto: false, editando: null });
+  const [modal, setModal] = useState<{ editando: string | null; foco?: "origen" } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<{ q: string; ods: string; etiqueta: string; estado: Estado }>({ q: "", ods: "", etiqueta: "", estado: "activos" });
+  const [aviso, setAviso] = useState<Aviso | null>(null);
+  const [resaltar, setResaltar] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<{ q: string; ods: string; etiqueta: string; estado: Estado }>(FILTRO_INICIAL);
 
   const idsTablas = useMemo(() => [...new Set((vins.data ?? []).map((v) => v.archivo_id))], [vins.data]);
   const { tablas } = useTablasDe(idsTablas);
@@ -74,8 +103,12 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
   const listo = inds.isSuccess && vins.isSuccess;
   useEffect(() => {
     if (!listo) return;
-    entrar(raiz.current, ".dsx-ind");
-    crecerMedidores(raiz.current, 0.15);
+    const a = entrar(raiz.current, ".dsx-ind");
+    const b = crecerMedidores(raiz.current, 0.15);
+    return () => {
+      a();
+      b();
+    };
   }, [listo]);
 
   const todas = inds.data ?? [];
@@ -102,38 +135,76 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
     return [...m.entries()].sort((a, b) => (a[0] ?? 99) - (b[0] ?? 99));
   }, [visibles]);
 
-  const editado = formulario.editando ? todas.find((i) => i.id === formulario.editando) : undefined;
+  // El indicador recién creado parpadea suave cuando la ventana ya se cerró y la fila existe.
+  useEffect(() => {
+    if (!resaltar || modal) return;
+    const capa = raiz.current?.querySelector(`[data-flash="${CSS.escape(resaltar)}"]`);
+    if (!capa) return;
+    capa.closest(".dsx-ind")?.scrollIntoView({ block: "nearest" });
+    const fin = parpadear(capa);
+    const t = window.setTimeout(() => setResaltar(null), 1400);
+    return () => {
+      fin();
+      window.clearTimeout(t);
+    };
+  }, [resaltar, modal, visibles]);
+
+  const editado = modal?.editando ? todas.find((i) => i.id === modal.editando) : undefined;
   const hayFiltro = Boolean(filtro.q || filtro.ods || filtro.etiqueta || filtro.estado !== "activos");
+
+  const alGuardar = (r: { id: string; nuevo: boolean; conectado: boolean; aviso?: string }) => {
+    setError(null);
+    if (r.nuevo) {
+      setFiltro(FILTRO_INICIAL);
+      setResaltar(r.id);
+    }
+    if (r.aviso) setAviso({ tipo: "aviso", texto: r.aviso });
+    else if (r.nuevo && !r.conectado) setAviso({ tipo: "ok", texto: "Indicador creado. Aún no tiene datos: el portal lo mostrará como ilustrativo hasta que lo conecte.", accion: { texto: "Conectar a una tabla", onClick: () => setModal({ editando: r.id, foco: "origen" }) } });
+    else setAviso({ tipo: "ok", texto: r.nuevo ? "Indicador creado y conectado a su tabla." : "Cambios guardados." });
+  };
 
   return (
     <div ref={raiz} className="dsx-pagina">
       <div className="dsx-cab">
-        <div>
-          <h2>Catálogo de indicadores</h2>
-          <p className="dsx-sub">Cada indicador sale de una columna de una tabla. Cree los propios, con el código y las etiquetas que quiera; el ODS es opcional.</p>
-        </div>
+        <p className="dsx-lead">Cada indicador sale de una columna de una tabla. Cree los propios; el ODS y las etiquetas son opcionales.</p>
         {acceso.administra ? (
-          <button type="button" className="es-btn es-btn--pri" aria-expanded={formulario.abierto} onClick={() => setFormulario(formulario.abierto ? { abierto: false, editando: null } : { abierto: true, editando: null })}>
+          <button type="button" className="dsx-btn dsx-btn--pri" onClick={() => setModal({ editando: null })}>
             <Icon name="plus" size={16} />
             Nuevo indicador
           </button>
         ) : null}
       </div>
       {!acceso.administra ? <AvisoSos>Ve el catálogo en solo lectura: crear, editar, archivar y publicar indicadores es de la administración y de quien Administra la unidad.</AvisoSos> : null}
+      {aviso ? (
+        <AvisoSos tipo={aviso.tipo} accion={aviso.accion} onCerrar={() => setAviso(null)}>
+          {aviso.texto}
+        </AvisoSos>
+      ) : null}
 
-      {formulario.abierto && acceso.administra ? (
-        <FormularioIndicador key={formulario.editando ?? "nuevo"} editado={editado} existentes={todas} etiquetas={etiquetasUsadas} raiz={acceso.unidad?.carpeta_raiz} onCerrar={() => setFormulario({ abierto: false, editando: null })} />
+      {modal && acceso.administra ? (
+        <IndicadorModal
+          key={modal.editando ?? "nuevo"}
+          editado={editado}
+          vinculo={editado ? vinculoDe(editado.id) : undefined}
+          nombreArchivo={nombreArchivo}
+          existentes={todas}
+          etiquetas={etiquetasUsadas}
+          raiz={acceso.unidad?.carpeta_raiz}
+          foco={modal.foco}
+          onGuardado={alGuardar}
+          onCerrar={() => setModal(null)}
+        />
       ) : null}
 
       {todas.length ? (
         <div className="dsx-filtros" role="search" aria-label="Filtrar el catálogo">
           <label className="dsx-filtros__q">
             <span className="dsx-sr">Buscar indicadores</span>
-            <input className="es-inp" type="search" value={filtro.q} placeholder="Buscar por nombre, código o etiqueta" onChange={(e) => setFiltro((f) => ({ ...f, q: e.target.value }))} />
+            <input className="dsx-inp" type="search" value={filtro.q} placeholder="Buscar por nombre, código o etiqueta" onChange={(e) => setFiltro((f) => ({ ...f, q: e.target.value }))} />
           </label>
           <label>
             <span className="dsx-sr">ODS</span>
-            <select className="es-inp" value={filtro.ods} onChange={(e) => setFiltro((f) => ({ ...f, ods: e.target.value }))}>
+            <select className="dsx-inp" value={filtro.ods} onChange={(e) => setFiltro((f) => ({ ...f, ods: e.target.value }))}>
               <option value="">Todos los ODS</option>
               <option value="sin">Sin ODS</option>
               {Array.from({ length: 17 }, (_, k) => k + 1).map((n) => (
@@ -145,7 +216,7 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
           </label>
           <label>
             <span className="dsx-sr">Etiqueta</span>
-            <select className="es-inp" value={filtro.etiqueta} onChange={(e) => setFiltro((f) => ({ ...f, etiqueta: e.target.value }))}>
+            <select className="dsx-inp" value={filtro.etiqueta} onChange={(e) => setFiltro((f) => ({ ...f, etiqueta: e.target.value }))}>
               <option value="">Todas las etiquetas</option>
               {etiquetasUsadas.map((t) => (
                 <option key={t} value={t}>
@@ -156,7 +227,7 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
           </label>
           <label>
             <span className="dsx-sr">Estado</span>
-            <select className="es-inp" value={filtro.estado} onChange={(e) => setFiltro((f) => ({ ...f, estado: e.target.value as Estado }))}>
+            <select className="dsx-inp" value={filtro.estado} onChange={(e) => setFiltro((f) => ({ ...f, estado: e.target.value as Estado }))}>
               {ESTADOS.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.etiqueta}
@@ -165,11 +236,11 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
             </select>
           </label>
           {hayFiltro ? (
-            <button type="button" className="es-btn es-btn--sm es-btn--ghost" onClick={() => setFiltro({ q: "", ods: "", etiqueta: "", estado: "activos" })}>
+            <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" onClick={() => setFiltro(FILTRO_INICIAL)}>
               Quitar filtros
             </button>
           ) : null}
-          <span className="dsx-tenue" role="status">
+          <span className="dsx-tenue dsx-num" role="status">
             {visibles.length} de {todas.length}
           </span>
         </div>
@@ -178,126 +249,147 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
       {inds.error ? <ErrorSos error={inds.error} /> : null}
       {vins.error && !inds.error ? <ErrorSos error={vins.error} /> : null}
       {error ? <AvisoSos tipo="error">{error}</AvisoSos> : null}
-      {inds.isPending ? <p className="admin-loading">Cargando el catálogo…</p> : null}
+      {inds.isPending ? <Cargando texto="Cargando el catálogo…" /> : null}
       {inds.isSuccess && !todas.length ? (
-        <div className="es-empty">
-          <b>El catálogo está vacío</b>
-          <span>{acceso.administra ? "Cree el primer indicador con «Nuevo indicador»." : "La administración aún no ha creado indicadores."}</span>
-        </div>
+        <Vacio
+          icono="spark-chart"
+          titulo="El catálogo está vacío"
+          accion={
+            acceso.administra ? (
+              <button type="button" className="dsx-btn dsx-btn--pri" onClick={() => setModal({ editando: null })}>
+                <Icon name="plus" size={16} />
+                Nuevo indicador
+              </button>
+            ) : undefined
+          }
+        >
+          {acceso.administra ? "Cree el primero: solo necesita un nombre y una unidad." : "La administración aún no ha creado indicadores."}
+        </Vacio>
       ) : null}
       {inds.isSuccess && todas.length > 0 && !visibles.length ? (
-        <div className="es-empty">
-          <b>Ningún indicador coincide</b>
-          <span>Pruebe con otra búsqueda o quite los filtros.</span>
-        </div>
+        <Vacio
+          icono="search"
+          titulo="Ningún indicador coincide"
+          accion={
+            hayFiltro ? (
+              <button type="button" className="dsx-btn dsx-btn--sm" onClick={() => setFiltro(FILTRO_INICIAL)}>
+                Quitar filtros
+              </button>
+            ) : undefined
+          }
+        >
+          Pruebe con otra búsqueda o quite los filtros.
+        </Vacio>
       ) : null}
 
       {grupos.map(([ods, lista]) => (
-        <section key={ods ?? "sin"} className="dsx-grupo" aria-label={ods === null ? "Sin ODS" : `ODS ${ods}`}>
-          <h3 className="dsx-grupo__t">
-            <FichaOds n={ods} /> {ods === null ? "Sin ODS" : `Objetivo ${ods}`}
-          </h3>
-          {lista.map((i) => {
-            const v = vinculoDe(i.id);
-            const tabla = v ? tablas.get(v.archivo_id) : undefined;
-            const calc = v && tabla ? calcularIndicador(i, v, tabla) : null;
-            return (
-              <div key={i.id} className="dsx-ind" data-archivado={i.archivado ? "" : undefined}>
-                <FichaOds n={i.ods} />
-                <div className="dsx-ind__nombre">
-                  <b>
-                    <span className="dsx-mono">{i.id}</span> · {i.nombre}
-                  </b>
-                  <small>
-                    {i.unidad} · mejor si {i.mejor === "sube" ? "sube" : "baja"} · se resume como {resumenTexto(i.resumen)}
-                  </small>
-                  {i.descripcion ? <small>{i.descripcion}</small> : null}
-                  {i.tarjeta ? <small>Alimenta la tarjeta «{INDICATORS[i.tarjeta]?.name ?? i.tarjeta}» del portal</small> : null}
-                  {i.etiquetas.length || i.archivado ? (
-                    <span className="dsx-etqs">
-                      {i.archivado ? (
-                        <span className="dsx-chip" data-t="aviso">
-                          Archivado
-                        </span>
-                      ) : null}
-                      {i.etiquetas.map((t) => (
-                        <button key={t} type="button" className="dsx-chip dsx-chip--etq" aria-label={`Filtrar por la etiqueta ${t}`} onClick={() => setFiltro((f) => ({ ...f, etiqueta: t }))}>
-                          {t}
-                        </button>
-                      ))}
+        <section key={ods ?? "sin"} className="dsx-grupo" aria-labelledby={`dsx-g-${ods ?? "sin"}`}>
+          <h2 className="dsx-grupo__t" id={`dsx-g-${ods ?? "sin"}`}>
+            <FichaOds n={ods} oculta />
+            {ods === null ? "Sin ODS" : `Objetivo ${ods} · ${odsByNumber(ods)?.name ?? ""}`}
+          </h2>
+          <ul className="dsx-ind-lista">
+            {lista.map((i) => {
+              const v = vinculoDe(i.id);
+              const tabla = v ? tablas.get(v.archivo_id) : undefined;
+              const calc = v && tabla ? calcularIndicador(i, v, tabla) : null;
+              return (
+                <li key={i.id} className="dsx-ind" data-archivado={i.archivado ? "" : undefined}>
+                  <span className="dsx-flash" data-flash={i.id} aria-hidden="true" />
+                  <FichaOds n={i.ods} />
+                  <div className="dsx-ind__nombre">
+                    <b className="dsx-ind__t">{i.nombre}</b>
+                    <span className="dsx-ind__sub">
+                      <span className="dsx-mono">{i.id}</span> · {i.unidad} · mejor si {i.mejor === "sube" ? "sube" : "baja"} · se resume como {resumenTexto(i.resumen)}
                     </span>
-                  ) : null}
-                </div>
-                <div className="dsx-ind__dato">
-                  {v ? (
-                    <>
-                      <small>
-                        Sale de <b>{nombreArchivo(v.archivo_id)}</b>, columna <span className="dsx-mono">{v.col_valor}</span>
-                      </small>
-                      {calc?.actual ? (
-                        <>
-                          {i.meta !== null && calc.avanceMeta !== null ? <Medidor fraccion={calc.avanceMeta} /> : null}
-                          <small className="dsx-num">
-                            {textoCifra(calc.actual.valor, i.decimales)}
-                            {i.meta !== null ? ` de ${textoCifra(i.meta, i.decimales)}` : ""} ({calc.actual.anio})
-                          </small>
-                        </>
-                      ) : (
-                        <small className="dsx-tenue">{tabla === undefined ? "Leyendo la tabla…" : "La tabla aún no tiene cifras para este indicador."}</small>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <span className="dsx-chip" data-t="aviso">
-                        <Icon name="alert" size={13} />
-                        Sin datos conectados
+                    {i.descripcion ? <span className="dsx-ind__sub">{i.descripcion}</span> : null}
+                    {i.tarjeta ? <span className="dsx-ind__sub">Alimenta la tarjeta «{INDICATORS[i.tarjeta]?.name ?? i.tarjeta}» del portal</span> : null}
+                    {i.etiquetas.length || i.archivado ? (
+                      <span className="dsx-etqs">
+                        {i.archivado ? (
+                          <span className="dsx-chip" data-t="aviso">
+                            Archivado
+                          </span>
+                        ) : null}
+                        {i.etiquetas.map((t) => (
+                          <button key={t} type="button" className="dsx-chip dsx-chip--etq" aria-label={`Filtrar por la etiqueta ${t}`} onClick={() => setFiltro((f) => ({ ...f, etiqueta: t }))}>
+                            {t}
+                          </button>
+                        ))}
                       </span>
-                      <small>Se muestra como ilustrativo</small>
-                    </>
-                  )}
-                </div>
-                <div className="dsx-ind__acciones">
-                  {acceso.administra ? (
-                    <>
-                      <Interruptor
-                        marcado={i.publicado}
-                        disabled={publicar.isPending || i.archivado || (!v && !i.publicado)}
-                        titulo={i.archivado ? "Restáurelo para publicarlo" : !v && !i.publicado ? "Para publicarlo, conecte primero una tabla" : undefined}
-                        onChange={(p) => {
-                          setError(null);
-                          publicar.mutate({ id: i.id, publicado: p }, { onError: (e) => setError(e.message) });
-                        }}
-                      >
-                        En el portal
-                      </Interruptor>
-                      <span className="dsx-ind__botones">
-                        <button type="button" className="es-btn es-btn--sm es-btn--ghost" onClick={() => setFormulario({ abierto: true, editando: i.id })}>
-                          <Icon name="pen" size={14} />
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="es-btn es-btn--sm es-btn--ghost"
-                          disabled={archivar.isPending}
-                          title={i.archivado ? "Vuelve al catálogo activo" : "Sale del catálogo activo y del portal; se conservan sus vínculos y tableros"}
-                          onClick={() => {
+                    ) : null}
+                  </div>
+                  <div className="dsx-ind__dato">
+                    {v ? (
+                      <>
+                        <span className="dsx-ind__sub">
+                          Sale de <b>{nombreArchivo(v.archivo_id)}</b>, columna <span className="dsx-mono">{v.col_valor}</span>
+                        </span>
+                        {calc?.actual ? (
+                          <>
+                            {i.meta !== null && calc.avanceMeta !== null ? <Medidor fraccion={calc.avanceMeta} /> : null}
+                            <span className="dsx-ind__cifra dsx-num">
+                              {textoCifra(calc.actual.valor, i.decimales)}
+                              {i.meta !== null ? ` de ${textoCifra(i.meta, i.decimales)}` : ""} <span className="dsx-tenue">({calc.actual.anio})</span>
+                            </span>
+                          </>
+                        ) : (
+                          <span className="dsx-tenue">{tabla === undefined ? "Leyendo la tabla…" : "La tabla aún no tiene cifras para este indicador."}</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span className="dsx-chip" data-t="aviso">
+                          <Icon name="alert" size={13} />
+                          Sin datos conectados
+                        </span>
+                        <span className="dsx-ind__sub">Se muestra como ilustrativo</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="dsx-ind__acciones">
+                    {acceso.administra ? (
+                      <>
+                        <Interruptor
+                          marcado={i.publicado}
+                          disabled={publicar.isPending || i.archivado || (!v && !i.publicado)}
+                          titulo={i.archivado ? "Restáurelo para publicarlo" : !v && !i.publicado ? "Para publicarlo, conecte primero una tabla" : undefined}
+                          onChange={(p) => {
                             setError(null);
-                            archivar.mutate({ id: i.id, archivado: !i.archivado }, { onError: (e) => setError(e.message) });
+                            publicar.mutate({ id: i.id, publicado: p }, { onError: (e) => setError(e.message) });
                           }}
                         >
-                          {i.archivado ? "Restaurar" : "Archivar"}
-                        </button>
+                          En el portal
+                        </Interruptor>
+                        <span className="dsx-ind__botones">
+                          <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" onClick={() => setModal({ editando: i.id })}>
+                            <Icon name="pen" size={14} />
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="dsx-btn dsx-btn--sm dsx-btn--ghost"
+                            disabled={archivar.isPending}
+                            title={i.archivado ? "Vuelve al catálogo activo" : "Sale del catálogo activo y del portal; se conservan sus vínculos y tableros"}
+                            onClick={() => {
+                              setError(null);
+                              archivar.mutate({ id: i.id, archivado: !i.archivado }, { onError: (e) => setError(e.message) });
+                            }}
+                          >
+                            {i.archivado ? "Restaurar" : "Archivar"}
+                          </button>
+                        </span>
+                      </>
+                    ) : (
+                      <span className="dsx-chip" data-t={i.publicado ? "ok" : undefined}>
+                        {i.publicado ? "En el portal" : "Sin publicar"}
                       </span>
-                    </>
-                  ) : (
-                    <span className="dsx-chip" data-t={i.publicado ? "ok" : undefined}>
-                      {i.publicado ? "En el portal" : "Sin publicar"}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       ))}
     </div>
@@ -308,10 +400,10 @@ export function Indicadores({ acceso }: { acceso: ReturnType<typeof useAccesoSos
 
 function CampoEtiquetas({ valor, sugeridas, onCambio }: { valor: string[]; sugeridas: string[]; onCambio: (v: string[]) => void }) {
   const [texto, setTexto] = useState("");
-  const lista = useId();
+  const lleno = valor.length >= TOPE_ETIQUETAS;
   const agregar = (crudo: string) => {
     const t = crudo.replace(/\s+/g, " ").trim().slice(0, 30);
-    if (!t || valor.length >= TOPE_ETIQUETAS || valor.some((x) => sinTildes(x) === sinTildes(t))) return setTexto("");
+    if (!t || lleno || valor.some((x) => sinTildes(x) === sinTildes(t))) return setTexto("");
     // Si coincide con una conocida (sin importar mayúsculas), se usa su escritura.
     onCambio([...valor, sugeridas.find((s) => sinTildes(s) === sinTildes(t)) ?? t]);
     setTexto("");
@@ -322,77 +414,138 @@ function CampoEtiquetas({ valor, sugeridas, onCambio }: { valor: string[]; suger
       agregar(texto);
     } else if (e.key === "Backspace" && !texto && valor.length) onCambio(valor.slice(0, -1));
   };
+  const libres = sugeridas.filter((s) => !valor.includes(s)).slice(0, 7);
   return (
-    <div className="es-fl dsx-form__ancha">
-      <label htmlFor={`${lista}-i`}>Etiquetas (opcional)</label>
-      <div className="dsx-etiquetas">
-        {valor.map((t) => (
-          <span key={t} className="dsx-chip dsx-chip--etq">
-            {t}
-            <button type="button" aria-label={`Quitar la etiqueta ${t}`} onClick={() => onCambio(valor.filter((x) => x !== t))}>
-              <Icon name="close" size={11} />
-            </button>
-          </span>
-        ))}
-        <input
-          id={`${lista}-i`}
-          className="es-inp"
-          list={lista}
-          value={texto}
-          maxLength={30}
-          disabled={valor.length >= TOPE_ETIQUETAS}
-          placeholder={valor.length >= TOPE_ETIQUETAS ? "Llegó al máximo de etiquetas" : "Escriba y pulse Enter"}
-          onChange={(e) => setTexto(e.target.value)}
-          onKeyDown={alTeclear}
-          onBlur={() => agregar(texto)}
-        />
-        <datalist id={lista}>
-          {sugeridas
-            .filter((s) => !valor.includes(s))
-            .map((s) => (
-              <option key={s} value={s} />
+    <Campo etiqueta="Etiquetas" opcional ayuda={`Temas libres para agrupar y filtrar. Hasta ${TOPE_ETIQUETAS}.`} ancho>
+      {(p) => (
+        <>
+          <div className="dsx-etiquetas">
+            {valor.map((t) => (
+              <span key={t} className="dsx-chip dsx-chip--etq">
+                {t}
+                <button type="button" aria-label={`Quitar la etiqueta ${t}`} onClick={() => onCambio(valor.filter((x) => x !== t))}>
+                  <Icon name="close" size={11} />
+                </button>
+              </span>
             ))}
-        </datalist>
-      </div>
-      <span className="dsx-tenue">Temas libres como «Campus» o «Energía» para agrupar y filtrar. Hasta {TOPE_ETIQUETAS}.</span>
-    </div>
+            <input
+              {...p}
+              className="dsx-inp"
+              value={texto}
+              maxLength={30}
+              disabled={lleno}
+              placeholder={lleno ? "Llegó al máximo de etiquetas" : "Escriba y pulse Enter"}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={alTeclear}
+              onBlur={() => agregar(texto)}
+            />
+          </div>
+          {libres.length && !lleno ? (
+            <div className="dsx-sugs" role="group" aria-label="Etiquetas sugeridas">
+              {libres.map((s) => (
+                <button key={s} type="button" className="dsx-sug" onClick={() => agregar(s)}>
+                  <Icon name="plus" size={11} />
+                  {s}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      )}
+    </Campo>
   );
 }
 
-/* ---------- Crear y editar ---------------------------------------------------------------------------- */
+/* ---------- El ODS: una fila de fichas de color ---------------------------------------------------- */
 
-function FormularioIndicador({ editado, existentes, etiquetas, raiz, onCerrar }: { editado: IndicadorSos | undefined; existentes: IndicadorSos[]; etiquetas: string[]; raiz: string | undefined; onCerrar: () => void }) {
+function SelectorOds({ valor, onChange }: { valor: string; onChange: (v: string) => void }) {
+  const ods = valor ? odsByNumber(valor) : undefined;
+  return (
+    <Grupo etiqueta="Objetivo de Desarrollo Sostenible" opcional ayuda={ods ? `ODS ${ods.n} · ${ods.name}` : "Sin ODS: queda en el grupo «Sin ODS» del catálogo."} ancho>
+      <div className="dsx-ods-sel">
+        <button type="button" className="dsx-ods-op dsx-ods-op--sin" aria-pressed={valor === ""} onClick={() => onChange("")}>
+          Sin ODS
+        </button>
+        {Array.from({ length: 17 }, (_, k) => k + 1).map((n) => (
+          <button key={n} type="button" className="dsx-ods-op" aria-pressed={valor === String(n)} aria-label={`ODS ${n}: ${odsByNumber(n)?.name ?? ""}`} title={odsByNumber(n)?.name} onClick={() => onChange(String(n))}>
+            <FichaOds n={n} oculta />
+          </button>
+        ))}
+      </div>
+    </Grupo>
+  );
+}
+
+/* ---------- Crear y editar, en una ventana emergente ---------------------------------------------- */
+
+interface PropsModal {
+  editado: IndicadorSos | undefined;
+  vinculo: VinculoSos | undefined;
+  nombreArchivo: (id: string) => string;
+  existentes: IndicadorSos[];
+  etiquetas: string[];
+  raiz: string | undefined;
+  foco?: "origen";
+  onGuardado: (r: { id: string; nuevo: boolean; conectado: boolean; aviso?: string }) => void;
+  onCerrar: () => void;
+}
+
+function IndicadorModal({ editado, vinculo, nombreArchivo, existentes, etiquetas, raiz, foco, onGuardado, onCerrar }: PropsModal) {
   const guardar = useGuardarIndicador();
   const vincular = useGuardarVinculo();
   const tablasUnidad = useArchivosSos(raiz).tablas;
-  const [b, setB] = useState<Borrador>(editado ? { ...editado, ods: editado.ods === null ? "" : String(editado.ods), meta: editado.meta === null ? "" : String(editado.meta), origen: "" } : BORRADOR_NUEVO);
-  const [mensaje, setMensaje] = useState<{ t: "error" | "aviso"; texto: string } | null>(null);
-  const caja = useRef<HTMLFormElement>(null);
+  // Lo que se abrió, fijo: una relectura de la lista mientras se escribe no cuenta como cambio.
+  const [inicial] = useState<Borrador>(() => (editado ? { ...editado, ods: editado.ods === null ? "" : String(editado.ods), meta: editado.meta === null ? "" : String(editado.meta), origen: "" } : BORRADOR_NUEVO));
+  const [b, setB] = useState<Borrador>(inicial);
+  const [codigoManual, setCodigoManual] = useState<string | null>(null);
+  // «Más opciones» se abre solo si lo que se edita ya usa algo de ahí (o si se viene a conectar una tabla).
+  const usaAvanzado = Boolean(editado && (editado.ods !== null || editado.etiquetas.length || editado.meta !== null || editado.descripcion || editado.tarjeta || editado.nota || editado.mejor !== "sube" || editado.resumen !== "promedio" || editado.decimales !== 0));
+  const [mas, setMas] = useState(usaAvanzado || foco === "origen");
+  const [tocado, setTocado] = useState({ nombre: false, unidad: false });
+  const [intento, setIntento] = useState(false);
+  const [falla, setFalla] = useState<string | null>(null);
+  const idMas = useId();
   const tablaElegida = useTablasDe(b.origen ? [b.origen] : []).tablas.get(b.origen) ?? null;
   const poner = <K extends keyof Borrador>(k: K, v: Borrador[K]) => setB((x) => ({ ...x, [k]: v }));
   const sugeridas = useMemo(() => [...new Set([...ETIQUETAS_SUGERIDAS, ...etiquetas])], [etiquetas]);
 
-  useEffect(() => {
-    if (caja.current) cambiar(caja.current);
-    caja.current?.querySelector<HTMLInputElement>("input")?.focus();
-  }, []);
-
+  const generado = useMemo(() => codigoDe(b.nombre, existentes), [b.nombre, existentes]);
+  const codigo = editado ? editado.id : (codigoManual ?? generado);
+  const sucio = JSON.stringify([b, codigoManual]) !== JSON.stringify([inicial, null]);
   const tarjetaUsada = (t: TarjetaPortal) => existentes.some((i) => i.tarjeta === t && i.id !== editado?.id);
 
-  const enviar = async (e: FormEvent) => {
-    e.preventDefault();
-    const id = b.id.trim();
-    if (!id || !b.nombre.trim() || !b.unidad.trim()) return setMensaje({ t: "error", texto: "Escriba el código, el nombre y la unidad del indicador." });
-    if (!CODIGO_OK.test(id)) return setMensaje({ t: "error", texto: "El código lleva letras, números, punto, guion o guion bajo, sin espacios (por ejemplo CAMP-01 o 7.2)." });
-    if (!editado && existentes.some((i) => i.id.toLowerCase() === id.toLowerCase())) return setMensaje({ t: "error", texto: `Ya existe un indicador con el código ${id}.` });
-    const meta = b.meta.trim() === "" ? null : Number(b.meta.replace(",", "."));
-    if (meta !== null && !Number.isFinite(meta)) return setMensaje({ t: "error", texto: "La meta debe ser un número." });
+  /* --- Validación en línea: el mensaje queda bajo su campo --- */
+  const errNombre = b.nombre.trim() ? null : "Escriba el nombre del indicador.";
+  const errUnidad = b.unidad.trim() ? null : "Escriba la unidad, por ejemplo «%» o «kWh».";
+  const errCodigo = !codigo
+    ? b.nombre.trim()
+      ? "No pude armar un código con ese nombre: escríbalo usted, por ejemplo CAMP-01."
+      : null
+    : !CODIGO_OK.test(codigo)
+      ? "Use letras, números, punto, guion o guion bajo, sin espacios (por ejemplo CAMP-01 o 7.2)."
+      : !editado && existentes.some((i) => i.id.toLowerCase() === codigo.toLowerCase())
+        ? `Ya existe un indicador con el código ${codigo}.`
+        : null;
+  const metaNum = b.meta.trim() === "" ? null : Number(b.meta.replace(",", "."));
+  const errMeta = metaNum !== null && !Number.isFinite(metaNum) ? "La meta debe ser un número, por ejemplo 80 o 12,5." : null;
+  // El del nombre y la unidad se muestran al salir del campo o al intentar crear; el código y la meta, apenas fallan.
+  const verNombre = tocado.nombre || intento ? errNombre : null;
+  const verUnidad = tocado.unidad || intento ? errUnidad : null;
+  const verCodigo = codigoManual !== null || intento ? errCodigo : null;
+
+  const enviar = async (): Promise<boolean> => {
+    setIntento(true);
+    setFalla(null);
+    if (errNombre || errUnidad || errCodigo || errMeta) {
+      if ((errCodigo || errMeta) && !mas) setMas(true);
+      window.setTimeout(() => document.querySelector<HTMLElement>("dialog [aria-invalid='true']")?.focus(), 0);
+      return false;
+    }
     const ods = b.ods === "" ? null : Number(b.ods);
-    setMensaje(null);
+    const mismos = existentes.filter((i) => i.ods === ods);
     try {
-      const mismos = existentes.filter((i) => i.ods === ods);
       await guardar.mutateAsync({
-        id,
+        id: codigo,
         ods,
         nombre: b.nombre,
         descripcion: b.descripcion,
@@ -400,134 +553,171 @@ function FormularioIndicador({ editado, existentes, etiquetas, raiz, onCerrar }:
         position: editado && editado.ods === ods ? editado.position : mismos.reduce((m, i) => Math.max(m, i.position), 0) + 1,
         mejor: b.mejor,
         resumen: b.resumen,
-        meta,
+        meta: metaNum,
         decimales: b.decimales,
         tarjeta: b.tarjeta,
         nota: b.nota,
         etiquetas: b.etiquetas,
       });
     } catch (err) {
-      return setMensaje({ t: "error", texto: err instanceof Error ? err.message : "No se pudo guardar el indicador." });
+      setFalla(err instanceof Error ? err.message : "No se pudo guardar el indicador.");
+      return false;
     }
     // La tabla de origen es opcional: con ella se proponen las columnas; si no encajan, se termina en el editor de la tabla.
+    let aviso: string | undefined;
+    let conectado = Boolean(vinculo);
     if (b.origen && tablaElegida) {
       const p = proponer(tablaElegida);
       if (p.valor && p.periodo) {
         try {
-          await vincular.mutateAsync({ indicador_id: id, archivo_id: b.origen, col_valor: p.valor, col_periodo: p.periodo, col_campus: p.campus || null, filtro_col: null, filtro_valor: null });
+          await vincular.mutateAsync({ indicador_id: codigo, archivo_id: b.origen, col_valor: p.valor, col_periodo: p.periodo, col_campus: p.campus || null, filtro_col: null, filtro_valor: null });
+          conectado = true;
         } catch (err) {
-          setMensaje({ t: "aviso", texto: `El indicador quedó guardado, pero no se pudo conectar: ${err instanceof Error ? err.message : "error"} Termine la conexión desde la tabla.` });
-          return;
+          aviso = `El indicador quedó guardado, pero no se pudo conectar: ${err instanceof Error ? err.message : "error"} Termine la conexión desde la tabla.`;
         }
-      } else {
-        setMensaje({ t: "aviso", texto: "El indicador quedó guardado. No encontré columnas de valor y periodo en esa tabla: conéctelo desde su editor." });
-        return;
-      }
+      } else aviso = "El indicador quedó guardado. No encontré columnas de valor y periodo en esa tabla: conéctelo desde su editor.";
     }
-    onCerrar();
+    onGuardado({ id: codigo, nuevo: !editado, conectado, aviso });
+    return true;
   };
 
+  const resumenActual = RESUMENES.find((r) => r.id === b.resumen);
+
   return (
-    <form ref={caja} className="dsx-form" onSubmit={(e) => void enviar(e)} aria-label={editado ? `Editar ${editado.nombre}` : "Nuevo indicador"}>
-      <h3>{editado ? `Editar «${editado.nombre}»` : "Nuevo indicador"}</h3>
-      <div className="dsx-form__rejilla">
-        <label className="es-fl">
-          Código
-          <input className="es-inp" value={b.id} disabled={Boolean(editado)} maxLength={40} placeholder="Por ejemplo, CAMP-01" onChange={(e) => poner("id", e.target.value)} />
-        </label>
-        <label className="es-fl">
-          Nombre
-          <input className="es-inp" value={b.nombre} maxLength={120} placeholder="Por ejemplo, árboles sembrados" onChange={(e) => poner("nombre", e.target.value)} />
-        </label>
-        <label className="es-fl">
-          Objetivo de Desarrollo Sostenible (opcional)
-          <select className="es-inp" value={b.ods} onChange={(e) => poner("ods", e.target.value)}>
-            <option value="">Sin ODS</option>
-            {Array.from({ length: 17 }, (_, k) => k + 1).map((n) => (
-              <option key={n} value={n}>
-                ODS {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="es-fl">
-          Unidad
-          <input className="es-inp" value={b.unidad} maxLength={60} placeholder="Por ejemplo, % del consumo" onChange={(e) => poner("unidad", e.target.value)} />
-        </label>
-        <label className="es-fl">
-          Mejor si…
-          <select className="es-inp" value={b.mejor} onChange={(e) => poner("mejor", e.target.value as MejorSos)}>
-            <option value="sube">El valor sube</option>
-            <option value="baja">El valor baja</option>
-          </select>
-        </label>
-        <label className="es-fl">
-          Cómo se resume
-          <select className="es-inp" value={b.resumen} onChange={(e) => poner("resumen", e.target.value as ResumenSos)}>
-            {RESUMENES.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.etiqueta}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="es-fl">
-          Meta (opcional)
-          <input className="es-inp" inputMode="decimal" value={b.meta} placeholder="Sin meta" onChange={(e) => poner("meta", e.target.value)} />
-        </label>
-        <label className="es-fl">
-          Decimales
-          <select className="es-inp" value={b.decimales} onChange={(e) => poner("decimales", Number(e.target.value))}>
-            {[0, 1, 2, 3].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="es-fl">
-          Tarjeta del portal que alimenta (opcional)
-          <select className="es-inp" value={b.tarjeta ?? ""} onChange={(e) => poner("tarjeta", (e.target.value || null) as TarjetaPortal | null)}>
-            <option value="">Ninguna: el portal le abre una tarjeta propia</option>
-            {TARJETAS.map((t) => (
-              <option key={t} value={t} disabled={tarjetaUsada(t)}>
-                {INDICATORS[t].name}
-                {tarjetaUsada(t) ? " (ya la alimenta otro)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="es-fl">
-          Tabla de origen (opcional)
-          <select className="es-inp" value={b.origen} onChange={(e) => poner("origen", e.target.value)}>
-            <option value="">Conectar después</option>
-            {tablasUnidad.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-          <span className="dsx-tenue">No hace falta una tabla para crearlo: se conecta después. Si elige una, se proponen las columnas.</span>
-        </label>
-        <label className="es-fl dsx-form__ancha">
-          Descripción (opcional)
-          <input className="es-inp" value={b.descripcion} maxLength={300} placeholder="Qué mide y cómo se calcula" onChange={(e) => poner("descripcion", e.target.value)} />
-        </label>
-        <CampoEtiquetas valor={b.etiquetas} sugeridas={sugeridas} onCambio={(v) => poner("etiquetas", v)} />
-        <label className="es-fl dsx-form__ancha">
-          Nota para el portal (opcional)
-          <input className="es-inp" value={b.nota} maxLength={400} onChange={(e) => poner("nota", e.target.value)} />
-        </label>
+    <Modal
+      titulo={editado ? "Editar indicador" : "Nuevo indicador"}
+      descripcion={editado ? `«${editado.nombre}» · ${editado.id}` : "Solo necesita un nombre y una unidad. Lo demás puede completarlo después."}
+      sucio={sucio}
+      onCerrar={onCerrar}
+      onEnviar={enviar}
+      principal={editado ? "Guardar cambios" : "Crear indicador"}
+      pendiente={guardar.isPending || vincular.isPending}
+      textoPendiente={editado ? "Guardando…" : "Creando…"}
+      ancho
+    >
+      <div className="dsx-form__basico">
+        <Campo etiqueta="Nombre" error={verNombre}>
+          {(p) => <input {...p} data-foco={foco === "origen" ? undefined : ""} className="dsx-inp" value={b.nombre} maxLength={120} placeholder="Por ejemplo, árboles sembrados" autoComplete="off" onChange={(e) => poner("nombre", e.target.value)} onBlur={() => setTocado((t) => ({ ...t, nombre: true }))} />}
+        </Campo>
+        <Campo etiqueta="Unidad" error={verUnidad}>
+          {(p) => (
+            <>
+              <input {...p} className="dsx-inp" value={b.unidad} maxLength={60} placeholder="Por ejemplo, % del consumo" autoComplete="off" onChange={(e) => poner("unidad", e.target.value)} onBlur={() => setTocado((t) => ({ ...t, unidad: true }))} />
+              <div className="dsx-sugs" role="group" aria-label="Unidades sugeridas">
+                {UNIDADES.map((u) => (
+                  <button key={u} type="button" className="dsx-sug" aria-pressed={b.unidad === u} onClick={() => poner("unidad", u)}>
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </Campo>
       </div>
-      {mensaje ? <AvisoSos tipo={mensaje.t === "error" ? "error" : "aviso"}>{mensaje.texto}</AvisoSos> : null}
-      <div className="dsx-form__pie">
-        <button type="submit" className="es-btn es-btn--pri" disabled={guardar.isPending || vincular.isPending}>
-          {guardar.isPending || vincular.isPending ? "Guardando…" : editado ? "Guardar cambios" : "Crear indicador"}
+
+      <div className="dsx-mas">
+        <button type="button" className="dsx-mas__btn" aria-expanded={mas} aria-controls={idMas} onClick={() => setMas((m) => !m)}>
+          <Icon name="chevron-down" size={16} />
+          Más opciones
+          <span className="dsx-tenue">{mas ? "" : "ODS, etiquetas, meta, tabla de origen…"}</span>
         </button>
-        <button type="button" className="es-btn" onClick={onCerrar}>
-          {mensaje?.t === "aviso" ? "Cerrar" : "Cancelar"}
-        </button>
+        {mas ? (
+          <div id={idMas} className="dsx-mas__cuerpo">
+            <div className="dsx-form__grupo">
+              <SelectorOds valor={b.ods} onChange={(v) => poner("ods", v)} />
+              <CampoEtiquetas valor={b.etiquetas} sugeridas={sugeridas} onCambio={(v) => poner("etiquetas", v)} />
+            </div>
+
+            <div className="dsx-form__grupo">
+              <Grupo etiqueta="Mejor si el valor…" ayuda="Decide si una subida se ve como mejora o como retroceso en el portal.">
+                <Segmentado<MejorSos>
+                  etiqueta="Mejor si el valor"
+                  valor={b.mejor}
+                  onChange={(v) => poner("mejor", v)}
+                  opciones={[
+                    { id: "sube", etiqueta: "Sube" },
+                    { id: "baja", etiqueta: "Baja" },
+                  ]}
+                />
+              </Grupo>
+              <Grupo etiqueta="Cómo se resume" ayuda={resumenActual?.ayuda} ancho>
+                <Segmentado<ResumenSos> etiqueta="Cómo se resume" valor={b.resumen} onChange={(v) => poner("resumen", v)} opciones={RESUMENES.map((r) => ({ id: r.id, etiqueta: r.etiqueta }))} ancho />
+              </Grupo>
+              <Campo etiqueta="Meta" opcional error={errMeta}>
+                {(p) => <input {...p} className="dsx-inp dsx-num" inputMode="decimal" value={b.meta} placeholder="Sin meta" autoComplete="off" onChange={(e) => poner("meta", e.target.value)} />}
+              </Campo>
+              <Grupo etiqueta="Decimales">
+                <Segmentado<"0" | "1" | "2" | "3">
+                  etiqueta="Decimales"
+                  valor={String(b.decimales) as "0" | "1" | "2" | "3"}
+                  onChange={(v) => poner("decimales", Number(v))}
+                  opciones={(["0", "1", "2", "3"] as const).map((n) => ({ id: n, etiqueta: n }))}
+                />
+              </Grupo>
+            </div>
+
+            <div className="dsx-form__grupo">
+              <Campo etiqueta="Descripción" opcional ancho>
+                {(p) => <input {...p} className="dsx-inp" value={b.descripcion} maxLength={300} placeholder="Qué mide y cómo se calcula" autoComplete="off" onChange={(e) => poner("descripcion", e.target.value)} />}
+              </Campo>
+              {vinculo ? (
+                <div className="dsx-fl" data-ancho="">
+                  <span className="dsx-fl__rotulo">Tabla de origen</span>
+                  <p className="dsx-fl__valor">
+                    <Icon name="link" size={14} />
+                    <span>
+                      <b>{nombreArchivo(vinculo.archivo_id)}</b>, columna <span className="dsx-mono">{vinculo.col_valor}</span>
+                    </span>
+                  </p>
+                  <p className="dsx-tenue">Para cambiar la conexión, ábrala desde la tabla en Archivos.</p>
+                </div>
+              ) : (
+                <Campo etiqueta="Tabla de origen" opcional ayuda="No hace falta para crearlo: se conecta después. Si elige una, se proponen las columnas." ancho>
+                  {(p) => (
+                    <select {...p} data-foco={foco === "origen" ? "" : undefined} className="dsx-inp" value={b.origen} onChange={(e) => poner("origen", e.target.value)}>
+                      <option value="">Conectar después</option>
+                      {tablasUnidad.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </Campo>
+              )}
+              <Campo etiqueta="Tarjeta del portal que alimenta" opcional ancho>
+                {(p) => (
+                  <select {...p} className="dsx-inp" value={b.tarjeta ?? ""} onChange={(e) => poner("tarjeta", (e.target.value || null) as TarjetaPortal | null)}>
+                    <option value="">Ninguna: el portal le abre una tarjeta propia</option>
+                    {TARJETAS.map((t) => (
+                      <option key={t} value={t} disabled={tarjetaUsada(t)}>
+                        {INDICATORS[t].name}
+                        {tarjetaUsada(t) ? " (ya la alimenta otro)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Campo>
+              <Campo etiqueta="Nota para el portal" opcional ancho>
+                {(p) => <input {...p} className="dsx-inp" value={b.nota} maxLength={400} autoComplete="off" onChange={(e) => poner("nota", e.target.value)} />}
+              </Campo>
+              <Campo etiqueta="Código" error={verCodigo} ayuda={editado ? "El código no cambia una vez creado." : codigoManual === null ? "Se genera solo a partir del nombre; puede escribir otro." : undefined} ancho>
+                {(p) => (
+                  <div className="dsx-codigo">
+                    <input {...p} className="dsx-inp dsx-mono" value={codigo} disabled={Boolean(editado)} maxLength={40} placeholder="Se genera con el nombre" autoComplete="off" spellCheck={false} onChange={(e) => setCodigoManual(e.target.value)} />
+                    {codigoManual !== null && !editado ? (
+                      <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" onClick={() => setCodigoManual(null)}>
+                        Volver al automático
+                      </button>
+                    ) : null}
+                  </div>
+                )}
+              </Campo>
+            </div>
+          </div>
+        ) : null}
       </div>
-    </form>
+      {falla ? <AvisoSos tipo="error">{falla}</AvisoSos> : null}
+    </Modal>
   );
 }

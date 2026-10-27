@@ -22,8 +22,8 @@ import type { TileDatos } from "../../sostenible/widgets";
 import "../../sostenible/sostenible.css";
 import { calcularIndicador, columnaSensible, usePublicacionesGraficas, usePublicarGrafica, usePublicarIndicador, useIndicadoresSos, useVinculos } from "../sos";
 import type { GraficaPublicaSos, IndicadorSos } from "../tipos";
-import { dibujarGrafica, encenderRecorrido } from "./movimiento";
-import { AvisoSos, ErrorSos, Interruptor } from "./piezas";
+import { contarCifras, dibujarGrafica, encenderRecorrido } from "./movimiento";
+import { AvisoSos, Cargando, ErrorSos, Interruptor, Vacio } from "./piezas";
 import { useAccesoSos, useArchivosSos, useTablaDeGraficas, useTablasDe } from "./usos";
 
 type Revision = { tipo: "ok" | "aviso"; texto: string };
@@ -145,23 +145,26 @@ export function Portal({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ídem
   }, [grafPublicadas, origen, tablas, publicadasGraf, tablasUnidad]);
 
-  // Al entrar a la sección: se enciende el recorrido y se dibujan las gráficas. Una sola vez, cuando hay datos.
+  // Al entrar a la sección: se enciende el recorrido, las cifras cuentan y se dibujan las gráficas. Una sola vez, cuando hay datos.
   const listo = inds.isSuccess && vins.isSuccess && pubs.isSuccess && !cargandoArchivos && !cargandoTablas;
   const yaEntro = useRef(false);
+  const limpieza = useRef<() => void>(() => {});
   useEffect(() => {
     if (!listo || yaEntro.current) return;
     yaEntro.current = true;
-    encenderRecorrido(recorrido.current);
-    dibujarGrafica(previa.current);
+    const fines = [encenderRecorrido(recorrido.current), contarCifras(recorrido.current), dibujarGrafica(previa.current)];
+    limpieza.current = () => fines.forEach((f) => f());
   }, [listo]);
+  // Al salir de la sección mueren los tweens que sigan vivos.
+  useEffect(() => () => limpieza.current(), []);
 
   const errorCarga = inds.error ?? vins.error ?? pubs.error;
-  const paso = (icono: "table" | "chart" | "spark-chart" | "pin", titulo: string, detalle: string) => ({ icono, titulo, detalle });
+  const paso = (icono: "table" | "chart" | "spark-chart" | "pin", n: number, rotulo: string, detalle: string) => ({ icono, n, rotulo, detalle });
   const pasos = [
-    paso("table", `${tablasUnidad.length} ${tablasUnidad.length === 1 ? "tabla" : "tablas"}`, "con datos de los campus"),
-    paso("chart", `${graficas.length} ${graficas.length === 1 ? "gráfica" : "gráficas"}`, `${grafPublicadas.length} publicada${grafPublicadas.length === 1 ? "" : "s"}`),
-    paso("spark-chart", `${lista.length} ${lista.length === 1 ? "indicador" : "indicadores"}`, `${lista.filter((i) => vins.data?.some((v) => v.indicador_id === i.id)).length} con datos`),
-    paso("pin", `${indsPublicados.length + grafPublicadas.length} en el portal`, "elementos visibles"),
+    paso("table", tablasUnidad.length, tablasUnidad.length === 1 ? "tabla" : "tablas", "con datos de los campus"),
+    paso("chart", graficas.length, graficas.length === 1 ? "gráfica" : "gráficas", `${grafPublicadas.length} publicada${grafPublicadas.length === 1 ? "" : "s"}`),
+    paso("spark-chart", lista.length, lista.length === 1 ? "indicador" : "indicadores", `${lista.filter((i) => vins.data?.some((v) => v.indicador_id === i.id)).length} con datos`),
+    paso("pin", indsPublicados.length + grafPublicadas.length, "en el portal", "elementos visibles"),
   ];
 
   const pubInd = (i: IndicadorSos, publicado: boolean) => {
@@ -179,25 +182,31 @@ export function Portal({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) 
   return (
     <div className="dsx-pagina">
       <div className="dsx-cab">
-        <div>
-          <h2>Portal de sostenibilidad</h2>
-          <p className="dsx-sub">Así llega el dato desde la tabla hasta la página pública.</p>
-        </div>
+        <p className="dsx-lead">Así llega el dato desde la tabla hasta la página pública. A la derecha elige qué se publica; a la izquierda ve cómo quedaría.</p>
       </div>
 
       {errorCarga ? <ErrorSos error={errorCarga} /> : null}
 
       <ol className="dsx-recorrido" ref={recorrido} aria-label="Del dato al portal">
         {pasos.map((p, i) => (
-          <li key={p.titulo} className="dsx-recorrido__item">
+          <li key={p.rotulo} className="dsx-recorrido__item">
             <span className="dsx-paso" data-paso="">
               <span className="dsx-paso__ico">
                 <Icon name={p.icono} size={18} />
               </span>
-              <b>{p.titulo}</b>
+              <b>
+                <span className="dsx-num" data-cuenta={p.n}>
+                  {p.n.toLocaleString("es-CO")}
+                </span>{" "}
+                {p.rotulo}
+              </b>
               <small>{p.detalle}</small>
             </span>
-            {i < pasos.length - 1 ? <span className="dsx-conector" data-conector="" aria-hidden="true" /> : null}
+            {i < pasos.length - 1 ? (
+              <span className="dsx-conector" data-conector="" aria-hidden="true">
+                <i />
+              </span>
+            ) : null}
           </li>
         ))}
       </ol>
@@ -207,7 +216,7 @@ export function Portal({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) 
           <div className="dsx-barra">
             <label className="dsx-campus">
               <span className="dsx-sr">Campus de la vista previa</span>
-              <select className="es-inp" value={campus} onChange={(e) => setCampus(e.target.value as Campus)}>
+              <select className="dsx-inp" value={campus} onChange={(e) => setCampus(e.target.value as Campus)}>
                 {CAMPUSES.map((c) => (
                   <option key={c} value={c}>
                     {c === "Todos" ? "Todos los campus" : c}
@@ -229,11 +238,11 @@ export function Portal({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) 
                 <p className="sos-eyebrow sos-eyebrow--on-dark">Indicadores de sostenibilidad</p>
                 <h3>Lo que medimos en los campus, en vivo.</h3>
               </div>
-              {!listo && !errorCarga ? <p className="dsx-previa__nota">Calculando la vista previa…</p> : null}
+              {!listo && !errorCarga ? <Cargando texto="Calculando la vista previa…" filas={2} /> : null}
               {listo && !tarjetas.length && !graficasPrevia.salida.length ? (
-                <p className="dsx-previa__nota">
-                  Nada publicado con cifras para {campus === "Todos" ? "los campus" : campus}. Marque indicadores o gráficas a la derecha; el portal sigue mostrando sus cifras de muestra.
-                </p>
+                <Vacio icono="eye-off" titulo={`Nada publicado con cifras para ${campus === "Todos" ? "los campus" : campus}`}>
+                  Marque indicadores o gráficas a la derecha; mientras tanto el portal sigue mostrando sus cifras de muestra.
+                </Vacio>
               ) : null}
               {tarjetas.length ? (
                 <div className="dsx-previa__cuerpo">
@@ -253,39 +262,48 @@ export function Portal({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) 
           </div>
         </div>
 
-        <div>
-          <div className="dsx-tarjeta">
-            <b>Qué se publica</b>
+        <div className="dsx-lado">
+          <section className="dsx-tarjeta" aria-labelledby="dsx-p-publica">
+            <h2 id="dsx-p-publica">Qué se publica</h2>
             <p className="dsx-tenue">Lo marcado aparece en la página.</p>
             {!acceso.administra ? <p className="dsx-tenue">Publicar indicadores es de quien Administra la unidad; las gráficas, de quien puede crear sobre ellas.</p> : null}
-            <div className="dsx-publica">
-              {lista.map((i) => (
-                <Interruptor
-                  key={i.id}
-                  marcado={i.publicado}
-                  disabled={!acceso.administra || publicarInd.isPending || (!i.publicado && !vins.data?.some((v) => v.indicador_id === i.id))}
-                  titulo={!vins.data?.some((v) => v.indicador_id === i.id) && !i.publicado ? "Conecte primero una tabla" : undefined}
-                  onChange={(p) => pubInd(i, p)}
-                >
-                  {i.nombre}
-                </Interruptor>
-              ))}
-              {graficas.map((g) => (
-                <Interruptor
-                  key={g.id}
-                  marcado={Boolean(publicadasGraf.get(g.id)?.publicado)}
-                  disabled={rangoDe(duenos.data?.get(g.id)?.mi_rol) < 3 || publicarGraf.isPending}
-                  onChange={(p) => pubGraf(g.id, p)}
-                >
-                  <Icon name="chart" size={13} /> {g.nombre}
-                </Interruptor>
-              ))}
-              {listo && !lista.length && !graficas.length ? <p className="dsx-tenue">Todavía no hay indicadores ni gráficas.</p> : null}
-            </div>
+            {!listo && !errorCarga ? <Cargando texto="Cargando lo publicable…" filas={3} /> : null}
+            {lista.length ? (
+              <div className="dsx-publica" role="group" aria-label="Indicadores">
+                <h3>Indicadores</h3>
+                {lista.map((i) => (
+                  <Interruptor
+                    key={i.id}
+                    marcado={i.publicado}
+                    disabled={!acceso.administra || publicarInd.isPending || (!i.publicado && !vins.data?.some((v) => v.indicador_id === i.id))}
+                    titulo={!vins.data?.some((v) => v.indicador_id === i.id) && !i.publicado ? "Conecte primero una tabla" : undefined}
+                    onChange={(p) => pubInd(i, p)}
+                  >
+                    {i.nombre}
+                  </Interruptor>
+                ))}
+              </div>
+            ) : null}
+            {graficas.length ? (
+              <div className="dsx-publica" role="group" aria-label="Gráficas">
+                <h3>Gráficas</h3>
+                {graficas.map((g) => (
+                  <Interruptor
+                    key={g.id}
+                    marcado={Boolean(publicadasGraf.get(g.id)?.publicado)}
+                    disabled={rangoDe(duenos.data?.get(g.id)?.mi_rol) < 3 || publicarGraf.isPending}
+                    onChange={(p) => pubGraf(g.id, p)}
+                  >
+                    {g.nombre}
+                  </Interruptor>
+                ))}
+              </div>
+            ) : null}
+            {listo && !lista.length && !graficas.length ? <p className="dsx-tenue">Todavía no hay indicadores ni gráficas.</p> : null}
             {error ? <AvisoSos tipo="error">{error}</AvisoSos> : null}
-          </div>
-          <div className="dsx-tarjeta">
-            <b>Revisión antes de publicar</b>
+          </section>
+          <section className="dsx-tarjeta" aria-labelledby="dsx-p-revision">
+            <h2 id="dsx-p-revision">Revisión antes de publicar</h2>
             <ul className="dsx-revision">
               {todasLasRevisiones.map((r) => (
                 <li key={r.texto} data-t={r.tipo}>
@@ -295,7 +313,7 @@ export function Portal({ acceso }: { acceso: ReturnType<typeof useAccesoSos> }) 
               ))}
               {listo && !todasLasRevisiones.length ? <li className="dsx-tenue">No hay nada publicado que revisar.</li> : null}
             </ul>
-          </div>
+          </section>
         </div>
       </div>
     </div>

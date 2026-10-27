@@ -54,7 +54,7 @@ import { UNIT_ROLE } from "../../tableros/model";
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type ModuleId =
   | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
-  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "udrive" | "gestion-master" | "pilo" | "sistema";
+  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "udrive" | "datos-sostenibilidad" | "gestion-master" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -261,6 +261,14 @@ export const MODULES: ModuleDef[] = [
     screens: [{ id: "udrive", label: "UDrive", note: "cada persona ve lo suyo y lo que le comparten; la base (0187) lo hace cumplir" }],
     levels: {
       ver: { hint: "Abre UDrive: archivos, tablas y gráficas propias y compartidas.", needs: "consulta" },
+    },
+  },
+  {
+    id: "datos-sostenibilidad",
+    label: "Datos de Sostenibilidad",
+    screens: [{ id: "datos-sostenibilidad", label: "Datos de Sostenibilidad", note: "quien la tiene ve todas las carpetas, tablas, gráficas, indicadores y tableros; edita según su papel en cada carpeta (se reparte en la unidad, como en UDrive) y lo publicado sale en /sostenible (0202)" }],
+    levels: {
+      ver: { hint: "Entra a Datos de Sostenibilidad: ve todo el espacio. Editar y publicar depende del papel que tenga en la unidad.", needs: "consulta" },
     },
   },
   {
@@ -583,6 +591,7 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     modules.correos = full("correos", "ver");
     modules.encuestas = full("encuestas", "editar");
     modules.udrive = full("udrive", "ver");
+    modules["datos-sostenibilidad"] = full("datos-sostenibilidad", "ver");
     modules.pilo = full("pilo", "ver");
     modules.sistema = full("sistema", "ver");
     return base;

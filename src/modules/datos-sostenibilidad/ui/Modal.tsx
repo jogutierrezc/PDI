@@ -32,10 +32,12 @@ export interface PropsModal {
   textoPendiente?: string;
   secundario?: string;
   ancho?: boolean;
+  /** Aún más ancha (una tabla de filas). */
+  grande?: boolean;
   children: ReactNode;
 }
 
-export function Modal({ titulo, descripcion, sucio = false, onCerrar, onEnviar, principal, pendiente = false, textoPendiente = "Guardando…", secundario = "Cancelar", ancho = false, children }: PropsModal) {
+export function Modal({ titulo, descripcion, sucio = false, onCerrar, onEnviar, principal, pendiente = false, textoPendiente = "Guardando…", secundario = "Cancelar", ancho = false, grande = false, children }: PropsModal) {
   const dialogo = useRef<HTMLDialogElement>(null);
   const velo = useRef<HTMLDivElement>(null);
   const caja = useRef<HTMLFormElement>(null);
@@ -133,7 +135,7 @@ export function Modal({ titulo, descripcion, sucio = false, onCerrar, onEnviar, 
           else salir();
         }}
       />
-      <form ref={caja} className="dsx-modal__caja" data-ancho={ancho ? "" : undefined} noValidate onSubmit={(e) => void enviar(e)}>
+      <form ref={caja} className="dsx-modal__caja" data-ancho={ancho || grande ? "" : undefined} data-grande={grande ? "" : undefined} noValidate onSubmit={(e) => void enviar(e)}>
         <header className="dsx-modal__cab">
           <div>
             <h2 id={idTitulo}>{titulo}</h2>

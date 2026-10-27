@@ -1896,3 +1896,63 @@ button.dsx-chip--etq:focus-visible {
     animation: none;
   }
 }
+
+/* --- Conectar varias columnas a la vez (ConexionVarias.tsx) ------------------------- */
+
+.dsx-modal__caja[data-grande] {
+  width: min(980px, calc(100% - 24px));
+}
+
+.dsx-cv {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.dsx-cv__global {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.dsx-cv__fila {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(220px, 2fr) minmax(150px, 1fr) minmax(120px, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.dsx-cv__fila[data-estado="ok"] {
+  border-color: var(--status-done);
+}
+
+.dsx-cv__fila[data-estado="error"] {
+  border-color: var(--status-risk);
+}
+
+.dsx-cv__fila > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dsx-cv__nota {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+}
+
+.dsx-cv__prog {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 760px) {
+  .dsx-cv__fila {
+    grid-template-columns: 1fr;
+  }
+}

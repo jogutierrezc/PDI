@@ -30,6 +30,7 @@ import {
 } from "../sos";
 import type { IndicadorSos, SeccionSos } from "../tipos";
 import { parpadear } from "./movimiento";
+import { columnasDeCategoria, ConectarVariasModal, SelectorCategoria, SelectorValor } from "./ConexionVarias";
 import { AvisoSos, Campo, ErrorSos, Interruptor, textoCifra } from "./piezas";
 import { useAccesoSos, useArchivosSos, useTablaDeGraficas } from "./usos";
 
@@ -76,7 +77,11 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
   const [valor, setValor] = useState("");
   const [periodo, setPeriodo] = useState("");
   const [campus, setCampus] = useState("");
+  // Filtro por valor: la tabla mezcla varios indicadores en una columna (filtro_col y filtro_valor van juntos).
+  const [filtroCol, setFiltroCol] = useState("");
+  const [filtroValor, setFiltroValor] = useState("");
   const [mensaje, setMensaje] = useState<{ t: "ok" | "error"; texto: string } | null>(null);
+  const [varias, setVarias] = useState(false);
 
   const puede = editable && rangoDe(duenos.data?.get(id)?.mi_rol) >= 3;
   const lista = inds.data ?? [];
@@ -93,10 +98,14 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
     setValor(v?.col_valor ?? p.valor);
     setPeriodo(v?.col_periodo ?? p.periodo);
     setCampus(v ? (v.col_campus ?? "") : p.campus);
+    setFiltroCol(v?.filtro_col ?? "");
+    setFiltroValor(v?.filtro_valor ?? "");
   };
 
-  const candidato = { col_valor: valor, col_periodo: periodo, col_campus: campus || null, filtro_col: actual?.archivo_id === id ? actual.filtro_col : null };
-  const avisos = useMemo(() => (indicador && valor && periodo ? avisosDeVinculo(candidato, tabla) : []), [indicador, valor, periodo, campus, tabla]); // eslint-disable-line react-hooks/exhaustive-deps -- candidato se arma de estos mismos valores
+  const candidato = { col_valor: valor, col_periodo: periodo, col_campus: campus || null, filtro_col: filtroCol || null, filtro_valor: filtroCol ? filtroValor : null };
+  const avisos = useMemo(() => (indicador && valor && periodo ? avisosDeVinculo(candidato, tabla) : []), [indicador, valor, periodo, campus, filtroCol, tabla]);
+  // Lo que daría hoy, antes de guardar.
+  const previa = useMemo(() => (elegido && valor && periodo && !avisos.length && (!filtroCol || filtroValor) ? calcularIndicador(elegido, candidato, tabla).actual : undefined), [elegido, valor, periodo, campus, filtroCol, filtroValor, avisos.length, tabla]); // eslint-disable-line react-hooks/exhaustive-deps -- candidato se arma de estos mismos valores
   const bloqueado = Boolean(elegido?.publicado) && !administra;
   const nombreDe = (archivoId: string) => (archivos.data ?? []).find((a) => a.id === archivoId)?.nombre ?? "otra tabla";
 
@@ -110,8 +119,8 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
         col_valor: valor,
         col_periodo: periodo,
         col_campus: campus || null,
-        filtro_col: actual?.archivo_id === id ? actual.filtro_col : null,
-        filtro_valor: actual?.archivo_id === id ? actual.filtro_valor : null,
+        filtro_col: candidato.filtro_col,
+        filtro_valor: candidato.filtro_valor,
       },
       { onSuccess: () => setMensaje({ t: "ok", texto: `«${elegido.nombre}» ahora sale de esta tabla.` }), onError: (e) => setMensaje({ t: "error", texto: e.message }) },
     );
@@ -140,7 +149,10 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
               <span>{ind.publicado ? "Portal" : "Sin publicar"}</span>
             </div>
             <b>{ind.nombre}</b>
-            <span className="dsx-mono">valor «{v.col_valor}» · periodo «{v.col_periodo}»{v.col_campus ? ` · campus «${v.col_campus}»` : ""}</span>
+            <span className="dsx-mono">
+              valor «{v.col_valor}» · periodo «{v.col_periodo}»{v.col_campus ? ` · campus «${v.col_campus}»` : ""}
+              {v.filtro_col ? ` · solo filas con «${v.filtro_col}» = «${v.filtro_valor ?? ""}»` : ""}
+            </span>
             <p className="dsx-actual">
               Valor actual <ValorVivo texto={textoCifra(calc.actual?.valor, ind.decimales)} />{" "}
               <span className="dsx-tenue">
@@ -151,6 +163,11 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
             {calc.avisos.map((a) => (
               <AvisoSos key={a}>{a}</AvisoSos>
             ))}
+            {puede && !(ind.publicado && !administra) ? (
+              <button type="button" className="dsx-btn dsx-btn--sm" onClick={() => elegir(ind.id)}>
+                Editar columnas y filtro
+              </button>
+            ) : null}
             {puede && !(ind.publicado && !administra) ? (
               <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" disabled={quitar.isPending} onClick={() => quitar.mutate(ind.id, { onError: (e) => setMensaje({ t: "error", texto: e.message }) })}>
                 Quitar la conexión
@@ -213,18 +230,64 @@ export function PanelConexion({ id, tabla, editable }: { id: string; tabla: Tabl
                   </select>
                 )}
               </Campo>
+              <Interruptor
+                marcado={Boolean(filtroCol)}
+                onChange={(on) => {
+                  setFiltroCol(on ? filtroCol || columnasDeCategoria(tabla, [valor, periodo, campus])[0]?.clave || "" : "");
+                  setFiltroValor("");
+                }}
+              >
+                Esta tabla mezcla varios indicadores en una columna
+              </Interruptor>
+              {filtroCol ? (
+                <>
+                  <SelectorCategoria
+                    tabla={tabla}
+                    excluir={[valor, periodo, campus]}
+                    valor={filtroCol}
+                    onChange={(v) => {
+                      setFiltroCol(v);
+                      setFiltroValor("");
+                    }}
+                  />
+                  <SelectorValor tabla={tabla} columna={filtroCol} valor={filtroValor} onChange={setFiltroValor} />
+                </>
+              ) : null}
+              {previa !== undefined ? (
+                <p className="dsx-actual">
+                  Hoy daría <span className="dsx-valor dsx-num">{previa ? textoCifra(previa.valor, elegido?.decimales) : "—"}</span>{" "}
+                  <span className="dsx-tenue">{previa ? `${elegido?.unidad} · ${previa.anio}` : "Sin filas con valor y año para esta combinación"}</span>
+                </p>
+              ) : null}
               {actual && actual.archivo_id !== id ? <AvisoSos>Hoy sale de «{nombreDe(actual.archivo_id)}»; conectarlo aquí lo cambia.</AvisoSos> : null}
               {bloqueado ? <AvisoSos>Este indicador ya está en el portal: cambiar su tabla lo decide quien administra la unidad.</AvisoSos> : null}
               {avisos.map((a) => (
                 <AvisoSos key={a}>{a}</AvisoSos>
               ))}
-              <button type="button" className="dsx-btn dsx-btn--pri" disabled={!valor || !periodo || avisos.length > 0 || bloqueado || guardar.isPending} onClick={conectar}>
+              <button type="button" className="dsx-btn dsx-btn--pri" disabled={!valor || !periodo || avisos.length > 0 || (Boolean(filtroCol) && !filtroValor) || bloqueado || guardar.isPending} onClick={conectar}>
                 <Icon name="link" size={16} />
                 {guardar.isPending ? "Conectando…" : "Conectar"}
               </button>
             </>
           ) : null}
+          <button type="button" className="dsx-btn dsx-btn--sm dsx-btn--ghost" onClick={() => setVarias(true)}>
+            <Icon name="link" size={14} />
+            Conectar varias columnas
+          </button>
           {mensaje ? <AvisoSos tipo={mensaje.t}>{mensaje.texto}</AvisoSos> : null}
+          {varias ? (
+            <ConectarVariasModal
+              archivoId={id}
+              tabla={tabla}
+              indicadores={lista}
+              vinculos={vins.data ?? []}
+              nombreArchivo={nombreDe}
+              administra={administra}
+              propuesta={proponer(tabla)}
+              onCerrar={() => setVarias(false)}
+              onListo={(texto) => setMensaje({ t: "ok", texto })}
+            />
+          ) : null}
         </>
       ) : (
         <p className="dsx-tenue">Conectar una tabla a un indicador pide el papel Puede crear sobre ella.</p>

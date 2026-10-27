@@ -21,7 +21,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { useArchivos } from "../../udrive/datos";
 import { INDICATORS } from "../../sostenible/data";
 import { odsByNumber } from "../../sostenible/ods-data";
-import { calcularIndicador, useArchivarIndicador, useGuardarIndicador, useGuardarVinculo, useIndicadoresSos, usePublicarIndicador, useVinculos } from "../sos";
+import { calcularIndicador, codigoDe, useArchivarIndicador, useGuardarIndicador, useGuardarVinculo, useIndicadoresSos, usePublicarIndicador, useVinculos } from "../sos";
 import type { IndicadorSos, MejorSos, ResumenSos, TarjetaPortal, VinculoSos } from "../tipos";
 import { proponer } from "./Conexion";
 import { Modal } from "./Modal";
@@ -45,21 +45,6 @@ const TOPE_ETIQUETAS = 12;
 const CODIGO_OK = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
 
 const sinTildes = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-
-/** El código sale del nombre: «Árboles sembrados» → ARBOLES-SEMBRADOS; si ya existe, se le suma -2, -3… */
-function codigoDe(nombre: string, existentes: IndicadorSos[]): string {
-  const base = sinTildes(nombre)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toUpperCase()
-    .slice(0, 28)
-    .replace(/-+$/, "");
-  if (!base) return "";
-  const usados = new Set(existentes.map((i) => i.id.toLowerCase()));
-  let c = base;
-  for (let n = 2; usados.has(c.toLowerCase()); n++) c = `${base}-${n}`;
-  return c;
-}
 
 type Estado = "activos" | "conectado" | "sin-datos" | "publicado" | "archivado" | "todos";
 const ESTADOS: { id: Estado; etiqueta: string }[] = [

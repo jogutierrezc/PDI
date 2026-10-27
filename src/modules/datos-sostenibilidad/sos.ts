@@ -264,6 +264,31 @@ export function columnaSensible(c: Pick<ColumnaUd, "clave" | "etiqueta"> & { sen
   );
 }
 
+/** El código de un indicador sale del nombre: «Árboles sembrados» → ARBOLES-SEMBRADOS; si ya existe, se le suma -2, -3… */
+export function codigoDe(nombre: string, existentes: Pick<IndicadorSos, "id">[]): string {
+  const base = sinTildes(nombre)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toUpperCase()
+    .slice(0, 28)
+    .replace(/-+$/, "");
+  if (!base) return "";
+  const usados = new Set(existentes.map((i) => i.id.toLowerCase()));
+  let c = base;
+  for (let n = 2; usados.has(c.toLowerCase()); n++) c = `${base}-${n}`;
+  return c;
+}
+
+/** Los valores distintos de una columna de la tabla con su número de filas (para elegir el valor de un filtro). Vacíos fuera. */
+export function valoresDistintos(tabla: TablaDatos, clave: string): { valor: string; filas: number }[] {
+  const cuenta = new Map<string, number>();
+  for (const f of tabla.filas) {
+    const v = String(f.datos[clave] ?? "").trim();
+    if (v) cuenta.set(v, (cuenta.get(v) ?? 0) + 1);
+  }
+  return [...cuenta].map(([valor, filas]) => ({ valor, filas })).sort((a, b) => a.valor.localeCompare(b.valor, "es"));
+}
+
 const INSTITUCIONAL = new Set(["", "institucional", "universidad", "todos", "todas"]);
 
 /** Los avisos que la base rechazaría al guardar el vínculo (la base manda; esto es para avisar antes). */

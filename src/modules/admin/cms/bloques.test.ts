@@ -105,7 +105,7 @@ describe("valores de partida frente a sus campos", () => {
 
   it("un bloque vivo no trae campos que no sean texto de encabezado, salvo el selector de su micrositio", () => {
     // Los micrositios eligen con un selector (ranking o subcategoría) qué sección dibujan; no es contenido.
-    const selectores = ["ranking", "categoria"];
+    const selectores = ["ranking", "categoria", "seccion"];
     for (const def of BLOQUES.filter((b) => b.vivo)) {
       for (const campo of def.campos) {
         const permitidos = selectores.includes(campo.clave) ? ["enum"] : ["texto", "area"];

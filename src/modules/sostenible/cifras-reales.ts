@@ -1,21 +1,26 @@
 /* =============================================================================
-   UDES Sostenible · cifras reales de los libros de Datos de Sostenibilidad.
+   UDES Sostenible · cifras reales de Datos de Sostenibilidad.
 
-   Lee ds_cifras_publicas() (migración 0198): por indicador, las filas de los
-   libros en estado «listo». El portal las usa cuando existen para ese
-   indicador, campus y año, y cae al dato de muestra (data.ts) cuando no. Si la
-   función no existe (migración sin aplicar) o no hay datos, devuelve vacío y el
-   portal queda como estaba.
+   Primera fuente: sos_cifras_publicas() (migración 0202): indicadores
+   publicados con su serie ya agregada por campus y año. Los que traen `tarjeta`
+   reemplazan la cifra de muestra de esa tarjeta; los que no, salen como
+   tarjetas nuevas (useIndicadoresNuevos). Segunda fuente, mientras una tarjeta
+   no tenga vínculo nuevo: ds_cifras_publicas() (0198, libros «listo»). El
+   portal usa la cifra real si existe para ese campus y año, y cae al dato de
+   muestra (data.ts) cuando no. Si las funciones no existen (migración sin
+   aplicar) o no hay datos, devuelve vacío y el portal queda como estaba.
    ========================================================================== */
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import { CAMPUSES, YEARS } from "./data";
 import type { Campus, IndKey } from "./data";
+import type { CifraPublicaSos } from "../datos-sostenibilidad/tipos";
 
 /**
- * Equivalencia explícita entre un indicador del catálogo (ds_indicadores.id) y
- * una tarjeta del portal (IndKey). Solo se mapea lo que mide lo mismo; lo demás
+ * Equivalencia de LA SEGUNDA FUENTE (libros de 0198) entre un indicador del
+ * catálogo (ds_indicadores.id) y una tarjeta del portal (IndKey). Los vínculos
+ * nuevos (0202) no la usan: llevan la tarjeta en ds_indicadores.tarjeta. Solo se mapea lo que mide lo mismo; lo demás
  * sigue siendo de muestra hasta que haya equivalencia clara.
  *
  *   13.2 «Energía con bajas emisiones» (%)  →  solar «Energía renovable» (% del consumo)
@@ -92,21 +97,80 @@ export const seriesReal = (reales: CifrasReales, k: IndKey, campus: Campus): { y
     (p): p is { yearIndex: number; valor: number } => typeof p.valor === "number",
   );
 
+/** Un indicador publicado que no alimenta ninguna tarjeta existente: el portal le abre una tarjeta propia. */
+export interface IndicadorNuevo {
+  id: string;
+  nombre: string;
+  unidad: string;
+  decimales: number;
+  higherIsBetter: boolean;
+  /** Tope de las magnitudes en porcentaje: dibuja la barra de avance. */
+  max?: number;
+  /** Cifras reales: clave `campus|índice de año`. */
+  valores: Map<string, CifraReal>;
+}
+
+interface CifrasPortal {
+  reales: CifrasReales;
+  nuevos: IndicadorNuevo[];
+}
+
+/** Ordena lo que entrega sos_cifras_publicas(): las que traen tarjeta van a esa tarjeta; el resto, a tarjetas nuevas. */
+export function ordenarSos(lista: CifraPublicaSos[] | null | undefined): CifrasPortal {
+  const reales: CifrasReales = {};
+  const nuevos: IndicadorNuevo[] = [];
+  for (const ind of Array.isArray(lista) ? lista : []) {
+    const mapa = new Map<string, CifraReal>();
+    for (const p of Array.isArray(ind.serie) ? ind.serie : []) {
+      const campus = campusDe(p.campus);
+      const i = YEARS.findIndex((y) => y === p.anio);
+      if (!campus || i < 0 || typeof p.valor !== "number") continue;
+      mapa.set(claveDe(campus, i), { valor: p.valor, fuente: ind.fuente || null, evidencia: null });
+    }
+    if (!mapa.size) continue;
+    if (ind.tarjeta) reales[ind.tarjeta] = mapa;
+    else {
+      nuevos.push({
+        id: ind.id,
+        nombre: ind.nombre,
+        unidad: ind.unidad,
+        decimales: ind.decimales,
+        higherIsBetter: ind.mejor === "sube",
+        max: ind.unidad.includes("%") ? 100 : undefined,
+        valores: mapa,
+      });
+    }
+  }
+  return { reales, nuevos };
+}
+
 /**
- * Las cifras reales del portal. Pública (anon): la función es security definer y
- * entrega solo cifra, periodo, campus, fuente y evidencia. Cualquier fallo
- * —migración sin aplicar, sin red— es «no hay cifras reales», nunca un error.
+ * Lo que lee el portal. Pública (anon): ambas funciones son security definer y
+ * entregan solo cifras agregadas. Cualquier fallo —migración sin aplicar, sin
+ * red— es «no hay cifras reales», nunca un error.
  */
-export function useCifrasReales(): CifrasReales {
+function useCifrasPortal(): CifrasPortal {
   const q = useQuery({
     queryKey: ["sostenible", "cifras-reales"],
     staleTime: 5 * 60_000,
     retry: false,
-    queryFn: async (): Promise<CifrasReales> => {
-      const r = await supabase.rpc("ds_cifras_publicas");
-      if (r.error) return {};
-      return ordenarCifras(r.data as Record<string, CifraFila[]> | null);
+    queryFn: async (): Promise<CifrasPortal> => {
+      const nuevo = await supabase.rpc("sos_cifras_publicas");
+      const { reales, nuevos } = ordenarSos(nuevo.error ? [] : (nuevo.data as CifraPublicaSos[] | null));
+      // Segunda fuente: los libros de 0198 llenan las tarjetas que aún no tienen vínculo nuevo.
+      const viejo = await supabase.rpc("ds_cifras_publicas");
+      if (!viejo.error) {
+        const legado = ordenarCifras(viejo.data as Record<string, CifraFila[]> | null);
+        for (const k of Object.keys(legado) as IndKey[]) if (!reales[k]) reales[k] = legado[k];
+      }
+      return { reales, nuevos };
     },
   });
-  return q.data ?? {};
+  return q.data ?? { reales: {}, nuevos: [] };
 }
+
+/** Las cifras reales de las tarjetas del portal. */
+export const useCifrasReales = (): CifrasReales => useCifrasPortal().reales;
+
+/** Los indicadores publicados que no tienen tarjeta propia en el portal. */
+export const useIndicadoresNuevos = (): IndicadorNuevo[] => useCifrasPortal().nuevos;

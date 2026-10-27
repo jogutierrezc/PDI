@@ -57,17 +57,22 @@ Todo lo que depende de una oficina recibe `oficina` (uuid de `units`). Sin la mi
 
 **Lógica pura** (`lib/`): `indicadores.ts` (`SLOTS`, `INDICADORES_DS`, `autoMap` — propone el mapa con solo ver las columnas —, `faltanDelMapa`, `coberturaDelMapa`), `permisos.ts`. La validación de celdas, la lectura de valores y la inferencia de columnas desde un Excel son las de `programas-en-cifras/lib/{validacion,inferencia}.ts`, reutilizadas.
 
-## Las pantallas (paquete 2)
+## Las pantallas (paquete H, 0202)
 
-`/admin/datos-sostenibilidad`, con entrada en el lanzador y en el menú (`AdminShell`). Pertenecer a `ds_miembros` es el permiso (`inDatosSostenibilidad` en `lib/auth.tsx`).
+`/admin/datos-sostenibilidad/:vista?/:id?`, con entrada en el lanzador y en el menú (`AdminShell`). Entra quien tiene la pantalla habilitada (`sos_entra()`), Planeación y la administración. **Las pantallas de libros por oficina (0178) se retiraron**; las tablas `ds_*` y `ds_cifras_publicas()` siguen en la base, intactas, y `datos.ts` conserva sus hooks de libros sin uso desde la interfaz (candidatos a borrar cuando se decida dar de baja el modelo de 0178).
 
-| Pantalla | Qué hace |
+| Ruta | Qué hace |
 |---|---|
-| `DatosSostenibilidad.tsx` | El shell: selector de oficina (`useYo`), riel con Libros y Equipo, banner de Planeación observador, aviso de migración pendiente. La oficina y el libro abierto viajan en la dirección (`?oficina=…&libro=…`). |
-| `ExploradorLibros.tsx` | Carpetas como pestañas (las fijas y las propias), libros con filas, errores, estado y a qué indicadores responden; marcar listo, volver a borrador, borrar; nueva carpeta. |
-| `AsistenteLibro.tsx` | «Nuevo libro»: en blanco (columnas a mano) o subiendo un Excel/CSV — `leerArchivoEnNavegador` + `columnasDesdeMatriz` de pc proponen columnas con tipo y filas. Nada sale del navegador hasta Crear. |
-| `EditorLibro.tsx` | Tres pestañas: **Filas** (grilla de celdas tipadas, errores pintados, «siguiente error», pegar desde Excel con o sin reemplazo, guardar por lotes), **Columnas** (añadir, tipo, obligatoria, opciones; la clave de una existente no se toca), **Responde a** (conectar el libro a un indicador con `autoMap`, ver lo que falta, desconectar). |
-| `EquipoOficina.tsx` | El equipo de la oficina: añadir gestor o colaborador del directorio de la intranet, quitar. Del gestor o de la administración. |
+| `/admin/datos-sostenibilidad` | **Archivos**: el `Explorador` de UDrive acotado a la unidad «Datos de Sostenibilidad», en el marco de la intranet (`incrustado`: sin la barra y el riel de pantalla completa). Carpetas, búsqueda, «Nuevo» (tabla, gráfica, cruce, Excel/CSV, carpeta) y, en el detalle de cada archivo, «Dónde se usa» y «Quién la ve». |
+| `/indicadores` | **Indicadores**: el catálogo agrupado por ODS, de qué tabla y columna sale cada uno, último dato y avance a la meta. Crear, editar y publicar: administración y Administra de la unidad; el resto lo ve en solo lectura. |
+| `/portal` | **Portal de sostenibilidad**: recorrido tabla → gráfica → indicador → portal, un campus a elegir, vista previa de `/sostenible` calculada en el cliente con `calcularIndicador` y los componentes reales del portal (`TileCuerpo`, `GraficasPublicadas`), «Qué se publica» (interruptores) y «Revisión antes de publicar». |
+| `/tabla/:id`, `/grafica/:id`, `/cruce/:id` | Los editores de UDrive a pantalla completa, por rutas propias (la ruta `/admin/udrive` pide la pantalla «udrive»). Se vuelve con «← Archivos». El editor de tablas suma el panel **Conectar a un indicador** (`PanelConexion`, con el valor actual que parpadea al editar una celda); el de gráficas, **Publicar en el portal** (`PanelPublicar`: interruptor y sección del Observatorio). Quien no puede editar los ve en solo lectura. |
+
+Cómo se montan: `udrive/ui/contexto.tsx` (`ProveedorDrive`) le dice al explorador y a los editores de UDrive su ruta base, a dónde volver, si van incrustados y qué paneles extra mostrar; sin proveedor son el UDrive de siempre. Archivos del módulo: `ui/DatosSostenibilidad.tsx` (rutas y marco), `Conexion.tsx` (paneles y «Dónde se usa»), `Indicadores.tsx`, `Portal.tsx`, `usos.ts` (unidad, tablas y gráficas), `piezas.tsx`, `movimiento.ts` (GSAP: entradas ≤ 240 ms, escalonado de 30 ms hasta 9, parpadeo verde, barras y líneas que se dibujan al abrir; nada por teclado; movimiento reducido = fundidos cortos) y `datos-sostenibilidad.css`.
+
+Sin la migración 0202 las consultas fallan con `FaltaMigracion`: cada sección muestra el aviso (`ErrorSos`) y nada más; el portal público no cambia. Sin la unidad sembrada, la pantalla dice que no la encuentra.
+
+**Gráficas en el portal**: `sostenible/GraficasSostenibles.tsx` dibuja `sos_graficas_publicas()` (barras y líneas, globo por ratón y teclado) agrupadas por sección. Aparecen en la página de respaldo (`SostenibleHome`, solo si hay publicadas) y en el bloque del CMS «Gráficas de sostenibilidad» (grupo «Datos en vivo», campo opcional de sección).
 
 ## El portal lee los libros (paquete B, migración 0198)
 
@@ -89,3 +94,48 @@ Sección **Indicadores** en el riel de `/admin/datos-sostenibilidad`, visible so
 - La equivalencia `13.2 → solar` es aproximada (bajas emisiones no es lo mismo que renovable); si UDES Verde prefiere no mapearla, se quita de `IND_DE_DS`.
 - Las tarjetas del portal (energía, agua, residuos…) no tienen indicador en el catálogo; la administración debe crearlos y mapearlos para que dejen de ser de muestra.
 - Las oficinas son unidades del organigrama (`units`): UDES Verde y Planeación Institucional tienen que existir como unidades; las crea la administración en Mis Tableros.
+
+# Datos de Sostenibilidad «al estilo UDrive» (0202)
+
+El módulo pasa de «libros por oficina» a trabajar sobre **UDrive**: una unidad de trabajo sembrada («Datos de Sostenibilidad», carpetas Energía y clima, Agua, Residuos, Campus verde) donde carpetas, tablas y gráficas son libres. Migración `supabase/migrations/0202_sostenibilidad_estilo_udrive.sql` (requiere 0178, 0198, 0187, 0188, 0191, 0195). Lo viejo (`ds_libros`…) sigue en la base; su interfaz ya se retiró. Los porqués de seguridad están en la cabecera de la migración.
+
+## Reglas
+- **Ver**: toda persona que pasa `sos_entra()` (pantalla `datos-sostenibilidad` habilitada, o en `ds_miembros`, o Planeación/administración) recibe al menos **Solo ver** en la unidad (`drive_unidades.lectura_abierta`), sin ser miembro. Ve todas las carpetas, tablas y gráficas.
+- **Editar**: quien tenga papel en `drive_unidad_miembros` (Solo ver / Editar / Crear / Administra, los de 0191). La administración general administra siempre.
+- **Catálogo de indicadores**: crear/editar y marcar publicado = administración o **Administra** en la unidad. Publicar exige un vínculo válido.
+- **Vincular** una tabla a un indicador y **publicar una gráfica**: papel **Crear** o más sobre el archivo (si el indicador ya está publicado, cambiar su vínculo pide Administra).
+- **Público**: solo indicadores y gráficas publicados, con datos agregados y solo las columnas que usan. Las tablas crudas no salen. Una tabla con columna sensible (marca `sensible: true` o nombre típico de dato personal) no se publica; las gráficas de dispersión y burbujas tampoco, ni tablas de más de 500 filas.
+- **Qué valida la base** (SQL sobre el jsonb de UDrive): archivo tipo `tabla` de la unidad, columnas existentes, columna del valor `numero|porcentaje`, columnas no sensibles. **Qué no puede**: si una columna de texto libre cuela datos personales (revisión humana), ni cambios posteriores a la tabla (el RPC público los vuelve a comprobar y omite lo que ya no vale).
+
+## Contrato para las pantallas
+
+Todo en `sos.ts` (hooks) y `tipos.ts` (tipos). Sin la migración, las consultas fallan con `FaltaMigracion` (`esFaltaMigracion`). Las tablas y gráficas en sí se leen/editan con UDrive (`../udrive/datos.ts`: `useContenido(id)`, `useArchivos()`, `useCarpetas()`, `useGuardarContenido()`…; la unidad con `drive_unidades_listar()` y su `mi_rol`).
+
+**Tablas nuevas**
+- `ds_indicadores` (ampliada): `id, ods, nombre, descripcion, unidad, position` + `mejor 'sube'|'baja'`, `resumen 'promedio'|'suma'|'ultimo'`, `meta numeric|null`, `decimales 0..3`, `publicado bool`, `tarjeta` (`energia|solar|agua|residuos|verde|arboles|movil|volunt`, única, `null` = tarjeta nueva), `nota`. Los 4 indicadores de 0178 quedan con valores por defecto y sin publicar.
+- `sos_vinculos` (uno por indicador): `id, indicador_id, archivo_id, col_valor, col_periodo, col_campus|null, filtro_col|null, filtro_valor|null`. `col_*` son las `clave` de las columnas de la tabla de UDrive.
+- `sos_publicaciones` (por gráfica): `archivo_id, seccion ('panorama'|'tendencia'|'composicion'|'territorio'|'detalle'), orden, publicado, por, en`.
+
+**Hooks** (react-query)
+| Hook | Devuelve / hace |
+|---|---|
+| `useIndicadoresSos()` | `IndicadorSos[]` (catálogo con los campos de 0202) |
+| `useGuardarIndicador()` | `mutate(IndicadorSos sin publicado)` crea/edita (upsert por `id`); no toca `publicado` |
+| `usePublicarIndicador()` | `mutate({ id, publicado })`; Administra; rechaza si no hay vínculo |
+| `useVinculos()` | `VinculoSos[]` |
+| `useGuardarVinculo()` | `mutate(VinculoSosEntrada)` upsert por `indicador_id`; la base valida tabla/columnas y devuelve el motivo en español |
+| `useQuitarVinculo()` | `mutate(indicadorId)`; si era el último vínculo de un indicador publicado, lo despublica |
+| `usePublicacionesGraficas()` | `PublicacionSos[]` |
+| `usePublicarGrafica()` | `mutate({ archivo_id, publicado, seccion?, orden? })` |
+| `useCifrasPublicas()` | `CifraPublicaSos[]` lo que ve hoy el público (sin error: sin migración, `[]`) |
+| `useGraficasPublicas()` | `GraficaPublicaSos[]` ídem |
+
+**Lógica pura** (para la vista previa del portal sin ir a la base)
+- `calcularIndicador(ind, vinculo, tabla, campus = null)` → `IndicadorCalculado { serie, actual, previo, meta, cambioPct, mejora, avanceMeta, avisos }`. `ind` = `{ resumen, meta, mejor }`; `tabla` = `TablaDatos` de UDrive (`{ columnas, filas }`); `campus` nulo o «Todos» = institucional. Replica `sos_cifras_publicas()`: año = primer número de cuatro cifras del periodo; resumen por campus y año; si hay campus pero no fila institucional, «Todos» se calcula con todos los campus.
+- `agregarSerie(ind, vinculo, tabla)` → `PuntoSerieSos[]` (todas las series). `avisosDeVinculo(vinculo, tabla)` y `columnaSensible(col)` avisan antes de que la base rechace.
+
+**RPC públicas** (anon y authenticated, `SECURITY DEFINER`)
+- `sos_cifras_publicas()` → `[{ id, ods, nombre, unidad, mejor, meta, tarjeta, decimales, nota, resumen, fuente (nombre del archivo), serie: [{ campus|null, anio, periodo, valor }] }]`.
+- `sos_graficas_publicas()` → `[{ id, nombre, seccion, orden, fuente, actualizado, config (tipo, titulo, nota, x, series, tamano, filaCalor, ejeX, ejeY, ejeY2, min, max, tendencia, rotular), columnas: [{ clave, etiqueta, tipo }], filas: [{ <clave>: valor }] }]`.
+
+**Portal**: `sostenible/cifras-reales.ts` lee `sos_cifras_publicas()` y, mientras una tarjeta no tenga vínculo nuevo, `ds_cifras_publicas()` (0198). Con `tarjeta` reemplaza la cifra de muestra; sin ella, `IndicatorBoard nuevos` (Inicio y CMS) añade una tarjeta propia solo si hay cifra real para el campus y año elegidos. `sos_graficas_publicas()` se pinta con `sostenible/GraficasSostenibles.tsx` (página de respaldo y bloque `graficas-sostenibles` del CMS).

@@ -130,3 +130,107 @@ export interface DsActividad {
 }
 
 export type { ErrorCelda, PcValor } from "../programas-en-cifras/tipos";
+
+/* ---------- «Al estilo UDrive» (migración 0202) ----------------------------------------------
+   Los indicadores se vinculan a tablas de la unidad de UDrive «Datos de Sostenibilidad»; las
+   gráficas de esa unidad se publican por sección del Observatorio. Contrato en README.md. */
+
+/** Claves de las tarjetas del portal (IndKey en sostenible/data.ts). */
+export type TarjetaPortal = "energia" | "solar" | "agua" | "residuos" | "verde" | "arboles" | "movil" | "volunt";
+
+export type MejorSos = "sube" | "baja";
+export type ResumenSos = "promedio" | "suma" | "ultimo";
+
+/** Un indicador del catálogo con lo que 0202 le añade. */
+export interface IndicadorSos extends DsIndicador {
+  mejor: MejorSos;
+  resumen: ResumenSos;
+  meta: number | null;
+  decimales: number;
+  publicado: boolean;
+  /** Tarjeta del portal que alimenta; nulo si es nuevo y sale como tarjeta propia. */
+  tarjeta: TarjetaPortal | null;
+  nota: string;
+}
+
+/** De qué tabla de UDrive y de qué columnas sale un indicador (sos_vinculos; uno por indicador). */
+export interface VinculoSos {
+  id: string;
+  indicador_id: string;
+  archivo_id: string;
+  col_valor: string;
+  col_periodo: string;
+  col_campus: string | null;
+  filtro_col: string | null;
+  filtro_valor: string | null;
+}
+
+/** Lo que la pantalla manda al guardar un vínculo (sin id). */
+export type VinculoSosEntrada = Omit<VinculoSos, "id">;
+
+export type SeccionSos = "panorama" | "tendencia" | "composicion" | "territorio" | "detalle";
+
+/** Una gráfica marcada (o desmarcada) para el portal (sos_publicaciones). */
+export interface PublicacionSos {
+  archivo_id: string;
+  seccion: SeccionSos;
+  orden: number;
+  publicado: boolean;
+  por: string | null;
+  en: string;
+}
+
+/** Un punto de la serie agregada. `campus` nulo es la cifra institucional («Todos»). */
+export interface PuntoSerieSos {
+  campus: string | null;
+  anio: number;
+  periodo: string | null;
+  valor: number;
+}
+
+/** Un indicador publicado tal como lo entrega sos_cifras_publicas(). */
+export interface CifraPublicaSos {
+  id: string;
+  ods: number;
+  nombre: string;
+  unidad: string;
+  mejor: MejorSos;
+  meta: number | null;
+  tarjeta: TarjetaPortal | null;
+  decimales: number;
+  nota: string;
+  resumen: ResumenSos;
+  /** Nombre del archivo de UDrive del que sale. */
+  fuente: string;
+  serie: PuntoSerieSos[];
+}
+
+/** Una gráfica publicada tal como la entrega sos_graficas_publicas(): config mínima y solo sus columnas. */
+export interface GraficaPublicaSos {
+  id: string;
+  nombre: string;
+  seccion: SeccionSos;
+  orden: number;
+  fuente: string;
+  actualizado: string;
+  config: Partial<import("../udrive/tipos").ConfigGrafica>;
+  columnas: { clave: string; etiqueta: string; tipo: string }[];
+  filas: Record<string, string | number | null>[];
+}
+
+/** Lo que la vista previa del portal necesita de un indicador calculado en el cliente. */
+export interface IndicadorCalculado {
+  /** Serie del campus pedido, por año. */
+  serie: PuntoSerieSos[];
+  actual: PuntoSerieSos | null;
+  previo: PuntoSerieSos | null;
+  meta: number | null;
+  /** Cambio porcentual frente al año previo; nulo si no hay previo o es cero. */
+  cambioPct: number | null;
+  /** ¿El cambio es para bien según `mejor`? Nulo si no hay cambio. */
+  mejora: boolean | null;
+  /** Avance hacia la meta (0 a 1+) si hay meta y valor. */
+  avanceMeta: number | null;
+  /** Lo que el RPC omitiría o rechazaría (columna inexistente, no numérica, sensible…). */
+  avisos: string[];
+}

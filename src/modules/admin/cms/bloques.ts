@@ -1189,6 +1189,31 @@ export const BLOQUES: DefinicionBloque[] = [
     }),
   },
   {
+    tipo: "graficas-sostenibles",
+    nombre: "Gráficas de sostenibilidad",
+    ayuda: "Las gráficas publicadas desde Datos de Sostenibilidad. Elija una sección del Observatorio o deje todas",
+    grupo: "Datos en vivo",
+    movimiento: "sube",
+    vivo: true,
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: false })),
+      {
+        clave: "seccion",
+        etiqueta: "Sección del Observatorio (opcional)",
+        tipo: "enum",
+        opciones: [
+          { valor: "", etiqueta: "Todas las secciones" },
+          { valor: "panorama", etiqueta: "Panorama" },
+          { valor: "tendencia", etiqueta: "Tendencia" },
+          { valor: "composicion", etiqueta: "Composición" },
+          { valor: "territorio", etiqueta: "Territorio" },
+          { valor: "detalle", etiqueta: "Detalle" },
+        ],
+      },
+    ],
+    valores: () => ({ antetitulo: "Datos abiertos", titulo: "Las gráficas de los campus", texto: "", seccion: "" }),
+  },
+  {
     tipo: "avance-plan",
     nombre: "Avance del plan",
     ayuda: "Anillo con el avance global del PDI y sus cifras de seguimiento",

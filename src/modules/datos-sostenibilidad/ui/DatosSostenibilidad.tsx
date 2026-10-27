@@ -1,152 +1,124 @@
 /* =============================================================================
    Datos de Sostenibilidad · la pantalla (/admin/datos-sostenibilidad).
 
-   Como Mis Tableros y el resto de la intranet, no como Programas en Cifras
-   (que vive en su marco de pantalla completa): aquí se entra por el lanzador,
-   se elige la oficina —UDES Verde, Planeación Institucional…— y se trabaja en
-   tres secciones: los libros de datos, el equipo y (solo la administración) el
-   catálogo de indicadores. Pertenecer a ds_miembros
-   (0178) es el permiso; Planeación observa sin editar.
+   Los datos de sostenibilidad viven en UDrive, en la unidad de trabajo «Datos
+   de Sostenibilidad», abierta a todas las personas con acceso a la pantalla:
+   todas ven, edita quien tiene papel en la unidad. Tres secciones dentro del
+   marco de la intranet (AdminShell):
+
+     /admin/datos-sostenibilidad                 Archivos: el explorador de UDrive acotado a la unidad
+     /admin/datos-sostenibilidad/indicadores     el catálogo de indicadores y de dónde sale cada uno
+     /admin/datos-sostenibilidad/portal          qué se publica y la vista previa de /sostenible
+
+   Abrir una tabla, una gráfica o un cruce usa los editores de UDrive, pero por
+   rutas propias, para no sacar a nadie de aquí ni pedirle la pantalla UDrive:
+
+     /admin/datos-sostenibilidad/tabla/:id       /grafica/:id       /cruce/:id
+
+   Allí los editores traen un panel más: «Conectar a un indicador» (tabla) y
+   «Publicar en el portal» (gráfica). Se vuelve con «← Archivos».
    ========================================================================== */
 
 import { useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { AdminRail, AdminRailTab, AdminShell } from "../../admin/components/AdminShell";
-import { Icon } from "../../../components/ui/Icon";
-import { useAuth } from "../../../lib/auth";
-import { ErrorBlock } from "../../../components/ui/QueryState";
-import { esFaltaMigracion, useYo } from "../datos";
-import { esMiembro, puedeRepartir, rolEn } from "../lib/permisos";
-import type { DsOficina } from "../tipos";
-import { ExploradorLibros } from "./ExploradorLibros";
-import { EditorLibro } from "./EditorLibro";
-import { EquipoOficina } from "./EquipoOficina";
-import { CatalogoIndicadores } from "./CatalogoIndicadores";
+import { EditorCruce } from "../../udrive/ui/EditorCruce";
+import { EditorGrafica } from "../../udrive/ui/EditorGrafica";
+import { EditorTabla } from "../../udrive/ui/EditorTabla";
+import { Explorador } from "../../udrive/ui/Explorador";
+import { ProveedorDrive } from "../../udrive/ui/contexto";
+import type { ContextoDrive } from "../../udrive/ui/contexto";
+import { DondeSeUsa, PanelConexion, PanelPublicar } from "./Conexion";
+import { Indicadores } from "./Indicadores";
+import { Portal } from "./Portal";
+import { AvisoSos, ErrorSos } from "./piezas";
+import { useAccesoSos } from "./usos";
 import "../../admin/udes-en-cifras/od-admin.css";
 import "./datos-sostenibilidad.css";
 
-type Seccion = "libros" | "equipo" | "catalogo";
+const BASE = "/admin/datos-sostenibilidad";
+type Seccion = "archivos" | "indicadores" | "portal";
 
 export function DatosSostenibilidad() {
-  const yo = useYo();
-  const [params, setParams] = useSearchParams();
-  const seccion = (params.get("seccion") as Seccion | null) ?? "libros";
-  const { hasRole } = useAuth();
-  const admin = hasRole("admin");
+  const { vista, id } = useParams();
+  const navigate = useNavigate();
+  const acceso = useAccesoSos();
+  const raiz = acceso.unidad?.carpeta_raiz;
 
-  const oficinas = yo.data?.oficinas ?? [];
-  const actual = useMemo(
-    () => oficinas.find((o) => o.oficina_id === params.get("oficina")) ?? oficinas[0] ?? null,
-    [oficinas, params],
+  // Lo que se suma a UDrive dentro de esta pantalla: rutas propias y los paneles de Sostenibilidad.
+  const contexto = useMemo<ContextoDrive>(
+    () => ({
+      base: BASE,
+      volver: "Archivos",
+      incrustado: true,
+      extraTabla: (a) => <PanelConexion id={a.id} tabla={a.tabla} editable={a.editable} />,
+      extraGrafica: (a) => <PanelPublicar id={a.id} editable={a.editable} />,
+      detalleExtra: (a) => (raiz ? <DondeSeUsa archivo={a.archivo} raiz={raiz} /> : null),
+    }),
+    [raiz],
   );
 
-  const setQuery = (entries: Record<string, string | null>) => {
-    const next = new URLSearchParams(params);
-    for (const [k, v] of Object.entries(entries)) {
-      if (v) next.set(k, v);
-      else next.delete(k);
-    }
-    setParams(next, { replace: true });
-  };
-
-  if (yo.isPending) {
+  // Los editores van a pantalla completa, como en UDrive, pero por nuestras rutas.
+  if (id && (vista === "tabla" || vista === "grafica" || vista === "cruce")) {
     return (
-      <AdminShell section="datos-sostenibilidad" kicker="Datos de Sostenibilidad" title="Cargando…" description="">
-        <p className="admin-loading">Buscando sus oficinas…</p>
-      </AdminShell>
-    );
-  }
-  if (yo.error) {
-    return (
-      <AdminShell section="datos-sostenibilidad" kicker="Datos de Sostenibilidad" title="Datos de Sostenibilidad" description="">
-        {esFaltaMigracion(yo.error) ? (
-          <p className="oda-banner" role="alert">
-            <Icon name="alert" size={16} /> {yo.error.message}
-          </p>
-        ) : (
-          <ErrorBlock error={yo.error} onRetry={() => void yo.refetch()} />
-        )}
-      </AdminShell>
-    );
-  }
-  if (!yo.data || !esMiembro(yo.data)) {
-    return (
-      <AdminShell section="datos-sostenibilidad" kicker="Datos de Sostenibilidad" title="Sin oficina asignada" description="">
-        <p className="tb-prose">
-          Todavía no tiene una oficina asignada. Pídale a la administración de la intranet que lo nombre gestor o
-          colaborador de una oficina en Datos de Sostenibilidad.
-        </p>
-        <Link to="/admin" className="button-secondary">
-          Volver a la intranet
-        </Link>
-      </AdminShell>
-    );
-  }
-  if (!actual) {
-    return (
-      <AdminShell section="datos-sostenibilidad" kicker="Datos de Sostenibilidad" title="Sin oficinas" description="">
-        <p className="tb-prose">No hay oficinas en el organigrama todavía.</p>
-      </AdminShell>
+      <ProveedorDrive value={contexto}>
+        {vista === "tabla" ? <EditorTabla key={id} id={id} /> : vista === "grafica" ? <EditorGrafica key={id} id={id} /> : <EditorCruce key={id} id={id} />}
+      </ProveedorDrive>
     );
   }
 
-  const rol = rolEn(yo.data, actual.oficina_id);
-  const reparte = puedeRepartir(yo.data, actual.oficina_id, admin);
-  const libroAbierto = params.get("libro");
+  const seccion: Seccion = vista === "indicadores" || vista === "portal" ? vista : "archivos";
+  const ir = (s: Seccion) => navigate(s === "archivos" ? BASE : `${BASE}/${s}`);
 
   return (
     <AdminShell
       section="datos-sostenibilidad"
       kicker="Datos de Sostenibilidad"
-      title={libroAbierto ? "Libro de datos" : actual.oficina}
-      description={`Libros de datos conectados a los indicadores de sostenibilidad · ${actual.codigo}`}
+      title={seccion === "indicadores" ? "Indicadores" : seccion === "portal" ? "Portal de sostenibilidad" : "Archivos"}
+      description="Tablas y gráficas abiertas a toda la comunidad de la intranet, conectadas a los indicadores de UDES Sostenible."
       rail={
         <AdminRail label="Secciones">
-          <AdminRailTab current={seccion === "libros"} onSelect={() => setQuery({ seccion: null, libro: null })}>
-            Libros
+          <AdminRailTab current={seccion === "archivos"} onSelect={() => ir("archivos")}>
+            Archivos
           </AdminRailTab>
-          {reparte && (
-            <AdminRailTab current={seccion === "equipo"} onSelect={() => setQuery({ seccion: "equipo", libro: null })}>
-              Equipo
-            </AdminRailTab>
-          )}
-          {admin && (
-            <AdminRailTab current={seccion === "catalogo"} onSelect={() => setQuery({ seccion: "catalogo", libro: null })}>
-              Indicadores
-            </AdminRailTab>
-          )}
+          <AdminRailTab current={seccion === "indicadores"} onSelect={() => ir("indicadores")}>
+            Indicadores
+          </AdminRailTab>
+          <AdminRailTab current={seccion === "portal"} onSelect={() => ir("portal")}>
+            Portal de sostenibilidad
+          </AdminRailTab>
         </AdminRail>
       }
-      actions={
-        oficinas.length > 1 ? (
-          <label className="ds-oficina">
-            <span className="sr-only">Oficina</span>
-            <select value={actual.oficina_id} onChange={(e) => setQuery({ oficina: e.target.value, libro: null })}>
-              {oficinas.map((o: DsOficina) => (
-                <option key={o.oficina_id} value={o.oficina_id}>
-                  {o.oficina} · {o.rol}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null
-      }
     >
-      {rol === "planeacion" && (
-        <p className="oda-banner" role="note">
-          <Icon name="eye" size={16} /> Entra como Planeación: lee los libros de cualquier oficina, pero editarlos es
-          de su gente.
-        </p>
-      )}
-
-      {seccion === "catalogo" && admin ? (
-        <CatalogoIndicadores />
-      ) : seccion === "equipo" ? (
-        <EquipoOficina oficina={actual} />
-      ) : libroAbierto ? (
-        <EditorLibro yo={yo.data!} oficina={actual} libroId={libroAbierto} onCerrar={() => setQuery({ libro: null })} />
+      {acceso.unidades.isPending ? (
+        <p className="admin-loading">Buscando la unidad de Datos de Sostenibilidad…</p>
+      ) : acceso.unidades.error ? (
+        <ErrorSos error={acceso.unidades.error} />
+      ) : !acceso.unidad ? (
+        <AvisoSos>
+          No encuentro la unidad «Datos de Sostenibilidad» de UDrive. Falta aplicar la migración 0202 o su cuenta no tiene acceso a ella.
+        </AvisoSos>
+      ) : seccion === "indicadores" ? (
+        <Indicadores acceso={acceso} />
+      ) : seccion === "portal" ? (
+        <Portal acceso={acceso} />
       ) : (
-        <ExploradorLibros yo={yo.data!} oficina={actual} onAbrir={(libro) => setQuery({ libro })} />
+        <ProveedorDrive value={contexto}>
+          <div className="dsx-archivos">
+            <Explorador
+              key={acceso.unidad.id}
+              unidad={{
+                id: acceso.unidad.id,
+                nombre: acceso.unidad.nombre,
+                raiz: acceso.unidad.carpeta_raiz,
+                rango: ({ lector: 1, editor: 2, creador: 3, admin: 4 } as const)[acceso.unidad.mi_rol],
+                uso: acceso.unidad.uso_bytes,
+                cuota: acceso.unidad.cuota_bytes,
+                archivada: Boolean(acceso.unidad.archivada_en),
+              }}
+            />
+          </div>
+        </ProveedorDrive>
       )}
     </AdminShell>
   );

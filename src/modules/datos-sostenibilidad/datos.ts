@@ -15,14 +15,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import { FaltaMigracion } from "../rankings/noticias";
-import { INDICADORES_DS } from "./lib/indicadores";
 import type {
   DsActividad,
   DsCarpeta,
   DsColumna,
   DsErrorCelda,
   DsFila,
-  DsIndicador,
   DsLibro,
   DsMiembro,
   DsResumenLibro,
@@ -99,38 +97,6 @@ export function useYo() {
       const yo = await rpc<DsYo>("ds_yo", {});
       return { planeacion: Boolean(yo?.planeacion), oficinas: yo?.oficinas ?? [] };
     },
-  });
-}
-
-/** El catálogo de indicadores. Si la base no está aplicada, cae a la semilla local. */
-export function useIndicadores() {
-  return useQuery({
-    queryKey: dsKeys.indicadores,
-    queryFn: async (): Promise<DsIndicador[]> => {
-      const r = await supabase.from("ds_indicadores").select("id,ods,nombre,descripcion,unidad,position").order("ods").order("position");
-      if (r.error) {
-        if (noExiste(r.error)) return INDICADORES_DS;
-        throw errorDe(r.error);
-      }
-      return (r.data ?? []) as DsIndicador[];
-    },
-  });
-}
-
-/** Crea o edita un indicador del catálogo (solo la administración: lo hace cumplir la RLS de 0178). */
-export function useGuardarIndicador() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (i: DsIndicador) => {
-      const r = await supabase
-        .from("ds_indicadores")
-        .upsert({ id: i.id.trim(), ods: i.ods, nombre: i.nombre.trim(), descripcion: i.descripcion.trim(), unidad: i.unidad.trim(), position: i.position }, { onConflict: "id" })
-        .select("id")
-        .single();
-      if (r.error) throw errorDe(r.error);
-      return r.data;
-    },
-    onSuccess: () => void client.invalidateQueries({ queryKey: dsKeys.indicadores }),
   });
 }
 

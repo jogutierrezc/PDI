@@ -14,8 +14,9 @@ import { useGSAP } from "@gsap/react";
 import { Modal } from "../../components/ui/Modal";
 import { CAMPUSES, INDICATORS, SDG, YEARS, fmt, indicatorChange, indicatorValue } from "./data";
 import type { Campus, IndKey } from "./data";
-import { cifraReal, seriesReal, useCifrasReales } from "./cifras-reales";
-import type { CifrasReales } from "./cifras-reales";
+import { cifraReal, seriesReal, useCifrasReales, useIndicadoresNuevos } from "./cifras-reales";
+import type { IndicadorNuevo } from "./cifras-reales";
+import type { CifraReal, CifrasReales } from "./cifras-reales";
 
 gsap.registerPlugin(useGSAP);
 
@@ -183,38 +184,43 @@ function Spark({ values }: { values: number[] }) {
   );
 }
 
-/** La tarjeta usa la cifra real del campus y año elegidos si existe; si no, la de muestra (y lo dice). */
-function Tile({ k, campus, yearIndex, reales }: { k: IndKey; campus: Campus; yearIndex: number; reales: CifrasReales }) {
-  const ind = INDICATORS[k];
-  const real = cifraReal(reales, k, campus, yearIndex);
-  const puntos = seriesReal(reales, k, campus);
-  const sample = YEARS.map((_, i) => indicatorValue(k, campus, i));
-  const series = real ? puntos.map((p) => p.valor) : sample;
-  const value = real ? real.valor : sample[yearIndex];
-  // Con cifra real, el cambio es frente a la primera edición que tenga cifra real.
-  const first = real ? puntos[0].valor : 0;
-  const pct = real ? (first ? ((value - first) / first) * 100 : 0) : indicatorChange(k, campus, yearIndex).pct;
-  const good = real ? (ind.higherIsBetter ? pct >= 0 : pct <= 0) : indicatorChange(k, campus, yearIndex).good;
-  const desde = real ? YEARS[puntos[0].yearIndex] : YEARS[0];
-  const bar = ind.max ? Math.min(100, (value / ind.max) * 100) : null;
+/** Lo que una tarjeta necesita para dibujarse; la arman Tile (tarjeta del portal) y TileNuevo (indicador sin tarjeta). */
+export interface TileDatos {
+  name: string;
+  unit: string;
+  decimals: number;
+  value: number;
+  series: number[];
+  pct: number;
+  good: boolean;
+  desde: number;
+  /** Porcentaje de la barra de avance, si la magnitud es un porcentaje. */
+  bar: number | null;
+  real: CifraReal | undefined;
+  /** Con cifra real y un solo punto no hay cambio que mostrar. */
+  sinCambio: boolean;
+}
+
+export function TileCuerpo({ d }: { d: TileDatos }) {
+  const { real } = d;
   return (
     <div className="sos-tile" data-real={real ? "si" : "no"}>
-      <span className="sos-tile__name">{ind.name}</span>
+      <span className="sos-tile__name">{d.name}</span>
       <span className="sos-tile__value">
-        <Num value={value} decimals={ind.decimals} />
-        <small>{ind.unit}</small>
+        <Num value={d.value} decimals={d.decimals} />
+        <small>{d.unit}</small>
       </span>
-      {real && puntos.length < 2 ? null : (
-        <span className="sos-delta" data-good={good}>
-          {pct >= 0 ? "▲" : "▼"} {fmt(Math.abs(pct))}% desde {desde}
+      {d.sinCambio ? null : (
+        <span className="sos-delta" data-good={d.good}>
+          {d.pct >= 0 ? "▲" : "▼"} {fmt(Math.abs(d.pct))}% desde {d.desde}
         </span>
       )}
-      {bar !== null && (
+      {d.bar !== null && (
         <div className="sos-bar" aria-hidden="true">
-          <i style={{ width: `${bar}%` }} />
+          <i style={{ width: `${d.bar}%` }} />
         </div>
       )}
-      {series.length > 1 && <Spark values={series} />}
+      {d.series.length > 1 && <Spark values={d.series} />}
       {real ? (
         (real.fuente || real.evidencia) && (
           <small className="sos-tile__src">
@@ -236,6 +242,39 @@ function Tile({ k, campus, yearIndex, reales }: { k: IndKey; campus: Campus; yea
   );
 }
 
+/** La tarjeta usa la cifra real del campus y año elegidos si existe; si no, la de muestra (y lo dice). */
+function Tile({ k, campus, yearIndex, reales }: { k: IndKey; campus: Campus; yearIndex: number; reales: CifrasReales }) {
+  const ind = INDICATORS[k];
+  const real = cifraReal(reales, k, campus, yearIndex);
+  const puntos = seriesReal(reales, k, campus);
+  const sample = YEARS.map((_, i) => indicatorValue(k, campus, i));
+  const series = real ? puntos.map((p) => p.valor) : sample;
+  const value = real ? real.valor : sample[yearIndex];
+  // Con cifra real, el cambio es frente a la primera edición que tenga cifra real.
+  const first = real ? puntos[0].valor : 0;
+  const pct = real ? (first ? ((value - first) / first) * 100 : 0) : indicatorChange(k, campus, yearIndex).pct;
+  const good = real ? (ind.higherIsBetter ? pct >= 0 : pct <= 0) : indicatorChange(k, campus, yearIndex).good;
+  const desde = real ? YEARS[puntos[0].yearIndex] : YEARS[0];
+  const bar = ind.max ? Math.min(100, (value / ind.max) * 100) : null;
+  return <TileCuerpo d={{ name: ind.name, unit: ind.unit, decimals: ind.decimals, value, series, pct, good, desde, bar, real, sinCambio: Boolean(real) && puntos.length < 2 }} />;
+}
+
+/** Tarjeta de un indicador publicado sin tarjeta propia: solo existe con cifra real (no hay muestra que inventar). */
+function TileNuevo({ ind, campus, yearIndex }: { ind: IndicadorNuevo; campus: Campus; yearIndex: number }) {
+  const real = ind.valores.get(`${campus}|${yearIndex}`);
+  if (!real) return null;
+  const puntos = YEARS.map((_, i) => ind.valores.get(`${campus}|${i}`)?.valor).flatMap((v, i) => (typeof v === "number" ? [{ i, v }] : []));
+  const first = puntos[0].v;
+  const pct = first ? ((real.valor - first) / first) * 100 : 0;
+  const good = ind.higherIsBetter ? pct >= 0 : pct <= 0;
+  const bar = ind.max ? Math.min(100, (real.valor / ind.max) * 100) : null;
+  return (
+    <TileCuerpo
+      d={{ name: ind.nombre, unit: ind.unidad, decimals: ind.decimales, value: real.valor, series: puntos.map((p) => p.v), pct, good, desde: YEARS[puntos[0].i], bar, real, sinCambio: puntos.length < 2 }}
+    />
+  );
+}
+
 function Chips<T extends string | number>({ label, options, value, onPick }: { label: string; options: { id: T; text: string }[]; value: T; onPick: (id: T) => void }) {
   return (
     <div className="sos-chips" role="group" aria-label={label}>
@@ -250,11 +289,13 @@ function Chips<T extends string | number>({ label, options, value, onPick }: { l
 }
 
 /** El tablero de indicadores: elige un campus y una edición y las cifras se recalculan. */
-export function IndicatorBoard({ keys }: { keys: IndKey[] }) {
+export function IndicatorBoard({ keys, nuevos = false }: { keys: IndKey[]; nuevos?: boolean }) {
   const [campus, setCampus] = useState<Campus>("Todos");
   const [yearIndex, setYearIndex] = useState(YEARS.length - 1);
   const scope = useRef<HTMLDivElement>(null);
   const reales = useCifrasReales();
+  // «Indicadores en vivo» suma las tarjetas de los indicadores nuevos publicados (0202).
+  const nuevas = useIndicadoresNuevos();
   const todasReales = keys.every((k) => cifraReal(reales, k, campus, yearIndex));
   useDrawLines(scope, [campus, keys.join()]);
   useGSAP(
@@ -274,6 +315,7 @@ export function IndicatorBoard({ keys }: { keys: IndKey[] }) {
         {keys.map((k) => (
           <Tile key={k} k={k} campus={campus} yearIndex={yearIndex} reales={reales} />
         ))}
+        {nuevos && nuevas.map((n) => <TileNuevo key={n.id} ind={n} campus={campus} yearIndex={yearIndex} />)}
       </div>
       {!todasReales && (
         <p className="sos-note">

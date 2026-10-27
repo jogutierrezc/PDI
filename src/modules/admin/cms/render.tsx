@@ -19,6 +19,8 @@ import { Icon } from "../../../components/ui/Icon";
 import { odsArt } from "../../sostenible/ods-data";
 import { ALL_INDICATORS, LAST, YEARS } from "../../sostenible/data";
 import { IndicatorBoard, SdgWheel, reduced } from "../../sostenible/widgets";
+import { GraficasSostenibles } from "../../sostenible/GraficasSostenibles";
+import type { SeccionSos } from "../../datos-sostenibilidad/tipos";
 import { CampusExplorer } from "../../landing/CampusExplorer";
 import { ResourceRoom } from "../../landing/ResourceRoom";
 import { RouteFinder } from "../../landing/RouteFinder";
@@ -1332,7 +1334,20 @@ function IndicadoresVivo({ p }: { p: Props }) {
     <div className="sos cms-vivo" style={{ "--sos-accent": "var(--pillar-2)" } as CSSProperties}>
       <div className="cms-wrap">
         <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />
-        <IndicatorBoard keys={ALL_INDICATORS} />
+        <IndicatorBoard keys={ALL_INDICATORS} nuevos />
+      </div>
+    </div>
+  );
+}
+
+/** Las gráficas publicadas desde Datos de Sostenibilidad, por sección del Observatorio (todas si no se elige una). */
+function GraficasSostenibilidad({ p }: { p: Props }) {
+  const seccion = texto(p.seccion) as SeccionSos | "";
+  return (
+    <div className="sos cms-vivo" style={{ "--sos-accent": "var(--pillar-2)" } as CSSProperties}>
+      <div className="cms-wrap">
+        <Cabecera antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} />
+        <GraficasSostenibles seccion={seccion} />
       </div>
     </div>
   );
@@ -1461,6 +1476,8 @@ function Contenido({ bloque, navegable }: { bloque: BloqueRender; navegable: boo
       return <Cierre p={p} navegable={navegable} />;
     case "indicadores":
       return <IndicadoresVivo p={p} />;
+    case "graficas-sostenibles":
+      return <GraficasSostenibilidad p={p} />;
     case "avance-plan":
       return <AvancePlan />;
     case "pilares-plan":

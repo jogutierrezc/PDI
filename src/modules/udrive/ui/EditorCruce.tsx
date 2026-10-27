@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useContextoDrive } from "./contexto";
 import { Aviso, useAviso } from "../../../components/espacio/piezas";
 import { Icon } from "../../../components/ui/Icon";
 import { useArchivos, useContenido, useCrearItem, useDuenos, useGuardarContenido, useRenombrar } from "../datos";
@@ -47,6 +48,7 @@ const aTabla = (c: ContenidoTabla | null): TablaDatos | null => (c ? { columnas:
 
 export function EditorCruce({ id }: { id: string }) {
   const navigate = useNavigate();
+  const { base: ruta, volver: volverA } = useContextoDrive();
   const leido = useContenido(id);
   const duenos = useDuenos([id]);
   const archivos = useArchivos();
@@ -104,7 +106,7 @@ export function EditorCruce({ id }: { id: string }) {
   const ponerGrafica = useCallback((grafica: ConfigGrafica) => setDatos((d) => (d ? { ...d, grafica } : d)), []);
   const volver = async () => {
     await vaciar();
-    navigate(leido.data?.carpeta_id ? `/admin/udrive?c=${leido.data.carpeta_id}` : "/admin/udrive");
+    navigate(leido.data?.carpeta_id ? `${ruta}?c=${leido.data.carpeta_id}` : ruta);
   };
 
   const alternarEstado = async () => {
@@ -126,7 +128,7 @@ export function EditorCruce({ id }: { id: string }) {
         <div className="es-empty" style={{ margin: 24 }}>
           <b>No se pudo abrir el cruce</b>
           <span>{leido.error?.message ?? "No existe, no es un cruce o no tiene permiso para verlo."}</span>
-          <button type="button" className="es-btn" onClick={() => navigate("/admin/udrive")}>Volver a UDrive</button>
+          <button type="button" className="es-btn" onClick={() => navigate(ruta)}>Volver a {volverA}</button>
         </div>
       </div>
     );
@@ -172,7 +174,7 @@ export function EditorCruce({ id }: { id: string }) {
         onVolver={() => void volver()}
         acciones={
           <>
-            {datos.resultado_id ? <button type="button" className="es-btn" onClick={() => void vaciar().then(() => navigate(`/admin/udrive/tabla/${datos.resultado_id}`))}><Icon name="table" size={16} />Abrir la tabla guardada</button> : null}
+            {datos.resultado_id ? <button type="button" className="es-btn" onClick={() => void vaciar().then(() => navigate(`${ruta}/tabla/${datos.resultado_id}`))}><Icon name="table" size={16} />Abrir la tabla guardada</button> : null}
             {editable && datos.modo === "dos" ? <button type="button" className="es-btn" disabled={!resultado.cruce || crear.isPending} onClick={guardarComoTabla}>Guardar como tabla nueva</button> : null}
             {editable ? (
               <button type="button" className="es-btn es-btn--pri" disabled={estado === "borrador" && Boolean(problema)} title={estado === "borrador" && problema ? problema : undefined} onClick={() => void alternarEstado()}>

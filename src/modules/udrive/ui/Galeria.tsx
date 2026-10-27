@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useContextoDrive } from "./contexto";
 import { Ventana } from "../../../components/espacio/Ventana";
 import { Icon } from "../../../components/ui/Icon";
 import { useArchivos, useContenido, useCrearItem } from "../datos";
@@ -74,6 +75,7 @@ function Glifo({ tipo }: { tipo: TipoGrafica | "tabla" | "cruce" | "excel" }) {
 
 export function Galeria({ carpeta, decir, onImportar }: { carpeta: string | null; decir: (m: string) => void; onImportar: () => void }) {
   const navigate = useNavigate();
+  const { base: ruta } = useContextoDrive();
   const [modo, setModo] = useState<"graficas" | "tablas">("graficas");
   const [tipo, setTipo] = useState<TipoGrafica>("linea");
   const [ejemplo, setEjemplo] = useState(false);
@@ -92,9 +94,9 @@ export function Galeria({ carpeta, decir, onImportar }: { carpeta: string | null
   }, [tipo, modo]);
 
   const nuevaTabla = () =>
-    crear.mutate({ tipo: "tabla", nombre: nombreLibre("Tabla sin título"), carpeta, contenido: tablaVacia(() => crypto.randomUUID()) }, { onSuccess: (id) => navigate(`/admin/udrive/tabla/${id}`), onError: (e) => decir(e.message) });
+    crear.mutate({ tipo: "tabla", nombre: nombreLibre("Tabla sin título"), carpeta, contenido: tablaVacia(() => crypto.randomUUID()) }, { onSuccess: (id) => navigate(`${ruta}/tabla/${id}`), onError: (e) => decir(e.message) });
   const nuevoCruce = () =>
-    crear.mutate({ tipo: "cruce", nombre: nombreLibre("Cruce de tablas"), carpeta, contenido: { version: 1, modo: "dos", tabla_a: null, tabla_b: null, columna_a: null, columna_b: null, conservar: "coinciden", resultado_id: null, grafica: null } }, { onSuccess: (id) => navigate(`/admin/udrive/cruce/${id}`), onError: (e) => decir(e.message) });
+    crear.mutate({ tipo: "cruce", nombre: nombreLibre("Cruce de tablas"), carpeta, contenido: { version: 1, modo: "dos", tabla_a: null, tabla_b: null, columna_a: null, columna_b: null, conservar: "coinciden", resultado_id: null, grafica: null } }, { onSuccess: (id) => navigate(`${ruta}/cruce/${id}`), onError: (e) => decir(e.message) });
 
   const datosEjemplo = tipo === "calor" ? MUESTRA_CALOR : MUESTRA_SERIE;
   const configEjemplo: ConfigGrafica = { ...configInicial(tipo, datosEjemplo), titulo: "Ejemplo con datos de muestra" };
@@ -180,6 +182,7 @@ export function Galeria({ carpeta, decir, onImportar }: { carpeta: string | null
 
 function UsarConTabla({ tipo, carpeta, nombre, decir, onCerrar }: { tipo: TipoGrafica; carpeta: string | null; nombre: string; decir: (m: string) => void; onCerrar: () => void }) {
   const navigate = useNavigate();
+  const { base: ruta } = useContextoDrive();
   const archivos = useArchivos();
   const crear = useCrearItem();
   const tablas = (archivos.data ?? []).filter((a) => a.tipo === "tabla" && !a.borrado_en);
@@ -202,7 +205,7 @@ function UsarConTabla({ tipo, carpeta, nombre, decir, onCerrar }: { tipo: TipoGr
             onClick={() => {
               if (!tabla) return;
               const contenido: ContenidoGrafica = { version: 1, tabla_id: id, config: configInicial(tipo, tabla) };
-              crear.mutate({ tipo: "grafica", nombre, carpeta, contenido }, { onSuccess: (nuevo) => navigate(`/admin/udrive/grafica/${nuevo}`), onError: (e) => decir(e.message) });
+              crear.mutate({ tipo: "grafica", nombre, carpeta, contenido }, { onSuccess: (nuevo) => navigate(`${ruta}/grafica/${nuevo}`), onError: (e) => decir(e.message) });
             }}
           >
             Crear la gráfica

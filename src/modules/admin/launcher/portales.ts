@@ -211,14 +211,16 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     ],
   },
   "datos-sostenibilidad": {
-    text: "Libros de datos de las oficinas, conectados a los indicadores de sostenibilidad de UDES Sostenible",
+    text: "Tablas y gráficas abiertas a toda la intranet, conectadas a los indicadores de sostenibilidad de UDES Sostenible",
     color: "var(--wall-programas-en-cifras)",
     rank: 5.65,
     sections: () => [
       {
-        title: "Mi oficina",
+        title: "Datos de Sostenibilidad",
         cards: [
-          { key: "ds-libros", title: "Datos de Sostenibilidad", text: "Libros de datos con columnas tipadas, conectados a los indicadores de sostenibilidad", to: "/admin/datos-sostenibilidad" },
+          { key: "ds-archivos", title: "Archivos", text: "Carpetas, tablas y gráficas de la unidad Datos de Sostenibilidad", to: "/admin/datos-sostenibilidad" },
+          { key: "ds-indicadores", title: "Indicadores", text: "El catálogo y de qué tabla y columna sale cada uno", to: "/admin/datos-sostenibilidad/indicadores" },
+          { key: "ds-portal", title: "Portal de sostenibilidad", text: "Qué se publica en /sostenible y la vista previa", to: "/admin/datos-sostenibilidad/portal" },
         ],
       },
     ],

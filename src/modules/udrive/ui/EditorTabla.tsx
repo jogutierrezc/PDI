@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useContextoDrive } from "./contexto";
 import { Editor } from "../../../components/espacio/Editor";
 import type { PanelEditor } from "../../../components/espacio/Editor";
 import { Aviso, useAviso } from "../../../components/espacio/piezas";
@@ -41,6 +42,7 @@ const aEsp = (c: ColumnaUd): EspColumna => ({ clave: c.clave, etiqueta: c.etique
 
 export function EditorTabla({ id }: { id: string }) {
   const navigate = useNavigate();
+  const { base: ruta, volver: volverA, incrustado, extraTabla } = useContextoDrive();
   const leido = useContenido(id);
   const duenos = useDuenos([id]);
   const { aviso, decir } = useAviso();
@@ -178,14 +180,14 @@ export function EditorTabla({ id }: { id: string }) {
         <div className="es-empty" style={{ margin: 24 }}>
           <b>No se pudo abrir la tabla</b>
           <span>{leido.error?.message ?? "No existe o no tiene permiso para verla."}</span>
-          <button type="button" className="es-btn" onClick={() => navigate("/admin/udrive")}>Volver a UDrive</button>
+          <button type="button" className="es-btn" onClick={() => navigate(ruta)}>Volver a {volverA}</button>
         </div>
       </div>
     );
   }
   if (leido.data.tipo !== "tabla" || !contenido) return <div className="es ud"><p className="es-note" style={{ padding: 24 }}>Este archivo no es una tabla.</p></div>;
 
-  const volver = () => navigate(leido.data?.carpeta_id ? `/admin/udrive?c=${leido.data.carpeta_id}` : "/admin/udrive");
+  const volver = () => navigate(leido.data?.carpeta_id ? `${ruta}?c=${leido.data.carpeta_id}` : ruta);
   const tabla = { columnas: contenido.columnas, filas: contenido.filas };
 
   const guardarPresentacion = (p: Partial<Presentacion>) => {
@@ -198,9 +200,17 @@ export function EditorTabla({ id }: { id: string }) {
     abierto: true,
     contenido: ({ guardarAntes }) => <PanelColumnas columnas={contenido.columnas} filas={contenido.filas} editable={editable} cambios={cambios} guardarAntes={guardarAntes} />,
   };
+  // Si la pantalla anfitriona trae su panel (Datos de Sostenibilidad: conectar a un indicador), va primero y el panel abre solo.
+  const extra = extraTabla?.({ id, nombre: nombre || leido.data.nombre, tabla, editable });
   const panelDer: PanelEditor = {
-    etiqueta: "Cómo se ve en el documento",
-    contenido: () => <PanelPresentacion p={contenido.presentacion} editable={editable} onGuardar={guardarPresentacion} />,
+    etiqueta: extra ? "Conexión y presentación" : "Cómo se ve en el documento",
+    abierto: Boolean(extra),
+    contenido: () => (
+      <>
+        {extra}
+        <PanelPresentacion p={contenido.presentacion} editable={editable} onGuardar={guardarPresentacion} />
+      </>
+    ),
   };
 
   return (
@@ -225,14 +235,16 @@ export function EditorTabla({ id }: { id: string }) {
               onClick={() => {
                 const cfg = configInicial("linea", tabla);
                 const contenidoG: ContenidoGrafica = { version: 1, tabla_id: id, config: cfg };
-                void guardarYa().then((ok) => ok && crear.mutate({ tipo: "grafica", nombre: `Gráfica de ${nombre || leido.data!.nombre}`.slice(0, 160), carpeta: leido.data!.carpeta_id, contenido: contenidoG }, { onSuccess: (nuevo) => navigate(`/admin/udrive/grafica/${nuevo}`), onError: (e) => decir(e.message) }));
+                void guardarYa().then((ok) => ok && crear.mutate({ tipo: "grafica", nombre: `Gráfica de ${nombre || leido.data!.nombre}`.slice(0, 160), carpeta: leido.data!.carpeta_id, contenido: contenidoG }, { onSuccess: (nuevo) => navigate(`${ruta}/grafica/${nuevo}`), onError: (e) => decir(e.message) }));
               }}
             >
               <Icon name="chart" size={16} />Crear una gráfica
             </button>
+            {incrustado ? null : (
             <button type="button" className="es-btn" onClick={() => void guardarYa().then((ok) => ok && setDialogo("informe"))}>
               <Icon name="document" size={16} />Usar en un informe
             </button>
+            )}
             {editable ? (
               <button
                 type="button"

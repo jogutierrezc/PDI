@@ -506,9 +506,9 @@ export default function App() {
               </RequireRole>
             }
           />
-          {/* Datos de Sostenibilidad: libros de datos por oficina conectados a los indicadores (0178). */}
+          {/* Datos de Sostenibilidad al estilo UDrive (0202): archivos, indicadores y portal; las tablas, gráficas y cruces se abren en /tabla/:id, /grafica/:id y /cruce/:id. */}
           <Route
-            path="/admin/datos-sostenibilidad"
+            path="/admin/datos-sostenibilidad/:vista?/:id?"
             element={
               <RequireRole minimum="consulta" screen="datos-sostenibilidad">
                 <DatosSostenibilidad />

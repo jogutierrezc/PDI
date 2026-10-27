@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useContextoDrive } from "./contexto";
 import { Aviso, useAviso } from "../../../components/espacio/piezas";
 import { Icon } from "../../../components/ui/Icon";
 import { useArchivos, useContenido, useDuenos, useGuardarContenido, useRenombrar } from "../datos";
@@ -26,6 +27,7 @@ import "./udrive.css";
 
 export function EditorGrafica({ id }: { id: string }) {
   const navigate = useNavigate();
+  const { base: ruta, volver: volverA, incrustado, extraGrafica } = useContextoDrive();
   const leido = useContenido(id);
   const duenos = useDuenos([id]);
   const archivos = useArchivos();
@@ -72,7 +74,7 @@ export function EditorGrafica({ id }: { id: string }) {
   const poner = useCallback((config: ConfigGrafica) => setDatos((d) => (d ? { ...d, config } : d)), []);
   const volver = async () => {
     await vaciar();
-    navigate(leido.data?.carpeta_id ? `/admin/udrive?c=${leido.data.carpeta_id}` : "/admin/udrive");
+    navigate(leido.data?.carpeta_id ? `${ruta}?c=${leido.data.carpeta_id}` : ruta);
   };
 
   const alternarEstado = async () => {
@@ -94,7 +96,7 @@ export function EditorGrafica({ id }: { id: string }) {
         <div className="es-empty" style={{ margin: 24 }}>
           <b>No se pudo abrir la gráfica</b>
           <span>{leido.error?.message ?? "No existe, no es una gráfica o no tiene permiso para verla."}</span>
-          <button type="button" className="es-btn" onClick={() => navigate("/admin/udrive")}>Volver a UDrive</button>
+          <button type="button" className="es-btn" onClick={() => navigate(ruta)}>Volver a {volverA}</button>
         </div>
       </div>
     );
@@ -115,10 +117,12 @@ export function EditorGrafica({ id }: { id: string }) {
         onVolver={() => void volver()}
         acciones={
           <>
-            {datos.tabla_id && tabla ? <button type="button" className="es-btn" onClick={() => void vaciar().then(() => navigate(`/admin/udrive/tabla/${datos.tabla_id}`))}><Icon name="table" size={16} />Abrir la tabla</button> : null}
+            {datos.tabla_id && tabla ? <button type="button" className="es-btn" onClick={() => void vaciar().then(() => navigate(`${ruta}/tabla/${datos.tabla_id}`))}><Icon name="table" size={16} />Abrir la tabla</button> : null}
+            {incrustado ? null : (
             <button type="button" className="es-btn" disabled={!datos.tabla_id} title={datos.tabla_id ? undefined : "Elija primero la tabla de la gráfica"} onClick={() => void vaciar().then((ok) => ok && setUsar(true))}>
               <Icon name="document" size={16} />Usar en un informe
             </button>
+            )}
             {editable ? (
               <button type="button" className="es-btn es-btn--pri" disabled={estado === "borrador" && Boolean(problema)} title={estado === "borrador" && problema ? problema : undefined} onClick={() => void alternarEstado()}>
                 {estado === "listo" ? "Volver a borrador" : "Marcar como lista"}
@@ -154,6 +158,7 @@ export function EditorGrafica({ id }: { id: string }) {
 
           <aside className="ud-panel ud-panel--r" aria-label="Estilo de la gráfica">
             <PanelEstilo config={datos.config} editable={editable} onChange={poner} />
+            {extraGrafica?.({ id, nombre, editable })}
           </aside>
         </div>
       </MarcoEditor>

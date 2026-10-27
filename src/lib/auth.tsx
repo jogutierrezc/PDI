@@ -188,8 +188,9 @@ export function screenVisible(
   if (screen === "internacionalizacion") return Boolean(who.inInternacionalizacion) || (listed && RANK[profile.role] >= RANK.planeacion);
   // Programas en Cifras: pertenecer a pc_miembros ES el permiso (0164); Planeación y la administración, todo.
   if (screen === "programas-en-cifras") return Boolean(who.inProgramasEnCifras) || (listed && RANK[profile.role] >= RANK.planeacion);
-  // Datos de Sostenibilidad: pertenecer a ds_miembros ES el permiso (0178); Planeación y la administración, todo.
-  if (screen === "datos-sostenibilidad") return Boolean(who.inDatosSostenibilidad) || (listed && RANK[profile.role] >= RANK.planeacion);
+  // Datos de Sostenibilidad (UDrive, 0202): entra quien tiene la pantalla habilitada (sos_entra); Planeación y la administración, siempre.
+  // Quien ya estaba en ds_miembros (0178) sigue entrando aunque su rol no la marque.
+  if (screen === "datos-sostenibilidad") return Boolean(who.inDatosSostenibilidad) || RANK[profile.role] >= RANK.planeacion || listed;
   // Informes Institucionales: quien pertenece a una unidad escribe el suyo, o el
   // de las unidades que su rol le da (0169); Planeación los abre, revisa y
   // consolida todos (0153). Un rol que no marca la pantalla la cierra, aunque

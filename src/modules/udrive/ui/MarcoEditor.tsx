@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { crecerDesde } from "../motion";
 import { IconoItem } from "./piezas";
+import { useContextoDrive } from "./contexto";
 import type { TipoItem } from "../tipos";
 
 export type EstadoGuardado = "guardado" | "guardando" | "error";
@@ -80,6 +81,7 @@ export function MarcoEditor({
   onVolver: () => void;
   children: ReactNode;
 }) {
+  const { volver } = useContextoDrive();
   const cuerpo = useRef<HTMLDivElement>(null);
   const [texto, setTexto] = useState(nombre.valor);
   useEffect(() => setTexto(nombre.valor), [nombre.valor]);
@@ -100,7 +102,7 @@ export function MarcoEditor({
       <div className="es-eh" data-entra>
         <button type="button" className="es-back" onClick={onVolver}>
           <Icon name="arrow-left" size={16} />
-          UDrive
+          {volver}
         </button>
         <div className="es-ename">
           <IconoItem tipo={tipo} />

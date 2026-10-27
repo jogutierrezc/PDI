@@ -1,0 +1,136 @@
+/* =============================================================================
+   UDES Sostenible · gráficas publicadas (GraficasSostenibles.tsx).
+
+   Acotado a .sos-gf*, con los tokens del portal. Las rejillas se adaptan al
+   ancho del contenedor (auto-fit), así que sirven igual en la página, en una
+   celda de columnas del CMS y en el modo Tableta o Teléfono del editor.
+   ========================================================================== */
+
+.sos-gfs {
+  display: grid;
+  gap: var(--space-6);
+  container-type: inline-size;
+}
+
+.sos-gfs__nombre {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+
+.sos-gfs__rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: var(--space-4);
+}
+
+.sos-gf {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  min-width: 0;
+}
+
+.sos-gf__titulo {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+
+.sos-gf__nota,
+.sos-gf__fuente {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.sos-gf__lienzo {
+  position: relative;
+}
+
+.sos-gf__lienzo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.sos-gf__linea {
+  stroke: var(--line);
+}
+
+.sos-gf__base {
+  stroke: var(--line-strong);
+}
+
+.sos-gf__eje {
+  fill: var(--ink-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sos-gf__marca {
+  cursor: default;
+}
+
+.sos-gf__marca:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+.sos-gf__globo {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.sos-gf__leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--ink-secondary);
+}
+
+.sos-gf__leyenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sos-gf__leyenda i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.sos-gf__vacia {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+/* Estilo del sitio y estilo por bloque del CMS (clases cms-e-*): los mismos controles que los demás bloques. */
+.cms-e-esc .sos-gf__titulo { font-size: var(--cms-h3); }
+.cms-e-fh .sos-gf__titulo { font-family: var(--cms-fh); }
+.cms-e-wt .sos-gf__titulo { font-weight: var(--cms-wt); }
+.cms-e-ls .sos-gf__titulo { letter-spacing: var(--cms-ls); }
+.cms-e-bs .sos-gf__nota { font-size: var(--cms-bs); }
+.cms-e-lh .sos-gf__nota { line-height: var(--cms-lh); }
+.cms-e-fb .sos-gf { font-family: var(--cms-fb); }

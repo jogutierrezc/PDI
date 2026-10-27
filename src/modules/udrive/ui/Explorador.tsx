@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useContextoDrive } from "./contexto";
 import { Buscador } from "../../../components/espacio/Buscador";
 import type { EntradaBuscador } from "../../../components/espacio/Buscador";
 import { PanelDetalles } from "../../../components/espacio/Explorador";
@@ -82,6 +83,7 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
   const { profile } = useAuth();
   const yo = profile?.id;
   const navigate = useNavigate();
+  const { base: ruta, incrustado, detalleExtra } = useContextoDrive();
   const [params, setParams] = useSearchParams();
   const carpetaParam = params.get("c");
   const carpetasQ = useCarpetas();
@@ -211,11 +213,11 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
       if (tipo === "carpeta") return irA(id);
       const a = todasA.find((x) => x.id === id);
       if (!a || a.borrado_en) return;
-      if (a.tipo === "tabla" || a.tipo === "grafica" || a.tipo === "cruce" || a.tipo === "documento" || a.tipo === "estilo") return navigate(`/admin/udrive/${a.tipo}/${a.id}`);
+      if (a.tipo === "tabla" || a.tipo === "grafica" || a.tipo === "cruce" || a.tipo === "documento" || a.tipo === "estilo") return navigate(`${ruta}/${a.tipo}/${a.id}`);
       if (vistaPrevia(a.mime)) return setDialogo({ t: "previa", s: { tipo: "archivo", fila: a } });
       void descargar(a);
     },
-    [irA, navigate, todasA], // eslint-disable-line react-hooks/exhaustive-deps -- descargar es estable
+    [irA, navigate, ruta, todasA], // eslint-disable-line react-hooks/exhaustive-deps -- descargar es estable
   );
 
   async function descargar(a: ArchivoRow) {
@@ -304,7 +306,7 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
     const { tablaVacia } = await import("../lib/tabla");
     crear.mutate(
       { tipo: "tabla", nombre: nombreLibre("Tabla sin título"), carpeta: carpetaActual, contenido: tablaVacia(() => crypto.randomUUID()) },
-      { onSuccess: (id) => navigate(`/admin/udrive/tabla/${id}`), onError: (e) => decir(e.message) },
+      { onSuccess: (id) => navigate(`${ruta}/tabla/${id}`), onError: (e) => decir(e.message) },
     );
   };
   const nombreLibre = (base: string) => {
@@ -323,7 +325,7 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
         {
           onSuccess: (id) => {
             if (t.errores.length) decir(`Importada con ${t.errores.length} ${t.errores.length === 1 ? "valor" : "valores"} por revisar.`);
-            navigate(`/admin/udrive/tabla/${id}`);
+            navigate(`${ruta}/tabla/${id}`);
           },
           onError: (e) => decir(e.message),
         },
@@ -399,13 +401,13 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
   const hayAlgo = lista.carpetas.length + lista.archivos.length > 0;
 
   return (
-    <div className="es pc ud">
-      <BarraSuperior sigla="UD" marca="UDrive" buscar="Buscar carpetas, tablas y gráficas" onBuscar={() => setBuscando(true)} />
+    <div className={`es pc ud${incrustado ? " pc--incrustado" : ""}`}>
+      {incrustado ? null : <BarraSuperior sigla="UD" marca="UDrive" buscar="Buscar carpetas, tablas y gráficas" onBuscar={() => setBuscando(true)} />}
       <div className="pc-body">
         <Riel etiqueta="Secciones de UDrive">
           {unidad ? (
             <>
-              <EntradaRiel icono="arrow-left" actual={false} to={`/admin/udrive/unidad/${unidad.id}`}>Inicio de la unidad</EntradaRiel>
+              {incrustado ? null : <EntradaRiel icono="arrow-left" actual={false} to={`/admin/udrive/unidad/${unidad.id}`}>Inicio de la unidad</EntradaRiel>}
               <TituloRiel>{unidad.nombre}</TituloRiel>
               <EntradaRiel icono="folder" actual={seccion === "archivos"} onClick={() => irA(null)}>Archivos de la unidad</EntradaRiel>
               <EntradaRiel icono="clock" actual={seccion === "recientes"} onClick={() => irA(null, "recientes")}>Recientes</EntradaRiel>
@@ -488,6 +490,7 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
               <button type="button" aria-pressed={vista === "mosaicos"} aria-label="Mosaicos" onClick={() => setVista("mosaicos")}><Icon name="tiles" size={16} /></button>
               <button type="button" aria-pressed={vista === "lista"} aria-label="Lista" onClick={() => setVista("lista")}><Icon name="rows" size={16} /></button>
             </div>
+            {incrustado ? <button type="button" className="es-btn" onClick={() => setBuscando(true)}><Icon name="search" size={16} />Buscar</button> : null}
             <button type="button" className="es-btn es-btn--ghost" aria-pressed={detalles} aria-label="Detalles" onClick={() => setDetalles(!detalles)}><Icon name="info" size={16} /></button>
           </div>
 
@@ -602,6 +605,7 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
             dias={diasSel}
             enUnidad={enU}
             yo={yo}
+            extra={seleccion?.tipo === "archivo" && detalleExtra ? detalleExtra({ archivo: seleccion.fila }) : null}
             carpetaAbierta={{ nombre: migas[migas.length - 1].texto, carpetas: resumenCarpeta.carpetas, archivos: resumenCarpeta.archivos, bytes }}
             acciones={seleccion ? acciones(seleccion) : { abrir() {}, previa() {}, descargar() {}, renombrar() {}, mover() {}, compartir() {}, aPapelera() {}, restaurar() {}, eliminar() {} }}
           />
@@ -613,12 +617,16 @@ export function Explorador({ seccionInicial = "archivos", unidad }: { seccionIni
           <div className="es-h">Crear</div>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); setDialogo({ t: "carpeta" }); }}><Icon name="folder" size={16} />Nueva carpeta</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => void nuevaTabla()}><Icon name="table" size={16} />Nueva tabla</button>
+          {incrustado ? null : (
+            <>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); setDialogo({ t: "informe" }); }}><Icon name="document" size={16} />Nuevo informe</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); setDialogo({ t: "estilo" }); }}><Icon name="layers" size={16} />Nuevo estilo de informe</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); setDialogo({ t: "importar" }); }}><Icon name="upload" size={16} />Informe desde Word o PDF</button>
+            </>
+          )}
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); inputImportar.current?.click(); }}><Icon name="upload" size={16} />Tabla desde Excel o CSV</button>
           <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); irA(null, "catalogo"); }}><Icon name="chart" size={16} />Nueva gráfica…</button>
-          <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); crear.mutate({ tipo: "cruce", nombre: nombreLibre("Cruce de tablas"), carpeta: carpetaActual, contenido: { version: 1, modo: "dos", tabla_a: null, tabla_b: null, columna_a: null, columna_b: null, conservar: "coinciden", resultado_id: null, grafica: null } }, { onSuccess: (id) => navigate(`/admin/udrive/cruce/${id}`), onError: (e) => decir(e.message) }); }}><Icon name="link" size={16} />Cruce de dos tablas</button>
+          <button type="button" role="menuitem" className="es-btn es-btn--ghost" onClick={() => { setMenu(null); crear.mutate({ tipo: "cruce", nombre: nombreLibre("Cruce de tablas"), carpeta: carpetaActual, contenido: { version: 1, modo: "dos", tabla_a: null, tabla_b: null, columna_a: null, columna_b: null, conservar: "coinciden", resultado_id: null, grafica: null } }, { onSuccess: (id) => navigate(`${ruta}/cruce/${id}`), onError: (e) => decir(e.message) }); }}><Icon name="link" size={16} />Cruce de dos tablas</button>
         </div>
       ) : null}
 

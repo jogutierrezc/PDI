@@ -8,6 +8,7 @@
    ========================================================================== */
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { enlaceDeArchivo } from "../datos";
 import { vistaPrevia } from "../lib/imagen";
@@ -39,6 +40,7 @@ export function Detalles({
   acciones,
   enUnidad = false,
   yo,
+  extra,
 }: {
   sel: Seleccion | null;
   dueno: DuenoRow | undefined;
@@ -51,6 +53,8 @@ export function Detalles({
   /** Dentro de una unidad de trabajo (0191): mover pide Crear; la papelera, Administra o Crear sobre lo propio; no se comparte por correo. */
   enUnidad?: boolean;
   yo?: string;
+  /** Bloque que la pantalla anfitriona añade al final del detalle de un archivo. */
+  extra?: ReactNode;
 }) {
   if (!sel) {
     return (
@@ -71,10 +75,10 @@ export function Detalles({
       </>
     );
   }
-  return <DetalleDe key={`${sel.tipo}:${sel.fila.id}`} sel={sel} dueno={dueno} hermanas={hermanas} dias={dias} acciones={acciones} enUnidad={enUnidad} yo={yo} />;
+  return <DetalleDe key={`${sel.tipo}:${sel.fila.id}`} sel={sel} dueno={dueno} hermanas={hermanas} dias={dias} acciones={acciones} enUnidad={enUnidad} yo={yo} extra={extra} />;
 }
 
-function DetalleDe({ sel, dueno, hermanas, dias, acciones, enUnidad, yo }: { sel: Seleccion; dueno: DuenoRow | undefined; hermanas: string[]; dias: number | null; acciones: AccionesDetalle; enUnidad: boolean; yo?: string }) {
+function DetalleDe({ sel, dueno, hermanas, dias, acciones, enUnidad, yo, extra }: { sel: Seleccion; dueno: DuenoRow | undefined; hermanas: string[]; dias: number | null; acciones: AccionesDetalle; enUnidad: boolean; yo?: string; extra?: ReactNode }) {
   const f = sel.fila;
   const rol = dueno?.mi_rol ?? null;
   const editar = puedeEditar(rol);
@@ -153,6 +157,7 @@ function DetalleDe({ sel, dueno, hermanas, dias, acciones, enUnidad, yo }: { sel
         {archivo?.tipo === "archivo" ? (<><dt>Tamaño</dt><dd className="es-num">{textoTamano(archivo.tamano)}</dd><dt>Formato</dt><dd style={{ overflowWrap: "anywhere" }}>{archivo.mime || "Desconocido"}</dd></>) : null}
         {archivo?.tipo === "tabla" ? (<><dt>Tamaño</dt><dd className="es-num">{archivo.resumen.filas ?? 0} filas × {archivo.resumen.columnas ?? 0} columnas</dd></>) : null}
       </dl>
+      {extra}
     </>
   );
 }

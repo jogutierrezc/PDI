@@ -47,6 +47,7 @@ const ICONO_BLOQUE: Record<string, IconName> = {
   "columnas-desiguales": "columns",
   video: "play",
   indicadores: "chart",
+  "graficas-sostenibles": "chart",
   "avance-plan": "spark-chart",
   "pilares-plan": "columns-view",
   "sdg-band": "grid",

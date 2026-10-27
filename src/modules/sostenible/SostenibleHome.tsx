@@ -15,6 +15,7 @@ import { Icon } from "../../components/ui/Icon";
 import { AXES, ALL_INDICATORS, LAST, RANKINGS, YEARS, reports } from "./data";
 import { Intro, SostenibleLayout, useIntro } from "./SostenibleLayout";
 import { IndicatorBoard, SdgWheel, SheetDialog, LineChart, reduced } from "./widgets";
+import { SeccionGraficasSostenibles } from "./GraficasSostenibles";
 import type { SheetData } from "./widgets";
 import type { Ranking } from "./data";
 import { odsArt } from "./ods-data";
@@ -149,9 +150,11 @@ export function SostenibleHome() {
               <h2 id="sos-ind">Lo que medimos en los campus, en vivo.</h2>
               <p>Elige un campus y un año: las cifras, las barras y las tendencias se recalculan al instante.</p>
             </div>
-            <IndicatorBoard keys={ALL_INDICATORS} />
+            <IndicatorBoard keys={ALL_INDICATORS} nuevos />
           </div>
         </section>
+
+        <SeccionGraficasSostenibles />
 
         <section className="sos-section" aria-labelledby="sos-ejes">
           <div className="sos-wrap">

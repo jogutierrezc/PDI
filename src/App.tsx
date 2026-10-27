@@ -25,6 +25,7 @@ const PlaneacionHome = lazy(() => import("./modules/planeacion/PlaneacionHome").
 const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ContactosPublico = lazy(() => import("./modules/internacionalizacion/contactos/publico/ContactosPublico").then((m) => ({ default: m.ContactosPublico })));
 const AskPilo = lazy(() => import("./modules/pregunta/AskPilo").then((m) => ({ default: m.AskPilo })));
+const ObsEmbed = lazy(() => import("./modules/obs-embed/ObsEmbed").then((m) => ({ default: m.ObsEmbed })));
 const PiloEmbed = lazy(() => import("./modules/pilo-embed/PiloEmbed").then((m) => ({ default: m.PiloEmbed })));
 const AgentesApp = lazy(() => import("./modules/agentes/AgentesApp").then((m) => ({ default: m.AgentesApp })));
 const PiloApp = lazy(() => import("./modules/pilo-app/PiloApp").then((m) => ({ default: m.PiloApp })));
@@ -82,12 +83,17 @@ const SostenibleTablero = lazy(() => import("./modules/sostenible/SostenibleTabl
 const SostenibleRanking = lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleRanking })));
 const RankingsAdmin = lazy(() => import("./modules/rankings/RankingsAdmin").then((m) => ({ default: m.RankingsAdmin })));
 const ReporteOficina = lazy(() => import("./modules/rankings/reporte/ui/ReporteOficina").then((m) => ({ default: m.ReporteOficina })));
+const UiGreenMios = lazy(() => import("./modules/rankings/uigreen/ui/UiGreen").then((m) => ({ default: m.UiGreenMios })));
 const OdsPortal = lazy(() => import("./modules/sostenible/OdsPortal").then((m) => ({ default: m.OdsPortal })));
 const OdsReport = lazy(() => import("./modules/sostenible/OdsReport").then((m) => ({ default: m.OdsReport })));
 const OdsRector = lazy(() => import("./modules/sostenible/OdsRector").then((m) => ({ default: m.OdsRector })));
 const OdsBulletin = lazy(() => import("./modules/sostenible/OdsBulletin").then((m) => ({ default: m.OdsBulletin })));
 const OdsEvidence = lazy(() => import("./modules/sostenible/OdsEvidence").then((m) => ({ default: m.OdsEvidence })));
 const SostenibleCategory =lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleCategory })));
+// UI GreenMetric público (U3): la puerta decide entre la página nueva y la de siempre; la hoja de evidencia va aparte.
+const RankingPublico = lazy(() => import("./modules/rankings/uigreen/publico/RankingPublico").then((m) => ({ default: m.RankingPublico })));
+const CategoriaPublica = lazy(() => import("./modules/rankings/uigreen/publico/RankingPublico").then((m) => ({ default: m.CategoriaPublica })));
+const UgmHoja = lazy(() => import("./modules/rankings/uigreen/publico/Hoja").then((m) => ({ default: m.Hoja })));
 const OpenDataPortal = lazy(() =>
   import("./modules/datos-abiertos/OpenDataPortal").then((m) => ({ default: m.OpenDataPortal })),
 );
@@ -117,6 +123,9 @@ const ObservatoryHub = lazy(() =>
 );
 const ObservatoryTopic = lazy(() =>
   import("./modules/datos-abiertos/observatorio/Observatory").then((m) => ({ default: m.ObservatoryTopic })),
+);
+const ObservatorioPagina = lazy(() =>
+  import("./modules/datos-abiertos/observatorio/ObservatorioPagina").then((m) => ({ default: m.ObservatorioPagina })),
 );
 const PublicBulletinPage = lazy(() =>
   import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.PublicBulletinPage })),
@@ -304,6 +313,8 @@ export default function App() {
           <Route path="/encuesta/:slug" element={<EncuestaPublica />} />
           {/* El chat emergente de Pilo, para verse dentro de un marco en otros portales (public/pilo.js). */}
           <Route path="/pilo-embed" element={<PiloEmbed />} />
+          {/* El Observatorio insertado en otras páginas (public/obs.js): ruta aislada, sin menú ni cabecera. */}
+          <Route path="/obs-embed" element={<ObsEmbed />} />
           {/* Mr. Pilo en Enseñanza (0113): la misma página y el mismo chat emergente, en su propio espacio. */}
           <Route path="/pilo-ensenanza" element={<AskPilo key="ensenanza" space="ensenanza" />} />
           <Route path="/pilo-ensenanza-embed" element={<PiloEmbed key="ensenanza" space="ensenanza" />} />
@@ -337,10 +348,13 @@ export default function App() {
           <Route path="/sostenible/impact/evidencia/:n/:indicador" element={<OdsEvidence />} />
           {/* Un tablero personalizado de Datos de Sostenibilidad (0204); antes de :ranking para no chocar. */}
           <Route path="/sostenible/tablero/:slug" element={<SostenibleTablero />} />
-          <Route path="/sostenible/:ranking" element={<SostenibleCms><SostenibleRanking /></SostenibleCms>} />
-          <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCms><SostenibleCategory /></SostenibleCms>} />
+          {/* La hoja de evidencia de UI GreenMetric: sin menú; antes de :ranking/:categoria. */}
+          <Route path="/sostenible/green/evidencia/:q" element={<UgmHoja />} />
+          <Route path="/sostenible/:ranking" element={<SostenibleCms><RankingPublico vieja={<SostenibleRanking />} /></SostenibleCms>} />
+          <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCms><CategoriaPublica vieja={<SostenibleCategory />} /></SostenibleCms>} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />
           <Route path="/datos-abiertos/observatorio" element={<ObservatoryHub />} />
+          <Route path="/datos-abiertos/observatorio/o/:slug" element={<ObservatorioPagina />} />
           <Route path="/datos-abiertos/observatorio/:tema" element={<ObservatoryTopic />} />
           <Route path="/datos-abiertos/boletines" element={<PublicBulletinList />} />
           <Route path="/datos-abiertos/boletines/:slug" element={<PublicBulletinPage />} />
@@ -775,6 +789,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <ReporteOficina />
+              </RequireRole>
+            }
+          />
+          {/* UI GreenMetric para quien solo responde o revisa (rol consulta): la base decide qué indicadores ve (ugm_participa y RLS). */}
+          <Route
+            path="/admin/reporte-rankings/green"
+            element={
+              <RequireRole minimum="consulta">
+                <UiGreenMios />
               </RequireRole>
             }
           />

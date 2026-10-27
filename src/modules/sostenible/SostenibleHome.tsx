@@ -19,6 +19,7 @@ import { SeccionGraficasSostenibles } from "./GraficasSostenibles";
 import type { SheetData } from "./widgets";
 import type { Ranking } from "./data";
 import { odsArt } from "./ods-data";
+import { TarjetaHome } from "../rankings/uigreen/publico/TarjetaHome";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -136,6 +137,7 @@ export function SostenibleHome() {
                 </Link>
               ))}
             </div>
+            <TarjetaHome />
             <p className="sos-note">
               <i aria-hidden="true" />
               Dato ilustrativo: cifras de muestra.

@@ -62,7 +62,9 @@ export type AdminSection =
   | "encuestas"
   | "udrive"
   | "gestion_master"
-  | "cms";
+  | "cms"
+  | "obs_observatorios"
+  | "obs_insertar";
 
 export interface NavItem {
   id: AdminSection;
@@ -132,6 +134,9 @@ export const navigation: NavGroup[] = [
     label: "Observatorio de Analítica",
     items: [
       { id: "observatorio", label: "Taller del Observatorio", icon: "spark-chart", to: "/admin/observatorio", minimum: "consulta" },
+      // Paneles nuevos (0231): solo aparecen para quien el rol se los marcó.
+      { id: "obs_observatorios", label: "Observatorios", icon: "layers", to: "/admin/observatorio/observatorios", minimum: "consulta" },
+      { id: "obs_insertar", label: "Insertar y publicar", icon: "code", to: "/admin/observatorio/insertar", minimum: "consulta" },
     ],
   },
   {

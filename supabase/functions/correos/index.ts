@@ -24,6 +24,13 @@
         { action: "prueba", to, clave, rol?, borrador? }       → { ok, message | error, code? }
             envía una plantilla (la guardada, o el borrador que llega, sin
             guardarlo) a un correo, con una persona de ejemplo de ese rol.
+        { action: "ugm_cola", limite? }                         → { ok, enviados, fallidos, pendientes } | { ok:false, error, code }
+            UI GreenMetric (0213): vacía un lote de la cola `ugm_notificaciones`
+            con las plantillas editables `c-ugm-*`. La puede llamar el rol de
+            servicio (tarea programada) o una persona activa de la intranet (el
+            botón «Enviar avisos pendientes»): no elige a quién ni qué se envía,
+            solo hace avanzar la cola. Mismas protecciones: interruptor general,
+            dominios permitidos, tope por hora y bitácora enmascarada.
 
    Decisiones que conviene conocer:
      · La identidad sale de la cuenta: con `user_metadata.pilo` es Mr. Pilo; si
@@ -181,7 +188,8 @@ export type Alcance = "cuerpo" | "completo";
 export const VARIABLES_POR_TIPO: Record<TipoPlantilla, readonly string[]> = {
   enlace: [...DATOS, "enlace"],
   codigo: [...DATOS, "codigo", "vigencia"],
-  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle"],
+  // UI GreenMetric (0213) usa los datos de la segunda línea: indicador, pregunta, categoría, vencimiento, etc.
+  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle", "indicador", "pregunta", "categoria", "fecha_limite", "dias", "comentario", "autor", "revisor", "cantidad", "lista"],
 };
 
 /** Cómo se llama cada dato en los botones de «Insertar un dato». */
@@ -196,6 +204,16 @@ export const ETIQUETA_VARIABLE: Record<string, string> = {
   modulo: "Módulo",
   titulo_aviso: "Título del aviso",
   detalle: "Detalle",
+  indicador: "Indicador",
+  pregunta: "Pregunta",
+  categoria: "Categoría",
+  fecha_limite: "Fecha límite",
+  dias: "Días que faltan",
+  comentario: "Comentario",
+  autor: "Quién lo envió",
+  revisor: "Quién revisa",
+  cantidad: "Cantidad",
+  lista: "Lista",
 };
 
 /** Valores de ejemplo para la vista previa y para «Enviar una prueba». Los datos de la persona vienen de PERSONAS_DE_EJEMPLO. */
@@ -206,6 +224,16 @@ export const VALORES_DE_EJEMPLO: Record<string, string> = {
   modulo: "UDES en Cifras",
   titulo_aviso: "Matrícula 2026-1",
   detalle: "El corte de matrícula 2026-1 quedó validado y publicado.",
+  indicador: "1.10 · SI3",
+  pregunta: "Área total cubierta por vegetación plantada",
+  categoria: "Entorno e infraestructura",
+  fecha_limite: "15 de noviembre de 2026",
+  dias: "3",
+  comentario: "El mapa no muestra los nombres de los edificios.",
+  autor: "Marcela Quintero",
+  revisor: "Sergio Beltrán",
+  cantidad: "3",
+  lista: "1.10 · SI3, vence el 15 de noviembre; 2.6, vence mañana",
 };
 
 /** El tope del HTML de una plantilla, en caracteres (la base lo rechaza más allá). */
@@ -1678,6 +1706,115 @@ async function avisoDeGestionMaster(request: Request, body: Record<string, unkno
   return json({ ok: true });
 }
 
+/* --- La cola de UI GreenMetric (0213): asignación, envío, devolución, aprobación, recordatorio y resumen ------ */
+
+/** El texto de respaldo si la plantilla c-ugm-* no está en la base (sin la migración 0213, o borrada). */
+const PLANTILLA_UGM_RESPALDO: Plantilla = {
+  clave: "c-ugm-respaldo",
+  identidad: "plan",
+  tipo: "aviso",
+  html: null,
+  alcance: "cuerpo",
+  grupo: "UI GreenMetric",
+  nombre: "Aviso de UI GreenMetric",
+  cuando: "Reporte de UI GreenMetric",
+  asunto: "UI GreenMetric: {{titulo_aviso}}",
+  previa: "",
+  titulo: "{{titulo_aviso}}",
+  saludo: "Hola, {{nombre}}.",
+  mensaje: "{{detalle}}",
+  boton: "Abrir en el portal",
+  nota: "Este aviso lo envía el portal de Planeación.",
+  roles: null,
+};
+
+/** Los datos que una fila de la cola puede traer, con su largo máximo. Lo demás se descarta. */
+const VALORES_UGM: Record<string, number> = {
+  indicador: 60, pregunta: 300, categoria: 120, fecha_limite: 60, dias: 60, comentario: 600, autor: 120, revisor: 120, cantidad: 60, lista: 1500,
+};
+
+async function colaDeUgm(request: Request, body: Record<string, unknown>, url: string, anonKey: string, serviceKey: string): Promise<Response> {
+  const inicio = Date.now();
+  const authorization = request.headers.get("Authorization") ?? "";
+  // Solo el rol de servicio (tarea programada) o una persona activa con sesión: la función no recibe a quién ni qué enviar.
+  if (authorization !== `Bearer ${serviceKey}`) {
+    if (!authorization.startsWith("Bearer ") || authorization.slice(7) === anonKey) return json({ ok: false, error: "Falta la sesión.", code: "sesion" }, 401);
+    const caller = cliente(url, anonKey, authorization);
+    const who = await caller.auth.getUser();
+    if (who.error || !who.data.user) return json({ ok: false, error: "Sesión inválida.", code: "sesion" }, 401);
+    const { data: perfil } = await caller.from("profiles").select("is_active").eq("id", who.data.user.id).maybeSingle();
+    if (!perfil?.is_active) return json({ ok: false, error: "Solo las personas activas de la intranet envían los avisos pendientes.", code: "permiso" }, 403);
+  }
+  const limite = Math.max(1, Math.min(Math.floor(Number(body.limite)) || 10, 20));
+  const admin = cliente(url, serviceKey);
+  await admin.rpc("ugm_cola_limpiar").then(() => undefined, () => undefined);
+  const tomada = await admin.rpc("ugm_cola_tomar", { p_limite: limite });
+  if (tomada.error) {
+    const falta = ["42883", "PGRST202", "42P01", "PGRST205"].includes(String(tomada.error.code ?? ""));
+    return json({ ok: false, code: falta ? "migracion" : "interno", error: falta ? "Falta aplicar la migración 0213 (correos de UI GreenMetric)." : "No se pudo leer la cola." });
+  }
+  const lote = (Array.isArray(tomada.data) ? tomada.data : []) as { id?: unknown; plantilla?: unknown; valores?: unknown; correo?: unknown; nombre?: unknown }[];
+  const sitio = basePublica(request.headers.get("Origin") ?? (typeof body.sitio === "string" ? body.sitio : ""), ENV("CORREOS_URL_PUBLICA"), "");
+  const limpio = (v: unknown, max: number): string => texto(v, max).replace(/\{\{|\}\}/g, "").replace(/\s+/g, " ").trim();
+  let enviados = 0;
+  let fallidos = 0;
+  for (const n of lote) {
+    const id = typeof n.id === "string" ? n.id : "";
+    if (!id) continue;
+    // Se corta antes de que la plataforma mate la función: lo que falte vuelve a la cola sin gastar un intento.
+    if (Date.now() - inicio > 90_000) {
+      await admin.rpc("ugm_cola_resultado", { p_id: id, p_estado: "liberar", p_error: null }).then(() => undefined, () => undefined);
+      continue;
+    }
+    const resultado = (estado: string, error: string | null) => admin.rpc("ugm_cola_resultado", { p_id: id, p_estado: estado, p_error: error }).then(() => undefined, () => undefined);
+    const para = typeof n.correo === "string" ? n.correo.trim().toLowerCase().slice(0, 254) : "";
+    const clave = typeof n.plantilla === "string" && /^c-ugm-[a-z0-9-]{1,30}$/.test(n.plantilla) ? n.plantilla : "";
+    if (!clave || !correoValido(para)) {
+      fallidos++;
+      await resultado("error", "La fila no tiene destinatario o plantilla válidos.");
+      continue;
+    }
+    const crudo = (n.valores && typeof n.valores === "object" ? n.valores : {}) as Record<string, unknown>;
+    const valores: Record<string, string> = { modulo: "UI GreenMetric" };
+    for (const [k, max] of Object.entries(VALORES_UGM)) valores[k] = limpio(crudo[k], max);
+    valores.titulo_aviso = valores.indicador || "Reporte de UI GreenMetric";
+    valores.detalle = [valores.indicador, valores.pregunta, valores.comentario, valores.lista].filter(Boolean).join(". ");
+    // La ruta abierta al rol «consulta» es /admin/reporte-rankings (0215); la antigua de 0213 se reescribe aquí también.
+    const rutaCruda = typeof crudo.ruta === "string" ? crudo.ruta.replace(/^\/admin\/rankings\//, "/admin/reporte-rankings/") : "";
+    const ruta = /^\/admin\/reporte-rankings\/[a-z0-9/?=&._-]{0,80}$/i.test(rutaCruda) ? rutaCruda : "/admin/reporte-rankings/green";
+    const base = sitio || "https://planeacion.udes.edu.co";
+    const hash = await huella(para, ENV("SEND_EMAIL_HOOK_SECRET") || serviceKey);
+    const ctx = await contextoDe(admin, hash, "");
+    const plantilla = plantillaDeFila(ctx?.templates?.[clave], clave) ?? PLANTILLA_UGM_RESPALDO;
+    const salida = await enviar(admin, ctx, {
+      tipo: "aviso",
+      plantilla,
+      persona: personaDe({ correo: para, nombre: limpio(n.nombre, 120), sede: "", rol: "" }),
+      rol: "administrativo",
+      para,
+      hash,
+      enlace: `${base}${ruta}`,
+      valores,
+      sitio,
+      accion: "ugm",
+      hook: "",
+      topeMs: SMTP_TOTAL_GANCHO_MS,
+    });
+    if (salida.ok) {
+      enviados++;
+      await resultado("enviado", null);
+    } else if (salida.code === "tope" || salida.code === "config" || salida.http >= 500) {
+      // Tope por hora, servidor sin configurar o servidor caído: se vuelve a intentar más tarde.
+      fallidos++;
+      await resultado("reintentar", salida.message);
+    } else {
+      fallidos++;
+      await resultado("error", salida.message);
+    }
+  }
+  return json({ ok: true, enviados, fallidos, pendientes: Math.max(0, lote.length - enviados - fallidos) });
+}
+
 /* --- La intranet: probar la conexión y enviar una prueba --------------------------------------- */
 
 async function panel(request: Request, crudo: string, url: string, anonKey: string, serviceKey: string): Promise<Response> {
@@ -1692,6 +1829,7 @@ async function panel(request: Request, crudo: string, url: string, anonKey: stri
   if (action === "codigo") return await codigoDePilo(request, body, url, serviceKey);
   if (action === "soporte") return await avisoDeSoporte(request, body, url, serviceKey);
   if (action === "gm") return await avisoDeGestionMaster(request, body, url, serviceKey);
+  if (action === "ugm_cola") return await colaDeUgm(request, body, url, anonKey, serviceKey);
   if (action !== "probar" && action !== "prueba") return json({ error: "Acción desconocida.", code: "datos" }, 400);
 
   // Solo la administración, con su sesión.

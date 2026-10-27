@@ -24,6 +24,10 @@ import { Icon } from "../../../components/ui/Icon";
 import { OBS_STATIONS, type ObsStationId } from "./stations";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { useAuth } from "../../../lib/auth";
+import { OBS_PANELS, usePermisosObservatorio } from "./publicar/permisos";
+import type { ObsPanel } from "./publicar/permisos";
+import { ObservatoriosPanel } from "./publicar/ObservatoriosPanel";
+import { InsertarPanel } from "./publicar/InsertarPanel";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { TOPICS, plural, topicConfig } from "./model";
 import type { ObsState } from "./model";
@@ -36,6 +40,7 @@ import "../udes-en-cifras/od-admin.css";
 import "../../datos-abiertos/datos-abiertos.css";
 import "../../datos-abiertos/components/free-sets.css";
 import "./obs-admin.css";
+import "./publicar/obsx.css";
 
 
 export interface ObsStationProps {
@@ -49,19 +54,28 @@ export function ObsAdmin() {
   const { station: stationParam, topic: topicParam } = useParams();
   const navigate = useNavigate();
   const { hasRole } = useAuth();
-  const canEdit = hasRole("planeacion");
+  const permisos = usePermisosObservatorio();
+  // Solo las estaciones cuyo panel marcó el rol (0231). Los paneles nuevos los arma O2.
+  const visibles = OBS_STATIONS.filter((s) => permisos.tiene(`obs_${s.id}` as const));
+  const station = (visibles.find((s) => s.id === stationParam)?.id ?? visibles[0]?.id ?? "captura") as ObsStationId;
+  const canEdit = hasRole("planeacion") && permisos.puede(`obs_${station}` as const, null, "editar");
   const query = useObsState();
   const commit = useObsCommit();
-  const station = (OBS_STATIONS.find((s) => s.id === stationParam)?.id ?? "captura") as ObsStationId;
+  const panel = stationParam === "observatorios" || stationParam === "insertar" ? stationParam : null;
+  const panelId: ObsPanel | null = panel ? (panel === "observatorios" ? "obs_observatorios" : "obs_insertar") : null;
+  const panelInfo = OBS_PANELS.find((p) => p.id === panelId);
   const topic = TOPICS.find((t) => t.slug === topicParam)?.slug ?? TOPICS[0].slug;
   const current = OBS_STATIONS.find((s) => s.id === station)!;
   const go = (s: ObsStationId, t = topic, q = "") => navigate(`/admin/observatorio/${s}/${t}${q ? `?${q}` : ""}`);
 
   return (
-    <AdminShell section="observatorio" kicker="Observatorio de Analítica" title={current.label} description={current.hint}>
-      {!canEdit && <ReadOnlyNotice>Tu rol consulta el Observatorio; para importar datos y armar visores hace falta capacidad de Planeación.</ReadOnlyNotice>}
+    <AdminShell section="observatorio" kicker="Observatorio de Analítica" title={panelInfo?.label ?? current.label} description={panelInfo?.hint ?? current.hint}>
+      {panelId && <PanelesNav actual={panel} />}
+      {panelId && (permisos.tiene(panelId) ? panel === "observatorios" ? <ObservatoriosPanel /> : <InsertarPanel /> : <ReadOnlyNotice>Tu rol no tiene el panel «{panelInfo?.label}».</ReadOnlyNotice>)}
+      {!panelId && visibles.length === 0 && <ReadOnlyNotice>Tu rol no tiene ningún panel del Observatorio marcado.</ReadOnlyNotice>}
+      {!panelId && !canEdit && <ReadOnlyNotice>Tu rol consulta el Observatorio; para importar datos y armar visores hace falta capacidad de Planeación.</ReadOnlyNotice>}
 
-      {query.isPending ? (
+      {panelId ? null : query.isPending ? (
         <LoadingBlock rows={6} label="Cargando el Observatorio" />
       ) : query.isError ? (
         <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
@@ -81,12 +95,13 @@ export function ObsAdmin() {
             </p>
           )}
 
-          <ObsStationBar station={station} topic={topic} state={query.data} />
+          <PanelesNav actual={null} />
+          <ObsStationBar station={station} topic={topic} state={query.data} visibles={visibles.map((s) => s.id)} />
 
           <div className="oda-workspace obs-workspace" data-station={station}>
             {station !== "diseno" && station !== "boletin" && <TopicRail state={query.data} active={topic} onPick={(slug) => go(station, slug)} />}
             <section className="oda-stage" aria-label={current.label}>
-              {station === "captura" && <CaptureStation state={query.data} topic={topic} canEdit={canEdit} go={go} />}
+              {visibles.length > 0 && station === "captura" && <CaptureStation state={query.data} topic={topic} canEdit={canEdit} go={go} />}
               {station === "diseno" && <DesignStation state={query.data} topic={topic} canEdit={canEdit} go={go} />}
               {station === "tableros" && <BoardsStation state={query.data} topic={topic} canEdit={canEdit} go={go} />}
               {station === "boletin" && <BulletinStation state={query.data} topic={topic} canEdit={canEdit} go={go} />}
@@ -98,9 +113,27 @@ export function ObsAdmin() {
   );
 }
 
+/* --- Los otros dos paneles (Observatorios, Insertar y publicar): enlaces a su pantalla ------------ */
+
+function PanelesNav({ actual }: { actual: "observatorios" | "insertar" | null }) {
+  const permisos = usePermisosObservatorio();
+  const items = ([["observatorios", "obs_observatorios"], ["insertar", "obs_insertar"]] as const).filter(([, p]) => permisos.tiene(p));
+  if (!items.length) return null;
+  return (
+    <nav className="obsx-pestanas obsx-paneles" aria-label="Paneles del Observatorio">
+      {actual && <NavLink to="/admin/observatorio" end>Estaciones</NavLink>}
+      {items.map(([id, p]) => (
+        <NavLink key={id} to={`/admin/observatorio/${id}`} aria-current={actual === id ? "page" : undefined}>
+          {OBS_PANELS.find((x) => x.id === p)?.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
 /* --- Barra de estaciones ------------------------------------------------------------ */
 
-function ObsStationBar({ station, topic, state }: { station: ObsStationId; topic: string; state: ObsState }) {
+function ObsStationBar({ station, topic, state, visibles }: { station: ObsStationId; topic: string; state: ObsState; visibles: ObsStationId[] }) {
   const real = state.datasets.filter((d) => !d.sample);
   const topicsWithData = new Set(state.datasets.map((d) => d.topic)).size;
   const topicsWithViews = new Set(state.views.filter((v) => v.visible).map((v) => v.topic)).size;
@@ -130,7 +163,7 @@ function ObsStationBar({ station, topic, state }: { station: ObsStationId; topic
   return (
     <nav className="oda-stations obs-stations" aria-label="Estaciones del Observatorio">
       <ol>
-        {OBS_STATIONS.map((s) => {
+        {OBS_STATIONS.filter((s) => visibles.includes(s.id)).map((s) => {
           const info = summary[s.id];
           return (
             <li key={s.id}>

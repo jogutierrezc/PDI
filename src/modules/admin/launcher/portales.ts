@@ -345,7 +345,15 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     color: "var(--wall-observatorio)",
     rank: 7,
     sections: () => [
-      { title: "El taller", cards: OBS_STATIONS.map((s) => ({ key: s.id, title: s.label, text: s.hint, to: `/admin/observatorio/${s.id}` })) },
+      // Cada estación aparece solo para quien su rol le marcó el panel (0231).
+      { title: "El taller", cards: OBS_STATIONS.map((s) => ({ key: s.id, title: s.label, text: s.hint, to: `/admin/observatorio/${s.id}`, screen: `obs_${s.id}` as AdminScreen })) },
+      {
+        title: "Observatorios y publicación",
+        cards: [
+          { key: "obs-observatorios", title: "Observatorios", text: "Crear y organizar observatorios, temas y líneas", to: "/admin/observatorio/observatorios", screen: "obs_observatorios" },
+          { key: "obs-insertar", title: "Insertar y publicar", text: "Código para otras páginas, dominios y registro de insertados", to: "/admin/observatorio/insertar", screen: "obs_insertar" },
+        ],
+      },
     ],
   },
   tableros: {

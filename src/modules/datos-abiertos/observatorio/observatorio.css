@@ -344,3 +344,19 @@
   .obs-series__bar,
   .obs-share__track i { transition: none; transform: none !important; }
 }
+
+/* --- Varios observatorios (O2): selector del Hub y portada de uno -------------------------- */
+
+.obs-otros { padding-block: var(--space-7); }
+.obs-otros h2 { margin: 0 0 var(--space-4); }
+.obs-otros__lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.obs-otros__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-4); color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); text-decoration: none; transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-base) ease; }
+.obs-otros__item strong { display: block; font-size: var(--text-base); }
+.obs-otros__item small { display: block; margin-top: 2px; color: var(--ink-muted); font-size: var(--text-sm); }
+.obs-otros__item:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.obs-otros__item:active { transform: scale(0.98); }
+.obs-otros__icono { display: inline-grid; place-items: center; width: 42px; height: 42px; color: #fff; background: var(--obs-color, var(--brand-blue)); border-radius: var(--radius-sm); flex: none; }
+@media (hover: hover) and (pointer: fine) { .obs-otros__item:hover { border-color: var(--obs-color, var(--brand-blue)); } }
+.obs-uno__titulo { display: flex; align-items: center; gap: var(--space-4); }
+.obs-uno__linea + .obs-uno__linea { margin-top: var(--space-7); }
+.obs-uno__linea > h2 { margin: 0 0 var(--space-3); font-size: var(--text-lg); }

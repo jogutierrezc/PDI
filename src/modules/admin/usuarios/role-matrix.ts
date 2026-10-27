@@ -43,12 +43,19 @@
    aunque otro módulo suba la capacidad del rol; por eso effectiveLevel no
    eleva Informes. La decide informe_gestiona() en la base.
 
+   El Observatorio de Analítica también va por su cuenta (0231): el rol elige
+   QUÉ PANELES (Captura, Diseño, Tableros, Boletín, Observatorios, Insertar y
+   publicar), el NIVEL (Ver · Editar · Administrar → access_roles.obs_nivel) y el
+   ALCANCE (todos los observatorios, o solo aquellos donde la persona figure
+   como responsable → all_obs). Los dos paneles nuevos jamás se heredan de
+   «todas las pantallas»: hay que marcarlos (EXPLICIT_ONLY).
+
    El rol va en el perfil de la persona. Lo que hace en cada unidad donde
    trabaja —Gestor, Contribuyente o Consulta— no es un rol de acceso: es su
    función en esa pertenencia (unit_members.role).
    ========================================================================== */
 
-import type { AccessRole, AdminScreen, AppRole, GmNivel, ImpactLevel, InformeLevel } from "../../../types/database";
+import type { AccessRole, AdminScreen, AppRole, GmNivel, ImpactLevel, InformeLevel, ObsNivel } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
@@ -67,6 +74,9 @@ export const LEVEL_LABEL: Record<Level, string> = {
 
 const RANK: Record<AppRole, number> = { consulta: 0, responsable: 1, planeacion: 2, admin: 3 };
 const LEVEL_RANK: Record<Level, number> = { none: 0, ver: 1, editar: 2, administrar: 3 };
+
+/** Pantallas que «todas las pantallas» NO incluye: se otorgan solo si el rol las marca (Observatorio, 0231). */
+export const EXPLICIT_ONLY: AdminScreen[] = ["obs_observatorios", "obs_insertar"];
 
 export interface ModuleDef {
   id: ModuleId;
@@ -122,10 +132,22 @@ export const MODULES: ModuleDef[] = [
   {
     id: "observatorio",
     label: "Observatorio de Analítica",
-    screens: [{ id: "observatorio", label: "Taller del Observatorio" }],
+    screens: [
+      { id: "observatorio", label: "Entrada al Observatorio", note: "la puerta general del módulo; sin ella no se ve ningún panel" },
+      { id: "obs_captura", label: "Captura de datos", note: "importar, analizar y anonimizar las tablas de cada tema" },
+      { id: "obs_diseno", label: "Diseño visual", note: "armar los visores (gráficas) sobre las tablas" },
+      { id: "obs_tableros", label: "Tableros", note: "tipo de informe de cada tema; publicar o despublicar" },
+      { id: "obs_boletin", label: "Boletín", note: "el PDF del Observatorio por temas, años y fuentes" },
+      { id: "obs_observatorios", label: "Observatorios", note: "crear y organizar observatorios, temas y líneas; asignar personas responsables. No se otorga sola" },
+      { id: "obs_insertar", label: "Insertar y publicar", note: "generar el código para otras páginas, administrar dominios y ver el registro de insertados. No se otorga sola" },
+    ],
     levels: {
-      ver: { hint: "Ve los temas y boletines en preparación.", needs: "consulta" },
-      editar: { hint: "Prepara y publica temas y boletines.", needs: "planeacion" },
+      ver: { hint: "Consulta lo que hay en los paneles marcados, sin cambiarlo.", needs: "consulta" },
+      editar: { hint: "Prepara y organiza contenido en los paneles marcados (pide capacidad de Planeación).", needs: "planeacion" },
+      administrar: {
+        hint: "Además crea y archiva observatorios, autoriza dominios externos y revoca insertados (pide capacidad de Planeación).",
+        needs: "planeacion",
+      },
     },
   },
   {
@@ -323,6 +345,8 @@ export const MODULES: ModuleDef[] = [
 ];
 
 export const ALL_SCREENS: AdminScreen[] = MODULES.flatMap((module) => module.screens.map((screen) => screen.id));
+/** Lo que significa all_screens: todas, salvo las de otorgamiento explícito. */
+const IMPLICIT_SCREENS: AdminScreen[] = ALL_SCREENS.filter((screen) => !EXPLICIT_ONLY.includes(screen));
 
 export const SCREEN_LABELS = Object.fromEntries(
   MODULES.flatMap((module) => module.screens.map((screen) => [screen.id, screen.label])),
@@ -373,6 +397,13 @@ export interface Matrix {
   informe: InformeScope;
   /** Gestión Master (0194). */
   gm: GmScope;
+  /** Observatorio (0231): todos los observatorios, o solo los que se asignen a la persona. */
+  obs: ObsScope;
+}
+
+/** Observatorio (0231): sobre qué observatorios actúa el rol. */
+export interface ObsScope {
+  allObs: boolean;
 }
 
 /** Lo que se guarda en access_roles (más las listas de informes y de unidades). */
@@ -394,11 +425,16 @@ export interface RoleColumns {
   gm_nivel: GmNivel;
   /** La función que firma (vaf, planeacion…); solo si el nivel es revisor o gestor. */
   gm_funcion: string | null;
+  /** Observatorio (0231): none sin el módulo; ver · editar · administrar con él. */
+  obs_nivel: ObsNivel;
+  /** Observatorio (0231): todos los observatorios o solo los asignados (obs_responsables). */
+  all_obs: boolean;
 }
 
 const emptyImpact = (): ImpactScope => ({ allUnits: false, units: [] });
 const emptyInforme = (): InformeScope => ({ level: "none", allUnits: false, units: [] });
 const emptyGm = (): GmScope => ({ papel: "solicitante", funcion: "" });
+const emptyObs = (): ObsScope => ({ allObs: true });
 
 /** Nivel de la matriz → gm_nivel. «Ver» no da acceso (como Impacto): el permiso es explícito. */
 const gmNivelOf = (level: Level, gm: GmScope): GmNivel => (level === "editar" ? gm.papel : level === "administrar" ? "gestor" : "none");
@@ -411,7 +447,8 @@ const levelOfImpact = (impact: ImpactLevel | undefined): Level =>
   impact === "editor" ? "editar" : impact === "admin" ? "administrar" : "ver";
 
 const moduleOf = (id: ModuleId) => MODULES.find((module) => module.id === id)!;
-const allOf = (id: ModuleId) => moduleOf(id).screens.map((screen) => screen.id);
+/** Las pantallas de un módulo que «todas» incluye (sin las de otorgamiento explícito). */
+const allOf = (id: ModuleId) => moduleOf(id).screens.map((screen) => screen.id).filter((screen) => !EXPLICIT_ONLY.includes(screen));
 
 function emptyModules(): Record<ModuleId, ModuleChoice> {
   return Object.fromEntries(MODULES.map((module) => [module.id, { level: "none", screens: [] }])) as unknown as Record<
@@ -447,6 +484,8 @@ export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
   if (id === "informes") return choice.level;
   // Gestión Master: el nivel es el elegido (gm_nivel), nunca la capacidad (0194).
   if (id === "gestion-master") return choice.level;
+  // Observatorio: el nivel es el elegido (obs_nivel); pedir Editar o Administrar ya sube la capacidad a Planeación (0231).
+  if (id === "observatorio") return choice.level;
   const capacity = capacityOf(matrix);
   const module = moduleOf(id);
   if (module.seenFrom && RANK[capacity] < RANK[module.seenFrom]) return "none";
@@ -486,10 +525,18 @@ export function compile(matrix: Matrix): RoleColumns {
   const informeLevel: InformeLevel = informeOn && !informeGestion ? matrix.informe.level : "none";
   const gmOn = matrix.modules["gestion-master"].level !== "none" && matrix.modules["gestion-master"].screens.length > 0;
   const gmNivel: GmNivel = gmOn ? gmNivelOf(matrix.modules["gestion-master"].level, matrix.gm) : "none";
+  // Observatorio (0231): con cualquier panel marcado, la entrada general va siempre; el nivel se guarda en obs_nivel.
+  const obsOn = matrix.modules.observatorio.level !== "none" && matrix.modules.observatorio.screens.length > 0;
+  if (obsOn && !screens.includes("observatorio")) screens.unshift("observatorio");
+  const obsNivel: ObsNivel = obsOn ? (matrix.modules.observatorio.level as ObsNivel) : "none";
+  // «Todas las pantallas» no incluye las de otorgamiento explícito: si están todas las demás, se guarda all_screens
+  // y solo se listan esas.
+  const implicit = screens.filter((screen) => !EXPLICIT_ONLY.includes(screen));
+  const allScreens = implicit.length === IMPLICIT_SCREENS.length;
   return {
     base_role: capacityOf(matrix),
-    screens: screens.length === ALL_SCREENS.length ? [] : screens,
-    all_screens: screens.length === ALL_SCREENS.length,
+    screens: allScreens ? screens.filter((screen) => EXPLICIT_ONLY.includes(screen)) : screens,
+    all_screens: allScreens,
     all_reports: allReports,
     reports: cifras && !allReports ? [...matrix.reports].sort() : [],
     impact_level: impactLevel,
@@ -501,19 +548,22 @@ export function compile(matrix: Matrix): RoleColumns {
     informe_gestion: informeGestion,
     gm_nivel: gmNivel,
     gm_funcion: (gmNivel === "revisor" || gmNivel === "gestor") && matrix.gm.funcion ? matrix.gm.funcion : null,
+    obs_nivel: obsNivel,
+    all_obs: obsOn ? matrix.obs.allObs : true,
   };
 }
 
 /** Columnas de un rol guardado → matriz, para editarlo. */
 export function decompile(
   role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports"> &
-    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion" | "gm_nivel" | "gm_funcion">>,
+    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion" | "gm_nivel" | "gm_funcion" | "obs_nivel" | "all_obs">>,
   reports: string[],
   units: string[] = [],
   informeUnits: string[] = [],
 ): Matrix {
   const modules = emptyModules();
-  const seen = role.all_screens ? ALL_SCREENS : role.screens;
+  // «Todas» no incluye las pantallas de otorgamiento explícito (Observatorio, 0231): esas solo si el rol las lista.
+  const seen = role.all_screens ? [...IMPLICIT_SCREENS, ...role.screens.filter((screen) => EXPLICIT_ONLY.includes(screen))] : role.screens;
   const draft: Matrix = {
     modules,
     allReports: role.all_reports,
@@ -521,6 +571,7 @@ export function decompile(
     impact: { allUnits: role.all_impact_units ?? false, units: [...units] },
     informe: { level: role.informe_level ?? "none", allUnits: role.all_informe_units ?? false, units: [...informeUnits] },
     gm: { papel: role.gm_nivel === "revisor" ? "revisor" : "solicitante", funcion: role.gm_funcion ?? "" },
+    obs: { allObs: role.all_obs ?? true },
   };
   for (const module of MODULES) {
     const screens = module.screens.map((screen) => screen.id).filter((screen) => seen.includes(screen));
@@ -531,7 +582,7 @@ export function decompile(
   // esa capacidad le permite. Es lo que la base hace cumplir.
   const capacity = role.base_role;
   for (const module of MODULES) {
-    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto" || module.id === "informes" || module.id === "gestion-master") continue;
+    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto" || module.id === "informes" || module.id === "gestion-master" || module.id === "observatorio") continue;
     let best: Level = "ver";
     for (const [level, def] of Object.entries(module.levels) as [Exclude<Level, "none">, { needs: AppRole }][]) {
       if (module.id === "cifras" && level === "administrar" && !role.all_reports) continue;
@@ -550,6 +601,12 @@ export function decompile(
   if (modules["gestion-master"].screens.length > 0) {
     modules["gestion-master"].level = role.gm_nivel === "gestor" ? "administrar" : role.gm_nivel === "solicitante" || role.gm_nivel === "revisor" ? "editar" : "ver";
   }
+  // Observatorio: su nivel es el que guarda obs_nivel. Un rol anterior a 0231 (obs_nivel = none) lo deriva de la
+  // capacidad, como hace la base; y Editar o Administrar piden capacidad de Planeación.
+  if (modules.observatorio.screens.length > 0) {
+    const stored: Level = role.obs_nivel && role.obs_nivel !== "none" ? role.obs_nivel : capacity === "admin" ? "administrar" : capacity === "planeacion" ? "editar" : "ver";
+    modules.observatorio.level = RANK[capacity] < RANK.planeacion ? "ver" : stored;
+  }
   return draft;
 }
 
@@ -557,8 +614,8 @@ export function decompile(
 
 export const TEMPLATES: { id: Exclude<TemplateId, "personalizada">; label: string; hint: string }[] = [
   { id: "consulta", label: "Consulta", hint: "Ve toda la intranet y no cambia nada." },
-  { id: "editor", label: "Editor", hint: "Escribe y publica en el Portal, el Plan, UDES en Cifras y el Observatorio." },
-  { id: "administrador", label: "Administrador", hint: "Todo, incluidas la estructura institucional, las personas y los roles." },
+  { id: "editor", label: "Editor", hint: "Escribe y publica en el Portal, el Plan, UDES en Cifras y las cuatro estaciones del Observatorio (no crea observatorios ni inserta)." },
+  { id: "administrador", label: "Administrador", hint: "Todo, incluidas la estructura institucional, las personas, los roles y los paneles Observatorios e Insertar y publicar." },
 ];
 
 function full(id: ModuleId, level: Level): ModuleChoice {
@@ -568,7 +625,7 @@ function full(id: ModuleId, level: Level): ModuleChoice {
 /** La matriz de una plantilla. */
 export function templateMatrix(template: Exclude<TemplateId, "personalizada">): Matrix {
   const modules = emptyModules();
-  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme(), gm: emptyGm() };
+  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme(), gm: emptyGm(), obs: emptyObs() };
   if (template === "consulta") {
     for (const module of MODULES) modules[module.id] = full(module.id, "ver");
     return base;
@@ -602,6 +659,8 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     // persona, y una plantilla no puede adivinarlas.
     modules[module.id] = full(module.id, module.id === "impacto" || module.id === "gestion-master" ? "ver" : levels[levels.length - 1]);
   }
+  // El administrador sí recibe, de forma explícita, los dos paneles nuevos del Observatorio.
+  modules.observatorio = { level: "administrar", screens: moduleOf("observatorio").screens.map((screen) => screen.id) };
   return base;
 }
 
@@ -614,6 +673,8 @@ const sameColumns = (a: RoleColumns, b: RoleColumns) =>
   a.informe_level === b.informe_level &&
   a.informe_gestion === b.informe_gestion &&
   a.gm_nivel === b.gm_nivel &&
+  a.obs_nivel === b.obs_nivel &&
+  a.all_obs === b.all_obs &&
   (a.gm_funcion ?? "") === (b.gm_funcion ?? "") &&
   a.all_informe_units === b.all_informe_units &&
   [...a.informe_units].sort().join() === [...b.informe_units].sort().join() &&
@@ -685,6 +746,14 @@ export function describe(
         : names.length > 0
           ? `En Informes de gestión ${does} el informe de: ${list(names)}.`
           : "En Informes de gestión no tiene unidades asignadas: solo escribe el de su unidad, si pertenece a una.",
+    );
+  }
+  const obs = effectiveLevel(matrix, "observatorio");
+  if (obs !== "none") {
+    const panels = moduleOf("observatorio").screens.filter((s) => s.id !== "observatorio" && matrix.modules.observatorio.screens.includes(s.id)).map((s) => s.label);
+    const does = obs === "administrar" ? "administra (además crea y archiva observatorios, autoriza dominios y revoca insertados)" : obs === "editar" ? "edita" : "consulta";
+    lines.push(
+      `En el Observatorio ${does}: ${panels.length ? list(panels) : "ningún panel (solo la entrada)"}; ${matrix.obs.allObs ? "en todos los observatorios" : "solo en los observatorios donde figure como persona responsable"}.`,
     );
   }
   const gm = effectiveLevel(matrix, "gestion-master");

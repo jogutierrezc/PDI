@@ -34,6 +34,7 @@ import { AvancePlan } from "./vivos/AvancePlan";
 import { PilaresPlan } from "./vivos/PilaresPlan";
 import { EnvolturaPlaneacion, EquipoOficina, GaleriaOficina, MosaicoPortales, RecientesOficina } from "./vivos/OficinaPlaneacion";
 import { MicrositioVivo } from "./vivos/RankingSecciones";
+import { BloqueRanking } from "../../rankings/uigreen/publico/BloqueRanking";
 import { ALINEACIONES, ALTO_HTML, ANCHOS, FONDOS, alinearDe, contenedorDe, destinoSeguro, documentoHtml, estiloDe, leerCifra, mapaOsm, medidaDe, hijosPlanos, idHijo, movimientoDe, ocultoDe, videoDatos, videoMiniatura, videoUrl, type HijoContenedor } from "./logica";
 import { initialsOf, officePhotoUrl } from "../../planeacion/page";
 import { PROPORCIONES_COLUMNAS, definicion } from "./bloques";
@@ -1673,6 +1674,8 @@ function Contenido({ bloque, navegable, disparo = "", auto = true, ocultos = fal
       return <IndicadoresElegidosVivo p={p} navegable={navegable} />;
     case "tablero-sostenibilidad":
       return <TableroSostenibilidad p={p} navegable={navegable} />;
+    case "ranking-avance":
+      return <BloqueRanking ranking={texto(p.ranking) || "green"} modo={p.seccion === "avance" ? "avance" : "pared"} antetitulo={texto(p.antetitulo)} titulo={texto(p.titulo)} texto={texto(p.texto)} navegable={navegable} />;
     case "avance-plan":
       return <AvancePlan />;
     case "pilares-plan":

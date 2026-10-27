@@ -25,6 +25,10 @@
      evaluar   { report_id, indicator }→ { ok, eval }
      mejorar   { report_id, indicator }→ { ok, antes, despues }
      traducir  { report_id, news_ids? }→ { ok, bloques, noticias, fallos, quedan }
+     traducir-campos { ciclo_id, items:[{ref, es}], glosario?:[{es, en}] }
+                                       → { ok, traducciones:[{ref, en, warn}], fallos:[{ref, error}], modelo }
+                 UI GreenMetric (0208): hasta 12 textos de 4000 caracteres y 14 000 en total, con el glosario del
+                 ranking; verifica cifras y siglas; 40 llamadas por persona y hora; no guarda nada.
 
    Reglas:
      · Solo Planeación o la administración, con sesión; «traducir-texto» también
@@ -50,7 +54,7 @@ import { foldSystem, roleRejected } from "../noticias-pilo/logica.ts";
 import { INDICADORES_THE } from "./indicadores.ts";
 import { anioDeNoticias, rangoFechasDeAnio } from "./anios.ts";
 import { extraerCifras, leerConfirmacion, mensajesConfirmarCifras, type CifraParaConfirmar } from "./cifras.ts";
-import { combinarRiesgos, completarFicha, leerEvaluacion, leerFichaMejorada, leerTextoParaTraducir, leerTraduccionTexto, leerTraducciones, mensajesEvaluar, mensajesMejorar, mensajesTraducir, puedeLlamar, validarFicha, verificarTraduccion, type Evaluacion, type ItemTraducir } from "./ficha.ts";
+import { combinarRiesgos, completarFicha, leerEvaluacion, leerFichaMejorada, leerCamposParaTraducir, leerTextoParaTraducir, leerTraduccionTexto, leerTraducciones, mensajesEvaluar, mensajesMejorar, mensajesTraducir, mensajesTraducirCampos, puedeLlamar, validarFicha, verificarTraduccion, type Evaluacion, type ItemTraducir } from "./ficha.ts";
 import { aNotaVirtual, datosCifras, datosImpacto, datosProyectos, ESTADO_FUENTES, type Criterio, type DatoFuente, type FilaCifras, type FilaImpacto, type FilaProyecto } from "./fuentes.ts";
 import { leerVision, mensajesVision, organizarImagenes, type ImagenDeNota, type UsoNota } from "./imagenes.ts";
 import {
@@ -182,7 +186,9 @@ Deno.serve(async (request: Request) => {
   const step = PASOS.includes(String(cuerpo.step)) ? String(cuerpo.step) : PASOS.includes(String(cuerpo.action)) ? String(cuerpo.action) : "";
   // «traducir-texto»: un comentario suelto (no es un informe); no guarda nada.
   const TEXTO = cuerpo.action === "traducir-texto";
-  if (!step && !TEXTO) return json({ error: "Paso desconocido." }, 400);
+  // «traducir-campos» (UI GreenMetric): varios textos del reporte con el glosario del ranking; no guarda nada.
+  const CAMPOS = cuerpo.action === "traducir-campos";
+  if (!step && !TEXTO && !CAMPOS) return json({ error: "Paso desconocido." }, 400);
 
   // Quién llama: Planeación o la administración, con sesión activa; «traducir-texto», también
   // quien es Gestor o Contribuyente (jefe o editor) de alguna oficina (puedeLlamar, ficha.ts).
@@ -193,7 +199,17 @@ Deno.serve(async (request: Request) => {
   const { data: perfil } = await admin.from("profiles").select("role, is_active").eq("id", who.data.user.id).maybeSingle();
   const { data: membresias } = TEXTO ? await admin.from("unit_members").select("role").eq("profile_id", who.data.user.id) : { data: [] };
   const rolesUnidad = ((membresias ?? []) as { role: string }[]).map((m) => m.role);
-  if (!puedeLlamar({ texto: TEXTO, perfil, rolesUnidad })) {
+  if (CAMPOS) {
+    // Planeación o la administración, o quien tiene una asignación vigente de responsable o apoyo en un ciclo de UI GreenMetric (0208).
+    const conRol = Boolean(perfil?.is_active) && ["planeacion", "admin"].includes(String(perfil?.role));
+    let conAsignacion = false;
+    if (perfil?.is_active && !conRol) {
+      const a = await admin.from("ugm_asignaciones").select("id", { count: "exact", head: true }).eq("usuario_id", who.data.user.id).eq("vigente", true).in("rol", ["responsable", "apoyo"]);
+      if (a.error) return json({ error: "Falta aplicar la migración 0208 (UI GreenMetric).", code: "migracion" }, 503);
+      conAsignacion = (a.count ?? 0) > 0;
+    }
+    if (!conRol && !conAsignacion) return json({ error: "Solo Planeación o quien tiene asignado un indicador de UI GreenMetric." }, 403);
+  } else if (!puedeLlamar({ texto: TEXTO, perfil, rolesUnidad })) {
     return json({ error: TEXTO ? "Solo Planeación o quien diligencia el reporte en una oficina (Gestor o Contribuyente)." : "Solo Planeación o la administración." }, 403);
   }
 
@@ -223,7 +239,7 @@ Deno.serve(async (request: Request) => {
     if (error) return json(faltaMigracion(error) ? MIGRACION : { error: error.message }, 500);
     if (!data) return json({ error: "No existe ese informe." }, 404);
     informe = data as unknown as Informe;
-  } else if (!TEXTO && !(step === "cifras" && Number(cuerpo.ods) >= 1 && Number(cuerpo.ods) <= 17)) {
+  } else if (!TEXTO && !CAMPOS && !(step === "cifras" && Number(cuerpo.ods) >= 1 && Number(cuerpo.ods) <= 17)) {
     return json({ error: "Falta el informe (report_id)." }, 400);
   }
   if (informe && informe.state === "publicado" && step !== "cifras") return json({ error: "El informe está publicado: pásalo a revisión para que Pilo escriba en él.", code: "publicado" }, 409);
@@ -437,6 +453,36 @@ Deno.serve(async (request: Request) => {
       }
       await bitacora(1, 0, null);
       return json({ ok: true, en: r.valor });
+    } catch (e) {
+      return alto(e);
+    }
+  }
+
+  // UI GreenMetric: varios textos en español → inglés, con glosario. Cuota por persona; no guarda la traducción ---
+  if (CAMPOS) {
+    const crudo = cuerpo as unknown as { items?: unknown; glosario?: unknown; ciclo_id?: unknown };
+    const leido = leerCamposParaTraducir(crudo.items, crudo.glosario);
+    if (!leido.ok) return json({ error: leido.error, code: "texto" }, 400);
+    const ciclo = typeof crudo.ciclo_id === "string" && /^[0-9a-f-]{36}$/i.test(crudo.ciclo_id) ? crudo.ciclo_id : "";
+    if (!ciclo) return json({ error: "Falta el ciclo (ciclo_id).", code: "ciclo" }, 400);
+    const cic = await admin.from("ranking_cycles").select("id").eq("id", ciclo).eq("ranking", "ui-greenmetric").maybeSingle();
+    if (!cic.data) return json({ error: "Ese ciclo no es de UI GreenMetric.", code: "ciclo" }, 404);
+    // Cuota: 40 llamadas por persona y hora. Se anota en la bitácora de UI GreenMetric (ugm_actividad).
+    const desde = new Date(Date.now() - 3_600_000).toISOString();
+    const usadas = await admin.from("ugm_actividad").select("id", { count: "exact", head: true }).eq("actor", who.data.user.id).eq("accion", "traduccion_pilo").gte("created_at", desde);
+    if (usadas.error) return json({ error: "Falta aplicar la migración 0208 (UI GreenMetric).", code: "migracion" }, 503);
+    if ((usadas.count ?? 0) >= 40) return json({ error: "Llegó al límite de 40 traducciones por hora. Intente más tarde.", code: "cuota" }, 429);
+    if (motivo) return json({ error: motivo, code: "sin_ia", ...enUso }, 503);
+    try {
+      const { items, glosario } = leido.valor;
+      const r = await llamarVerificado(mensajesTraducirCampos(items, glosario), 4000, (c) => leerTraducciones(c, items));
+      if (!r.ok) {
+        await bitacora(0, 1, r.error);
+        return json({ error: `Pilo no logró una traducción verificable: ${r.error}`, code: "verificacion" }, 422);
+      }
+      await admin.from("ugm_actividad").insert({ ciclo_id: ciclo, actor: who.data.user.id, accion: "traduccion_pilo", detalle: { textos: items.length, buenas: r.valor.buenas.length, malas: r.valor.malas.length } });
+      await bitacora(r.valor.buenas.length, r.valor.malas.length, null);
+      return json({ ok: true, traducciones: r.valor.buenas, fallos: r.valor.malas, modelo: enUso.modelo });
     } catch (e) {
       return alto(e);
     }

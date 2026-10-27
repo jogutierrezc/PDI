@@ -138,7 +138,8 @@ export type Alcance = "cuerpo" | "completo";
 export const VARIABLES_POR_TIPO: Record<TipoPlantilla, readonly string[]> = {
   enlace: [...DATOS, "enlace"],
   codigo: [...DATOS, "codigo", "vigencia"],
-  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle"],
+  // UI GreenMetric (0213) usa los datos de la segunda línea: indicador, pregunta, categoría, vencimiento, etc.
+  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle", "indicador", "pregunta", "categoria", "fecha_limite", "dias", "comentario", "autor", "revisor", "cantidad", "lista"],
 };
 
 /** Cómo se llama cada dato en los botones de «Insertar un dato». */
@@ -153,6 +154,16 @@ export const ETIQUETA_VARIABLE: Record<string, string> = {
   modulo: "Módulo",
   titulo_aviso: "Título del aviso",
   detalle: "Detalle",
+  indicador: "Indicador",
+  pregunta: "Pregunta",
+  categoria: "Categoría",
+  fecha_limite: "Fecha límite",
+  dias: "Días que faltan",
+  comentario: "Comentario",
+  autor: "Quién lo envió",
+  revisor: "Quién revisa",
+  cantidad: "Cantidad",
+  lista: "Lista",
 };
 
 /** Valores de ejemplo para la vista previa y para «Enviar una prueba». Los datos de la persona vienen de PERSONAS_DE_EJEMPLO. */
@@ -163,6 +174,16 @@ export const VALORES_DE_EJEMPLO: Record<string, string> = {
   modulo: "UDES en Cifras",
   titulo_aviso: "Matrícula 2026-1",
   detalle: "El corte de matrícula 2026-1 quedó validado y publicado.",
+  indicador: "1.10 · SI3",
+  pregunta: "Área total cubierta por vegetación plantada",
+  categoria: "Entorno e infraestructura",
+  fecha_limite: "15 de noviembre de 2026",
+  dias: "3",
+  comentario: "El mapa no muestra los nombres de los edificios.",
+  autor: "Marcela Quintero",
+  revisor: "Sergio Beltrán",
+  cantidad: "3",
+  lista: "1.10 · SI3, vence el 15 de noviembre; 2.6, vence mañana",
 };
 
 /** El tope del HTML de una plantilla, en caracteres (la base lo rechaza más allá). */

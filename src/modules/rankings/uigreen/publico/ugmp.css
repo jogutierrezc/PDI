@@ -1,0 +1,684 @@
+/* =============================================================================
+   UI GreenMetric · página pública (prefijo ugmp-).
+
+   Sobre los tokens `--o-*` de `.odsx` (ods.css) y las piezas `opt-*` del portal de
+   informes ODS (ods-portal.css): tema claro, esquinas vivas. Aquí solo lo propio:
+   la tira de siete colores, la regleta de cuadros, la cabecera de categoría, la
+   lista de indicadores, tablas, evidencias y el bloque del CMS.
+   El movimiento lo pone GSAP (movimiento.ts); aquí solo transiciones cortas y,
+   con prefers-reduced-motion, ninguna.
+   ========================================================================== */
+
+.ugmp {
+  /* Las gráficas de Datos de Sostenibilidad leen estas variables del sitio: aquí, siempre en claro. */
+  --ink: var(--o-ink);
+  --ink-muted: var(--o-muted);
+  --ink-secondary: var(--o-muted);
+  --line: var(--o-line);
+  --line-strong: var(--o-rule);
+  --surface: var(--o-surface);
+}
+
+.ugmp-bands {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  height: 6px;
+}
+.ugmp-bands i {
+  display: block;
+}
+
+.ugmp-regla {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--o-muted);
+}
+.ugmp-of {
+  font-style: normal;
+  font-size: 0.5em;
+  letter-spacing: 0;
+  color: var(--o-muted);
+}
+
+/* --- Regleta: un cuadro por indicador, lleno si está publicado ------------------------------------ */
+
+.ugmp-ticks {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  align-items: flex-end;
+  max-width: 100%;
+}
+.ugmp-tk {
+  flex: 1 1 0;
+  min-width: 3px;
+  max-width: 14px;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 60%, transparent);
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+.ugmp-tk.on {
+  background: currentColor;
+  border-color: currentColor;
+}
+.ugmp-ticks.wide {
+  height: 18px;
+  margin: 6px 0 4px;
+  max-width: 420px;
+  color: var(--o-acc-deep);
+}
+.ugmp-ticks.wide .ugmp-tk {
+  max-width: 18px;
+}
+
+/* --- Pared: ajustes de los carteles ------------------------------------------------------------------ */
+
+.ugmp-card .opt-card__fig {
+  color: color-mix(in srgb, var(--p-on) 34%, transparent);
+}
+.ugmp-ico {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ugmp-card__st {
+  display: grid;
+  gap: 6px;
+}
+.ugmp-wall.is-quiet .opt-card {
+  filter: saturate(0.55);
+}
+.ugmp-card .opt-card__id {
+  right: 8%;
+}
+.ugmp-card.is-xl .opt-card__id,
+.ugmp-card.is-w .opt-card__id {
+  right: 36%;
+}
+.ugmp-card .opt-card__link:focus-visible {
+  outline: 3px solid var(--p-on);
+  outline-offset: -9px;
+}
+
+/* --- Estados ------------------------------------------------------------------------------------------ */
+
+.ugmp-estado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-block: 64px;
+  font-size: 15px;
+  color: var(--o-muted);
+}
+.ugmp-spin {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--o-line);
+  border-top-color: var(--o-ink);
+  border-radius: 50%;
+  animation: ugmp-giro 0.8s linear infinite;
+}
+@keyframes ugmp-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ugmp-vacio {
+  display: grid;
+  gap: 6px;
+  margin-block: 32px;
+  padding: 22px 24px;
+  border: 1.5px solid var(--o-line);
+  border-left: 4px solid var(--o-rule);
+  background: var(--o-surface);
+  font-size: 15px;
+}
+.ugmp-vacio span {
+  color: var(--o-muted);
+}
+
+/* --- Categoría: cabecera de color ------------------------------------------------------------------- */
+
+.ugmp-chead {
+  position: relative;
+  overflow: hidden;
+  background: var(--ugmp-bg);
+  color: var(--ugmp-on);
+}
+.ugmp-chead__in {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding-block: clamp(32px, 5vw, 64px);
+  min-height: 220px;
+  align-content: end;
+}
+.ugmp-chead__num {
+  position: absolute;
+  right: 0;
+  top: -0.12em;
+  font-size: clamp(8rem, 26vw, 17rem);
+  font-weight: 800;
+  font-stretch: 75%;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  color: color-mix(in srgb, var(--ugmp-on) 22%, var(--ugmp-bg));
+  pointer-events: none;
+}
+.ugmp-chead__code {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.odsx .ugmp-chead__name {
+  position: relative;
+  max-width: 18ch;
+  font-size: clamp(2.2rem, 1.2rem + 4.4vw, 4.4rem);
+  font-weight: 800;
+  font-stretch: 75%;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  color: inherit;
+}
+.odsx .ugmp-chead__lede {
+  position: relative;
+  max-width: 56ch;
+  font-size: 16.5px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+/* --- Categoría: indicadores -------------------------------------------------------------------------- */
+
+.ugmp-h {
+  margin: 40px 0 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--o-muted);
+}
+.ugmp-inds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid var(--o-rule);
+}
+.ugmp-ind {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) minmax(150px, 220px);
+  gap: 8px 28px;
+  padding: 26px 0;
+  border-bottom: 1px solid var(--o-line);
+}
+.ugmp-ind.is-new {
+  animation: ugmp-nuevo 1.6s ease-out 1;
+}
+@keyframes ugmp-nuevo {
+  from {
+    background: var(--o-acc-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+.ugmp-ind__code {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  font-size: 22px;
+  font-weight: 800;
+  font-stretch: 75%;
+  letter-spacing: -0.01em;
+}
+.ugmp-ind__code small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--o-muted);
+}
+.ugmp-ind__body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  align-content: start;
+}
+.odsx .ugmp-ind__body h3 {
+  font-size: 20px;
+  font-weight: 800;
+  font-stretch: 87.5%;
+  letter-spacing: -0.012em;
+}
+.odsx .ugmp-ind__body p {
+  max-width: 68ch;
+  line-height: 1.6;
+}
+.ugmp-ind__val {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  justify-items: end;
+  text-align: right;
+}
+.ugmp-ind__val b {
+  font-size: clamp(34px, 2rem + 1.4vw, 52px);
+  font-weight: 800;
+  font-stretch: 75%;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ugmp-ind__val span {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.ugmp-ind__val small {
+  font-size: 12px;
+  color: var(--o-muted);
+}
+.ugmp-ind__val .ugmp-frase {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.ugmp-evh {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--o-muted);
+}
+.ugmp-evid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.ugmp-evid li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+}
+.ugmp-evid a,
+.ugmp-tabla a,
+.ugmp-campos a {
+  color: var(--o-brand);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+.ugmp-evid small,
+.ugmp-fuente,
+.ugmp-sin-evid {
+  font-size: 12.5px;
+  color: var(--o-muted);
+}
+.odsx .ugmp-sin-evid {
+  font-size: 13.5px;
+}
+.ugmp-campos {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: 0;
+  border-top: 1px solid var(--o-line);
+}
+.ugmp-campos > div {
+  display: contents;
+}
+.ugmp-campos dt,
+.ugmp-campos dd {
+  margin: 0;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--o-line);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.ugmp-campos dt {
+  padding-right: 18px;
+  font-weight: 700;
+  color: var(--o-muted);
+}
+.ugmp-campos dd {
+  overflow-wrap: anywhere;
+}
+.ugmp-tabla {
+  overflow-x: auto;
+  max-height: 360px;
+  border: 1px solid var(--o-line);
+  background: var(--o-surface);
+}
+.ugmp-tabla table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.ugmp-tabla caption {
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 800;
+}
+.ugmp-tabla th,
+.ugmp-tabla td {
+  padding: 7px 10px;
+  text-align: left;
+  border-top: 1px solid var(--o-line);
+  vertical-align: top;
+}
+.ugmp-tabla th {
+  position: sticky;
+  top: 0;
+  background: var(--o-surface-2);
+  font-weight: 800;
+}
+.ugmp-tabla .ugmp-fuente {
+  padding: 8px 10px;
+}
+.ugmp-graficas {
+  display: grid;
+  gap: 18px;
+}
+
+/* --- Categoría: programas, otras categorías, pie ---------------------------------------------------- */
+
+.ugmp-progs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0 28px;
+  border-top: 2px solid var(--o-rule);
+}
+.ugmp-progs li {
+  display: grid;
+  gap: 2px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--o-line);
+}
+.ugmp-progs span {
+  font-size: 13.5px;
+  color: var(--o-muted);
+}
+.ugmp-otras ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ugmp-otras a {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--o-ink);
+  color: var(--o-ink);
+  font-size: 14px;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s var(--o-ease);
+}
+.ugmp-otras a b {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.ugmp-otras a[aria-current="page"] {
+  background: var(--o-ink);
+  color: #fff;
+}
+.ugmp-otras a:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ugmp-otras a:not([aria-current="page"]):hover {
+    background: var(--o-surface-2);
+  }
+}
+.odsx .ugmp-foot {
+  margin-top: 28px;
+  font-size: 12.5px;
+  color: var(--o-muted);
+}
+
+/* --- Hoja de evidencia ------------------------------------------------------------------------------------- */
+
+.ugmp-oev {
+  display: block;
+  background: #f4f5f2;
+  min-height: 100dvh;
+}
+.ugmp-hoja-cuerpo {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.ugmp-hoja-cuerpo p {
+  max-width: 66ch;
+  line-height: 1.6;
+}
+.ugmp-oev .ugmp-campos,
+.ugmp-oev .ugmp-tabla {
+  margin-bottom: 4px;
+}
+.ugmp-ver-es {
+  color: #014898;
+  font-weight: 700;
+}
+
+/* --- Bloque del CMS ----------------------------------------------------------------------------------------- */
+
+.ugmp-b-aviso {
+  padding: 14px 16px;
+  border: 1px dashed currentColor;
+  font-size: 14px;
+}
+.ugmp-b-pared {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.ugmp-b-pared li:nth-child(2) {
+  grid-column: span 2;
+}
+.ugmp-b-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 6px;
+  align-content: end;
+  min-height: 170px;
+  height: 100%;
+  padding: 16px;
+  background: var(--ugmp-bg);
+  color: var(--ugmp-on);
+  text-decoration: none;
+  transition: transform 0.12s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.ugmp-b-card b {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.ugmp-b-card span:not(.ugmp-b-num):not(.ugmp-ticks) {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.ugmp-b-num {
+  position: absolute;
+  top: -0.1em;
+  left: 0.04em;
+  font-size: 6.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: color-mix(in srgb, var(--ugmp-on) 24%, var(--ugmp-bg));
+}
+.ugmp-b-card b,
+.ugmp-b-card > span {
+  position: relative;
+}
+.ugmp-b-card:active {
+  transform: scale(0.98);
+}
+.ugmp-b-card:focus-visible,
+.ugmp-home:focus-visible,
+.ugmp-b-ir:focus-visible,
+.ugmp-b-filas a:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+.ugmp-b-pie {
+  margin-top: 14px;
+  font-size: 12.5px;
+  opacity: 0.8;
+}
+.ugmp-b-avance {
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+}
+.ugmp-b-total {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.ugmp-b-total b {
+  font-size: clamp(56px, 2rem + 4vw, 88px);
+  font-weight: 800;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+.ugmp-b-avance .ugmp-ticks.wide {
+  color: currentColor;
+}
+.ugmp-b-filas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.ugmp-b-filas li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+.ugmp-b-filas a {
+  color: inherit;
+  font-weight: 700;
+}
+.ugmp-b-ir {
+  justify-self: start;
+  font-weight: 800;
+  color: inherit;
+  text-underline-offset: 5px;
+}
+
+/* --- Tarjeta de la portada de /sostenible ------------------------------------------------------------------- */
+
+.ugmp-home {
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 22px 24px;
+  border: 1.5px solid currentColor;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.12s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.ugmp-home:active {
+  transform: scale(0.99);
+}
+.ugmp-home__k {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ugmp-home b {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.ugmp-home .ugmp-ticks.wide {
+  color: currentColor;
+}
+.ugmp-home__s {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+/* --- Móvil ----------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 860px) {
+  .ugmp-ind {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .ugmp-ind__val {
+    justify-items: start;
+    text-align: left;
+    order: 1;
+  }
+  .ugmp-ind__body {
+    order: 2;
+  }
+  .ugmp-b-pared {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ugmp-b-pared li:nth-child(2) {
+    grid-column: span 2;
+  }
+}
+@media (max-width: 520px) {
+  .ugmp-b-pared {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ugmp-b-pared li:nth-child(2) {
+    grid-column: auto;
+  }
+  .ugmp-b-filas li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .ugmp-campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ugmp-campos dt {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .ugmp-card .opt-card__id,
+  .ugmp-card.is-xl .opt-card__id,
+  .ugmp-card.is-w .opt-card__id {
+    right: 20%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ugmp-tk,
+  .ugmp-b-card,
+  .ugmp-home,
+  .ugmp-otras a {
+    transition-duration: 0.01ms;
+  }
+  .ugmp-spin {
+    animation-duration: 3s;
+  }
+  .ugmp-ind.is-new {
+    animation: none;
+  }
+}

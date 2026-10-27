@@ -1,0 +1,71 @@
+/* Observatorio insertado: el documento del marco, sin el fondo ni los mínimos del portal. */
+html.obs-embed-doc,
+html.obs-embed-doc body {
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface, transparent);
+}
+
+html.obs-embed-doc .route-fallback {
+  display: none;
+}
+
+.obs-embed {
+  padding: 12px 16px 16px;
+  color: var(--text, inherit);
+  font-family: inherit;
+}
+
+.obs-embed__titulo {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+}
+
+.obs-embed__aviso {
+  margin: 24px 0;
+  text-align: center;
+  color: var(--text-muted, inherit);
+}
+
+.obs-embed__aviso[data-estado] {
+  padding: 16px;
+  border: 1px solid var(--border, currentColor);
+  border-radius: 10px;
+}
+
+.obs-embed__pie {
+  margin: 12px 0 0;
+  font-size: 0.8125rem;
+  text-align: right;
+}
+
+.obs-embed__portada section + section {
+  margin-top: 16px;
+}
+
+.obs-embed__portada h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.obs-embed__portada ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.obs-embed__portada small {
+  display: block;
+  color: var(--text-muted, inherit);
+}
+
+/* Opciones del insertado: la barra de acciones (imagen y CSV) y la fuente de cada gráfica. */
+.obs-embed[data-barra="no"] .od-frame__actions {
+  display: none;
+}
+
+.obs-embed[data-fuente="no"] .od-frame__source {
+  display: none;
+}

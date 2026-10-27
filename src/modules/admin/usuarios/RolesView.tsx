@@ -30,6 +30,7 @@ import type { Plantilla } from "../../informes/types";
 import { useProgramOffer, useUnitOptions, type UnitOption } from "./people-db";
 import { reason, roleMatrix } from "./summary";
 import {
+  EXPLICIT_ONLY,
   LEVEL_LABEL,
   MODULES,
   TEMPLATES,
@@ -393,7 +394,7 @@ function RoleEditor({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [openRows, setOpenRows] = useState<ModuleId[]>([]);
+  const [openRows, setOpenRows] = useState<ModuleId[]>(() => (matrix.modules.observatorio.level !== "none" ? ["observatorio"] : []));
 
   useEffect(() => setNotice(""), [matrix, name, description]);
 
@@ -435,7 +436,7 @@ function RoleEditor({
       const choice = draft.modules[id];
       choice.level = level;
       if (level === "none") choice.screens = [];
-      else if (choice.screens.length === 0) choice.screens = module.screens.map((s) => s.id);
+      else if (choice.screens.length === 0) choice.screens = module.screens.map((s) => s.id).filter((s) => !EXPLICIT_ONLY.includes(s));
       if (id === "cifras") {
         if (level === "administrar") draft.allReports = true;
         if (level === "editar" && draft.allReports) draft.allReports = false;
@@ -449,6 +450,11 @@ function RoleEditor({
       choice.screens = choice.screens.includes(screen)
         ? choice.screens.filter((s) => s !== screen)
         : [...choice.screens, screen];
+      // Observatorio (0231): cualquier panel exige la entrada; quitar la entrada quita todos los paneles.
+      if (id === "observatorio") {
+        if (screen === "observatorio" && !choice.screens.includes("observatorio")) choice.screens = [];
+        else if (!choice.screens.includes("observatorio") && choice.screens.length > 0) choice.screens = ["observatorio", ...choice.screens];
+      }
       if (choice.screens.length === 0) choice.level = "none";
     });
   }
@@ -495,6 +501,8 @@ function RoleEditor({
           informe_gestion: columns.informe_gestion,
           gm_nivel: columns.gm_nivel,
           gm_funcion: columns.gm_funcion,
+          // Sin la migración 0231 la columna no existe: solo se envía si el rol usa el Observatorio o ya la traía.
+          ...(columns.obs_nivel !== "none" || role?.obs_nivel !== undefined ? { obs_nivel: columns.obs_nivel, all_obs: columns.all_obs } : {}),
         },
         reports: columns.reports,
         units: columns.units,
@@ -739,6 +747,24 @@ function RoleEditor({
                   )}
                   {module.id === "gestion-master" && (choice.level === "editar" || choice.level === "administrar") && (
                     <GmPicker level={choice.level} scope={matrix.gm} onChange={(change) => update((draft) => change(draft.gm))} />
+                  )}
+                  {module.id === "observatorio" && (
+                    <div className="us-reports" role="group" aria-label="Alcance en el Observatorio">
+                      <strong>Sobre qué observatorios</strong>
+                      <label className="oda-check">
+                        <input type="radio" name="alcance-obs" checked={matrix.obs.allObs} onChange={() => update((draft) => void (draft.obs.allObs = true))} />
+                        Todos los observatorios
+                      </label>
+                      <label className="oda-check">
+                        <input type="radio" name="alcance-obs" checked={!matrix.obs.allObs} onChange={() => update((draft) => void (draft.obs.allObs = false))} />
+                        Solo los que le asignen
+                      </label>
+                      <small>
+                        {matrix.obs.allObs
+                          ? "Acceso efectivo = panel marcado aquí, dentro del nivel elegido."
+                          : "Acceso efectivo = panel marcado aquí Y ser persona responsable del observatorio (se asigna en el panel Observatorios), dentro del nivel elegido."}
+                      </small>
+                    </div>
                   )}
                   {module.id === "informes" && choice.level === "ver" && (
                     <InformeScopePicker

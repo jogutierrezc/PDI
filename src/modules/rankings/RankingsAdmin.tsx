@@ -16,6 +16,7 @@
    GreenMetric son ilustrativas); las del recolector, de la base (0143).
    ========================================================================== */
 
+import { Suspense, lazy } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
@@ -31,6 +32,9 @@ import { odsVars } from "./ods";
 import { Posicion, ResultadoTHE } from "./posicion/Posicion";
 import { ReportePlaneacion } from "./reporte/ui/ReportePlaneacion";
 import "./rankings.css";
+
+// UI GreenMetric (intranet): se carga aparte porque trae Word y zip.
+const UiGreen = lazy(() => import("./uigreen/ui/UiGreen").then((m) => ({ default: m.UiGreen })));
 
 type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion";
 const BASE = "/admin/rankings";
@@ -111,6 +115,15 @@ export function RankingsAdmin() {
     titulo = NOMBRE[ranking.id];
     descripcion = ranking.subtitle;
     cuerpo = <PaginaRanking ranking={ranking} />;
+    if (ranking.id === "green") {
+      titulo = "UI GreenMetric";
+      descripcion = "El reporte de la UDES al ranking: indicadores por categoría, responsables, evidencias, revisión y publicación";
+      cuerpo = (
+        <Suspense fallback={<p role="status">Cargando UI GreenMetric…</p>}>
+          <UiGreen resumen={cuerpo} />
+        </Suspense>
+      );
+    }
   }
 
   return (

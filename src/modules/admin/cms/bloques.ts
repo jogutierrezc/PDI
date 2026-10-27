@@ -1311,6 +1311,28 @@ export const BLOQUES: DefinicionBloque[] = [
     valores: () => ({ antetitulo: "", titulo: "", texto: "", tablero: "" }),
   },
   {
+    tipo: "ranking-avance",
+    nombre: "Avance del ranking (UI GreenMetric)",
+    ayuda: "La pared de categorías o el avance «N de M indicadores publicados» de UI GreenMetric, en vivo. Sin nada publicado no se ve",
+    grupo: "Datos en vivo",
+    movimiento: "sube",
+    vivo: true,
+    campos: [
+      ...CAMPOS_ENCABEZADO.map((c) => ({ ...c, requerido: false })),
+      { clave: "ranking", etiqueta: "Ranking", tipo: "enum", requerido: true, opciones: [{ valor: "green", etiqueta: "UI GreenMetric" }] },
+      {
+        clave: "seccion",
+        etiqueta: "Qué mostrar",
+        tipo: "enum",
+        opciones: [
+          { valor: "pared", etiqueta: "La pared de las siete categorías" },
+          { valor: "avance", etiqueta: "El avance con su regleta de cuadros" },
+        ],
+      },
+    ],
+    valores: () => ({ antetitulo: "UI GreenMetric", titulo: "Sostenibilidad del campus", texto: "", ranking: "green", seccion: "pared" }),
+  },
+  {
     tipo: "avance-plan",
     nombre: "Avance del plan",
     ayuda: "Anillo con el avance global del PDI y sus cifras de seguimiento",

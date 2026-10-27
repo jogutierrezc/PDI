@@ -69,6 +69,13 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   udrive: "/admin/udrive",
   gestion_master: "/admin/gestion-master",
   cms: "/admin/cms",
+  // Paneles del Observatorio (0231): las cuatro estaciones y los dos paneles nuevos.
+  obs_captura: "/admin/observatorio/captura",
+  obs_diseno: "/admin/observatorio/diseno",
+  obs_tableros: "/admin/observatorio/tableros",
+  obs_boletin: "/admin/observatorio/boletin",
+  obs_observatorios: "/admin/observatorio/observatorios",
+  obs_insertar: "/admin/observatorio/insertar",
 };
 
 export interface AuthContextValue {
@@ -169,6 +176,12 @@ export function screenVisible(
   if (screen === "correos") return RANK[profile.role] >= RANK.planeacion && listed;
   // Rutas del bus: solo por el rol, como en la base (0139).
   if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion && listed;
+  // Observatorio (0231): los dos paneles NUEVOS no se heredan de «todas las pantallas»; el rol debe marcarlos.
+  // La administración los tiene siempre. Las cuatro estaciones siguen la regla general (obs_captura…obs_boletin).
+  if (screen === "obs_observatorios" || screen === "obs_insertar") {
+    if (RANK[profile.role] >= RANK.admin) return true;
+    return Boolean(access) && access!.role.screens.includes(screen) && (access!.role.all_screens || access!.role.screens.includes("observatorio"));
+  }
   // Gestión Master: el permiso es el nivel del rol de acceso (gm_nivel), nunca la capacidad (0194).
   if (screen === "gestion_master") return gmNivelDe(profile, access) !== "none";
   // Warehouse UDES: datos de las plataformas institucionales; solo por el rol, como en la base (0155).

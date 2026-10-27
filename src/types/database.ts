@@ -70,7 +70,14 @@ export type AdminScreen =
   | "encuestas"
   | "udrive"
   | "gestion_master"
-  | "cms";
+  | "cms"
+  // Paneles del Observatorio de Analítica (0231). «observatorio» sigue siendo la entrada general al módulo.
+  | "obs_captura"
+  | "obs_diseno"
+  | "obs_tableros"
+  | "obs_boletin"
+  | "obs_observatorios"
+  | "obs_insertar";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {
@@ -96,12 +103,18 @@ export interface AccessRole {
   gm_nivel?: GmNivel;
   /** Gestión Master (0194): la función de aprobación del rol (vaf, planeacion, academica…). */
   gm_funcion?: string | null;
+  /** Observatorio (0231): none (se deriva de la capacidad, como antes) · ver · editar · administrar. */
+  obs_nivel?: ObsNivel;
+  /** Observatorio (0231): todos los observatorios, o solo aquellos donde la persona figure en obs_responsables. */
+  all_obs?: boolean;
   is_system: boolean;
   position: number;
   created_at?: string;
   updated_at?: string;
 }
 
+/** Observatorio (0231). */
+export type ObsNivel = "none" | "ver" | "editar" | "administrar";
 export type ImpactLevel = "none" | "editor" | "admin";
 export type InformeLevel = "none" | "editor" | "jefe";
 /** Gestión Master (0194): none · solicitante (crea) · revisor (decide su paso) · gestor (configura, aplica y cierra el corte). */

@@ -2,9 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/presentacion", "destination": "/presentacion/", "permanent": false }
+  ],
   "rewrites": [
     {
-      "source": "/((?!assets/|api/|.*\\.[a-zA-Z0-9]+$).*)",
+      "source": "/((?!assets/|api/|presentacion/|.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/index.html"
     }
   ],

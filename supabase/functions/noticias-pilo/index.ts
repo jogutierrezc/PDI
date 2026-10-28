@@ -40,6 +40,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { decidirEstado, foldSystem, fusionarOds, leerAjustes, leerRespuesta, mensajesParaPilo, roleRejected, type Ajustes, type NotaActual } from "./logica.ts";
 import { elegirProveedor, esperaTras429, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts";
 import { leer } from "../noticias-ods/clasificar.ts";
+import { PERFIL_IDS, leerConfig, leerPerfil, opcionesOds } from "../noticias-ods/perfiles.ts";
+import type { PerfilId } from "../noticias-ods/perfiles.ts";
+import { fusionarTemas, leerRespuestaPerfil, mensajesParaPerfil } from "./perfil.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
 const CORS = {
@@ -56,6 +59,7 @@ const FIN_MS = 140_000;
 const faltaMigracion = (e: { code?: string; message?: string } | null) =>
   Boolean(e && (e.code === "42P01" || e.code === "42703" || e.code === "PGRST204" || e.code === "PGRST205" || /does not exist|schema cache/i.test(e.message ?? "")));
 const MIGRACION = { error: "Falta aplicar la migración 0144 (Pilo clasifica noticias).", code: "migracion" };
+const MIGRACION_PERFILES = { error: "Falta aplicar la migración 0242 (perfiles del recolector).", code: "migracion" };
 
 async function detalleProveedor(r: Response): Promise<string> {
   try {
@@ -82,7 +86,7 @@ Deno.serve(async (request: Request) => {
   if (!url || !serviceKey) return json({ error: "La función no está configurada." }, 500);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let cuerpo: { action?: string; step?: string; limite?: number } = {};
+  let cuerpo: { action?: string; step?: string; limite?: number; perfil?: string } = {};
   try {
     cuerpo = JSON.parse((await request.text()) || "{}");
   } catch {
@@ -105,7 +109,15 @@ Deno.serve(async (request: Request) => {
     admin.from("news_settings").select("*").eq("id", 1).maybeSingle(),
   ]);
   if (ajustesFila.error) return json(faltaMigracion(ajustesFila.error) ? MIGRACION : { error: ajustesFila.error.message }, 500);
-  const ajustes: Ajustes = leerAjustes(ajustesFila.data as Record<string, unknown> | null);
+  // El perfil (0242): sin él, el de ODS de siempre. Con la migración, la confianza y «aprueba lo claro» son los del perfil.
+  const perfilId = String(cuerpo.perfil ?? "ods") as PerfilId;
+  if (!PERFIL_IDS.includes(perfilId)) return json({ error: "Perfil desconocido." }, 400);
+  const esOds = perfilId === "ods";
+  const perfilFila = await admin.from("news_profiles").select("*").eq("id", perfilId).maybeSingle();
+  if (perfilFila.error && !esOds) return json(faltaMigracion(perfilFila.error) ? MIGRACION_PERFILES : { error: perfilFila.error.message }, 500);
+  const cfgPerfil = leerConfig(perfilId, (perfilFila.error ? null : perfilFila.data) as Record<string, unknown> | null);
+  const hayPerfil = !perfilFila.error && Boolean(perfilFila.data);
+  const ajustes: Ajustes = hayPerfil ? { pilo_aprueba: cfgPerfil.pilo_aprueba, umbral: cfgPerfil.umbral_pilo } : leerAjustes(ajustesFila.data as Record<string, unknown> | null);
   // El proveedor de los rankings (0146): el de Mr. Pilo o Mistral con su clave guardada.
   const destino = elegirProveedor(leerAjustesIA(ajustesFila.data as Record<string, unknown> | null), settings as Record<string, unknown> | null, secret as Record<string, unknown> | null);
   const proveedor = destino.proveedor;
@@ -113,7 +125,9 @@ Deno.serve(async (request: Request) => {
   const motivo = destino.ok ? null : destino.motivo ?? "La IA de los rankings no está lista.";
 
   const contar = async (estado: string) =>
-    admin.from("news_items").select("id", { count: "exact", head: true }).eq("ai_status", estado).is("reviewed_by", null);
+    esOds
+      ? admin.from("news_items").select("id", { count: "exact", head: true }).eq("ai_status", estado).is("reviewed_by", null)
+      : admin.from("news_profile_notes").select("news_id", { count: "exact", head: true }).eq("profile", perfilId).eq("ai_status", estado).is("reviewed_by", null);
 
   const step = String(cuerpo.step ?? "");
 
@@ -124,7 +138,9 @@ Deno.serve(async (request: Request) => {
   }
 
   if (step === "reintentar") {
-    const r = await admin.from("news_items").update({ ai_status: "pendiente", ai_error: null }).eq("ai_status", "error").is("reviewed_by", null).select("id");
+    const r = esOds
+      ? await admin.from("news_items").update({ ai_status: "pendiente", ai_error: null }).eq("ai_status", "error").is("reviewed_by", null).select("id")
+      : await admin.from("news_profile_notes").update({ ai_status: "pendiente", ai_error: null }).eq("profile", perfilId).eq("ai_status", "error").is("reviewed_by", null).select("news_id");
     if (r.error) return json(faltaMigracion(r.error) ? MIGRACION : { error: r.error.message }, 500);
     return json({ ok: true, devueltas: (r.data ?? []).length });
   }
@@ -134,33 +150,54 @@ Deno.serve(async (request: Request) => {
 
   // ai_batch (0146) o, si no lo dice, el automático del proveedor (5 con Mistral, 2 con los demás).
   const limite = Math.max(1, Math.min(8, Math.floor(Number(cuerpo.limite) || destino.lote)));
-  const { data: filas, error } = await admin
-    .from("news_items")
-    .select("id, title, body, section, campus, published_on, state, reviewed_by, decided_by, news_ods(ods, manual)")
-    .eq("ai_status", "pendiente")
-    .is("reviewed_by", null)
-    .order("created_at", { ascending: true })
-    .limit(limite);
-  if (error) return json(faltaMigracion(error) ? MIGRACION : { error: error.message }, 500);
+  type Fila = { id: string; title: string; body: string; section: string; campus: string; published_on: string | null; state: "pending" | "ok" | "no"; reviewed_by: string | null; decided_by: "persona" | "pilo" | null; news_ods: { ods: number; manual: boolean }[] | null; manualesT?: string[] };
+  let filas: Fila[] = [];
+  if (esOds) {
+    const r = await admin
+      .from("news_items")
+      .select("id, title, body, section, campus, published_on, state, reviewed_by, decided_by, news_ods(ods, manual)")
+      .eq("ai_status", "pendiente")
+      .is("reviewed_by", null)
+      .order("created_at", { ascending: true })
+      .limit(limite);
+    if (r.error) return json(faltaMigracion(r.error) ? MIGRACION : { error: r.error.message }, 500);
+    filas = (r.data ?? []) as Fila[];
+  } else {
+    const r = await admin
+      .from("news_profile_notes")
+      .select("news_id, state, reviewed_by, decided_by, news_items!inner(title, body, section, campus, published_on)")
+      .eq("profile", perfilId)
+      .eq("ai_status", "pendiente")
+      .is("reviewed_by", null)
+      .order("created_at", { ascending: true })
+      .limit(limite);
+    if (r.error) return json(faltaMigracion(r.error) ? MIGRACION_PERFILES : { error: r.error.message }, 500);
+    type FilaNota = { news_id: string; state: Fila["state"]; reviewed_by: string | null; decided_by: Fila["decided_by"]; news_items: { title: string; body: string; section: string; campus: string; published_on: string | null } };
+    const notas = (r.data ?? []) as unknown as FilaNota[];
+    const manuales = notas.length ? await admin.from("news_temas").select("news_id, tema").eq("profile", perfilId).eq("manual", true).in("news_id", notas.map((n) => n.news_id)) : { data: [] };
+    const porNota = new Map<string, string[]>();
+    for (const m of (manuales.data ?? []) as { news_id: string; tema: string }[]) porNota.set(m.news_id, [...(porNota.get(m.news_id) ?? []), m.tema]);
+    filas = notas.map((n) => ({ id: n.news_id, ...n.news_items, state: n.state, reviewed_by: n.reviewed_by, decided_by: n.decided_by, news_ods: null, manualesT: porNota.get(n.news_id) ?? [] }));
+  }
 
   const inicio = Date.now();
   const cuenta = { procesadas: 0, aprobadas_por_pilo: 0, para_revisar: 0, descartadas: 0, errores: 0 };
   let alto: { error: string; code: string } | null = null;
   const plegar = settings?.system_role === "user" && destino.eleccion === "pilo";
 
-  type Fila = { id: string; title: string; body: string; section: string; campus: string; published_on: string | null; state: "pending" | "ok" | "no"; reviewed_by: string | null; decided_by: "persona" | "pilo" | null; news_ods: { ods: number; manual: boolean }[] | null };
-
   const marcarError = async (id: string, mensaje: string) => {
-    await admin.from("news_items").update({ ai_status: "error", ai_error: mensaje.slice(0, 300), ai_at: new Date().toISOString() }).eq("id", id).eq("ai_status", "pendiente");
+    if (esOds) await admin.from("news_items").update({ ai_status: "error", ai_error: mensaje.slice(0, 300), ai_at: new Date().toISOString() }).eq("id", id).eq("ai_status", "pendiente");
+    else await admin.from("news_profile_notes").update({ ai_status: "error", ai_error: mensaje.slice(0, 300), ai_at: new Date().toISOString() }).eq("news_id", id).eq("profile", perfilId).eq("ai_status", "pendiente");
     cuenta.errores++;
     cuenta.procesadas++;
   };
 
-  for (const fila of (filas ?? []) as Fila[]) {
+  for (const fila of filas) {
     const pasado = Date.now() - inicio;
     if (cuenta.procesadas > 0 && pasado > PRESUPUESTO_MS) break;
-    const { pistas } = leer(fila.title, fila.body);
-    const mensajes = mensajesParaPilo(fila, pistas);
+    const mensajes = esOds
+      ? mensajesParaPilo(fila, leer(fila.title, fila.body, opcionesOds(cfgPerfil)).pistas)
+      : mensajesParaPerfil(perfilId as Exclude<PerfilId, "ods">, fila, cfgPerfil.capas, leerPerfil(fila.title, fila.body, cfgPerfil).pistas);
     const unaVez = (doblar: boolean) =>
       fetch(destino.url, {
         method: "POST",
@@ -214,6 +251,45 @@ Deno.serve(async (request: Request) => {
     } catch {
       contenido = "";
     }
+    if (!esOds) {
+      // Un perfil de ranking: misma lectura y misma decisión, con sus temas en news_temas.
+      const l = leerRespuestaPerfil(contenido, perfilId as Exclude<PerfilId, "ods">);
+      if (!l.ok) {
+        await marcarError(fila.id, l.error);
+        continue;
+      }
+      const pp = l.propuesta;
+      const manualesT = fila.manualesT ?? [];
+      const ver = decidirEstado(
+        { ods: pp.temas.map((t) => ({ ods: 0, indicador: null, confianza: t.confianza, razon: t.razon })), decision: pp.decision, confianza: pp.confianza, resumen: pp.resumen },
+        { state: fila.state, reviewed_by: fila.reviewed_by, decided_by: fila.decided_by, manuales: manualesT.length },
+        ajustes,
+      );
+      const baseP = { ai_status: "hecho", ai_decision: pp.decision, ai_summary: pp.resumen, ai_confidence: pp.confianza, ai_error: null, ai_at: new Date().toISOString() };
+      let escritaP = admin.from("news_profile_notes").update(ver.state ? { ...baseP, state: ver.state, decided_by: ver.decided_by } : baseP).eq("news_id", fila.id).eq("profile", perfilId).is("reviewed_by", null);
+      if (ver.state) escritaP = escritaP.or("state.eq.pending,decided_by.eq.pilo");
+      const { data: hechaP, error: errorP } = await escritaP.select("news_id");
+      if (errorP) {
+        await marcarError(fila.id, "No se pudo guardar la lectura de Pilo.");
+        continue;
+      }
+      if (!hechaP?.length) {
+        // Una persona la decidió mientras Pilo leía: se guarda la lectura sin tocar el estado ni los temas.
+        await admin.from("news_profile_notes").update(baseP).eq("news_id", fila.id).eq("profile", perfilId);
+        ver.resultado = "revisar";
+      }
+      const fusion = fusionarTemas(manualesT, pp);
+      if (fusion.borrar && hechaP?.length && ver.motivo !== "persona") {
+        // Lo que Pilo propuso antes se reemplaza; lo que puso una persona y las palabras propias se quedan.
+        await admin.from("news_temas").delete().eq("news_id", fila.id).eq("profile", perfilId).eq("manual", false).neq("tema", "propio");
+        if (fusion.insertar.length) await admin.from("news_temas").upsert(fusion.insertar.map((t) => ({ news_id: fila.id, profile: perfilId, ...t })), { onConflict: "news_id,profile,tema", ignoreDuplicates: true });
+      }
+      cuenta.procesadas++;
+      if (ver.resultado === "aprobada") cuenta.aprobadas_por_pilo++;
+      else if (ver.resultado === "descartada") cuenta.descartadas++;
+      else cuenta.para_revisar++;
+      continue;
+    }
     const lectura = leerRespuesta(contenido);
     if (!lectura.ok) {
       await marcarError(fila.id, lectura.error);
@@ -258,7 +334,7 @@ Deno.serve(async (request: Request) => {
     await admin.from("news_runs").insert({
       started_at: new Date(inicio).toISOString(),
       finished_at: new Date().toISOString(),
-      source: `Pilo lee noticias (${destino.model})`.slice(0, 200),
+      source: `Pilo lee noticias${esOds ? "" : ` · ${perfilId}`} (${destino.model})`.slice(0, 200),
       seen: cuenta.procesadas,
       saved: cuenta.aprobadas_por_pilo,
       skipped: cuenta.descartadas,

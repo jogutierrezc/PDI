@@ -38,6 +38,15 @@
         ],
         "createdAt": "2026-10-20T21:38:19.153Z",
         "reason": "Falso positivo verificado en código: cms.css L656 es el indicador de destino del arrastre (línea horizontal de 3px con left:0/right:0 en el borde superior o inferior de la celda), no un borde lateral de tarjeta. Los bordes laterales reales del archivo son de 1px. Decisión propia del asistente, sin confirmación del usuario."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/modules/rankings/thimpact/lib/correo-html.ts"
+        ],
+        "createdAt": "2026-10-28T15:39:46.189Z",
+        "reason": "Plantilla de correo de THE Impact: la caja de observaciones replica el HTML de ejemplo que aportó el usuario (border-left 4px). Es correo en tablas inline, no interfaz del portal; el usuario no confirmó el borde por separado."
       }
     ]
   }

@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import { ODS13 } from "../sostenible/ods-data";
 import { FaltaMigracion, type NewsItem, type NewsOds } from "./noticias";
+import type { PerfilId } from "./perfiles";
 
 export interface AjustesNoticias {
   pilo_aprueba: boolean;
@@ -83,13 +84,14 @@ async function invocar<T>(body: Record<string, unknown>): Promise<T> {
   return r.data as T;
 }
 
-export const estadoPilo = () => invocar<EstadoPilo>({ step: "estado" });
+/** `perfil` (0242): el perfil de ranking que Pilo lee; sin él, ODS, como siempre. */
+export const estadoPilo = (perfil: PerfilId = "ods") => invocar<EstadoPilo>({ step: "estado", perfil });
 /** Sin `limite`, la función usa el lote de los ajustes de IA de los rankings (0146: 5 con Mistral, 2 con los demás). */
-export const clasificarLote = (limite?: number) => invocar<RespuestaLote>({ step: "lote", ...(limite ? { limite: Math.max(1, Math.min(8, Math.floor(limite))) } : {}) });
-export const reintentarErrores = () => invocar<{ ok: boolean; devueltas: number }>({ step: "reintentar" });
+export const clasificarLote = (limite?: number, perfil: PerfilId = "ods") => invocar<RespuestaLote>({ step: "lote", perfil, ...(limite ? { limite: Math.max(1, Math.min(8, Math.floor(limite))) } : {}) });
+export const reintentarErrores = (perfil: PerfilId = "ods") => invocar<{ ok: boolean; devueltas: number }>({ step: "reintentar", perfil });
 
-export function useEstadoPilo() {
-  return useQuery({ queryKey: ["noticias", "pilo"], staleTime: 20_000, retry: false, queryFn: estadoPilo });
+export function useEstadoPilo(perfil: PerfilId = "ods") {
+  return useQuery({ queryKey: ["noticias", "pilo", perfil], staleTime: 20_000, retry: false, queryFn: () => estadoPilo(perfil) });
 }
 
 /* ---------- El ciclo de lotes --------------------------------------------- */
@@ -139,7 +141,7 @@ const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * refresca la bandeja (query ["noticias"]); al terminar, siempre. Ante el
  * límite del proveedor (429) espera 30 s y reintenta hasta 3 veces.
  */
-export function usePiloNoticias({ limite, invalidarCada = 3 }: { limite?: number; invalidarCada?: number } = {}): UsoPilo {
+export function usePiloNoticias({ limite, invalidarCada = 3, perfil = "ods" }: { limite?: number; invalidarCada?: number; perfil?: PerfilId } = {}): UsoPilo {
   const cliente = useQueryClient();
   const [progreso, setProgreso] = useState<ProgresoPilo>(PROGRESO_CERO);
   const [corriendo, setCorriendo] = useState(false);
@@ -174,7 +176,7 @@ export function usePiloNoticias({ limite, invalidarCada = 3 }: { limite?: number
         while (!parar.current) {
           let r: RespuestaLote;
           try {
-            r = await clasificarLote(limite);
+            r = await clasificarLote(limite, perfil);
           } catch (e) {
             if (e instanceof ErrorPilo && e.code === "limite_proveedor" && esperas < 3 && !parar.current) {
               esperas++;
@@ -204,7 +206,7 @@ export function usePiloNoticias({ limite, invalidarCada = 3 }: { limite?: number
         if (vivo.current) setCorriendo(false);
       }
     })();
-  }, [limite, invalidarCada, refrescar]);
+  }, [limite, invalidarCada, perfil, refrescar]);
 
   const detener = useCallback(() => {
     parar.current = true;
@@ -303,7 +305,7 @@ export interface DetalleOds {
 }
 
 /** Lo que la bandeja muestra de cada ODS de una nota. */
-export function detalleOds(o: NewsOds): DetalleOds {
+export function detalleOds(o: Pick<NewsOds, "manual" | "by_ai" | "score" | "reason" | "indicator">): DetalleOds {
   const dePilo = o.by_ai === true && !o.manual;
   return {
     origen: o.manual ? "Agregado por Planeación" : dePilo ? "Propuesto por Pilo" : "Por palabras clave",

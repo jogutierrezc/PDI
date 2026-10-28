@@ -11,6 +11,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
+import type { PerfilId } from "./perfiles";
 
 export type NewsState = "pending" | "ok" | "no";
 
@@ -20,6 +21,20 @@ export interface NewsOds {
   reason: string;
   manual: boolean;
   /** 0144: el indicador de THE que propuso Pilo («13.2») y si la fila es de Pilo. Solo en la intranet. */
+  indicator?: string | null;
+  by_ai?: boolean;
+}
+
+/**
+ * 0242: un tema de la nota en un perfil de ranking: «ods13», un pilar («ens»), una
+ * categoría («SI») o «propio» (una palabra propia del perfil). Las notas del perfil
+ * ODS lo traen de news_ods; las demás, de news_temas.
+ */
+export interface NewsTema {
+  tema: string;
+  score: number;
+  reason: string;
+  manual: boolean;
   indicator?: string | null;
   by_ai?: boolean;
 }
@@ -38,6 +53,8 @@ export interface NewsItem {
   campus: string;
   state: NewsState;
   ods: NewsOds[];
+  /** 0242: los temas en el perfil que se mira. Sin esto (informes, pruebas), los de `ods`. */
+  temas?: NewsTema[];
   ai_status?: NewsAiStatus;
   ai_decision?: "aprobar" | "revisar" | "descartar" | null;
   ai_summary?: string | null;
@@ -59,6 +76,12 @@ export const NEWS_SOURCES: { key: string; label: string }[] = [
 ];
 
 export class FaltaMigracion extends Error {}
+/** Falta la migración 0242 (perfiles del recolector): lo de ODS sigue como siempre. */
+export class FaltaPerfiles extends FaltaMigracion {}
+
+/** Los temas de una nota: los del perfil que se mira o, si no los trae, sus ODS como «odsN». */
+export const temasDe = (n: NewsItem): NewsTema[] =>
+  n.temas ?? n.ods.map((o) => ({ tema: `ods${o.ods}`, score: o.score, reason: o.reason, manual: o.manual, indicator: o.indicator, by_ai: o.by_ai }));
 
 const noExiste = (e: { code?: string; message?: string } | null) =>
   Boolean(e && (e.code === "42P01" || e.code === "PGRST205" || /does not exist|schema cache/i.test(e.message ?? "")));
@@ -79,12 +102,86 @@ const aNota = (f: FilaNota): NewsItem => ({ ...f, ods: (f.news_ods ?? []).slice(
 
 /* ---------- Intranet ------------------------------------------------------- */
 
-export function useNewsInbox() {
+/** La llave de la bandeja de un perfil (la caché que la pantalla pinta al instante al decidir). */
+export const llaveIntranet = (perfil: PerfilId = "ods") => ["noticias", "intranet", perfil];
+
+const PAGINA_BASE = 1000;
+const TOPE_NOTAS = 2000;
+
+/** Lee por páginas de 1000 (el tope de filas de la API) hasta `tope` filas. */
+async function paginar<T>(pedir: (desde: number, hasta: number) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>, tope = TOPE_NOTAS): Promise<{ filas: T[]; error: { code?: string; message?: string } | null }> {
+  const filas: T[] = [];
+  for (let desde = 0; desde < tope; desde += PAGINA_BASE) {
+    const r = await pedir(desde, Math.min(tope, desde + PAGINA_BASE) - 1);
+    if (r.error) return { filas, error: r.error };
+    const lote = (r.data as T[] | null) ?? [];
+    filas.push(...lote);
+    if (lote.length < PAGINA_BASE) break;
+  }
+  return { filas, error: null };
+}
+
+interface FilaTema {
+  news_id: string;
+  tema: string;
+  score: number;
+  reason: string;
+  manual: boolean;
+  indicator: string | null;
+  by_ai: boolean;
+}
+
+/** Los temas de un perfil guardados en news_temas, por nota. Sin la tabla (sin 0242), ninguno. */
+async function temasDelPerfil(perfil: PerfilId, soloPropio: boolean): Promise<Map<string, NewsTema[]>> {
+  const r = await paginar<FilaTema>((d, h) => {
+    const q = supabase.from("news_temas" as never).select("news_id, tema, score, reason, manual, indicator, by_ai").eq("profile", perfil);
+    return (soloPropio ? q.eq("tema", "propio") : q).range(d, h);
+  }, 8000);
+  const m = new Map<string, NewsTema[]>();
+  if (r.error) return m;
+  for (const f of r.filas) m.set(f.news_id, [...(m.get(f.news_id) ?? []), { tema: f.tema, score: f.score, reason: f.reason, manual: f.manual, indicator: f.indicator, by_ai: f.by_ai }]);
+  return m;
+}
+
+const porAfinidad = (a: NewsTema, b: NewsTema) => b.score - a.score;
+
+/**
+ * La bandeja de un perfil. El de ODS es la de siempre (news_items y news_ods) más las
+ * coincidencias con sus palabras propias; los demás leen la decisión de cada nota de
+ * news_profile_notes (0242) y sus temas de news_temas.
+ */
+export function useNewsInbox(perfil: PerfilId = "ods", { activo = true }: { activo?: boolean } = {}) {
   return useQuery({
-    queryKey: ["noticias", "intranet"],
+    queryKey: llaveIntranet(perfil),
+    enabled: activo,
     staleTime: 30_000,
     retry: false,
     queryFn: async (): Promise<NewsItem[]> => {
+      if (perfil !== "ods") {
+        const r = await paginar<{ news_id: string; state: NewsState; decided_by: NewsItem["decided_by"]; ai_status: NewsAiStatus; ai_decision: NewsItem["ai_decision"]; ai_summary: string | null; ai_confidence: number | null; ai_error: string | null; ai_at: string | null; news_items: Omit<NewsItem, "ods" | "state"> }>((d, h) =>
+          supabase
+            .from("news_profile_notes" as never)
+            .select("news_id, state, decided_by, ai_status, ai_decision, ai_summary, ai_confidence, ai_error, ai_at, news_items!inner(id, url, title, excerpt, image_url, published_on, section, campus)")
+            .eq("profile", perfil)
+            .order("created_at", { ascending: false })
+            .range(d, h),
+        );
+        if (r.error) throw noExiste(r.error) ? new FaltaPerfiles("Falta aplicar la migración 0242 (perfiles del recolector).") : new Error(r.error.message);
+        const temas = await temasDelPerfil(perfil, false);
+        return r.filas.map((f) => ({
+          ...f.news_items,
+          state: f.state,
+          decided_by: f.decided_by,
+          ai_status: f.ai_status,
+          ai_decision: f.ai_decision,
+          ai_summary: f.ai_summary,
+          ai_confidence: f.ai_confidence,
+          ai_error: f.ai_error,
+          ai_at: f.ai_at,
+          ods: [],
+          temas: (temas.get(f.news_id) ?? []).sort(porAfinidad),
+        }));
+      }
       const pedir = (columnas: string) =>
         supabase
           .from("news_items" as never)
@@ -94,7 +191,9 @@ export function useNewsInbox() {
       let r = await pedir(COLUMNAS_INTRANET);
       if (r.error && faltaColumna(r.error)) r = await pedir(COLUMNAS_PUBLICAS);
       if (r.error) throw noExiste(r.error) ? falta() : new Error(r.error.message);
-      return ((r.data as unknown as FilaNota[] | null) ?? []).map(aNota);
+      const notas = ((r.data as unknown as FilaNota[] | null) ?? []).map(aNota);
+      const propias = await temasDelPerfil("ods", true);
+      return notas.map((n) => ({ ...n, temas: [...temasDe(n), ...(propias.get(n.id) ?? [])].sort(porAfinidad) }));
     },
   });
 }
@@ -121,12 +220,14 @@ export function useSetNewsState() {
 export function useSetNewsStates() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async ({ ids, state, by }: { ids: string[]; state: NewsState; by: string | null }) => {
+    mutationFn: async ({ ids, state, by, perfil = "ods" }: { ids: string[]; state: NewsState; by: string | null; perfil?: PerfilId }) => {
       if (!ids.length) return;
-      const r = await supabase
-        .from("news_items" as never)
-        .update({ state, reviewed_by: state === "pending" ? null : by, reviewed_at: state === "pending" ? null : new Date().toISOString() } as never)
-        .in("id", ids);
+      const cambio = { state, reviewed_by: state === "pending" ? null : by, reviewed_at: state === "pending" ? null : new Date().toISOString() } as never;
+      // La decisión es de cada perfil: en los demás, vive en news_profile_notes (0242).
+      const r =
+        perfil === "ods"
+          ? await supabase.from("news_items" as never).update(cambio).in("id", ids)
+          : await supabase.from("news_profile_notes" as never).update(cambio).eq("profile", perfil).in("news_id", ids);
       if (r.error) throw new Error(r.error.message);
     },
     onSuccess: () => void cliente.invalidateQueries({ queryKey: ["noticias"], predicate: (q) => q.queryKey[1] !== "intranet" }),
@@ -144,6 +245,34 @@ export function useToggleNewsOds() {
         if (r.error) throw new Error(r.error.message);
       } else {
         const r = await supabase.from("news_ods" as never).delete().eq("news_id", id).eq("ods", ods);
+        if (r.error) throw new Error(r.error.message);
+      }
+    },
+    onSuccess: () => void cliente.invalidateQueries({ queryKey: ["noticias"] }),
+  });
+}
+
+/** Agrega o quita un tema a mano en un perfil. En ODS es un ODS; en los demás, una fila de news_temas (0242). */
+export function useToggleNewsTema() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, perfil, tema, on }: { id: string; perfil: PerfilId; tema: string; on: boolean }) => {
+      if (perfil === "ods" && /^ods\d+$/.test(tema)) {
+        const ods = Number(tema.slice(3));
+        if (on) {
+          const r = await supabase.from("news_ods" as never).upsert({ news_id: id, ods, score: 100, reason: "Agregado por Planeación", manual: true } as never, { onConflict: "news_id,ods" });
+          if (r.error) throw new Error(r.error.message);
+        } else {
+          const r = await supabase.from("news_ods" as never).delete().eq("news_id", id).eq("ods", ods);
+          if (r.error) throw new Error(r.error.message);
+        }
+        return;
+      }
+      if (on) {
+        const r = await supabase.from("news_temas" as never).upsert({ news_id: id, profile: perfil, tema, score: 100, reason: "Agregado por Planeación", manual: true } as never, { onConflict: "news_id,profile,tema" });
+        if (r.error) throw new Error(r.error.message);
+      } else {
+        const r = await supabase.from("news_temas" as never).delete().eq("news_id", id).eq("profile", perfil).eq("tema", tema);
         if (r.error) throw new Error(r.error.message);
       }
     },

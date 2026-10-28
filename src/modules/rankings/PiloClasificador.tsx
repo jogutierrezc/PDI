@@ -13,6 +13,8 @@
 import { useEffect, useId, useState } from "react";
 import { useAuth } from "../../lib/auth";
 import { FaltaMigracion } from "./noticias";
+import { CATALOGO, conPilo, useNewsProfiles, useSaveNewsProfiles } from "./perfiles";
+import type { PerfilId } from "./perfiles";
 import { reintentarErrores, useEstadoPilo, useNewsSettings, usePiloNoticias, useSaveNewsSettings } from "./pilo-noticias";
 import "./pilo-noticias.css";
 
@@ -21,50 +23,62 @@ export interface PiloClasificadorProps {
   limite?: number;
   /** Cada cuántos lotes se refresca la bandeja. Por defecto 3. */
   invalidarCada?: number;
+  /** El perfil de ranking que Pilo lee (0242). Sin él, ODS. */
+  perfil?: PerfilId;
   className?: string;
 }
 
 const fmt = (n: number) => n.toLocaleString("es-CO");
 
-export function PiloClasificador({ limite = 2, invalidarCada = 3, className = "" }: PiloClasificadorProps) {
+export function PiloClasificador({ limite = 2, invalidarCada = 3, perfil = "ods", className = "" }: PiloClasificadorProps) {
   const { profile } = useAuth();
   const titulo = useId();
   const umbralId = useId();
-  const estado = useEstadoPilo();
+  const estado = useEstadoPilo(perfil);
   const ajustes = useNewsSettings();
   const guardar = useSaveNewsSettings();
-  const ciclo = usePiloNoticias({ limite, invalidarCada });
+  const perfiles = useNewsProfiles();
+  const guardarPerfil = useSaveNewsProfiles();
+  const ciclo = usePiloNoticias({ limite, invalidarCada, perfil });
+  // Con la migración 0242 la confianza y «aprueba lo claro» son del perfil; sin ella, los de news_settings (0144).
+  const cfg = perfiles.perfiles[perfil];
+  const listo = perfiles.hay ? true : Boolean(ajustes.data);
+  const nombre = perfil === "ods" ? "" : ` · ${CATALOGO[perfil].nombre}`;
   const [umbral, setUmbral] = useState("85");
   const [reintentando, setReintentando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
+  const umbralGuardado = perfiles.hay ? cfg.umbral_pilo : ajustes.data?.umbral;
   useEffect(() => {
-    if (ajustes.data) setUmbral(String(ajustes.data.umbral));
-  }, [ajustes.data]);
+    if (umbralGuardado !== undefined) setUmbral(String(umbralGuardado));
+  }, [umbralGuardado]);
 
-  const faltaMigracion = ciclo.faltaMigracion || estado.error instanceof FaltaMigracion || ajustes.error instanceof FaltaMigracion;
+  const faltaMigracion = ciclo.faltaMigracion || estado.error instanceof FaltaMigracion || (perfil === "ods" && !perfiles.hay && ajustes.error instanceof FaltaMigracion);
+  const mensajeFalta = (estado.error instanceof FaltaMigracion && perfil !== "ods" ? estado.error.message : ciclo.error) || "Falta aplicar la migración 0144 (Pilo clasifica noticias). Mientras tanto, la bandeja funciona como siempre, solo con el léxico.";
   const e = estado.data;
   const iaLista = Boolean(e?.ia);
   const pendientes = ciclo.quedan ?? e?.pendientes ?? 0;
   const total = ciclo.procesadas + (ciclo.quedan ?? 0);
-  const aprueba = ajustes.data?.pilo_aprueba === true;
+  const aprueba = perfiles.hay ? cfg.pilo_aprueba : ajustes.data?.pilo_aprueba === true;
 
   const guardarAjustes = (pilo_aprueba: boolean, valor: string) => {
     const n = Math.round(Number(valor));
     if (!Number.isFinite(n) || n < 50 || n > 100) {
       setAviso("El umbral va de 50 a 100.");
-      setUmbral(String(ajustes.data?.umbral ?? 85));
+      setUmbral(String(umbralGuardado ?? 85));
       return;
     }
     setAviso(null);
-    guardar.mutate({ ajustes: { pilo_aprueba, umbral: n }, by: profile?.id ?? null }, { onError: (err) => setAviso(err instanceof Error ? err.message : String(err)) });
+    const alFallar = { onError: (err: unknown) => setAviso(err instanceof Error ? err.message : String(err)) };
+    if (perfiles.hay) guardarPerfil.mutate({ cambios: { [perfil]: conPilo({ ...cfg, umbral_pilo: n }, pilo_aprueba) }, by: profile?.id ?? null }, alFallar);
+    else guardar.mutate({ ajustes: { pilo_aprueba, umbral: n }, by: profile?.id ?? null }, alFallar);
   };
 
   const reintentar = async () => {
     setReintentando(true);
     setAviso(null);
     try {
-      const r = await reintentarErrores();
+      const r = await reintentarErrores(perfil);
       setAviso(r.devueltas ? `${fmt(r.devueltas)} ${r.devueltas === 1 ? "nota volvió" : "notas volvieron"} a la fila de Pilo.` : "No había notas con error.");
       void estado.refetch();
     } catch (err) {
@@ -77,9 +91,9 @@ export function PiloClasificador({ limite = 2, invalidarCada = 3, className = ""
   if (faltaMigracion) {
     return (
       <section className={`rk-pilo ${className}`} aria-labelledby={titulo}>
-        <h3 id={titulo} className="rk-pilo__title">Pilo lee las noticias</h3>
+        <h3 id={titulo} className="rk-pilo__title">Pilo lee las noticias{nombre}</h3>
         <p className="rk-pilo__note rk-pilo__note--warn" role="status">
-          Falta aplicar la migración 0144 (Pilo clasifica noticias). Mientras tanto, la bandeja funciona como siempre, solo con el léxico.
+          {mensajeFalta}
         </p>
       </section>
     );
@@ -88,7 +102,7 @@ export function PiloClasificador({ limite = 2, invalidarCada = 3, className = ""
   return (
     <section className={`rk-pilo ${className}`} aria-labelledby={titulo} aria-busy={ciclo.corriendo}>
       <div className="rk-pilo__head">
-        <h3 id={titulo} className="rk-pilo__title">Pilo lee las noticias</h3>
+        <h3 id={titulo} className="rk-pilo__title">Pilo lee las noticias{nombre}</h3>
         <p className="rk-pilo__sub">
           {estado.isLoading
             ? "Consultando la fila de Pilo…"
@@ -172,7 +186,7 @@ export function PiloClasificador({ limite = 2, invalidarCada = 3, className = ""
             type="checkbox"
             role="switch"
             checked={aprueba}
-            disabled={!ajustes.data || guardar.isPending}
+            disabled={!listo || guardar.isPending || guardarPerfil.isPending}
             onChange={(ev) => guardarAjustes(ev.target.checked, umbral)}
           />
           <span>Que Pilo apruebe lo claro</span>
@@ -188,17 +202,17 @@ export function PiloClasificador({ limite = 2, invalidarCada = 3, className = ""
             max={100}
             step={1}
             value={umbral}
-            disabled={!ajustes.data || guardar.isPending}
+            disabled={!listo || guardar.isPending || guardarPerfil.isPending}
             onChange={(ev) => setUmbral(ev.target.value)}
-            onBlur={() => umbral !== String(ajustes.data?.umbral ?? "") && guardarAjustes(aprueba, umbral)}
+            onBlur={() => umbral !== String(umbralGuardado ?? "") && guardarAjustes(aprueba, umbral)}
             onKeyDown={(ev) => ev.key === "Enter" && (ev.currentTarget as HTMLInputElement).blur()}
           />
         </span>
       </div>
       <p className="rk-pilo__hint">
         {aprueba
-          ? "Lo que Pilo aprueba se publica en los informes, queda marcado «Aprobada por Pilo» y se puede revertir desde la bandeja. Lo dudoso queda para revisión; lo que ya decidió una persona, Pilo no lo toca."
-          : "Apagado: Pilo solo propone ODS, indicador y resumen; cada nota espera tu decisión. Si lo enciendes, lo que Pilo aprueba se publica en los informes, queda marcado y se puede revertir."}
+          ? `Lo que Pilo aprueba ${perfil === "ods" ? "se publica en los informes" : "queda aprobado en este perfil"}, queda marcado «Aprobada por Pilo» y se puede revertir desde la bandeja. Lo dudoso queda para revisión; lo que ya decidió una persona, Pilo no lo toca.`
+          : `Apagado: Pilo solo propone ${perfil === "ods" ? "ODS, indicador" : "temas"} y resumen; cada nota espera tu decisión. Si lo enciendes, lo que Pilo aprueba ${perfil === "ods" ? "se publica en los informes" : "queda aprobado en este perfil"}, queda marcado y se puede revertir.`}
       </p>
     </section>
   );

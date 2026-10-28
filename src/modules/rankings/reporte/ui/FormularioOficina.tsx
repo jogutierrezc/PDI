@@ -1,6 +1,6 @@
 /* Formulario de una oficina: sus indicadores, una ficha por indicador. */
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { DragEvent, ChangeEvent } from "react";
 import type { RankingCycleRow, RankingResponseRow } from "../../../../types/database";
 import { camposDeDato, catalogoOrdenado, coincide, conteoAportes, indicadoresDeUnidad, otrosAportes, respuestaDe } from "../resumen";
@@ -28,6 +28,9 @@ import { DeLaBiblioteca } from "./DeLaBiblioteca";
 import type { AporteRef, Asignacion, Chequeo, Indicador, RolActor, RolAsignacion, TipoIndicador } from "../tipos";
 import { Chequeos, EstadoPill, Cargando, OdsChip, fmtNumero } from "./comunes";
 import { useCrecer, useEntrada, useIndicador, usePliegue } from "../../movimiento";
+
+// Carpeta de evidencias en UDrive (THE Impact, 0239): se carga aparte; sin ella la ficha funciona igual.
+const EvidenciasEnFicha = lazy(() => import("../../thimpact/ui/EvidenciasEnFicha").then((m) => ({ default: m.EvidenciasEnFicha })));
 
 export interface OficinaRef {
   id: string;
@@ -736,6 +739,12 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
               </ul>
             )}
           </section>
+        )}
+
+        {mostrarEvidenciasSeccion && !esInv && (
+          <Suspense fallback={null}>
+            <EvidenciasEnFicha ciclo={{ id: ciclo.id, anio: ciclo.anio }} indicador={indicador.id} respuesta={respuesta.id} editable={editable} esAdmin={actor === "planeacion"} />
+          </Suspense>
         )}
 
         {mostrarComentario && (

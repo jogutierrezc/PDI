@@ -22,6 +22,9 @@
        guarda sus imágenes en news_images. Salta las que ya tienen imágenes.
        → { ok, seen, saved, next, fin }
 
+     { action: "evaluar", perfil, start?, limite?, reevaluar? }   (0242) lee con un perfil de
+       ranking las notas ya guardadas, sin descargar nada. → { ok, seen, saved, next, fin }
+
      { action: "nuevas" }   con el encabezado x-noticias-cron (secreto NOTICIAS_CRON):
        lee la primera página de cada fuente y guarda lo nuevo del año en curso.
        Pensada para una tarea diaria (pg_cron o cron externo).
@@ -30,6 +33,9 @@
      · Con sesión: solo Planeación o administración.
      · Una nota que ya existe no se toca: su estado y sus ODS corregidos a mano
        se respetan.
+     · Perfiles (0242): una descarga se lee una sola vez y se evalúa con cada
+       perfil que recibe noticias (perfiles.ts): ODS en news_items y news_ods,
+       los demás en news_profile_notes y news_temas. Sin 0242, solo ODS, como antes.
      · Con 0144, una nota con CUALQUIER coincidencia del léxico (aunque no
        llegue al umbral) queda «pending» con ai_status = 'pendiente': Mr. Pilo
        la lee después (función noticias-pilo). Una sin ninguna coincidencia se
@@ -47,6 +53,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { extracto, leer } from "./clasificar.ts";
 import { enlacesDelListado, imagenesDeK2, leerK2, tamanoOg, type ImagenNota } from "./parseo.ts";
 import { hablaDeMenores } from "../pilo-rankingsod/logica.ts";
+import { PERFIL_IDS, opcionesOds } from "./perfiles.ts";
+import type { PerfilId } from "./perfiles.ts";
+import { cargarPerfiles, evaluarEnPerfiles, fuenteDeUrl, leeDeLaFuente, reevaluarNota } from "./perfiles-db.ts";
+import type { Perfiles } from "./perfiles-db.ts";
 
 const FUENTES: Record<string, { host: string; ruta: string; sede: string; seccion: string }> = {
   comunicaciones: { host: "udes.edu.co", ruta: "/comunicaciones/noticias", sede: "", seccion: "Comunicaciones" },
@@ -154,7 +164,7 @@ interface Resultado {
   fin: boolean;
 }
 
-async function cargarFuente(admin: ReturnType<typeof createClient>, clave: string, start: number, year: number, pages: number): Promise<Resultado> {
+async function cargarFuente(admin: ReturnType<typeof createClient>, clave: string, start: number, year: number, pages: number, perfiles: Perfiles): Promise<Resultado> {
   const f = FUENTES[clave];
   const r: Resultado = { seen: 0, saved: 0, skipped: 0, next: start, fin: false };
   let viejas = 0;
@@ -187,7 +197,10 @@ async function cargarFuente(admin: ReturnType<typeof createClient>, clave: strin
         continue;
       }
       if (anio !== year) continue;
-      const { afinidad, candidata } = leer(nota.title, nota.body);
+      // El perfil ODS (valores de fábrica = lo de siempre); los demás perfiles la leen al guardarla, una sola descarga.
+      const cfgOds = perfiles.ods;
+      const { afinidad, candidata, propia } = leeDeLaFuente(cfgOds, clave) ? leer(nota.title, nota.body, opcionesOds(cfgOds)) : { afinidad: [], candidata: false, propia: null };
+      const propone = afinidad.length > 0 || Boolean(propia);
       const guardar = (conPilo: boolean) =>
         admin
           .from("news_items")
@@ -201,7 +214,7 @@ async function cargarFuente(admin: ReturnType<typeof createClient>, clave: strin
               published_on: nota.published_on,
               section: nota.section,
               campus: f.sede,
-              state: afinidad.length || (conPilo && candidata) ? "pending" : "no",
+              state: propone || (conPilo && candidata) ? "pending" : "no",
               ...(conPilo ? { ai_status: candidata ? "pendiente" : "none" } : {}),
             },
             { onConflict: "url", ignoreDuplicates: true },
@@ -217,8 +230,10 @@ async function cargarFuente(admin: ReturnType<typeof createClient>, clave: strin
       }
       if (error || !fila) continue;
       await guardarImagenes(admin, fila.id, nota);
-      if (afinidad.length || (conPilo && candidata)) {
+      await evaluarEnPerfiles(admin, perfiles, { id: fila.id, title: nota.title, body: nota.body }, clave);
+      if (propone || (conPilo && candidata)) {
         if (afinidad.length) await admin.from("news_ods").insert(afinidad.map((a) => ({ news_id: fila.id, ods: a.ods, score: a.score, reason: a.reason, manual: false })));
+        if (propia) await admin.from("news_temas").upsert({ news_id: fila.id, profile: "ods", tema: "propio", score: propia.score, reason: propia.reason.slice(0, 300), manual: false, by_ai: false }, { onConflict: "news_id,profile,tema", ignoreDuplicates: true });
         r.saved++;
       } else {
         r.skipped++;
@@ -245,7 +260,7 @@ Deno.serve(async (request: Request) => {
   if (!url || !serviceKey) return json({ error: "La función no está configurada." }, 500);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let cuerpo: { action?: string; fuente?: string; start?: number; year?: number; pages?: number; limite?: number; ods?: number } = {};
+  let cuerpo: { action?: string; fuente?: string; start?: number; year?: number; pages?: number; limite?: number; ods?: number; perfil?: string; reevaluar?: boolean } = {};
   try {
     cuerpo = JSON.parse((await request.text()) || "{}");
   } catch {
@@ -279,7 +294,8 @@ Deno.serve(async (request: Request) => {
     if (year < 2015 || year > anioActual) return json({ error: "Año fuera de rango." }, 400);
     const pages = Math.max(1, Math.min(2, Math.floor(Number(cuerpo.pages) || 1)));
     const inicio = new Date().toISOString();
-    const r = await cargarFuente(admin, fuente, start, year, pages);
+    const { perfiles } = await cargarPerfiles(admin);
+    const r = await cargarFuente(admin, fuente, start, year, pages, perfiles);
     await admin.from("news_runs").insert({ started_at: inicio, finished_at: new Date().toISOString(), source: `${fuente} ${year} (${autor ? "intranet" : "cron"})`, seen: r.seen, saved: r.saved, skipped: r.skipped });
     return json({ ok: true, ...r });
   }
@@ -323,11 +339,56 @@ Deno.serve(async (request: Request) => {
     return json({ ok: true, seen, saved, next: start + filas.length, fin });
   }
 
+  if (action === "evaluar") {
+    // Lee con un perfil las notas que ya están guardadas (sin descargar nada): las de un perfil nuevo o las que
+    // recibirían una palabra propia. Con reevaluar, las que nadie ha decidido ni Pilo leído se vuelven a puntuar.
+    const perfil = String(cuerpo.perfil ?? "") as PerfilId;
+    if (!PERFIL_IDS.includes(perfil)) return json({ error: "Perfil desconocido." }, 400);
+    const start = Math.max(0, Math.min(100_000, Math.floor(Number(cuerpo.start) || 0)));
+    const limite = Math.max(1, Math.min(300, Math.floor(Number(cuerpo.limite) || 150)));
+    const { perfiles, hay } = await cargarPerfiles(admin);
+    if (!hay) return json({ error: "Falta aplicar la migración 0242 (perfiles del recolector).", code: "migracion" }, 500);
+    const cfg = perfiles[perfil];
+    const inicio = new Date().toISOString();
+    const { data, error } = await admin
+      .from("news_items")
+      .select("id, url, title, body, state, reviewed_by, decided_by")
+      .order("created_at", { ascending: true })
+      .range(start, start + limite - 1);
+    if (error) return json({ error: error.message }, 500);
+    type FilaEv = { id: string; url: string; title: string; body: string; state: string; reviewed_by: string | null; decided_by: string | null };
+    const filas = (data ?? []) as FilaEv[];
+    let saved = 0;
+    for (const f of filas) {
+      const fuente = fuenteDeUrl(f.url);
+      if (perfil === "ods") {
+        // El perfil ODS no cambia: solo suma las coincidencias con sus palabras propias.
+        if (!cfg.palabras.length || !leeDeLaFuente(cfg, fuente)) continue;
+        const { propia } = leer(f.title, f.body, opcionesOds(cfg));
+        if (!propia) continue;
+        const { data: nuevo } = await admin
+          .from("news_temas")
+          .upsert({ news_id: f.id, profile: "ods", tema: "propio", score: propia.score, reason: propia.reason.slice(0, 300), manual: false, by_ai: false }, { onConflict: "news_id,profile,tema", ignoreDuplicates: true })
+          .select("news_id");
+        if (!(nuevo ?? []).length) continue;
+        saved++;
+        if (f.state === "no" && !f.reviewed_by && !f.decided_by) await admin.from("news_items").update({ state: "pending", ai_status: "pendiente" }).eq("id", f.id).eq("state", "no").is("reviewed_by", null).is("decided_by", null);
+      } else {
+        saved += await evaluarEnPerfiles(admin, perfiles, f, fuente, perfil);
+        if (cuerpo.reevaluar === true && cfg.recibe && (await reevaluarNota(admin, perfiles, f, perfil))) saved++;
+      }
+    }
+    const fin = filas.length < limite;
+    await admin.from("news_runs").insert({ started_at: inicio, finished_at: new Date().toISOString(), source: `evaluar ${perfil} (intranet)`, seen: filas.length, saved, skipped: 0 });
+    return json({ ok: true, seen: filas.length, saved, next: start + filas.length, fin });
+  }
+
   if (action === "nuevas") {
     const total = { seen: 0, saved: 0, skipped: 0 };
     const inicio = new Date().toISOString();
+    const { perfiles } = await cargarPerfiles(admin);
     for (const clave of Object.keys(FUENTES)) {
-      const r = await cargarFuente(admin, clave, 0, anioActual, 1);
+      const r = await cargarFuente(admin, clave, 0, anioActual, 1, perfiles);
       total.seen += r.seen;
       total.saved += r.saved;
       total.skipped += r.skipped;

@@ -30,11 +30,12 @@ import { InformesOds } from "./informes/InformesOds";
 import { BarraCarga, CargaProvider } from "./carga";
 import { odsVars } from "./ods";
 import { Posicion, ResultadoTHE } from "./posicion/Posicion";
-import { ReportePlaneacion } from "./reporte/ui/ReportePlaneacion";
 import "./rankings.css";
 
 // UI GreenMetric (intranet): se carga aparte porque trae Word y zip.
 const UiGreen = lazy(() => import("./uigreen/ui/UiGreen").then((m) => ({ default: m.UiGreen })));
+// THE Impact (intranet): misma estructura que UI GreenMetric, sobre el reporte por oficinas (0149) y los ciclos (0237 a 0241).
+const ThImpact = lazy(() => import("./thimpact/ui/ThImpact").then((m) => ({ default: m.ThImpact })));
 
 type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion";
 const BASE = "/admin/rankings";
@@ -115,6 +116,15 @@ export function RankingsAdmin() {
     titulo = NOMBRE[ranking.id];
     descripcion = ranking.subtitle;
     cuerpo = <PaginaRanking ranking={ranking} />;
+    if (ranking.id === "impact") {
+      titulo = "THE Impact Rankings";
+      descripcion = "El reporte de la UDES al ranking: ciclo, indicadores por ODS, oficinas responsables, evidencias, revisión y lista de entrega";
+      cuerpo = (
+        <Suspense fallback={<p role="status">Cargando THE Impact…</p>}>
+          <ThImpact resumen={<PaginaRanking ranking={ranking} soloSobre />} />
+        </Suspense>
+      );
+    }
     if (ranking.id === "green") {
       titulo = "UI GreenMetric";
       descripcion = "El reporte de la UDES al ranking: indicadores por categoría, responsables, evidencias, revisión y publicación";
@@ -287,16 +297,14 @@ function EstadoRecolector({ inbox }: { inbox: ReturnType<typeof useNewsInbox> })
 /* ---------- Página de un ranking ------------------------------------------- */
 
 /**
- * THE Impact es un espacio de trabajo (franja, subpestañas y tablas); los demás
- * rankings muestran su aviso. «Qué es», las categorías y los accesos se pliegan
- * al final, en «Sobre este ranking».
+ * THE Impact tiene su propia sección de trabajo (thimpact/ui/ThImpact.tsx), que usa
+ * esto con `soloSobre` en «Cifras del ranking»; los demás rankings muestran su aviso.
+ * «Qué es», las categorías y los accesos se pliegan al final, en «Sobre este ranking».
  */
-function PaginaRanking({ ranking }: { ranking: Ranking }) {
+function PaginaRanking({ ranking, soloSobre = false }: { ranking: Ranking; soloSobre?: boolean }) {
   return (
     <div className="rk-page">
-      {ranking.id === "impact" ? (
-        <ReportePlaneacion />
-      ) : (
+      {soloSobre ? null : (
         <section className="rk-soon" aria-labelledby="rk-soon">
           <h2 id="rk-soon" className="rk-h2">
             Próximamente: carga de datos

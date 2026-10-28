@@ -31,6 +31,9 @@
             botón «Enviar avisos pendientes»): no elige a quién ni qué se envía,
             solo hace avanzar la cola. Mismas protecciones: interruptor general,
             dominios permitidos, tope por hora y bitácora enmascarada.
+        { action: "thi_cola", limite? }                         → igual que ugm_cola
+            THE Impact (0241): la cola `thi_notificaciones` con las plantillas
+            `c-thi-*`. Misma lógica y mismas protecciones (colaDeRanking).
 
    Decisiones que conviene conocer:
      · La identidad sale de la cuenta: con `user_metadata.pilo` es Mr. Pilo; si
@@ -188,8 +191,8 @@ export type Alcance = "cuerpo" | "completo";
 export const VARIABLES_POR_TIPO: Record<TipoPlantilla, readonly string[]> = {
   enlace: [...DATOS, "enlace"],
   codigo: [...DATOS, "codigo", "vigencia"],
-  // UI GreenMetric (0213) usa los datos de la segunda línea: indicador, pregunta, categoría, vencimiento, etc.
-  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle", "indicador", "pregunta", "categoria", "fecha_limite", "dias", "comentario", "autor", "revisor", "cantidad", "lista"],
+  // UI GreenMetric (0213) y THE Impact (0241) usan los datos de la segunda línea: indicador, pregunta, categoría (en THE, el ODS), oficina, vencimiento, etc.
+  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle", "indicador", "pregunta", "categoria", "fecha_limite", "dias", "comentario", "autor", "revisor", "cantidad", "lista", "oficina"],
 };
 
 /** Cómo se llama cada dato en los botones de «Insertar un dato». */
@@ -214,6 +217,7 @@ export const ETIQUETA_VARIABLE: Record<string, string> = {
   revisor: "Quién revisa",
   cantidad: "Cantidad",
   lista: "Lista",
+  oficina: "Oficina",
 };
 
 /** Valores de ejemplo para la vista previa y para «Enviar una prueba». Los datos de la persona vienen de PERSONAS_DE_EJEMPLO. */
@@ -234,6 +238,7 @@ export const VALORES_DE_EJEMPLO: Record<string, string> = {
   revisor: "Sergio Beltrán",
   cantidad: "3",
   lista: "1.10 · SI3, vence el 15 de noviembre; 2.6, vence mañana",
+  oficina: "Planeación Institucional",
 };
 
 /** El tope del HTML de una plantilla, en caracteres (la base lo rechaza más allá). */
@@ -1730,10 +1735,63 @@ const PLANTILLA_UGM_RESPALDO: Plantilla = {
 
 /** Los datos que una fila de la cola puede traer, con su largo máximo. Lo demás se descarta. */
 const VALORES_UGM: Record<string, number> = {
-  indicador: 60, pregunta: 300, categoria: 120, fecha_limite: 60, dias: 60, comentario: 600, autor: 120, revisor: 120, cantidad: 60, lista: 1500,
+  indicador: 60, pregunta: 300, categoria: 120, fecha_limite: 60, dias: 60, comentario: 600, autor: 120, revisor: 120, cantidad: 60, lista: 1500, oficina: 160,
 };
 
-async function colaDeUgm(request: Request, body: Record<string, unknown>, url: string, anonKey: string, serviceKey: string): Promise<Response> {
+/**
+ * Lo que distingue una cola de otra: UI GreenMetric (0213, `ugm_*`) y THE Impact (0241, `thi_*`) comparten la misma lógica de
+ * envío; cambian las funciones de la base, la plantilla de respaldo, el módulo que se nombra y las rutas que se aceptan.
+ */
+interface PerfilCola {
+  prefijo: "ugm" | "thi";
+  modulo: string;
+  respaldo: Plantilla;
+  migracion: string;
+  /** Rutas del portal que un aviso puede abrir (lista cerrada). */
+  rutaValida: RegExp;
+  rutaPorDefecto: string;
+  /** Reescribe la ruta que dejó la base antes de validarla. */
+  rutaDe: (cruda: string) => string;
+}
+
+const PERFIL_UGM: PerfilCola = {
+  prefijo: "ugm",
+  modulo: "UI GreenMetric",
+  respaldo: PLANTILLA_UGM_RESPALDO,
+  migracion: "Falta aplicar la migración 0213 (correos de UI GreenMetric).",
+  // La ruta abierta al rol «consulta» es /admin/reporte-rankings (0215); la antigua de 0213 se reescribe aquí también.
+  rutaValida: /^\/admin\/reporte-rankings\/[a-z0-9/?=&._-]{0,80}$/i,
+  rutaPorDefecto: "/admin/reporte-rankings/green",
+  rutaDe: (cruda) => cruda.replace(/^\/admin\/rankings\//, "/admin/reporte-rankings/"),
+};
+
+/** El texto de respaldo si la plantilla c-thi-* no está en la base (sin la migración 0241, o borrada). */
+const PLANTILLA_THI_RESPALDO: Plantilla = {
+  ...PLANTILLA_UGM_RESPALDO,
+  clave: "c-thi-respaldo",
+  grupo: "THE Impact",
+  nombre: "Aviso de THE Impact",
+  cuando: "Reporte de THE Impact",
+  asunto: "THE Impact: {{titulo_aviso}}",
+};
+
+const PERFIL_THI: PerfilCola = {
+  prefijo: "thi",
+  modulo: "THE Impact",
+  respaldo: PLANTILLA_THI_RESPALDO,
+  migracion: "Falta aplicar la migración 0241 (correos de THE Impact).",
+  // Quien responde entra por el reporte de su oficina (abierto a cualquier persona activa); la administración, por el tablero.
+  rutaValida: /^\/admin\/(reporte-rankings|rankings\/impact)(\?[a-z0-9=&._%-]{1,120})?$/i,
+  rutaPorDefecto: "/admin/reporte-rankings",
+  rutaDe: (cruda) => cruda,
+};
+
+const colaDeUgm = (request: Request, body: Record<string, unknown>, url: string, anonKey: string, serviceKey: string) =>
+  colaDeRanking(PERFIL_UGM, request, body, url, anonKey, serviceKey);
+const colaDeThi = (request: Request, body: Record<string, unknown>, url: string, anonKey: string, serviceKey: string) =>
+  colaDeRanking(PERFIL_THI, request, body, url, anonKey, serviceKey);
+
+async function colaDeRanking(perfil: PerfilCola, request: Request, body: Record<string, unknown>, url: string, anonKey: string, serviceKey: string): Promise<Response> {
   const inicio = Date.now();
   const authorization = request.headers.get("Authorization") ?? "";
   // Solo el rol de servicio (tarea programada) o una persona activa con sesión: la función no recibe a quién ni qué enviar.
@@ -1747,11 +1805,11 @@ async function colaDeUgm(request: Request, body: Record<string, unknown>, url: s
   }
   const limite = Math.max(1, Math.min(Math.floor(Number(body.limite)) || 10, 20));
   const admin = cliente(url, serviceKey);
-  await admin.rpc("ugm_cola_limpiar").then(() => undefined, () => undefined);
-  const tomada = await admin.rpc("ugm_cola_tomar", { p_limite: limite });
+  await admin.rpc(`${perfil.prefijo}_cola_limpiar`).then(() => undefined, () => undefined);
+  const tomada = await admin.rpc(`${perfil.prefijo}_cola_tomar`, { p_limite: limite });
   if (tomada.error) {
     const falta = ["42883", "PGRST202", "42P01", "PGRST205"].includes(String(tomada.error.code ?? ""));
-    return json({ ok: false, code: falta ? "migracion" : "interno", error: falta ? "Falta aplicar la migración 0213 (correos de UI GreenMetric)." : "No se pudo leer la cola." });
+    return json({ ok: false, code: falta ? "migracion" : "interno", error: falta ? perfil.migracion : "No se pudo leer la cola." });
   }
   const lote = (Array.isArray(tomada.data) ? tomada.data : []) as { id?: unknown; plantilla?: unknown; valores?: unknown; correo?: unknown; nombre?: unknown }[];
   const sitio = basePublica(request.headers.get("Origin") ?? (typeof body.sitio === "string" ? body.sitio : ""), ENV("CORREOS_URL_PUBLICA"), "");
@@ -1763,29 +1821,28 @@ async function colaDeUgm(request: Request, body: Record<string, unknown>, url: s
     if (!id) continue;
     // Se corta antes de que la plataforma mate la función: lo que falte vuelve a la cola sin gastar un intento.
     if (Date.now() - inicio > 90_000) {
-      await admin.rpc("ugm_cola_resultado", { p_id: id, p_estado: "liberar", p_error: null }).then(() => undefined, () => undefined);
+      await admin.rpc(`${perfil.prefijo}_cola_resultado`, { p_id: id, p_estado: "liberar", p_error: null }).then(() => undefined, () => undefined);
       continue;
     }
-    const resultado = (estado: string, error: string | null) => admin.rpc("ugm_cola_resultado", { p_id: id, p_estado: estado, p_error: error }).then(() => undefined, () => undefined);
+    const resultado = (estado: string, error: string | null) => admin.rpc(`${perfil.prefijo}_cola_resultado`, { p_id: id, p_estado: estado, p_error: error }).then(() => undefined, () => undefined);
     const para = typeof n.correo === "string" ? n.correo.trim().toLowerCase().slice(0, 254) : "";
-    const clave = typeof n.plantilla === "string" && /^c-ugm-[a-z0-9-]{1,30}$/.test(n.plantilla) ? n.plantilla : "";
+    const clave = typeof n.plantilla === "string" && new RegExp(`^c-${perfil.prefijo}-[a-z0-9-]{1,30}$`).test(n.plantilla) ? n.plantilla : "";
     if (!clave || !correoValido(para)) {
       fallidos++;
       await resultado("error", "La fila no tiene destinatario o plantilla válidos.");
       continue;
     }
     const crudo = (n.valores && typeof n.valores === "object" ? n.valores : {}) as Record<string, unknown>;
-    const valores: Record<string, string> = { modulo: "UI GreenMetric" };
+    const valores: Record<string, string> = { modulo: perfil.modulo };
     for (const [k, max] of Object.entries(VALORES_UGM)) valores[k] = limpio(crudo[k], max);
-    valores.titulo_aviso = valores.indicador || "Reporte de UI GreenMetric";
+    valores.titulo_aviso = valores.indicador || `Reporte de ${perfil.modulo}`;
     valores.detalle = [valores.indicador, valores.pregunta, valores.comentario, valores.lista].filter(Boolean).join(". ");
-    // La ruta abierta al rol «consulta» es /admin/reporte-rankings (0215); la antigua de 0213 se reescribe aquí también.
-    const rutaCruda = typeof crudo.ruta === "string" ? crudo.ruta.replace(/^\/admin\/rankings\//, "/admin/reporte-rankings/") : "";
-    const ruta = /^\/admin\/reporte-rankings\/[a-z0-9/?=&._-]{0,80}$/i.test(rutaCruda) ? rutaCruda : "/admin/reporte-rankings/green";
+    const rutaCruda = typeof crudo.ruta === "string" ? perfil.rutaDe(crudo.ruta) : "";
+    const ruta = perfil.rutaValida.test(rutaCruda) ? rutaCruda : perfil.rutaPorDefecto;
     const base = sitio || "https://planeacion.udes.edu.co";
     const hash = await huella(para, ENV("SEND_EMAIL_HOOK_SECRET") || serviceKey);
     const ctx = await contextoDe(admin, hash, "");
-    const plantilla = plantillaDeFila(ctx?.templates?.[clave], clave) ?? PLANTILLA_UGM_RESPALDO;
+    const plantilla = plantillaDeFila(ctx?.templates?.[clave], clave) ?? perfil.respaldo;
     const salida = await enviar(admin, ctx, {
       tipo: "aviso",
       plantilla,
@@ -1796,7 +1853,7 @@ async function colaDeUgm(request: Request, body: Record<string, unknown>, url: s
       enlace: `${base}${ruta}`,
       valores,
       sitio,
-      accion: "ugm",
+      accion: perfil.prefijo,
       hook: "",
       topeMs: SMTP_TOTAL_GANCHO_MS,
     });
@@ -1830,6 +1887,7 @@ async function panel(request: Request, crudo: string, url: string, anonKey: stri
   if (action === "soporte") return await avisoDeSoporte(request, body, url, serviceKey);
   if (action === "gm") return await avisoDeGestionMaster(request, body, url, serviceKey);
   if (action === "ugm_cola") return await colaDeUgm(request, body, url, anonKey, serviceKey);
+  if (action === "thi_cola") return await colaDeThi(request, body, url, anonKey, serviceKey);
   if (action !== "probar" && action !== "prueba") return json({ error: "Acción desconocida.", code: "datos" }, 400);
 
   // Solo la administración, con su sesión.

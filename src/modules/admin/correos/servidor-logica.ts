@@ -138,8 +138,8 @@ export type Alcance = "cuerpo" | "completo";
 export const VARIABLES_POR_TIPO: Record<TipoPlantilla, readonly string[]> = {
   enlace: [...DATOS, "enlace"],
   codigo: [...DATOS, "codigo", "vigencia"],
-  // UI GreenMetric (0213) usa los datos de la segunda línea: indicador, pregunta, categoría, vencimiento, etc.
-  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle", "indicador", "pregunta", "categoria", "fecha_limite", "dias", "comentario", "autor", "revisor", "cantidad", "lista"],
+  // UI GreenMetric (0213) y THE Impact (0241) usan los datos de la segunda línea: indicador, pregunta, categoría (en THE, el ODS), oficina, vencimiento, etc.
+  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle", "indicador", "pregunta", "categoria", "fecha_limite", "dias", "comentario", "autor", "revisor", "cantidad", "lista", "oficina"],
 };
 
 /** Cómo se llama cada dato en los botones de «Insertar un dato». */
@@ -164,6 +164,7 @@ export const ETIQUETA_VARIABLE: Record<string, string> = {
   revisor: "Quién revisa",
   cantidad: "Cantidad",
   lista: "Lista",
+  oficina: "Oficina",
 };
 
 /** Valores de ejemplo para la vista previa y para «Enviar una prueba». Los datos de la persona vienen de PERSONAS_DE_EJEMPLO. */
@@ -184,6 +185,7 @@ export const VALORES_DE_EJEMPLO: Record<string, string> = {
   revisor: "Sergio Beltrán",
   cantidad: "3",
   lista: "1.10 · SI3, vence el 15 de noviembre; 2.6, vence mañana",
+  oficina: "Planeación Institucional",
 };
 
 /** El tope del HTML de una plantilla, en caracteres (la base lo rechaza más allá). */

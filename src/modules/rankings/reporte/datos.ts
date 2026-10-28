@@ -10,6 +10,7 @@
    ========================================================================== */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import type { RankingAporteRow, RankingAssignmentRow, RankingCycleRow, RankingEvidenceRow, RankingIndicatorRow, RankingResponseRow } from "../../../types/database";
@@ -28,8 +29,14 @@ import type { Chequeo, Indicador, RolActor } from "./tipos";
 
 export const RANKING_THE = "the-impact";
 export const ODS_PRIORIZADOS = [4, 5, 10, 17];
-export const ANIO_EDICION = 2026;
-const ANIO_DATOS = 2024;
+/**
+ * Edición y año de datos por omisión al importar un Excel sin ciclo abierto: los de la metodología vigente
+ * («Sustainability Impact Ratings 2027», v1.1: datos del año académico 2025). Antes eran 2026 y 2024 fijos, y
+ * la pantalla mostraba siempre ese ciclo. Ahora los ciclos se crean y se eligen en la sección «Inicio de ciclo» / «Nuevo
+ * ciclo» (thimpact, migración 0237); estos valores solo quedan como último recurso de la importación.
+ */
+export const ANIO_EDICION = 2027;
+const ANIO_DATOS = 2025;
 const BUCKET = "ranking-evidencias";
 const CLAVE_RESPUESTA = "ciclo,indicador,unidad";
 const PAGINA = 1000;
@@ -95,22 +102,37 @@ export const CLAVES = {
 
 /* ---------- Lecturas ---------------------------------------------------------- */
 
-/** El ciclo más reciente de THE Impact, o nulo si no se ha importado el Excel. */
+/** Todos los ciclos de THE Impact, el de año más alto primero. */
+async function leerCiclos(): Promise<RankingCycleRow[]> {
+  const r = await supabase
+    .from("ranking_cycles")
+    .select("id, ranking, anio, anio_datos, ods_priorizados, fecha_limite, estado")
+    .eq("ranking", RANKING_THE)
+    .order("anio", { ascending: false });
+  if (r.error) throw errorDe(r.error);
+  return (r.data as RankingCycleRow[] | null) ?? [];
+}
+
+/** El ciclo pedido (`?ciclo=`); si no, el abierto de año más alto; si no hay abierto, el más reciente. */
+export function elegirCiclo(lista: RankingCycleRow[], pedido: string | null): RankingCycleRow | null {
+  return lista.find((c) => c.id === pedido) ?? lista.find((c) => c.estado === "abierto") ?? lista[0] ?? null;
+}
+
+/** La lista de ciclos de THE Impact (para el selector). Comparte caché con useCicloReporte. */
+export function useCiclosReporte() {
+  return useQuery({ queryKey: CLAVES.ciclo, retry: false, staleTime: 30_000, queryFn: leerCiclos });
+}
+
+/** El ciclo con el que se trabaja: el de `?ciclo=` en la dirección o, si no, el abierto; nulo si aún no hay ninguno. */
 export function useCicloReporte() {
+  const [params] = useSearchParams();
+  const pedido = params.get("ciclo");
   return useQuery({
     queryKey: CLAVES.ciclo,
     retry: false,
     staleTime: 30_000,
-    queryFn: async (): Promise<RankingCycleRow | null> => {
-      const r = await supabase
-        .from("ranking_cycles")
-        .select("id, ranking, anio, anio_datos, ods_priorizados, fecha_limite, estado")
-        .eq("ranking", RANKING_THE)
-        .order("anio", { ascending: false })
-        .limit(1);
-      if (r.error) throw errorDe(r.error);
-      return ((r.data as RankingCycleRow[] | null) ?? [])[0] ?? null;
-    },
+    queryFn: leerCiclos,
+    select: (lista): RankingCycleRow | null => elegirCiclo(lista, pedido),
   });
 }
 

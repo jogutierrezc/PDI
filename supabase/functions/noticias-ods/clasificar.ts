@@ -28,9 +28,30 @@
 
 export const UMBRAL = 35;
 export const MAX_ODS = 3;
+/** El título pesa el triple que el texto, y el puntaje se frena con esta constante (los valores de fábrica). */
+export const PESO_TITULO = 3;
+export const SATURACION = 14;
+
+/** Raíces sueltas y frases de un tema (de un ODS, de un pilar, de una categoría). */
+export interface Entrada {
+  raices: string[];
+  frases: string[];
+}
+
+/** Lo que un perfil de ranking puede ajustar (0242). Sin nada, los valores de fábrica de siempre. */
+export interface OpcionesLectura {
+  umbral?: number;
+  max?: number;
+  pesoTitulo?: number;
+  saturacion?: number;
+  /** Palabras propias del perfil: cada una cuenta como una frase y propone el tema «propio». */
+  palabras?: string[];
+  /** Solo estos ODS (los activos del perfil); sin esto, los 17. */
+  capas?: number[];
+}
 
 /** [raíces sueltas, frases]. Se normalizan al usarse: tildes, mayúsculas y signos no importan. */
-const LEXICO: Record<number, { raices: string[]; frases: string[] }> = {
+export const LEXICO: Record<number, Entrada> = {
   1: {
     raices: ["pobreza", "vulnerab", "subsidio", "mendic", "gratuidad", "habitante de calle", "habitantes de calle", "asistencia humanitaria"],
     frases: ["bajos recursos", "estratos 1", "estrato 1", "estrato 2", "capital semilla", "poblacion vulnerable", "comunidades vulnerables", "sin hogar", "inclusion social", "familias en accion", "jovenes en accion", "renta ciudadana", "ingreso solidario", "pobreza multidimensional", "matricula cero", "auxilio economico", "kits escolares", "pobreza extrema"],
@@ -134,14 +155,31 @@ export interface Lectura {
   pistas: Afinidad[];
   /** ¿Tiene alguna coincidencia? Entonces Pilo la lee. */
   candidata: boolean;
+  /** La coincidencia con las palabras propias del perfil, si las hay y llega al umbral. */
+  propia?: AfinidadTema | null;
 }
 
-/** El léxico completo sobre una nota: lo que propone y las pistas que encontró. */
-export function leer(titulo: string, texto: string): Lectura {
+/** Un tema cualquiera con su puntaje: el id de un ODS («ods13»), de un pilar o de una categoría. */
+export interface AfinidadTema {
+  tema: string;
+  score: number;
+  reason: string;
+}
+
+export const TEMA_PROPIO = "propio";
+
+/**
+ * El motor: puntúa un texto contra los léxicos dados, del más al menos afín.
+ * Es el cálculo de siempre; el título pesa `pesoTitulo` veces y el puntaje se
+ * frena con `saturacion`.
+ */
+export function puntuarTemas(titulo: string, texto: string, entradas: [string, Entrada][], op: OpcionesLectura = {}): AfinidadTema[] {
+  const pesoTitulo = op.pesoTitulo ?? PESO_TITULO;
+  const saturacion = op.saturacion ?? SATURACION;
   const t = ` ${normalizar(titulo)} `;
   const x = ` ${normalizar(texto).slice(0, 6000)} `;
-  const pistas: Afinidad[] = [];
-  for (const [clave, lex] of Object.entries(LEXICO)) {
+  const pistas: AfinidadTema[] = [];
+  for (const [clave, lex] of entradas) {
     let peso = 0;
     const pruebas: string[] = [];
     const sumar = (entrada: string, valor: number) => {
@@ -149,27 +187,47 @@ export function leer(titulo: string, texto: string): Lectura {
       const enT = contar(t, a);
       const enX = contar(x, a);
       if (!enT && !enX) return;
-      peso += valor * (enT * 3 + Math.min(enX, 3));
+      peso += valor * (enT * pesoTitulo + Math.min(enX, 3));
       pruebas.push(a.trim());
     };
     lex.frases.forEach((f) => sumar(f, 4));
     lex.raices.forEach((r) => sumar(r, 1.5));
     if (!peso) continue;
-    const score = Math.round(100 * (1 - Math.exp(-peso / 14)));
+    const score = Math.round(100 * (1 - Math.exp(-peso / saturacion)));
     const unicas = [...new Set(pruebas)].slice(0, 4);
-    pistas.push({ ods: Number(clave), score, reason: "Menciona " + unicas.join(", ") });
+    pistas.push({ tema: clave, score, reason: (clave === TEMA_PROPIO ? "Palabra propia: " : "Menciona ") + unicas.join(", ") });
   }
-  pistas.sort((a, b) => b.score - a.score);
+  return pistas.sort((a, b) => b.score - a.score);
+}
+
+/** Las palabras propias como un léxico de frases (cada una cuenta como frase), o null si no hay. */
+export function lexicoPropio(palabras: string[] | undefined): Entrada | null {
+  const lista = (palabras ?? []).map((p) => p.trim()).filter(Boolean);
+  return lista.length ? { raices: [], frases: lista } : null;
+}
+
+/** El léxico completo sobre una nota: lo que propone y las pistas que encontró. */
+export function leer(titulo: string, texto: string, op: OpcionesLectura = {}): Lectura {
+  const umbral = op.umbral ?? UMBRAL;
+  const max = op.max ?? MAX_ODS;
+  const activos = op.capas ? new Set(op.capas) : null;
+  const entradas = Object.entries(LEXICO)
+    .filter(([clave]) => !activos || activos.has(Number(clave)))
+    .map(([clave, lex]) => [clave, lex] as [string, Entrada]);
+  const pistas: Afinidad[] = puntuarTemas(titulo, texto, entradas, op).map((p) => ({ ods: Number(p.tema), score: p.score, reason: p.reason }));
+  const propio = lexicoPropio(op.palabras);
+  const propia = propio ? (puntuarTemas(titulo, texto, [[TEMA_PROPIO, propio]], op)[0] ?? null) : null;
   return {
-    afinidad: pistas.filter((p) => p.score >= UMBRAL).slice(0, MAX_ODS),
+    afinidad: pistas.filter((p) => p.score >= umbral).slice(0, max),
     pistas,
-    candidata: pistas.length > 0,
+    candidata: pistas.length > 0 || Boolean(propia),
+    propia: propia && propia.score >= umbral ? propia : null,
   };
 }
 
 /** Los ODS de una noticia, del más al menos afín. Vacío si ninguno llega al umbral. */
-export function clasificar(titulo: string, texto: string): Afinidad[] {
-  return leer(titulo, texto).afinidad;
+export function clasificar(titulo: string, texto: string, op: OpcionesLectura = {}): Afinidad[] {
+  return leer(titulo, texto, op).afinidad;
 }
 
 /** Un extracto de unas 40 palabras, cortado en el final de una frase si cabe. */

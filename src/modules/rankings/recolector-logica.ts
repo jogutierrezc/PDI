@@ -4,6 +4,7 @@
    lote de alta afinidad, los conteos del riel y el progreso guardado.
    ========================================================================== */
 
+import { temasDe } from "./noticias";
 import type { NewsItem, NewsState } from "./noticias";
 
 /** Filtro de estado de la franja de flujo: "all" son todas las cargadas. */
@@ -11,15 +12,25 @@ export type FiltroEstado = NewsState | "all";
 /** Filtro del riel: 0 todas, -1 sin ODS, 1..17 un ODS. */
 export const SIN_ODS = -1;
 
+/** Filtro del riel de un perfil (0242): "" todas, "sin" las que no tienen tema, o el id de un tema («ods13», «ens», «SI», «propio»). */
+export const SIN_TEMA = "sin";
+
 export interface Filtro {
   estado: FiltroEstado;
   ods: number;
   q: string;
+  /** Si viene, manda sobre `ods`: es el filtro de cualquier perfil. */
+  tema?: string;
 }
 
 const normal = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
-export const mejorAfinidad = (n: NewsItem) => n.ods.reduce((m, o) => Math.max(m, o.score), 0);
+export const mejorAfinidad = (n: NewsItem) => temasDe(n).reduce((m, o) => Math.max(m, o.score), 0);
+
+const tieneTema = (n: NewsItem, f: Filtro) => {
+  if (f.tema !== undefined) return f.tema === "" || (f.tema === SIN_TEMA ? temasDe(n).length === 0 : temasDe(n).some((t) => t.tema === f.tema));
+  return f.ods === 0 || (f.ods === SIN_ODS ? n.ods.length === 0 : n.ods.some((o) => o.ods === f.ods));
+};
 
 const porFecha = (a: NewsItem, b: NewsItem) => (b.published_on ?? "").localeCompare(a.published_on ?? "");
 
@@ -30,7 +41,7 @@ export function filtrar(notas: NewsItem[], f: Filtro): NewsItem[] {
     .filter(
       (n) =>
         (f.estado === "all" || n.state === f.estado) &&
-        (f.ods === 0 || (f.ods === SIN_ODS ? n.ods.length === 0 : n.ods.some((o) => o.ods === f.ods))) &&
+        tieneTema(n, f) &&
         (!q || normal(n.title).includes(q)),
     )
     .sort(porFecha);
@@ -124,6 +135,24 @@ export function contarRiel(notas: NewsItem[]): Map<number, Conteo> {
     sumar(0, n.state);
     if (!n.ods.length) sumar(SIN_ODS, n.state);
     for (const o of n.ods) sumar(o.ods, n.state);
+  }
+  return m;
+}
+
+/** Conteos por estado de cada tema del perfil: clave "" todas, "sin" las que no tienen tema, o el id del tema. */
+export function contarTemas(notas: NewsItem[]): Map<string, Conteo> {
+  const m = new Map<string, Conteo>();
+  const sumar = (k: string, s: NewsState) => {
+    const c = m.get(k) ?? vacio();
+    c[s]++;
+    c.total++;
+    m.set(k, c);
+  };
+  for (const n of notas) {
+    const temas = temasDe(n);
+    sumar("", n.state);
+    if (!temas.length) sumar(SIN_TEMA, n.state);
+    for (const t of temas) sumar(t.tema, n.state);
   }
   return m;
 }

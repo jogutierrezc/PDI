@@ -228,7 +228,7 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
     } catch (e) {
       setEstado("mal");
       setMsgOtp(asCuentaError(e).message || "Ese código no coincide. Revise el correo e intente de nuevo.");
-      if (!movimientoReducido()) gsap.to(".pw .otp", { keyframes: { x: [-10, 9, -6, 4, 0] }, duration: 0.4, ease: "power2.out" });
+      if (!movimientoReducido()) gsap.to(".pwk .otp", { keyframes: { x: [-10, 9, -6, 4, 0] }, duration: 0.4, ease: "power2.out" });
       setTimeout(() => {
         dig.current.forEach((d) => {
           d.value = "";
@@ -256,7 +256,7 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
   return (
     <section className="screen" id="auth" aria-label="Acceso a Pilo at Work">
       <div className="hero">
-        <Logo alto={34} />
+        <Logo alto={34} variante="blanco" />
         <div className="hero__mid">
           <div className="hero__grid" aria-hidden="true" />
           <h1>
@@ -285,7 +285,7 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
                     {p}
                   </span>
                   {i < 2 && (
-                    <span className="ln">
+                    <span className="sln">
                       <b style={{ transform: `scaleX(${i + 1 < n ? 1 : 0})`, transition: "transform .45s cubic-bezier(.23,1,.32,1)" }} />
                     </span>
                   )}
@@ -338,7 +338,7 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
                   <label htmlFor="c-mail">Correo institucional</label>
                   <input className="inp" id="c-mail" type="email" value={f.correo} onChange={(e) => setF({ ...f, correo: e.target.value })} placeholder="nombre@udes.edu.co" autoComplete="email" />
                   <span className={`dom${f.correo ? (dominio ? " ok" : " bad") : ""}`} aria-live="polite">
-                    {!f.correo ? "Use su correo de la UDES" : dominio ? "✓ Dominio de la UDES reconocido" : "Este correo no es de la UDES"}
+                    {!f.correo ? "Use su correo de la UDES" : dominio ? "Dominio de la UDES reconocido" : "Este correo no es de la UDES"}
                   </span>
                 </div>
                 <div className="row2">

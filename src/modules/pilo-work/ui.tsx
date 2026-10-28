@@ -104,6 +104,39 @@ export const sale = (el: Element | null, fin: () => void) => {
   gsap.to(el, { opacity: 0, x: 16, duration: 0.18, ease: "power2.in", onComplete: fin });
 };
 
+/** Diálogo modal: foco adentro al abrir, Tab atrapado, Esc cierra y el foco vuelve a quien lo abrió. */
+export function useDialogo(cerrar: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cierre = useRef(cerrar);
+  cierre.current = cerrar;
+  useEffect(() => {
+    const previo = document.activeElement as HTMLElement | null;
+    const raiz = ref.current;
+    const foco = () => Array.from(raiz?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])') ?? []);
+    if (!raiz?.contains(document.activeElement)) foco()[0]?.focus();
+    const f = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return cierre.current();
+      if (e.key !== "Tab") return;
+      const l = foco();
+      if (!l.length) return;
+      const [a, z] = [l[0], l[l.length - 1]];
+      if (e.shiftKey && document.activeElement === a) {
+        z.focus();
+        e.preventDefault();
+      } else if (!e.shiftKey && document.activeElement === z) {
+        a.focus();
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", f);
+    return () => {
+      document.removeEventListener("keydown", f);
+      previo?.focus?.();
+    };
+  }, []);
+  return ref;
+}
+
 /* --- Iconos -------------------------------------------------------------------------------- */
 
 const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -125,6 +158,9 @@ export const IC = {
   doc: svg(<><path d="M4 3h8l4 4v10H4z" /><path d="M12 3v4h4" /></>),
   lock: svg(<><rect x="4" y="9" width="12" height="8" rx="2" /><path d="M7 9V6a3 3 0 016 0v3" /></>),
   send: <svg width="16" height="16" viewBox="0 0 20 20" {...P} strokeWidth={2}><path d="M3 10l14-7-5 14-2-6z" /></svg>,
+  panel: svg(<><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M8 4v12" /></>),
+  out: svg(<path d="M8 4H5a1 1 0 00-1 1v10a1 1 0 001 1h3M12 7l3 3-3 3M15 10H8" />),
+  plus: svg(<path d="M10 4v12M4 10h12" />),
   arrow: <svg width="14" height="14" viewBox="0 0 14 14" {...P} strokeWidth={1.8}><path d="M2 7h9M7 3l4 4-4 4" /></svg>,
 };
 
@@ -146,11 +182,17 @@ export function Seg<T extends string>({ valor, opciones, onChange, etiqueta, tab
   );
 }
 
-export const Logo = ({ alto = 22 }: { alto?: number }) => (
-  <span className="logo">
-    <img src="/logo-udes.svg" alt="Universidad de Santander" style={{ height: alto }} />
-  </span>
-);
+/** El logo de la UDES sin placa: el original sobre fondos claros, el blanco sobre oscuros; «tema» cambia con el tema. */
+const RAZON_LOGO = 2757 / 991;
+export const Logo = ({ alto = 22, variante = "tema" }: { alto?: number; variante?: "tema" | "original" | "blanco" }) => {
+  const dim = { width: Math.round(alto * RAZON_LOGO), height: alto };
+  return (
+    <span className={`logo logo--${variante}`} role="img" aria-label="Universidad de Santander" style={dim}>
+      {variante !== "blanco" && <img className="lg-o" src="/logo-udes.svg" alt="" aria-hidden="true" {...dim} />}
+      {variante !== "original" && <img className="lg-b" src="/logo-udes-blanco.png" alt="" aria-hidden="true" {...dim} />}
+    </span>
+  );
+};
 
 export const iniciales = (n: string) => n.split(" ").filter(Boolean).map((x) => x.charAt(0)).slice(0, 2).join("").toUpperCase();
 

@@ -129,7 +129,7 @@ export function Chat() {
   const vistos = useRef(new Set<string>());
   useEffect(() => {
     if (movimientoReducido()) return;
-    const nuevos = document.querySelectorAll<HTMLElement>(".pw .thread .bubble:not([data-v])");
+    const nuevos = document.querySelectorAll<HTMLElement>(".pwk .thread .bubble:not([data-v])");
     nuevos.forEach((n) => n.setAttribute("data-v", "1"));
     if (nuevos.length) gsap.fromTo(nuevos, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", clearProps: "opacity,transform" });
     void vistos;
@@ -140,13 +140,13 @@ export function Chat() {
     <div className="chat">
       <div className="thread">
         <div className="col">
-          <div className="bubble pilo">
+          <div className="bubble es-pilo">
             <Cara mood="feliz" />
             <div className="t">
               <p>
                 Hola, {perfil.nombre.split(" ")[0]}. Soy Pilo, su agente de trabajo. Recuerdo cómo escribe usted y su oficina, y puedo leer sus archivos sin subirlos.
               </p>
-              <p className="muted small">Pruebe una de estas ideas o escriba lo suyo.</p>
+              <p className="muted small">Elija una idea para empezar o escriba lo suyo.</p>
             </div>
           </div>
           {messages.map((m) => {
@@ -160,7 +160,7 @@ export function Chat() {
               );
             const ultimo = m === messages[messages.length - 1];
             return (
-              <div className="bubble pilo" key={m.id}>
+              <div className="bubble es-pilo" key={m.id}>
                 <Cara mood={isLoading && ultimo ? "piensa" : "bien"} />
                 <div className="t">
                   {partes.map((p, i) => {
@@ -188,7 +188,7 @@ export function Chat() {
             );
           })}
           {isLoading && messages[messages.length - 1]?.role === "user" && (
-            <div className="bubble pilo">
+            <div className="bubble es-pilo">
               <Cara mood="piensa" />
               <div className="t">
                 <span className="muted">Pilo está pensando…</span>

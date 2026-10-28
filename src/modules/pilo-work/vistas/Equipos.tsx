@@ -13,7 +13,7 @@ import { supabase } from "../../../lib/supabase";
 import { callWork } from "../api";
 import type { Memoria } from "../api";
 import { movimientoReducido } from "../../rankings/movimiento";
-import { Cara, IC, iniciales, MOOD, Seg, Tg, useEntra, useWork } from "../ui";
+import { Cara, IC, iniciales, MOOD, Seg, Tg, useDialogo, useEntra, useWork } from "../ui";
 
 interface Equipo {
   id: string;
@@ -86,7 +86,7 @@ export function Equipos() {
     <div className="tm" style={{ position: "relative" }} ref={raiz}>
       <aside className="tm__l" aria-label="Sus equipos">
         <button type="button" className="tmnew" onClick={() => setAsistente(true)}>
-          <span style={{ fontSize: 22, lineHeight: 1 }}>＋</span>Crear un equipo
+          <span style={{ display: "grid", width: 22, height: 22 }}>{IC.plus}</span>Crear un equipo
         </button>
         {invitaciones.map((i) => (
           <div className="propose" key={i.equipo_id}>
@@ -112,7 +112,7 @@ export function Equipos() {
         </div>
         {!equipos.length && !invitaciones.length && <p className="hint">Aún no está en ningún equipo. Cree uno: cualquier persona con rol puede.</p>}
       </aside>
-      <section className="tm__r">{actual ? <Detalle key={actual.id} equipo={actual} recargar={cargar} /> : <div className="pad muted">Elija un equipo o cree uno.</div>}</section>
+      <section className="tm__r">{actual ? <Detalle key={actual.id} equipo={actual} recargar={cargar} /> : <div className="pad muted">Elija un equipo de la lista o cree uno nuevo.</div>}</section>
       {asistente && (
         <Asistente
           cerrar={() => setAsistente(false)}
@@ -243,7 +243,7 @@ function Detalle({ equipo, recargar }: { equipo: Equipo; recargar: () => Promise
             <div className="tmsgs" ref={caja}>
               {!msgs.length && <p className="hint">Aún no hay mensajes. Escriba al equipo; mencione a @Pilo o haga una pregunta para que participe.</p>}
               {msgs.map((m) => (
-                <div className={`tm-msg${m.es_pilo ? " pilo" : ""}`} key={m.id}>
+                <div className={`tm-msg${m.es_pilo ? " es-pilo" : ""}`} key={m.id}>
                   {m.es_pilo ? <Cara mood="bien" /> : <span className="avatar">{iniciales(m.autor)}</span>}
                   <div>
                     <b>
@@ -264,7 +264,7 @@ function Detalle({ equipo, recargar }: { equipo: Equipo; recargar: () => Promise
                 </div>
               ))}
               {pensando && (
-                <div className="tm-msg pilo">
+                <div className="tm-msg es-pilo">
                   <Cara mood="piensa" />
                   <div>
                     <b>Pilo del equipo</b>
@@ -371,6 +371,7 @@ function Detalle({ equipo, recargar }: { equipo: Equipo; recargar: () => Promise
 
 function Asistente({ cerrar, listo, numero }: { cerrar: () => void; listo: (id: string) => void; numero: number }) {
   const { perfil, toast } = useWork();
+  const caja = useDialogo(cerrar);
   const [paso, setPaso] = useState(1);
   const [n, setN] = useState("");
   const [d, setD] = useState("");
@@ -437,7 +438,7 @@ function Asistente({ cerrar, listo, numero }: { cerrar: () => void; listo: (id: 
               {t}
             </span>
             {i < 2 && (
-              <span className="ln">
+              <span className="sln">
                 <b style={{ transform: `scaleX(${i + 1 < paso ? 1 : 0})`, transition: "transform .4s cubic-bezier(.23,1,.32,1)" }} />
               </span>
             )}
@@ -525,7 +526,7 @@ function Asistente({ cerrar, listo, numero }: { cerrar: () => void; listo: (id: 
   );
   return (
     <div className="wiz">
-      <div className="wiz__box" role="dialog" aria-modal="true" aria-labelledby="wz-t" style={{ ["--x" as string]: 0 } as CSSProperties}>
+      <div className="wiz__box" role="dialog" aria-modal="true" aria-labelledby="wz-t" ref={caja} style={{ ["--x" as string]: 0 } as CSSProperties}>
         {cuerpo}
       </div>
     </div>

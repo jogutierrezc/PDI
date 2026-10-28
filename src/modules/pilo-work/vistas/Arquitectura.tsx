@@ -8,7 +8,7 @@ const Capa = ({ n, items, pilo }: { n: string; items: string[]; pilo?: RegExp })
     <b>{n}</b>
     <ul>
       {items.map((i) => (
-        <li key={i} className={pilo?.test(i) ? "pilo" : ""}>
+        <li key={i} className={pilo?.test(i) ? "es-pilo" : ""}>
           {i}
         </li>
       ))}

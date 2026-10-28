@@ -22,7 +22,7 @@ import { Acceso } from "./Acceso";
 import { leerPerfil, miRol, ROL_ETIQUETA, SUPABASE_URL } from "./api";
 import type { Perfil, Rol } from "./api";
 import { registrarWorker } from "./push";
-import { Cara, IC, iniciales, Logo, MOOD, useToastState, WorkProvider } from "./ui";
+import { Cara, IC, iniciales, Logo, MOOD, useDialogo, useToastState, WorkProvider } from "./ui";
 import type { Avisar, WorkCtx } from "./ui";
 import "./work.css";
 
@@ -103,18 +103,28 @@ export function PiloWork() {
   const cortina = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", tema);
+    const raiz = document.documentElement;
+    const previo = raiz.getAttribute("data-theme");
+    raiz.setAttribute("data-theme", tema);
     try {
       localStorage.setItem("pilo-work-tema", tema);
     } catch {
       /* sin almacenamiento */
     }
-    return () => document.documentElement.removeAttribute("data-theme");
+    // Al salir de /work el portal recupera su propio tema, no el de Pilo at Work.
+    return () => {
+      if (previo) raiz.setAttribute("data-theme", previo);
+      else raiz.removeAttribute("data-theme");
+    };
   }, [tema]);
 
   useEffect(() => {
     registrarWorker();
+    const titulo = document.title;
     document.title = "Pilo at Work";
+    return () => {
+      document.title = titulo;
+    };
   }, []);
 
   /* Al abrir: si ya hay sesión y rol, directo adentro; si vuelve de Microsoft, se sigue su camino. */
@@ -171,7 +181,7 @@ export function PiloWork() {
   };
 
   return (
-    <div className="pw">
+    <div className="pwk" data-tema={tema}>
       <div className="frame">
         {estado.fase === "cargando" && (
           <div className="screen" style={{ display: "grid", placeItems: "center" }}>
@@ -207,6 +217,14 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
   const [notifs, setNotifs] = useState<(Avisar & { id: number })[]>([]);
   const [pal, setPal] = useState(false);
   const [versionNav, setVersionNav] = useState(0);
+  const [plegado, setPlegado] = useState(() => {
+    try {
+      return localStorage.getItem("pilo-work-riel") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const app = useRef<HTMLElement>(null);
   const [pendientes, setPendientes] = useState(0);
   const idN = useRef(0);
 
@@ -251,6 +269,34 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
     return () => clearInterval(iv);
   }, [avisosApp, aviso]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("pilo-work-riel", plegado ? "1" : "0");
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, [plegado]);
+
+  /* Plegar el riel; con el teclado (Ctrl B) el cambio es instantáneo. */
+  const alternarRiel = useCallback((instantaneo = false) => {
+    const a = app.current;
+    if (instantaneo && a) {
+      a.dataset.inst = "1";
+      requestAnimationFrame(() => requestAnimationFrame(() => a.removeAttribute("data-inst")));
+    }
+    setPlegado((p) => !p);
+  }, []);
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "b") return;
+      if ((e.target as HTMLElement | null)?.isContentEditable) return;
+      e.preventDefault();
+      alternarRiel(true);
+    };
+    document.addEventListener("keydown", f);
+    return () => document.removeEventListener("keydown", f);
+  }, [alternarRiel]);
+
   /* Paleta Ctrl K. */
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
@@ -276,15 +322,18 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
   const nav = useRef<HTMLElement>(null);
   const ind = useRef<HTMLSpanElement>(null);
   const primera = useRef(true);
+  const plegadoAntes = useRef(plegado);
   useEffect(() => {
     const b = nav.current?.querySelector<HTMLElement>('[aria-current="page"]');
     const i = ind.current;
     if (!b || !i) return;
-    if (primera.current || movimientoReducido()) {
+    const cambioRiel = plegadoAntes.current !== plegado;
+    plegadoAntes.current = plegado;
+    if (primera.current || cambioRiel || movimientoReducido()) {
       gsap.set(i, { y: b.offsetTop, height: b.offsetHeight, opacity: 1 });
       primera.current = false;
     } else gsap.to(i, { y: b.offsetTop, height: b.offsetHeight, duration: 0.26, ease: "expo.out", overwrite: true });
-  }, [actual, versionNav, esAdmin]);
+  }, [actual, versionNav, esAdmin, plegado]);
 
   /* La vista entra con un fundido corto. */
   const vista = useRef<HTMLDivElement>(null);
@@ -295,11 +344,11 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
 
   return (
     <WorkProvider value={ctx}>
-      <section className="screen" id="app" aria-label="Espacio de trabajo">
+      <section className="screen" id="app" ref={app} data-plegado={plegado ? "1" : undefined} aria-label="Espacio de trabajo">
         <aside className="rail">
           <div className="rail__brand">
-            <Logo />
-            <div>
+            {plegado ? <Cara mood="feliz" /> : <Logo alto={24} />}
+            <div className="rail__txt">
               <b>Pilo at Work</b>
               <small>{perfil.dependencia || "Universidad de Santander"}</small>
             </div>
@@ -309,31 +358,59 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
             {grupos.map((g) => (
               <div key={g.nombre} style={{ display: "contents" }}>
                 <h3>{g.nombre}</h3>
-                {g.items.map((i) => (
-                  <button key={i.ruta} type="button" className="nav" aria-current={actual === i.ruta ? "page" : undefined} onClick={() => ir(i.ruta)}>
-                    {i.icono}
-                    <span>{i.titulo}</span>
-                    {i.ruta === "admin/memoria" && pendientes > 0 && <em>{pendientes}</em>}
-                  </button>
-                ))}
+                {g.items.map((i) => {
+                  const cuenta = i.ruta === "admin/memoria" ? pendientes : 0;
+                  return (
+                    <button
+                      key={i.ruta}
+                      type="button"
+                      className="nav"
+                      aria-current={actual === i.ruta ? "page" : undefined}
+                      aria-label={cuenta > 0 ? `${i.titulo}, ${cuenta} por revisar` : i.titulo}
+                      title={plegado ? i.titulo : undefined}
+                      onClick={() => ir(i.ruta)}
+                    >
+                      {i.icono}
+                      <span>{i.titulo}</span>
+                      {cuenta > 0 && <em>{cuenta}</em>}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </nav>
+          <div className="rail__fold">
+            <button
+              type="button"
+              className="nav"
+              aria-expanded={!plegado}
+              aria-label={plegado ? "Desplegar el menú lateral" : "Plegar el menú lateral"}
+              title={`${plegado ? "Desplegar" : "Plegar"} el menú (Ctrl B)`}
+              onClick={() => alternarRiel()}
+            >
+              {IC.panel}
+              <span>{plegado ? "Desplegar menú" : "Plegar menú"}</span>
+            </button>
+          </div>
           <div className="rail__me">
-            <span className="avatar">{iniciales(perfil.nombre) || "?"}</span>
-            <div style={{ minWidth: 0 }}>
+            <span className="avatar" title={plegado ? `${perfil.nombre} · ${ROL_ETIQUETA[perfil.rol]}` : undefined}>
+              {iniciales(perfil.nombre) || "?"}
+            </span>
+            <div className="rail__who">
               <b>{perfil.nombre}</b>
               <small>{ROL_ETIQUETA[perfil.rol]}</small>
             </div>
             <button
               type="button"
-              className="tbtn"
-              style={{ marginLeft: "auto" }}
+              className="tbtn rail__out"
+              aria-label="Salir"
+              title="Salir"
               onClick={async () => {
                 await supabase.auth.signOut();
               }}
             >
-              Salir
+              {IC.out}
+              <span>Salir</span>
             </button>
           </div>
         </aside>
@@ -420,6 +497,7 @@ function Paleta({ grupos, cerrar, ir, setPedido }: { grupos: { items: Item[] }[]
     if (q.trim().length > 2) o.push([`Pedir a Pilo: ${q.trim()}`, () => { setPedido(q.trim()); ir("chat"); }]);
     return o.filter((x) => x[0].toLowerCase().includes(q.toLowerCase()) || x[0].startsWith("Pedir"));
   }, [grupos, q, ir, setPedido]);
+  const caja = useDialogo(cerrar);
   const usar = (i: number) => {
     const o = opciones[i];
     if (!o) return;
@@ -428,9 +506,8 @@ function Paleta({ grupos, cerrar, ir, setPedido }: { grupos: { items: Item[] }[]
   };
   return (
     <div className="pal" onClick={(e) => e.target === e.currentTarget && cerrar()}>
-      <div className="pal__box" role="dialog" aria-label="Buscar o ir a">
+      <div className="pal__box" role="dialog" aria-modal="true" aria-label="Buscar o ir a" ref={caja}>
         <input
-          autoFocus
           value={q}
           placeholder="Ir a una sección o pedir algo a Pilo"
           aria-label="Buscar"

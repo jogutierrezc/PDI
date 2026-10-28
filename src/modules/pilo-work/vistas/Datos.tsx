@@ -53,7 +53,7 @@ export function Datos() {
   };
   useEffect(() => {
     if (!res || movimientoReducido()) return;
-    gsap.fromTo(".pw .bar .tr i", { scaleX: 0.08 }, { scaleX: 1, duration: 0.5, ease: "expo.out", stagger: 0.04 });
+    gsap.fromTo(".pwk .bar .tr i", { scaleX: 0.08 }, { scaleX: 1, duration: 0.5, ease: "expo.out", stagger: 0.04 });
   }, [res]);
 
   if (!d) {
@@ -132,7 +132,11 @@ export function Datos() {
                 {d.columnas.map((c) => (
                   <th key={c.nombre}>
                     {c.nombre}
-                    {c.sensible ? " 🔒" : ""}
+                    {c.sensible && (
+                      <span role="img" aria-label="Columna sensible" title="Columna sensible" style={{ display: "inline-block", width: 13, height: 13, marginLeft: 5, verticalAlign: -2 }}>
+                        {IC.lock}
+                      </span>
+                    )}
                   </th>
                 ))}
               </tr>

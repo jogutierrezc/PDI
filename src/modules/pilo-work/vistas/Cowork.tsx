@@ -370,7 +370,7 @@ export function Cowork() {
           ) : (
             <article className="sheet" aria-label={doc.titulo} key={`${doc.id}-${version}`}>
               <header>
-                <Logo />
+                <Logo variante="original" />
                 <span className="mono muted">
                   <input
                     className="inp"

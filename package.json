@@ -33,6 +33,9 @@
     "@nivo/pie": "^0.99.0",
     "@nivo/radar": "^0.99.0",
     "@supabase/supabase-js": "^2.114.0",
+    "@tanstack/ai": "^1.0.0",
+    "@tanstack/ai-client": "^1.0.0",
+    "@tanstack/ai-react": "^1.0.0",
     "@tanstack/charts": "^1.1.0",
     "@tanstack/react-query": "^5.102.8",
     "@tanstack/react-table": "^9.3.1",
@@ -47,7 +50,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.3",
-    "read-excel-file": "^9.3.10"
+    "read-excel-file": "^9.3.10",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",

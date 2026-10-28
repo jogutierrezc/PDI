@@ -26,6 +26,20 @@
       ]
     },
     {
+      "source": "/work-sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "Service-Worker-Allowed", "value": "/work" }
+      ]
+    },
+    {
+      "source": "/work-manifest.webmanifest",
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    },
+    {
       "source": "/manifest.webmanifest",
       "headers": [
         {

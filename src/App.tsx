@@ -29,6 +29,7 @@ const ObsEmbed = lazy(() => import("./modules/obs-embed/ObsEmbed").then((m) => (
 const PiloEmbed = lazy(() => import("./modules/pilo-embed/PiloEmbed").then((m) => ({ default: m.PiloEmbed })));
 const AgentesApp = lazy(() => import("./modules/agentes/AgentesApp").then((m) => ({ default: m.AgentesApp })));
 const PiloApp = lazy(() => import("./modules/pilo-app/PiloApp").then((m) => ({ default: m.PiloApp })));
+const PiloWork = lazy(() => import("./modules/pilo-work/PiloWork").then((m) => ({ default: m.PiloWork })));
 const PiloPolicy = lazy(() => import("./modules/pilo-app/terms/PolicyPage").then((m) => ({ default: m.PolicyPage })));
 
 const Dashboard = lazy(() => import("./routes/Dashboard").then((m) => ({ default: m.Dashboard })));
@@ -321,6 +322,8 @@ export default function App() {
           {/* La app móvil de Mr. Pilo (PWA): /app, /app/universidad y /app/ensenanza. Una sola ruta, para que
               cambiar de Pilo no desmonte la app ni corte el vuelo de la bienvenida. */}
           <Route path="/app/*" element={<PiloApp />} />
+          {/* Pilo at Work (PWA de escritorio): /work, solo para personas con un rol asignado. */}
+          <Route path="/work/*" element={<PiloWork />} />
           {/* El Portal de agentes: aparte de la intranet, con su propio marco, ingreso y guardia (0181). */}
           <Route path="/agentes/*" element={<AgentesApp />} />
           {/* La política de uso de Mr. Pilo: un documento público, enlazable por sección (#p1…#p6). */}

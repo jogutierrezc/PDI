@@ -75,6 +75,30 @@
       })();
     </script>
 
+    <!-- Pilo at Work (/work) es una PWA de escritorio independiente: su propio manifiesto y su
+         propio service worker (public/work-sw.js, alcance /work). Solo se ponen bajo /work. -->
+    <script>
+      (function () {
+        var path = location.pathname;
+        if (path !== "/work" && path.indexOf("/work/") !== 0) return;
+        var head = document.head;
+        var add = function (tag, attrs) {
+          var el = document.createElement(tag);
+          for (var key in attrs) el.setAttribute(key, attrs[key]);
+          head.appendChild(el);
+        };
+        add("link", { rel: "manifest", href: "/work-manifest.webmanifest" });
+        add("link", { rel: "apple-touch-icon", href: "/pilo-app/apple-touch-icon.png" });
+        add("meta", { name: "mobile-web-app-capable", content: "yes" });
+        add("meta", { name: "application-name", content: "Pilo at Work" });
+        window.addEventListener("beforeinstallprompt", function (event) {
+          event.preventDefault();
+          window.__workInstall = event;
+          window.dispatchEvent(new Event("work-install"));
+        });
+      })();
+    </script>
+
     <!-- El Portal de agentes (/agentes) es instalable como app: recibe avisos
          con el navegador cerrado (Web Push). Su manifiesto y su service worker
          se ponen solo bajo /agentes, igual que la app de Mr. Pilo bajo /app. -->

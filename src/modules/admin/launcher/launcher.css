@@ -519,6 +519,20 @@
 .ln__portal strong { font-size: var(--text-md); font-weight: 800; }
 .ln__portal small { color: var(--pilo-stage-muted); font-size: var(--text-xs); line-height: var(--leading-snug); }
 .ln__portal > svg { transition: transform var(--dur-fast) var(--ease-out); }
+.ln__nuevo {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  color: var(--pilo-accent-ink);
+  background: var(--pilo-accent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  vertical-align: 2px;
+}
 .ln__portal:active { transform: scale(0.98); }
 
 .ln__pending,

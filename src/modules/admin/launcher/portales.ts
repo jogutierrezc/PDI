@@ -396,7 +396,7 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
           nav("development", "Los proyectos web de la oficina"),
         ],
       },
-      { title: "Mr. Pilo", cards: [nav("pilo", "La conexión, las funciones y a quién se abre"), nav("pilo_ensenanza", "Su página, su memoria, su catálogo y su bitácora"), nav("pilo_capacitacion", "Lo que Pilo no supo, sus capas y los permisos por oficina")] },
+      { title: "Mr. Pilo", cards: [nav("pilo", "La conexión, las funciones y a quién se abre"), nav("pilo_ensenanza", "Su página, su memoria, su catálogo y su bitácora"), nav("pilo_capacitacion", "Lo que Pilo no supo, sus capas y los permisos por oficina"), nav("pilo_work", "Modelos de IA, límites, funciones, Microsoft 365 y uso del espacio de trabajo")] },
       { title: "Datos", cards: [nav("transfer", "Copia otro servidor de Supabase en este")] },
     ],
   },

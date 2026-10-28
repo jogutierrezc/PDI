@@ -174,6 +174,7 @@ const PiloAiSettings = lazy(() =>
 const PiloEnsenanzaSettings = lazy(() =>
   import("./modules/admin/pilo-ensenanza/PiloEnsenanza").then((m) => ({ default: m.PiloEnsenanzaSettings })),
 );
+const PiloWorkSettings = lazy(() => import("./modules/admin/pilo-work/PiloWorkSettings").then((m) => ({ default: m.PiloWorkSettings })));
 const PiloCapacitacionPage = lazy(() =>
   import("./modules/admin/pilo-capacitacion/PiloCapacitacion").then((m) => ({ default: m.PiloCapacitacionPage })),
 );
@@ -713,6 +714,15 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="pilo_capacitacion">
                 <PiloCapacitacionPage />
+              </RequireRole>
+            }
+          />
+          {/* Pilo At Work: modelos de IA por nivel, límites, funciones habilitadas, Microsoft 365 y uso. */}
+          <Route
+            path="/admin/pilo-work"
+            element={
+              <RequireRole minimum="admin" screen="pilo_work">
+                <PiloWorkSettings />
               </RequireRole>
             }
           />

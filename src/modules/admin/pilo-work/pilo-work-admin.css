@@ -1,0 +1,24 @@
+/* Pilo At Work (admin) · solo lo que no trae ya pilo-settings.css. Prefijo único: pwa-. */
+.pwa { display: grid; gap: var(--space-4); }
+.pwa .pwa-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.pwa .pwa-4 { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+.pwa-nota { color: var(--ink-muted); font-size: var(--text-sm); max-width: 78ch; margin: 0; }
+.pwa-claves { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 700; }
+.pwa-efectivo { font-size: var(--text-sm); margin: 0; color: var(--ink); }
+.pwa-funcs { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.pwa-funcs li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+.pwa-funcs li:last-child { border-bottom: 0; }
+.pwa-funcs span { display: grid; gap: 2px; min-width: 0; }
+.pwa-funcs small { color: var(--ink-muted); font-size: var(--text-sm); }
+.pwa-vars { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.pwa-tabla { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.pwa-tabla th, .pwa-tabla td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); vertical-align: top; }
+.pwa-tabla th { color: var(--ink-muted); font-weight: 800; }
+.pwa-tabla code, .pwa-vars code { font-size: 12px; overflow-wrap: anywhere; }
+.pwa-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-4); margin: 0; }
+.pwa-cifras div { display: grid; gap: 2px; }
+.pwa-cifras dt { color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; }
+.pwa-cifras dd { margin: 0; font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pwa-h { margin: var(--space-2) 0 0; font-size: var(--text-sm); font-weight: 800; color: var(--ink); }
+.pwa-estado { min-height: 1.25rem; margin: 0; color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; }
+@media (max-width: 720px) { .pwa .pwa-2 { grid-template-columns: minmax(0, 1fr); } }

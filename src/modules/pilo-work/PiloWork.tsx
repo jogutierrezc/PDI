@@ -23,13 +23,16 @@ import { leerPerfil, miRol, ROL_ETIQUETA, SUPABASE_URL } from "./api";
 import type { Perfil, Rol } from "./api";
 import { registrarWorker } from "./push";
 import { Cara, IC, iniciales, Logo, MOOD, useDialogo, useToastState, WorkProvider } from "./ui";
-import type { Avisar, WorkCtx } from "./ui";
+import type { Avisar, ModeloUsado, WorkCtx } from "./ui";
+import { PerfilDialogo } from "./vistas/Perfil";
+import type { PerfilPw } from "./vistas/Perfil";
 import "./work.css";
 
 const Inicio = lazy(() => import("./vistas/Inicio").then((m) => ({ default: m.Inicio })));
 const Chat = lazy(() => import("./vistas/Chat").then((m) => ({ default: m.Chat })));
 const Cowork = lazy(() => import("./vistas/Cowork").then((m) => ({ default: m.Cowork })));
 const Datos = lazy(() => import("./vistas/Datos").then((m) => ({ default: m.Datos })));
+const Archivos = lazy(() => import("./vistas/Archivos").then((m) => ({ default: m.Archivos })));
 const Correo = lazy(() => import("./vistas/Correo").then((m) => ({ default: m.Correo })));
 const Agenda = lazy(() => import("./vistas/Agenda").then((m) => ({ default: m.Agenda })));
 const Skills = lazy(() => import("./vistas/Skills").then((m) => ({ default: m.Skills })));
@@ -46,23 +49,26 @@ interface Item {
   titulo: string;
   icono: ReactNode;
   solo?: "admin" | "correo";
+  /** Función global de pw_config que la administración puede apagar. */
+  funcion?: string;
 }
 const GRUPOS: { nombre: string; items: Item[] }[] = [
   { nombre: "Panel", items: [{ ruta: "", titulo: "Inicio", icono: IC.home }] },
   {
     nombre: "Trabajo",
     items: [
-      { ruta: "chat", titulo: "Chat", icono: IC.chat },
-      { ruta: "cowork", titulo: "Cowork", icono: IC.cow },
-      { ruta: "agenda", titulo: "Mi agenda", icono: IC.cal },
-      { ruta: "equipos", titulo: "Pilo for Teams", icono: IC.team },
+      { ruta: "chat", titulo: "Chat", icono: IC.chat, funcion: "chat" },
+      { ruta: "cowork", titulo: "Cowork", icono: IC.cow, funcion: "cowork" },
+      { ruta: "agenda", titulo: "Mi agenda", icono: IC.cal, funcion: "agenda" },
+      { ruta: "equipos", titulo: "Pilo for Teams", icono: IC.team, funcion: "equipos" },
     ],
   },
   {
     nombre: "Mis fuentes",
     items: [
-      { ruta: "correo", titulo: "Correo", icono: IC.mail },
-      { ruta: "datos", titulo: "Datos en este equipo", icono: IC.data },
+      { ruta: "correo", titulo: "Correo", icono: IC.mail, funcion: "correo" },
+      { ruta: "archivos", titulo: "Archivos", icono: IC.cloud, funcion: "archivos" },
+      { ruta: "datos", titulo: "Datos en este equipo", icono: IC.data, funcion: "datos" },
     ],
   },
   {
@@ -217,6 +223,11 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
   const [notifs, setNotifs] = useState<(Avisar & { id: number })[]>([]);
   const [pal, setPal] = useState(false);
   const [versionNav, setVersionNav] = useState(0);
+  const [funciones, setFunciones] = useState<Record<string, boolean>>({});
+  const [subidaMaxMb, setSubidaMaxMb] = useState(100);
+  const [perfilPw, setPerfilPw] = useState<Partial<PerfilPw> | null>(null);
+  const [perfilAbierto, setPerfilAbierto] = useState<{ x: number; y: number } | null | false>(false);
+  const [modelo, setModelo] = useState<ModeloUsado | null>(null);
   const [plegado, setPlegado] = useState(() => {
     try {
       return localStorage.getItem("pilo-work-riel") === "1";
@@ -234,6 +245,21 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
     setNotifs((n) => [...n, { ...a, id }]);
     setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 9000);
   }, []);
+
+  /* Funciones habilitadas por la administración (pw_config) y el nombre del perfil. Si pw_config aún no existe, todo queda encendido. */
+  const cargarPerfil = useCallback(async () => {
+    const { data } = await supabase.from("pw_perfiles").select("nombre, usar_en_respuestas").eq("user_id", perfil.userId).maybeSingle();
+    setPerfilPw((data as Partial<PerfilPw> | null) ?? null);
+  }, [perfil.userId]);
+  useEffect(() => {
+    void supabase.rpc("pw_config_publica").then(({ data, error }) => {
+      const fila = Array.isArray(data) ? data[0] : data;
+      if (error || !fila) return;
+      setFunciones((fila.funciones as Record<string, boolean>) ?? {});
+      setSubidaMaxMb(Number(fila.subida_max_mb) || 100);
+    });
+    void cargarPerfil();
+  }, [cargarPerfil]);
 
   /* Propuestas por revisar (solo administración). */
   useEffect(() => {
@@ -309,12 +335,18 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
     return () => document.removeEventListener("keydown", f);
   }, []);
 
+  const nombreMostrar = (perfilPw?.nombre || perfil.nombre).trim() || perfil.nombre;
+  const abrirPerfil = useCallback(() => {
+    const a = document.activeElement as HTMLElement | null;
+    const r = a?.getBoundingClientRect();
+    setPerfilAbierto(r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null);
+  }, []);
   const ctx: WorkCtx = useMemo(
-    () => ({ perfil, esAdmin, conCorreo, toast, aviso, ir, filas, setFilas, pedido, setPedido, esquema, setEsquema, avisosApp, setAvisosApp, refrescarNav: () => setVersionNav((v) => v + 1) }),
-    [perfil, esAdmin, conCorreo, toast, aviso, ir, filas, pedido, esquema, avisosApp],
+    () => ({ perfil, esAdmin, conCorreo, toast, aviso, ir, filas, setFilas, pedido, setPedido, esquema, setEsquema, avisosApp, setAvisosApp, refrescarNav: () => setVersionNav((v) => v + 1), funciones, subidaMaxMb, abrirPerfil, nombreMostrar, modelo, setModelo }),
+    [perfil, esAdmin, conCorreo, toast, aviso, ir, filas, pedido, esquema, avisosApp, funciones, subidaMaxMb, abrirPerfil, nombreMostrar, modelo],
   );
 
-  const grupos = GRUPOS.map((g) => ({ ...g, items: g.items.filter((i) => (i.solo === "admin" ? esAdmin : true)) })).filter((g) => g.items.length);
+  const grupos = GRUPOS.map((g) => ({ ...g, items: g.items.filter((i) => (i.solo === "admin" ? esAdmin : true) && (!i.funcion || funciones[i.funcion] !== false)) })).filter((g) => g.items.length);
   const actual = loc.pathname.replace(/^\/work\/?/, "").replace(/\/+$/, "");
   const titulo = grupos.flatMap((g) => g.items).find((i) => i.ruta === actual)?.titulo ?? (actual.startsWith("microsoft") ? "Microsoft 365" : "Pilo at Work");
 
@@ -393,13 +425,13 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
             </button>
           </div>
           <div className="rail__me">
-            <span className="avatar" title={plegado ? `${perfil.nombre} · ${ROL_ETIQUETA[perfil.rol]}` : undefined}>
-              {iniciales(perfil.nombre) || "?"}
-            </span>
-            <div className="rail__who">
-              <b>{perfil.nombre}</b>
-              <small>{ROL_ETIQUETA[perfil.rol]}</small>
-            </div>
+            <button type="button" className="rail__perfil" onClick={abrirPerfil} aria-label={`Mi perfil: ${nombreMostrar}`} title={plegado ? `${nombreMostrar} · ${ROL_ETIQUETA[perfil.rol]} · Mi perfil` : "Mi perfil"} disabled={funciones.perfil === false}>
+              <span className="avatar">{iniciales(nombreMostrar) || "?"}</span>
+              <span className="rail__who">
+                <b>{nombreMostrar}</b>
+                <small>{ROL_ETIQUETA[perfil.rol]}</small>
+              </span>
+            </button>
             <button
               type="button"
               className="tbtn rail__out"
@@ -422,9 +454,9 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
               <i />
               <span>Datos locales · {filas} filas enviadas</span>
             </span>
-            <span className="chip" title="El modelo de texto es el de Pilo; NVIDIA de apoyo">
-              <i style={{ background: "var(--blue)" }} />
-              Mistral · NVIDIA de apoyo
+            <span className="chip" title={modelo ? `${modelo.modelo}${modelo.conmutado ? ` · se usó el modelo de apoyo (${modelo.motivo || "el principal no respondió a tiempo"})` : ""} · ${modelo.ms} ms hasta el primer fragmento` : "Aún no hay una respuesta en esta sesión. Pilo usa Mistral y, si hace falta más capacidad o no responde a tiempo, NVIDIA."}>
+              <i style={{ background: modelo?.conmutado ? "var(--warn)" : "var(--blue)" }} />
+              {modelo ? `${modelo.proveedor === "nvidia" ? (modelo.conmutado ? "NVIDIA (apoyo)" : "NVIDIA") : "Mistral"}${modelo.nivel === "capacidad" ? " · capacidad" : ""}` : "Mistral"}
             </span>
             <button type="button" className="tbtn" onClick={onTema} aria-label="Cambiar entre tema claro y oscuro">
               Tema {tema === "dark" ? "oscuro" : "claro"}
@@ -441,6 +473,7 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
                 <Route path="cowork" element={<Cowork />} />
                 <Route path="datos" element={<Datos />} />
                 <Route path="correo" element={<Correo />} />
+                <Route path="archivos" element={<Archivos />} />
                 <Route path="agenda" element={<Agenda />} />
                 <Route path="skills" element={<Skills />} />
                 <Route path="memoria" element={<Memoria />} />
@@ -483,20 +516,31 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
             </div>
           ))}
         </div>
-        {pal && <Paleta grupos={grupos} cerrar={() => setPal(false)} ir={ir} setPedido={setPedido} />}
+        {pal && <Paleta grupos={grupos} cerrar={() => setPal(false)} ir={ir} setPedido={setPedido} perfil={funciones.perfil !== false ? abrirPerfil : undefined} />}
+        {perfilAbierto !== false && (
+          <PerfilDialogo
+            userId={perfil.userId}
+            nombreBase={perfil.nombre}
+            dependenciaBase={perfil.dependencia}
+            origen={perfilAbierto}
+            onCerrar={() => setPerfilAbierto(false)}
+            onGuardado={(p) => setPerfilPw(p)}
+          />
+        )}
       </section>
     </WorkProvider>
   );
 }
 
-function Paleta({ grupos, cerrar, ir, setPedido }: { grupos: { items: Item[] }[]; cerrar: () => void; ir: (r: string) => void; setPedido: (q: string) => void }) {
+function Paleta({ grupos, cerrar, ir, setPedido, perfil }: { grupos: { items: Item[] }[]; cerrar: () => void; ir: (r: string) => void; setPedido: (q: string) => void; perfil?: () => void }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const opciones = useMemo(() => {
     const o: [string, () => void][] = grupos.flatMap((g) => g.items).map((i) => [`Ir a ${i.titulo}`, () => ir(i.ruta)] as [string, () => void]);
+    if (perfil) o.push(["Abrir Mi perfil", perfil]);
     if (q.trim().length > 2) o.push([`Pedir a Pilo: ${q.trim()}`, () => { setPedido(q.trim()); ir("chat"); }]);
     return o.filter((x) => x[0].toLowerCase().includes(q.toLowerCase()) || x[0].startsWith("Pedir"));
-  }, [grupos, q, ir, setPedido]);
+  }, [grupos, q, ir, setPedido, perfil]);
   const caja = useDialogo(cerrar);
   const usar = (i: number) => {
     const o = opciones[i];

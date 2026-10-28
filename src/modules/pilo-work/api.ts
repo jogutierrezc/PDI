@@ -38,14 +38,21 @@ export class WorkError extends Error {
 }
 
 /** Un pedido JSON a una función; los errores llegan en español, tal como los dice el servidor. */
-export async function callFn<T>(name: string, body: Record<string, unknown>): Promise<T> {
+export async function callFn<T>(name: string, body: Record<string, unknown>, opts: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<T> {
+  // Siempre termina: tope de tiempo (por defecto 30 s) y cancelación.
+  const ctl = new AbortController();
+  const fuera = window.setTimeout(() => ctl.abort(), opts.timeoutMs ?? 30_000);
+  opts.signal?.addEventListener("abort", () => ctl.abort());
   let response: Response;
   try {
-    response = await fetch(functionUrl(name), { method: "POST", headers: await authHeaders(), body: JSON.stringify(body) });
+    response = await fetch(functionUrl(name), { method: "POST", headers: await authHeaders(), body: JSON.stringify(body), signal: ctl.signal });
   } catch {
+    window.clearTimeout(fuera);
+    if (opts.signal?.aborted) throw new WorkError("Se canceló.", "cancelado");
+    if (ctl.signal.aborted) throw new WorkError("El servidor tardó demasiado en responder. Intente de nuevo.", "tiempo");
     throw new WorkError("No hay conexión con el servidor. Revise su red.", "red");
   }
-  const data = (await response.json().catch(() => null)) as (T & { error?: string; code?: string; advice?: string }) | null;
+  const data = (await response.json().catch(() => null).finally(() => window.clearTimeout(fuera))) as (T & { error?: string; code?: string; advice?: string }) | null;
   if (!response.ok) throw new WorkError(data?.error ? `${data.error}${data.advice ? ` ${data.advice}` : ""}` : "El servidor no respondió como se esperaba.", data?.code, response.status);
   return data as T;
 }

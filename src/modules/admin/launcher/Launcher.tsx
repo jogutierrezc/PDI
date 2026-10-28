@@ -548,6 +548,17 @@ export function Launcher() {
             </span>
             <Icon name="arrow-right" size={16} />
           </Link>
+          {/* Pilo At Work: la entrada la ve toda persona con sesión; en /work se pide el rol si aún no lo tiene. */}
+          <Link to="/work" className="ln__portal" data-tour="launcher-work" data-anim>
+            <PiloAvatar mood="excelente" size={48} />
+            <span>
+              <strong>
+                Pilo At Work <em className="ln__nuevo">Nuevo</em>
+              </strong>
+              <small>El agente de IA para el trabajo de su oficina: redactar, ordenar el correo y preparar reuniones.</small>
+            </span>
+            <Icon name="arrow-right" size={16} />
+          </Link>
           {pending.length > 0 && (
             <section className="ln__pending" aria-labelledby="ln-pending-title" data-anim>
               <h2 id="ln-pending-title">

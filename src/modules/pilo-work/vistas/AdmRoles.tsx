@@ -53,6 +53,9 @@ export function AdmRoles() {
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <h2>Quién puede entrar</h2>
           <span className="badge role-adm">Solo administración</span>
+          <a className="btn sm" href="/admin/pilo-work">
+            Configurar en Planeación
+          </a>
         </div>
         <p className="muted" style={{ maxWidth: "66ch" }}>
           Solo las personas con un rol asignado usan Pilo at Work. Crear la cuenta y verificar el código no basta: la administración asigna el rol.

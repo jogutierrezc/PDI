@@ -19,7 +19,7 @@ interface Tile {
 }
 
 export function Inicio() {
-  const { perfil, esAdmin, conCorreo, ir, setPedido } = useWork();
+  const { nombreMostrar, esAdmin, conCorreo, ir, setPedido, funciones } = useWork();
   const [n, setN] = useState({ skills: 0, memoria: 0, equipos: 0, docs: 0, ms: false, reuniones: 0, propuestas: 0 });
   const [q, setQ] = useState("");
   const raiz = useEntra(".tile", 0, 28);
@@ -59,19 +59,20 @@ export function Inicio() {
 
   const h = new Date().getHours();
   const saludo = h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
-  const nombre = perfil.nombre.split(" ")[0];
+  const nombre = nombreMostrar.split(" ")[0];
   const T: Tile[] = [
     { ruta: "chat", t: "Chat", d: "Pídale a Pilo redactar, resumir o revisar lo que necesite.", k: "k1", r: "30px 48px 30px 40px", big: true, ic: IC.chat, b: "Empiece aquí" },
     { ruta: "cowork", t: "Cowork", d: "Documentos, código y revisión en un mismo lienzo, con Pilo al lado.", k: "k2", r: "48px 30px 42px 30px", big: true, ic: IC.cow, b: n.docs ? `${n.docs} documento${n.docs === 1 ? "" : "s"}` : "Sin documentos aún" },
     { ruta: "agenda", t: "Mi agenda", d: "Reuniones de Teams y recordatorios.", k: "k3", r: "28px 40px 28px 34px", ic: IC.cal, b: n.ms ? (n.reuniones ? `${n.reuniones} en 24 h` : "Sin reuniones hoy") : "Conectar calendario" },
     { ruta: "equipos", t: "Pilo for Teams", d: "Grupos con memoria compartida.", k: "k4", r: "40px 28px 36px 28px", ic: IC.team, b: `${n.equipos} equipo${n.equipos === 1 ? "" : "s"}` },
     ...(conCorreo ? [{ ruta: "correo", t: "Correo", d: "Leer y ordenar sin enviar nada.", k: "k1", r: "30px 38px 28px 42px", ic: IC.mail, b: n.ms ? "Conectado" : "Conectar correo" } as Tile] : []),
+    { ruta: "archivos", t: "Archivos", d: "OneDrive y SharePoint, sin borrar ni mover.", k: "k5", r: "34px 40px 30px 36px", ic: IC.cloud, b: "Conectar o explorar" },
     { ruta: "datos", t: "Datos en este equipo", d: "Revise Excel sin subirlo.", k: "k5", r: "38px 28px 40px 30px", ic: IC.data, b: "Se leen aquí" },
     { ruta: "skills", t: "Mis skills", d: "Sus maneras de trabajar.", k: "k6", r: "28px 42px 30px 36px", ic: IC.spark, b: `${n.skills} activas` },
     { ruta: "memoria", t: "Memoria", d: "Lo que Pilo sabe de su trabajo.", k: "k2", r: "42px 30px 34px 28px", ic: IC.mem, b: `${n.memoria} reglas suyas` },
     { ruta: "conectores", t: "Conectores", d: "Microsoft 365 y más.", k: "k3", r: "30px 34px 42px 28px", ic: IC.plug, b: n.ms ? "1 conectado" : "Ninguno conectado" },
     ...(esAdmin ? [{ ruta: "admin/memoria", t: "Administración", d: "Memoria colectiva, accesos y diseño.", k: "k4", r: "34px 28px 38px 30px", ic: IC.shield, b: `${n.propuestas} propuesta${n.propuestas === 1 ? "" : "s"} por revisar` } as Tile] : []),
-  ];
+  ].filter((t) => funciones[({ chat: "chat", cowork: "cowork", agenda: "agenda", equipos: "equipos", correo: "correo", archivos: "archivos", datos: "datos" } as Record<string, string>)[t.ruta] ?? ""] !== false);
 
   const enviar = (e: FormEvent) => {
     e.preventDefault();

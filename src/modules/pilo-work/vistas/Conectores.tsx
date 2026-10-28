@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { callFn } from "../api";
 import { conectarMs, useMs } from "../ms";
+import type { Servicio } from "../ms";
 import { IC, MOOD, useEntra, useWork } from "../ui";
 
 export function Conectores() {
@@ -11,7 +12,7 @@ export function Conectores() {
   const ms = useMs();
   const raiz = useEntra(".item", ms.cargando, 8);
   const [ocupado, setOcupado] = useState(false);
-  const conectar = async (s: ("correo" | "agenda")[]) => {
+  const conectar = async (s: Servicio[]) => {
     setOcupado(true);
     try {
       await conectarMs(s);
@@ -29,7 +30,7 @@ export function Conectores() {
     { t: "Microsoft 365 · Correo", d: "Leer, organizar y dejar borradores. Nunca envía ni borra.", ic: IC.mail, estado: ms.correoListo ? "Conectado" : ms.correoPermitido ? "Sin conectar" : "Su rol no lo incluye", ir: "correo" },
     { t: "Microsoft 365 · Calendario", d: "Ver su semana, proponer horarios y crear reuniones de Teams.", ic: IC.cal, estado: ms.agendaListo ? "Conectado" : "Sin conectar", ir: "agenda" },
     { t: "Datos en este equipo", d: "Excel y CSV que se leen en este equipo, nunca en la nube.", ic: IC.data, estado: "Siempre disponible", ir: "datos" },
-    { t: "OneDrive y SharePoint", d: "Documentos de la oficina.", ic: IC.plug, estado: "Próximamente" },
+    { t: "Microsoft 365 · Archivos", d: "OneDrive y SharePoint: explorar, abrir en Cowork y guardar. Sin borrar ni mover.", ic: IC.cloud, estado: ms.archivosListo ? "Conectado" : "Sin conectar", ir: "archivos" },
     { t: "Génesis · cifras", d: "Datos académicos, solo agregados.", ic: IC.data, estado: "En estudio" },
     { t: "Moodle", d: "Pertenece a Pilo Enseñanza; no se usa aquí.", ic: IC.plug, estado: "No aplica" },
   ];
@@ -48,6 +49,11 @@ export function Conectores() {
               {!ms.correoListo && ms.correoPermitido && (
                 <button type="button" className="btn sm" disabled={ocupado} onClick={() => void conectar(["correo", "agenda"])}>
                   Añadir correo
+                </button>
+              )}
+              {!ms.archivosListo && (
+                <button type="button" className="btn sm primary" disabled={ocupado} onClick={() => void conectar(["archivos"])}>
+                  Conectar archivos
                 </button>
               )}
               {!ms.agendaListo && (
@@ -84,7 +90,10 @@ export function Conectores() {
         {!ms.conectado && ms.configurado && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" className="btn navy" disabled={ocupado} onClick={() => void conectar(ms.correoPermitido ? ["correo", "agenda"] : ["agenda"])}>
-              {ocupado ? "Abriendo Microsoft…" : "Conectar con Microsoft"}
+              {ocupado ? "Abriendo Microsoft…" : "Conectar correo y agenda"}
+            </button>
+            <button type="button" className="btn" disabled={ocupado} onClick={() => void conectar(["archivos"])}>
+              Conectar archivos
             </button>
           </div>
         )}

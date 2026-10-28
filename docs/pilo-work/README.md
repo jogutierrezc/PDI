@@ -81,3 +81,27 @@ Desplegar el portal como siempre. `vercel.json` ya sirve `work-sw.js` con `Servi
 - Nunca se envía ni se borra correo. Organizar, borradores y reuniones piden aprobación en cada caso y las etiquetas se pueden deshacer.
 - Los archivos Excel/CSV se leen en un Web Worker del navegador. A la IA solo viaja la pregunta, el esquema que la persona dejó permitido y los agregados que aprobó; las columnas sensibles detectadas quedan cerradas. El contador «filas enviadas» es 0.
 - La bitácora (`pw_bitacora`) dice quién usó qué y cuándo; nunca el contenido.
+
+## Tanda 2026-10-28: qué hay que hacer para activarla
+
+### Migraciones nuevas (en este orden, tras 0243–0245)
+1. `0246_pw_perfiles.sql`: «Mi perfil» (`pw_perfiles`, solo la dueña lee y escribe su fila).
+2. `0247_pw_config.sql`: configuración global (`pw_config`), funciones de uso y retención. Programar la retención: `select cron.schedule('pw-purgar-bitacora', '15 3 * * *', $$select public.pw_purgar_bitacora()$$);`
+
+### Funciones que hay que volver a copiar al servidor (y reiniciar)
+- `supabase/functions/pilo-work/` (`index.ts` y `proveedor.ts`)
+- `supabase/functions/pw-microsoft/`
+`pw-avisos` no cambió.
+
+### Permisos nuevos en Microsoft Entra (los concede TIC)
+Además de los de correo y agenda, agregue permisos **delegados** de Microsoft Graph: `Files.ReadWrite` y `Sites.ReadWrite.All` (consentimiento de administrador). Siguen sin pedirse `Mail.Send` ni permisos de administración de sitios. **Cada persona debe pulsar «Conectar archivos»** (en Conectores o en Archivos): los alcances se suman a los de correo y agenda, no los reemplazan. Si falta el consentimiento, el mensaje dice que se pida a TIC.
+
+### Límites de subida (verificados en la documentación de Microsoft Graph, 2026-10)
+- Subida simple (`PUT /content`): hasta 250 MB según Microsoft; aquí solo se usa hasta **1 MiB** por la función.
+- Sesión de subida (`createUploadSession`): trozos múltiplos de 320 KiB, menos de 60 MiB por petición, recomendado 5–10 MiB y reanudable (`nextExpectedRanges`). Aquí: trozos de **3 932 160 bytes** (12 × 320 KiB), enviados **directo del navegador** a la `uploadUrl` (ya autenticada; no lleva `Authorization`), con 3 reintentos, reanudación, progreso y cancelación. Si el navegador no llega (CORS/red) pasa a relevo por `pw-microsoft` (`archivos_trozo`).
+- Tope en la interfaz: **100 MB** (constante `MAX_SUBIDA_MB` y límite del servidor; `pw_config.subida_max_mb` puede bajarlo). Lectura de archivos: hasta 8 MB, texto y .docx.
+- `conflictBehavior: "rename"` por defecto; «Reemplazar» solo con casilla explícita.
+Fuentes: learn.microsoft.com/graph/api/driveitem-createuploadsession y driveitem-put-content.
+
+### Configuración desde Planeación
+`/admin/pilo-work` (Sistema, junto a Mr. Pilo): modelos por nivel, umbrales, límites, funciones habilitadas, estado de Microsoft 365 y uso. En el panel de Mr. Pilo debe estar el proveedor = Mistral con su modelo rápido y la **clave de NVIDIA** presente.

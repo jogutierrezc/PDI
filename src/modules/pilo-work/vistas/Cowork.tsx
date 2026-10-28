@@ -16,7 +16,10 @@ import { supabase } from "../../../lib/supabase";
 import { callWork, hace, marcarSenal } from "../api";
 import type { Bloque, Documento } from "../api";
 import { movimientoReducido } from "../../rankings/movimiento";
+import { leerTexto } from "../archivos";
+import { useMs } from "../ms";
 import { Cara, IC, Logo, Seg, useWork } from "../ui";
+import { AbrirDesdeNube, GuardarEnNube } from "./Archivos";
 
 interface Sug {
   h: string;
@@ -66,7 +69,9 @@ const ESQUELETO = (tipo: string, nombre: string, dep: string): Bloque[] =>
 const clase = (k: string) => (k === "titulo" ? "d-t" : k === "h" ? "d-h" : k === "asunto" ? "asunto" : k === "meta" ? "mono muted" : "");
 
 export function Cowork() {
-  const { perfil, toast, ir } = useWork();
+  const { perfil, toast, ir, funciones } = useWork();
+  const ms = useMs();
+  const [nube, setNube] = useState<{ modo: "abrir" | "guardar"; x: number; y: number; blob?: Blob } | null>(null);
   const [params, setParams] = useSearchParams();
   const [docs, setDocs] = useState<Pick<Documento, "id" | "titulo" | "tipo" | "actualizado_en">[]>([]);
   const [doc, setDoc] = useState<Documento | null>(null);
@@ -140,6 +145,37 @@ export function Cowork() {
     await supabase.from("pw_documentos").update({ bloques: b, actualizado_en: new Date().toISOString() }).eq("id", doc.id);
     void listar();
   };
+
+  /* --- OneDrive y SharePoint: importar el texto de un documento como documento nuevo --------------- */
+  const importar = useCallback(
+    async (drive: string, id: string, nombre: string) => {
+      try {
+        const r = await leerTexto(drive, id);
+        const partes = r.texto.split(/\n{1,}/).map((t) => t.trim()).filter(Boolean).slice(0, 400);
+        if (!partes.length) return toast("Ese archivo no tiene texto para importar.");
+        const b: Bloque[] = [{ k: "titulo", t: nombre.replace(/\.[^.]+$/, "") }, ...partes.map((t) => ({ k: "p" as const, t }))];
+        const { data, error } = await supabase.from("pw_documentos").insert({ user_id: perfil.userId, titulo: nombre.replace(/\.[^.]+$/, "").slice(0, 120), tipo: "informe", bloques: b }).select("id").single();
+        if (error || !data) return toast("No se pudo crear el documento.");
+        toast(r.truncado ? "Importado (solo el comienzo del archivo)" : "Documento importado");
+        void listar();
+        setParams({ doc: data.id as string });
+      } catch (e) {
+        toast(e instanceof Error ? e.message : "No se pudo importar el archivo.");
+      }
+    },
+    [perfil.userId, toast, listar, setParams],
+  );
+  useEffect(() => {
+    let pendiente: { drive: string; id: string; nombre: string } | null = null;
+    try {
+      pendiente = JSON.parse(sessionStorage.getItem("pw-cowork-importar") ?? "null");
+      sessionStorage.removeItem("pw-cowork-importar");
+    } catch {
+      /* sin almacenamiento */
+    }
+    if (pendiente) void importar(pendiente.drive, pendiente.id, pendiente.nombre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir
+  }, []);
 
   /* --- Crear ------------------------------------------------------------------------------------ */
   const crear = async (tipo: string, titulo: string, b: Bloque[]) => {
@@ -259,8 +295,8 @@ export function Cowork() {
     }
     setBusy("");
   };
-  const exportar = async () => {
-    if (!doc) return;
+  const construirDocx = async (): Promise<Blob | null> => {
+    if (!doc) return null;
     const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } = await import("docx");
     const hijos = bloques.current.flatMap((b) => {
       const lineas = b.t.split("\n");
@@ -268,7 +304,13 @@ export function Cowork() {
       if (b.k === "h") return [new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 240, after: 80 }, children: [new TextRun({ text: b.t, bold: true })] })];
       return [new Paragraph({ alignment: b.k === "fecha" ? AlignmentType.RIGHT : AlignmentType.JUSTIFIED, spacing: { after: 160, line: 320 }, children: lineas.flatMap((l, i) => [new TextRun({ text: l, bold: b.k === "asunto", break: i ? 1 : 0, font: "Calibri", size: 22 })]) })];
     });
-    const blob = await Packer.toBlob(new Document({ creator: perfil.nombre, title: doc.titulo, sections: [{ children: hijos }] }));
+    return await Packer.toBlob(new Document({ creator: perfil.nombre, title: doc.titulo, sections: [{ children: hijos }] }));
+  };
+  const nombreDocx = () => `${(doc?.titulo ?? "documento").replace(/[^\w\- áéíóúñÁÉÍÓÚÑ]+/g, "").trim() || "documento"}.docx`;
+  const exportar = async () => {
+    if (!doc) return;
+    const blob = await construirDocx();
+    if (!blob) return;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${doc.titulo.replace(/[^\w\- áéíóúñÁÉÍÓÚÑ]+/g, "").trim() || "documento"}.docx`;
@@ -341,6 +383,25 @@ export function Cowork() {
           <button type="button" className="btn sm" disabled={!doc} onClick={() => void exportar()}>
             Exportar .docx
           </button>
+          {ms.archivosListo && funciones.archivos !== false && (
+            <>
+              <button type="button" className="btn sm" onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); setNube({ modo: "abrir", x: r.left + r.width / 2, y: r.top + r.height / 2 }); }}>
+                Abrir desde OneDrive
+              </button>
+              <button
+                type="button"
+                className="btn sm"
+                disabled={!doc}
+                onClick={async (ev) => {
+                  const r = ev.currentTarget.getBoundingClientRect();
+                  const blob = await construirDocx();
+                  if (blob) setNube({ modo: "guardar", x: r.left + r.width / 2, y: r.top + r.height / 2, blob });
+                }}
+              >
+                Guardar en OneDrive
+              </button>
+            </>
+          )}
         </div>
 
         {tab === "doc" &&
@@ -572,6 +633,28 @@ export function Cowork() {
           </button>
         </div>
       </aside>
+      {nube?.modo === "abrir" && (
+        <AbrirDesdeNube
+          origen={nube}
+          onCerrar={() => setNube(null)}
+          onElegir={(i, drive) => {
+            setNube(null);
+            void importar(drive, i.id, i.nombre);
+          }}
+        />
+      )}
+      {nube?.modo === "guardar" && nube.blob && (
+        <GuardarEnNube
+          origen={nube}
+          nombreInicial={nombreDocx()}
+          blob={nube.blob}
+          onCerrar={() => setNube(null)}
+          onGuardado={(i) => {
+            setNube(null);
+            toast(`Guardado en la nube como «${i.nombre}»`);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,6 @@
-/* Pilo at Work · estado y conexión de Microsoft 365 (función pw-microsoft). */
+/* Pilo at Work · estado y conexión de Microsoft 365 (función pw-microsoft).
+   Los permisos se piden por módulo: «Correo y agenda» y «Archivos» (OneDrive y SharePoint).
+   Conectar un módulo suma sus alcances a los que la persona ya tenía. */
 
 import { useCallback, useEffect, useState } from "react";
 import { callFn } from "./api";
@@ -27,11 +29,13 @@ export function useMs() {
     void recargar();
   }, [recargar]);
   const tiene = (alcance: string) => e.scopes.toLowerCase().includes(alcance.toLowerCase());
-  return { ...e, recargar, correoListo: e.conectado && tiene("Mail.Read"), agendaListo: e.conectado && tiene("Calendars"), puedeOrganizar: tiene("Mail.ReadWrite") };
+  return { ...e, recargar, correoListo: e.conectado && tiene("Mail.Read"), agendaListo: e.conectado && tiene("Calendars"), archivosListo: e.conectado && tiene("Files.ReadWrite"), puedeOrganizar: tiene("Mail.ReadWrite") };
 }
 
+export type Servicio = "correo" | "agenda" | "archivos";
+
 /** Sale hacia Microsoft con los servicios pedidos; vuelve a /work/microsoft. */
-export async function conectarMs(servicios: ("correo" | "agenda")[], organizar = true): Promise<void> {
+export async function conectarMs(servicios: Servicio[], organizar = true): Promise<void> {
   const r = await callFn<{ url: string }>("pw-microsoft", { action: "iniciar", servicios, organizar, borradores: organizar });
   window.location.assign(r.url);
 }

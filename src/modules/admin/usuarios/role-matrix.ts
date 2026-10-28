@@ -320,6 +320,7 @@ export const MODULES: ModuleDef[] = [
       { id: "pilo", label: "Mr. Pilo" },
       { id: "pilo_ensenanza", label: "Mr. Pilo Enseñanza" },
       { id: "pilo_capacitacion", label: "Capacitación de Pilo" },
+      { id: "pilo_work", label: "Pilo At Work" },
     ],
     levels: {
       ver: { hint: "Aparece en el menú de quien sea administrador.", needs: "consulta" },

@@ -49,6 +49,7 @@ export type AdminSection =
   | "pilo"
   | "pilo_ensenanza"
   | "pilo_capacitacion"
+  | "pilo_work"
   | "reportes"
   | "correos"
   | "rutas"
@@ -309,6 +310,8 @@ export const navigation: NavGroup[] = [
       { id: "pilo_ensenanza", label: "Mr. Pilo en Enseñanza", icon: "compass", to: "/admin/mr-pilo-ensenanza", minimum: "admin" },
       // La capacitación de los dos Pilos: la bandeja de lo que no supo, las capas y los permisos por oficina.
       { id: "pilo_capacitacion", label: "Capacitación de Pilo", icon: "spark", to: "/admin/mr-pilo-capacitacion", minimum: "admin" },
+      // Pilo At Work (/work): modelos de IA por nivel, límites, funciones habilitadas, Microsoft 365 y uso. Comparte las claves con Mr. Pilo.
+      { id: "pilo_work", label: "Pilo At Work", icon: "spark", to: "/admin/pilo-work", minimum: "admin" },
       // Los correos de cuenta de Planeación y de Pilo: plantillas, conexión y bitácora.
       // Planeación entra a leer la bitácora; lo demás es de la administración.
       { id: "correos", label: "Correos", icon: "mail", to: "/admin/correos", minimum: "planeacion" },

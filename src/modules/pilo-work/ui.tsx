@@ -50,6 +50,23 @@ export interface WorkCtx {
   avisosApp: boolean;
   setAvisosApp: (v: boolean) => void;
   refrescarNav: () => void;
+  /** Funciones que la administración dejó encendidas (pw_config; por defecto todas) y el tope de subida en MB. */
+  funciones: Record<string, boolean>;
+  subidaMaxMb: number;
+  /** El perfil de la persona («Mi perfil»): abre el diálogo y el nombre para mostrar. */
+  abrirPerfil: () => void;
+  nombreMostrar: string;
+  /** El último modelo que respondió en el chat (para el chip superior). */
+  modelo: ModeloUsado | null;
+  setModelo: (m: ModeloUsado | null) => void;
+}
+export interface ModeloUsado {
+  proveedor: string;
+  modelo: string;
+  nivel: string;
+  conmutado: boolean;
+  motivo: string;
+  ms: number;
 }
 const Ctx = createContext<WorkCtx | null>(null);
 export const WorkProvider = Ctx.Provider;
@@ -158,6 +175,18 @@ export const IC = {
   doc: svg(<><path d="M4 3h8l4 4v10H4z" /><path d="M12 3v4h4" /></>),
   lock: svg(<><rect x="4" y="9" width="12" height="8" rx="2" /><path d="M7 9V6a3 3 0 016 0v3" /></>),
   send: <svg width="16" height="16" viewBox="0 0 20 20" {...P} strokeWidth={2}><path d="M3 10l14-7-5 14-2-6z" /></svg>,
+  folder: svg(<path d="M3 6a2 2 0 012-2h3l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2z" />),
+  file: svg(<><path d="M5 3h6l4 4v10H5z" /><path d="M11 3v4h4M8 11h4M8 14h4" /></>),
+  cloud: svg(<path d="M6.5 15a3.5 3.5 0 01-.4-6.98A4.5 4.5 0 0114.6 7.6 3.7 3.7 0 0114 15z" />),
+  user: svg(<><circle cx="10" cy="7" r="3.2" /><path d="M3.5 17c.6-3.2 3.1-5 6.5-5s5.9 1.8 6.5 5" /></>),
+  up: svg(<path d="M10 14V4M6 8l4-4 4 4M4 16h12" />),
+  close: svg(<path d="M5 5l10 10M15 5L5 15" />),
+  link: svg(<path d="M8.5 11.5a3 3 0 004.2 0l2.3-2.3a3 3 0 00-4.2-4.2l-.8.8M11.5 8.5a3 3 0 00-4.2 0L5 10.8A3 3 0 009.2 15l.8-.8" />),
+  video: svg(<><rect x="2.5" y="5.5" width="10" height="9" rx="2" /><path d="M12.5 9l5-2.5v7L12.5 11z" /></>),
+  clock: svg(<><circle cx="10" cy="10" r="7" /><path d="M10 6v4l3 2" /></>),
+  chevL: svg(<path d="M12 4l-6 6 6 6" />),
+  chevR: svg(<path d="M8 4l6 6-6 6" />),
+  refresh: svg(<path d="M16 10a6 6 0 11-1.8-4.3M16 3v4h-4" />),
   panel: svg(<><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M8 4v12" /></>),
   out: svg(<path d="M8 4H5a1 1 0 00-1 1v10a1 1 0 001 1h3M12 7l3 3-3 3M15 10H8" />),
   plus: svg(<path d="M10 4v12M4 10h12" />),
@@ -194,35 +223,116 @@ export const Logo = ({ alto = 22, variante = "tema" }: { alto?: number; variante
   );
 };
 
-export const iniciales = (n: string) => n.split(" ").filter(Boolean).map((x) => x.charAt(0)).slice(0, 2).join("").toUpperCase();
+/* --- Diálogo animado -------------------------------------------------------------------------
+   Modal con foco atrapado y devuelto (useDialogo), aria-modal y Esc. Entrada ≤ 300 ms (expo.out,
+   scale .96 + opacity, desde el disparador si se pasa `origen`), salida más corta. Esc y todo lo
+   que viene del teclado cierran SIN animación; movimiento reducido: solo un fundido. */
+export function Dialogo({ titulo, onCerrar, children, ancho = 560, origen, pie, descripcion }: { titulo: string; onCerrar: () => void; children: ReactNode; ancho?: number; origen?: { x: number; y: number } | null; pie?: ReactNode; descripcion?: string }) {
+  const panel = useRef<HTMLDivElement>(null);
+  const fondo = useRef<HTMLDivElement>(null);
+  const cerrando = useRef(false);
+  const caja = useDialogo(() => onCerrar());
+  const idT = useRef(`dlg-${Math.random().toString(36).slice(2, 8)}`).current;
+  useEffect(() => {
+    const p = panel.current;
+    const f = fondo.current;
+    if (!p || !f) return;
+    if (movimientoReducido()) {
+      gsap.fromTo([f, p], { opacity: 0 }, { opacity: 1, duration: 0.12, clearProps: "opacity" });
+      return;
+    }
+    if (origen) {
+      const r = p.getBoundingClientRect();
+      p.style.transformOrigin = `${Math.round(origen.x - r.left)}px ${Math.round(origen.y - r.top)}px`;
+    }
+    gsap.fromTo(f, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out", clearProps: "opacity" });
+    gsap.fromTo(p, { opacity: 0, scale: 0.96, y: 8 }, { opacity: 1, scale: 1, y: 0, duration: 0.26, ease: "expo.out", clearProps: "opacity,transform" });
+    return () => {
+      gsap.killTweensOf([f, p]);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
+  }, []);
+  /** Cierre con el puntero: sale más rápido de lo que entró. */
+  const cerrar = () => {
+    if (cerrando.current) return;
+    cerrando.current = true;
+    const p = panel.current;
+    const f = fondo.current;
+    if (!p || !f || movimientoReducido()) return onCerrar();
+    gsap.to(p, { opacity: 0, scale: 0.97, duration: 0.14, ease: "power2.in" });
+    gsap.to(f, { opacity: 0, duration: 0.16, ease: "power2.in", onComplete: onCerrar });
+  };
+  return (
+    <div className="dlg" ref={fondo} onMouseDown={(e) => e.target === e.currentTarget && cerrar()}>
+      <div className="dlg__p" ref={panel} style={{ maxWidth: ancho }}>
+        <div ref={caja} role="dialog" aria-modal="true" aria-labelledby={idT} aria-describedby={descripcion ? `${idT}-d` : undefined} className="dlg__i">
+          <header className="dlg__h">
+            <h2 id={idT}>{titulo}</h2>
+            <button type="button" className="tbtn dlg__x" aria-label="Cerrar" onClick={cerrar}>
+              {IC.close}
+            </button>
+          </header>
+          {descripcion && (
+            <p className="muted small" id={`${idT}-d`}>
+              {descripcion}
+            </p>
+          )}
+          <div className="dlg__b">{children}</div>
+          {pie && <footer className="dlg__f">{pie}</footer>}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-/** Un texto con «**negrita**» y listas sencillas, sin HTML crudo (el contenido viene del modelo). */
+export const iniciales =(n: string) => n.split(" ").filter(Boolean).map((x) => x.charAt(0)).slice(0, 2).join("").toUpperCase();
+
+/** Markdown seguro (nunca HTML crudo): párrafos, listas, tablas, citas, encabezados, código, negrita, cursiva, código en línea y enlaces http(s). */
 export function Md({ texto }: { texto: string }) {
-  const bloques = texto.split(/\n{2,}/);
-  const inline = (s: string) =>
-    s.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith("**") && p.endsWith("**") ? <b key={i}>{p.slice(2, -2)}</b> : <span key={i}>{p}</span>));
+  const inline = (s: string): ReactNode[] =>
+    s.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g).map((p, i) => {
+      if (p.length > 2 && p.startsWith("`") && p.endsWith("`")) return <code key={i}>{p.slice(1, -1)}</code>;
+      if (p.length > 4 && p.startsWith("**") && p.endsWith("**")) return <b key={i}>{p.slice(2, -2)}</b>;
+      if (p.length > 2 && p.startsWith("*") && p.endsWith("*")) return <i key={i}>{p.slice(1, -1)}</i>;
+      const m = p.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (m) return <a key={i} href={m[2]} target="_blank" rel="noopener noreferrer">{m[1]}</a>;
+      return <span key={i}>{p}</span>;
+    });
+  const celdas = (l: string) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  const bloque = (b: string, i: number): ReactNode => {
+    const lineas = b.split("\n");
+    if (lineas.length >= 2 && lineas[0].includes("|") && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(lineas[1])) {
+      const cab = celdas(lineas[0]);
+      return (
+        <div className="md-tabla" key={i} tabIndex={0} role="region" aria-label="Tabla">
+          <table>
+            <thead><tr>{cab.map((c, j) => <th key={j}>{inline(c)}</th>)}</tr></thead>
+            <tbody>{lineas.slice(2).map((l, r) => <tr key={r}>{cab.map((_, j) => <td key={j}>{inline(celdas(l)[j] ?? "")}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      );
+    }
+    if (lineas.every((l) => /^\s*[-*•]\s+/.test(l))) return <ul key={i}>{lineas.map((l, j) => <li key={j}>{inline(l.replace(/^\s*[-*•]\s+/, ""))}</li>)}</ul>;
+    if (lineas.every((l) => /^\s*\d+[.)]\s+/.test(l))) return <ol key={i}>{lineas.map((l, j) => <li key={j}>{inline(l.replace(/^\s*\d+[.)]\s+/, ""))}</li>)}</ol>;
+    if (lineas.every((l) => /^\s*>/.test(l))) return <blockquote key={i}>{inline(lineas.map((l) => l.replace(/^\s*>\s?/, "")).join(" "))}</blockquote>;
+    const h = lineas.length === 1 ? lineas[0].match(/^\s*(#{1,6})\s+(.+)$/) : null;
+    if (h) return <p className="md-h" key={i}><b>{inline(h[2])}</b></p>;
+    return (
+      <p key={i}>
+        {lineas.map((l, j) => (
+          <span key={j}>
+            {j > 0 && <br />}
+            {inline(l)}
+          </span>
+        ))}
+      </p>
+    );
+  };
   return (
     <div className="md">
-      {bloques.map((b, i) => {
-        const lineas = b.split("\n");
-        if (lineas.every((l) => /^\s*[-*•]\s+/.test(l)))
-          return (
-            <ul key={i}>
-              {lineas.map((l, j) => (
-                <li key={j}>{inline(l.replace(/^\s*[-*•]\s+/, ""))}</li>
-              ))}
-            </ul>
-          );
-        return (
-          <p key={i}>
-            {lineas.map((l, j) => (
-              <span key={j}>
-                {j > 0 && <br />}
-                {inline(l)}
-              </span>
-            ))}
-          </p>
-        );
+      {texto.split(/(```[^\n]*\n[\s\S]*?(?:```|$))/g).map((pieza, k) => {
+        if (k % 2 === 1) return <pre key={k} tabIndex={0}><code>{pieza.replace(/^```[^\n]*\n/, "").replace(/```$/, "").replace(/\n$/, "")}</code></pre>;
+        return pieza.split(/\n{2,}/).filter((b) => b.trim()).map((b, i) => bloque(b, k * 1000 + i));
       })}
     </div>
   );

@@ -876,8 +876,19 @@ HOOKS.s29=function(s){
   }
   function drive(sp,hold){ sp.hold=hold; step(sp,0); }
   function simulate(sp){ drive(sp,false); }
-  // La voz oficial de Pilo (ElevenLabs), generada una vez y guardada: sin claves en la página y sin gastar cuota por visita.
-  var audio=new Audio("pilo-bienvenida.mp3"); audio.preload="auto";
+  // La voz oficial de Pilo: se pide en vivo a Pilo AI (la misma función que usan los portales, con la clave pública del portal).
+  // Si no responde, suena el audio guardado de la misma bienvenida y, en último caso, avanzan solo los subtítulos.
+  var PILO_FN="https://planeacion.udes.edu.co/functions/v1/pilo-ia", PILO_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc5MDExMTE2MCwiZXhwIjo0OTQ1Nzg0NzYwLCJyb2xlIjoiYW5vbiJ9.U-dv9awSJe8LlTbXayXyofoJkK-12oagVFfnTYkK6kc";
+  var audio=new Audio(), saved="pilo-bienvenida.mp3", liveUrl=null;
+  audio.preload="auto"; audio.setAttribute("playsinline","");
+  function fetchVoice(){
+    if(liveUrl) return Promise.resolve(liveUrl);
+    var ctl=new AbortController(), t=setTimeout(function(){ ctl.abort() },15000);
+    return fetch(PILO_FN,{method:"POST",signal:ctl.signal,headers:{"Content-Type":"application/json",apikey:PILO_KEY,Authorization:"Bearer "+PILO_KEY},body:JSON.stringify({action:"voz",portal:"pregunta",text:plain})})
+      .then(function(r){ clearTimeout(t); if(!r.ok) throw new Error("HTTP "+r.status); return r.blob() })
+      .then(function(b){ if(!b||b.size<1000) throw new Error("audio vacío"); return (liveUrl=URL.createObjectURL(new Blob([b],{type:"audio/mpeg"}))) })
+      .catch(function(e){ clearTimeout(t); try{console.warn("[Pilo] La voz en vivo no sonó:",e&&e.message||e)}catch(_){} return null });
+  }
   function weights(){ var w=words.map(function(e){ var t=e.textContent; return t.length+1+(/[.:]$/.test(t)?7:/,$/.test(t)?3:0) }), tot=0, cum=[]; w.forEach(function(x){ tot+=x; cum.push(tot) }); return {cum:cum,tot:tot}; }
   function follow(sp){
     var W=weights(); sp.watch=setInterval(function(){
@@ -887,15 +898,18 @@ HOOKS.s29=function(s){
       if(i!==sp.i){ sp.i=i; mark(i) }
     },60);
   }
+  function play(sp,src,onFail){
+    audio.onended=function(){ if(speaking===sp){ clearInterval(sp.watch); finish() } };
+    audio.onerror=function(){ if(speaking===sp&&!sp.audio) onFail() };
+    audio.src=src; try{ audio.currentTime=0 }catch(e){}
+    var pr; try{ pr=audio.play() }catch(e){}
+    if(!pr||!pr.then){ onFail(); return }
+    pr.then(function(){ if(speaking===sp){ sp.audio=true; follow(sp) } }).catch(function(e){ try{console.warn("[Pilo] El navegador no dejó sonar el audio:",e&&e.name)}catch(_){} if(speaking===sp) onFail() });
+  }
   function speak(){
     stop(); var sp={timer:0,guard:0,u:null,i:-1}; speaking=sp; wave(true);
-    audio.onended=function(){ if(speaking===sp){ clearInterval(sp.watch); finish() } };
-    audio.onerror=function(){ if(speaking===sp&&!sp.audio) simulate(sp) };
-    try{ audio.currentTime=0 }catch(e){}
-    var pr; try{ pr=audio.play() }catch(e){}
-    if(!pr||!pr.then){ simulate(sp); return }
-    // Si el navegador bloquea el audio, los subtítulos avanzan igual; «Escuchar de nuevo» lo reintenta con un clic.
-    pr.then(function(){ if(speaking===sp){ sp.audio=true; follow(sp) } }).catch(function(){ if(speaking===sp) simulate(sp) });
+    var fallback=function(){ if(speaking!==sp) return; play(sp,saved,function(){ if(speaking===sp) simulate(sp) }) };
+    fetchVoice().then(function(url){ if(speaking!==sp) return; if(url) play(sp,url,fallback); else fallback() });
   }
   function reset(){
     stop(); words.forEach(function(w){w.classList.remove("said","on")});

@@ -1225,5 +1225,42 @@ var start=parseInt((location.hash||"").replace("#d",""),10);
 go(isNaN(start)?0:start-1);
 })();
 </script>
+
+
+<style>
+/* planpresent · pantalla completa, sin flechas. */
+html,body{margin:0!important;padding:0!important;height:100%;background:#fff;overflow:hidden}
+:root{padding:0!important}
+.shell{grid-template-rows:minmax(0,1fr)!important;height:100%}
+#view{height:100%!important}
+#stage{border-radius:0!important;box-shadow:none!important}
+#notes,#notesBtn{display:none!important}
+.ctl{position:fixed!important;bottom:max(14px,env(safe-area-inset-bottom,0px));left:max(40px,env(safe-area-inset-left,0px));z-index:30;padding:0!important;gap:0!important;opacity:0;pointer-events:none;transition:opacity .25s cubic-bezier(.23,1,.32,1)}
+.ctl>*:not(#fsBtn){display:none!important}
+#fsBtn{height:42px;padding:0 18px;border-radius:21px;border:0;background:rgba(10,45,99,.88);color:#fff;font-weight:700;font-size:15px;box-shadow:0 8px 24px rgba(0,40,100,.28)}
+body.pp-ui .ctl{opacity:1;pointer-events:auto}
+body.pp-nofs #fsBtn{display:none!important}
+body.pp-idle{cursor:none}
+.pp-edge{position:fixed;top:0;bottom:0;width:5vw;z-index:25}
+.pp-edge.l{left:0}.pp-edge.r{right:0}
+@media (prefers-reduced-motion:reduce){.ctl{transition:none}}
+</style>
+<div class="pp-edge l" id="ppL" aria-hidden="true"></div><div class="pp-edge r" id="ppR" aria-hidden="true"></div>
+<script>
+(function(){
+  var b=document.body, de=document.documentElement, t=0, idle=0;
+  if(!(de.requestFullscreen||de.webkitRequestFullscreen)) b.classList.add("pp-nofs");
+  function ui(){ b.classList.add("pp-ui"); b.classList.remove("pp-idle"); clearTimeout(t); clearTimeout(idle);
+    t=setTimeout(function(){ b.classList.remove("pp-ui") },2600);
+    idle=setTimeout(function(){ if(document.fullscreenElement) b.classList.add("pp-idle") },3200); }
+  ["pointermove","pointerdown","touchstart"].forEach(function(e){ addEventListener(e,ui,{passive:true}) });
+  ui();
+  var fsb=document.getElementById("fsBtn");
+  function label(){ if(fsb) fsb.textContent=document.fullscreenElement?"Salir de pantalla completa (F)":"Pantalla completa (F)"; }
+  document.addEventListener("fullscreenchange",label); label();
+  document.getElementById("ppL").addEventListener("click",function(){ document.getElementById("prev").click() });
+  document.getElementById("ppR").addEventListener("click",function(){ document.getElementById("next").click() });
+})();
+</script>
 </body>
 </html>

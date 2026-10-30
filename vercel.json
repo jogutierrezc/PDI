@@ -3,11 +3,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "redirects": [
-    { "source": "/presentacion", "destination": "/presentacion/", "permanent": false }
+    { "source": "/presentacion", "destination": "/presentacion/", "permanent": false },
+    { "source": "/planpresent", "destination": "/planpresent/", "permanent": false }
   ],
   "rewrites": [
     {
-      "source": "/((?!assets/|api/|presentacion/|.*\\.[a-zA-Z0-9]+$).*)",
+      "source": "/((?!assets/|api/|presentacion/|planpresent/|.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/index.html"
     }
   ],

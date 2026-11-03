@@ -99,7 +99,7 @@ html:has(.pi) { scrollbar-color: var(--od-board-line-strong) var(--od-page); }
 .pi-arc p { max-width: 54ch; font-size: 0.98rem; color: var(--od-board-muted); text-wrap: pretty; }
 /* El ciclo cierra: de «Transformar» vuelve a «Comprender». Con bordes, sin SVG estirado. */
 .pi-loop { position: absolute; right: 0; top: 3.4rem; bottom: 3.4rem; width: clamp(30px, 5.5vw, 72px); border: 3px solid var(--od-signal); border-left: 0; border-radius: 0 var(--radius-xl) var(--radius-xl) 0; }
-.pi-loop::before { content: ""; position: absolute; left: -1px; top: -10px; border-block: 8px solid transparent; border-right: 13px solid var(--od-signal); }
+.pi-loop::before { content: ""; position: absolute; left: -1px; top: -10px; width: 13px; height: 16px; background: var(--od-signal); clip-path: polygon(100% 0, 0 50%, 100% 100%); }
 
 /* Viaje del dato */
 .pi-route { position: relative; margin-top: clamp(40px, 6vw, 72px); --pi-stop: clamp(44px, 5vw, 72px); }

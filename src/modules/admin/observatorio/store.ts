@@ -176,7 +176,7 @@ export function useSyncObsTopics() {
       const topics = conColor.error ? await supabase.from("obs_topics").select(columnas).order("observatorio_id").order("orden") : conColor;
       if (topics.error || !topics.data) return [];
       const numero = new Map(((lineas.data ?? []) as { id: string; numero: number | null }[]).map((l) => [l.id, l.numero]));
-      return (topics.data as { slug: string; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; linea_id: string | null; color: string | null }[])
+      return (topics.data as unknown as { slug: string; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; linea_id: string | null; color: string | null }[])
         .filter((t) => t.nombre)
         .map((t, i) => ({
           slug: t.slug,

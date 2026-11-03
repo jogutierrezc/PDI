@@ -44,9 +44,9 @@ function useTemasPublicos() {
     staleTime: 60_000,
     queryFn: async (): Promise<FilaTema[]> => {
       const columnas = "slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado";
-      let r = await supabase.from("obs_topics").select(`${columnas},color`).eq("status", "publicado");
+      const conColor = await supabase.from("obs_topics").select(`${columnas},color`).eq("status", "publicado");
       // Antes de la migración 0248 no existe la columna color: se lee sin ella.
-      if (r.error) r = await supabase.from("obs_topics").select(columnas).eq("status", "publicado");
+      const r = conColor.error ? await supabase.from("obs_topics").select(columnas).eq("status", "publicado") : conColor;
       return r.error ? [] : (r.data as unknown as FilaTema[]);
     },
   });

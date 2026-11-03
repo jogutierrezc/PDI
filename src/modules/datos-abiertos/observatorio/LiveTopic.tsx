@@ -17,6 +17,7 @@ import { ObsChart } from "../../admin/observatorio/ObsCharts";
 import { SECTION_LABEL } from "../../admin/observatorio/model";
 import type { ObsDataset, ObsView } from "../../admin/observatorio/model";
 import type { LiveTopic } from "./live";
+import { Palabras } from "./tablero";
 
 export default function LiveTopicBody({ live, slug }: { live: LiveTopic; slug: string }) {
   const { config, views, datasets } = live;
@@ -31,7 +32,10 @@ export default function LiveTopicBody({ live, slug }: { live: LiveTopic; slug: s
       <div className="u-container obs-live__body">
         {sections.map((section) => (
           <div key={section} className="obs-live__section">
-            <h2 className="obs-live__heading">{SECTION_LABEL[section]}</h2>
+            <h2 className="obs-live__heading" aria-label={SECTION_LABEL[section]}>
+              <Palabras text={SECTION_LABEL[section]} />
+            </h2>
+            <div className="obsr-rule" aria-hidden="true" />
             <div className="obs-live__grid">
               {views
                 .filter((v) => v.section === section)

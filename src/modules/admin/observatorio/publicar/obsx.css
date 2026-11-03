@@ -334,3 +334,20 @@ button.obsx-asa:active { cursor: grabbing; }
 .obsx-pestanas > a:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
 
 .obsx-pestanas > a { text-decoration: none; }
+
+/* --- Apariencia del tablero (0251) ------------------------------------------------------ */
+
+.obsx-apar__vista .obsr { padding: 0; background: none; }
+.obsx-apar__vista .obsr-tile { min-height: 200px; }
+.obsx-apar__libre { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); color: var(--ink-secondary); font-size: var(--text-sm); }
+.obsx-apar__libre input { width: 44px; height: 36px; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--radius-xs); background: none; }
+.obsx-apar__soltar { display: grid; gap: var(--space-3); justify-items: start; padding: var(--space-4); border: 2px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--ink-secondary); font-size: var(--text-sm); transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.obsx-apar__soltar[data-encima] { border-color: var(--brand-blue); background: var(--brand-blue-soft); }
+.obsx-apar__botones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.obsx-apar__botones label { position: relative; cursor: pointer; }
+.obsx-apar__botones label:has(input:focus-visible) { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.obsx-apar__rangos { display: grid; gap: var(--space-3); margin: 0; padding: 0; border: 0; min-width: 0; }
+.obsx-apar__rangos:disabled { opacity: 0.5; }
+.obsx-apar__rangos legend { padding: 0; margin-bottom: var(--space-2); color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+.obsx-apar__rango { display: grid; grid-template-columns: 6rem minmax(0, 1fr) 3ch; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
+.obsx-apar__rango output { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }

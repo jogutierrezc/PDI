@@ -26,6 +26,8 @@ export interface Tema {
   pregunta: string | null; fuente: string | null; orden: number; archivado: boolean; status: "borrador" | "publicado";
   /** Color e icono propios del tema (0248); null: los de su línea. */
   color: string | null; icono: string | null;
+  /** Foto y degradado del tablero público (0251); sin la migración no vienen. */
+  imagen_url?: string | null; degradado?: number; alcance?: number; encuadre_x?: number; encuadre_y?: number;
 }
 export interface Responsable { observatorio_id: string; persona_id: string; propone_dominios: boolean }
 export type EstadoDominio = "propuesto" | "aprobado" | "rechazado";
@@ -44,7 +46,7 @@ export class FaltaMigracion extends Error {
   }
 }
 
-const FALTA = new Set(["PGRST205", "PGRST202", "42P01", "42883", "42703"]);
+const FALTA = new Set(["PGRST205", "PGRST202", "PGRST204", "42P01", "42883", "42703"]);
 function revisar<T>(migracion: string, r: { data: T | null; error: DatabaseError | null }): T {
   if (r.error) {
     if (FALTA.has(r.error.code ?? "")) throw new FaltaMigracion(migracion);
@@ -72,7 +74,17 @@ export const useLineas = (obs: string) =>
   useQuery({ queryKey: obsKeys2.lineas(obs), enabled: !!obs, queryFn: async () => revisar<Linea[]>("0230", await supabase.from("obs_lineas").select("*").eq("observatorio_id", obs).order("orden")) });
 
 export const useTemas = (obs: string) =>
-  useQuery({ queryKey: obsKeys2.temas(obs), enabled: !!obs, queryFn: async () => revisar<Tema[]>("0230", await supabase.from("obs_topics").select("slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado,status,color,icono").eq("observatorio_id", obs).order("orden")) });
+  useQuery({
+    queryKey: obsKeys2.temas(obs),
+    enabled: !!obs,
+    queryFn: async () => {
+      const columnas = "slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado,status,color,icono";
+      const con = await supabase.from("obs_topics").select(`${columnas},imagen_url,degradado,alcance,encuadre_x,encuadre_y`).eq("observatorio_id", obs).order("orden");
+      // Antes de la migración 0251 no existen las columnas de imagen: se leen sin ellas.
+      const r = con.error?.code === "42703" ? await supabase.from("obs_topics").select(columnas).eq("observatorio_id", obs).order("orden") : con;
+      return revisar<Tema[]>("0230", r as { data: Tema[] | null; error: DatabaseError | null });
+    },
+  });
 
 export const useResponsables = (obs: string) =>
   useQuery({ queryKey: obsKeys2.responsables(obs), enabled: !!obs, queryFn: async () => revisar<Responsable[]>("0230", await supabase.from("obs_responsables").select("*").eq("observatorio_id", obs)) });
@@ -142,6 +154,8 @@ export function useEditarObservatorios() {
     linea: (l: Partial<Linea> & { observatorio_id: string }) => run("0230", supabase.from("obs_lineas").upsert(l)),
     quitarLinea: (id: string) => run("0230", supabase.from("obs_lineas").delete().eq("id", id)),
     tema: (slug: string, c: Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden" | "archivado" | "status" | "color" | "icono">>) => run("0230", supabase.from("obs_topics").update(c).eq("slug", slug)),
+    /** Apariencia del tablero público: color, icono, foto y degradado. Migración 0251. */
+    apariencia: (slug: string, c: Partial<Pick<Tema, "color" | "icono" | "imagen_url" | "degradado" | "alcance" | "encuadre_x" | "encuadre_y">>) => run("0251", supabase.from("obs_topics").update(c).eq("slug", slug)),
     /** Tema nuevo (nace en borrador). El enlace es único en todo el portal: si choca, el llamador elige otro. */
     crearTema: (t: Pick<Tema, "slug" | "observatorio_id"> & Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden">>) => run("0230", supabase.from("obs_topics").insert({ ...t, status: "borrador" })),
     asignar: (r: Responsable) => run("0230", supabase.from("obs_responsables").upsert(r)),

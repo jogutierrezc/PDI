@@ -29,14 +29,25 @@ export interface TemaPublico extends ObsTopic {
   lineaId: string | null;
   /** Color propio del tema (0248); null: el de su línea. */
   color: string | null;
+  /** Icono propio del tema (0248); null: el que le toque por defecto. */
+  icono: string | null;
+  /** Foto del tablero (0251); null: color sólido. */
+  imagenUrl: string | null;
+  /** Intensidad y alcance del degradado sobre la foto, y su encuadre (0–100). */
+  degradado: number;
+  alcance: number;
+  encuadreX: number;
+  encuadreY: number;
   /** Tema nuevo de la base: no tiene cifras de ejemplo, solo lo que publique. */
   vacio: boolean;
 }
 
-interface FilaTema { slug: string; observatorio_id: string; linea_id: string | null; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; orden: number; archivado: boolean; color?: string | null }
+interface FilaTema { slug: string; observatorio_id: string; linea_id: string | null; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; orden: number; archivado: boolean; color?: string | null; icono?: string | null; imagen_url?: string | null; degradado?: number | null; alcance?: number | null; encuadre_x?: number | null; encuadre_y?: number | null }
+
+const APARIENCIA_BASE = { icono: null, imagenUrl: null, degradado: 92, alcance: 62, encuadreX: 50, encuadreY: 50 } as const;
 
 const ESTATICOS = new Map(OBS_TOPICS.map((t) => [t.slug, t]));
-const estaticoComoTema = (t: ObsTopic): TemaPublico => ({ ...t, obsId: null, lineaId: null, color: null, vacio: false });
+const estaticoComoTema = (t: ObsTopic): TemaPublico => ({ ...t, obsId: null, lineaId: null, color: null, ...APARIENCIA_BASE, vacio: false });
 
 function useTemasPublicos() {
   return useQuery({
@@ -44,8 +55,10 @@ function useTemasPublicos() {
     staleTime: 60_000,
     queryFn: async (): Promise<FilaTema[]> => {
       const columnas = "slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado";
-      const conColor = await supabase.from("obs_topics").select(`${columnas},color`).eq("status", "publicado");
-      // Antes de la migración 0248 no existe la columna color: se lee sin ella.
+      const conImagen = await supabase.from("obs_topics").select(`${columnas},color,icono,imagen_url,degradado,alcance,encuadre_x,encuadre_y`).eq("status", "publicado");
+      // Antes de la migración 0251 no existen las columnas de imagen: se lee sin ellas (tablero de color sólido).
+      const conColor = conImagen.error ? await supabase.from("obs_topics").select(`${columnas},color,icono`).eq("status", "publicado") : conImagen;
+      // Antes de la migración 0248 no existen color ni icono: se lee sin ellos.
       const r = conColor.error ? await supabase.from("obs_topics").select(columnas).eq("status", "publicado") : conColor;
       return r.error ? [] : (r.data as unknown as FilaTema[]);
     },
@@ -74,6 +87,12 @@ function aTema(fila: FilaTema, lineas: Linea[], indice: number): TemaPublico {
     obsId: fila.observatorio_id,
     lineaId: fila.linea_id,
     color: fila.color ?? null,
+    icono: fila.icono ?? null,
+    imagenUrl: fila.imagen_url?.trim() || null,
+    degradado: fila.degradado ?? APARIENCIA_BASE.degradado,
+    alcance: fila.alcance ?? APARIENCIA_BASE.alcance,
+    encuadreX: fila.encuadre_x ?? APARIENCIA_BASE.encuadreX,
+    encuadreY: fila.encuadre_y ?? APARIENCIA_BASE.encuadreY,
     vacio: !base,
   };
 }

@@ -22,6 +22,7 @@ import { SelectorPersona } from "../../components/SelectorPersona";
 import { useProfiles } from "../../../tableros/store";
 import { FaltaMigracion, useCrearObservatorio, useCrearTema, useEditarObservatorios, useInsertados, useLineas, useMoverTema, useObservatorios, useResponsables, useTemas } from "./api";
 import type { EstadoObservatorio, Linea, Observatorio, Tema } from "./api";
+import { AparienciaTema } from "./AparienciaTema";
 import { usePermisosObservatorio } from "./permisos";
 import { Chip, COLORES_OBS, Confirmar, Dialogo, EstadoMigracion, ICONOS_OBS, Ico, MenuAcciones, Seg, Vacio, codigoDe, nombreColor, slugify, useAvisos, useCascada, useFlip } from "./ui";
 import "./obsx.css";
@@ -286,6 +287,7 @@ function Temas({ o, editar, decir, vivos, confirmar }: { o: Observatorio; editar
   const [formTema, setFormTema] = useState<{ tema: Tema | null; linea: string | null } | null>(null);
   const [formLinea, setFormLinea] = useState<Linea | "nueva" | null>(null);
   const [mover, setMover] = useState<Tema | null>(null);
+  const [apariencia, setApariencia] = useState<Tema | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
   const foco = useRef<string | null>(null);
   const base = useMemo(() => armarSecciones(lineas.data ?? [], temas.data ?? []), [lineas.data, temas.data]);
@@ -523,6 +525,7 @@ function Temas({ o, editar, decir, vivos, confirmar }: { o: Observatorio; editar
                       {editar && (
                         <MenuAcciones etiqueta={`Más acciones de «${t.nombre ?? slug}»`} items={[
                           { texto: "Editar tema", icono: "edit", hecho: () => setFormTema({ tema: t, linea: t.linea_id }) },
+                          { texto: "Apariencia del tablero", icono: "edit", hecho: () => setApariencia(t) },
                           { texto: "Duplicar", icono: "duplicate", hecho: () => void duplicar(t) },
                           { texto: "Subir un lugar", icono: "up", hecho: () => mueve(slug, -1) },
                           { texto: "Bajar un lugar", icono: "down", hecho: () => mueve(slug, 1) },
@@ -542,6 +545,7 @@ function Temas({ o, editar, decir, vivos, confirmar }: { o: Observatorio; editar
         );
       })}
       {formTema && <FormTema o={o} lineas={lineas.data ?? []} tema={formTema.tema} linea={formTema.linea} decir={decir} onCerrar={() => setFormTema(null)} />}
+      {apariencia && <AparienciaTema o={o} tema={apariencia} decir={decir} onCerrar={() => setApariencia(null)} />}
       {formLinea && <FormLinea o={o} linea={formLinea === "nueva" ? null : formLinea} total={(lineas.data ?? []).length} decir={decir} onCerrar={() => setFormLinea(null)} />}
       {mover && <FormMover origen={o} tema={mover} decir={decir} onCerrar={() => setMover(null)} />}
     </div>

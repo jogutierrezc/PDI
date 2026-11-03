@@ -72,7 +72,9 @@ export function BoardsStation({ state, topic, canEdit, go }: ObsStationProps) {
   const [device, setDevice] = useState<"escritorio" | "movil">("escritorio");
   const commit = useObsCommit();
 
-  useEffect(() => setConfig(topicConfig(state, topic)), [state, topic]);
+  // Solo cuando cambia lo GUARDADO (no en cada refresco en segundo plano): así «Publicado» no se pierde antes de guardar.
+  const guardado = JSON.stringify(saved);
+  useEffect(() => setConfig(topicConfig(state, topic)), [guardado, topic]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setOrder(views), [views]);
 
   const configDirty = JSON.stringify(config) !== JSON.stringify(saved);

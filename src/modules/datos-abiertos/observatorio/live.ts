@@ -48,15 +48,17 @@ async function fetchLive(): Promise<Map<string, LiveTopic>> {
   const byTopic = new Map<string, LiveTopic>();
   const allDatasets = (datasets.data as DatasetRow[]).map(datasetFrom);
   const allViews = (views.data as ViewRow[]).map(viewFrom);
+  const pool = new Map(allDatasets.map((d) => [d.id, d]));
   for (const row of topics.data as TopicRow[]) {
     const config: ObsTopicConfig = { slug: row.slug, template: row.template, intro: row.intro, sections: row.sections, status: row.status };
-    const own = new Map(allDatasets.filter((d) => d.topic === row.slug).map((d) => [d.id, d]));
+    // Un visor puede usar una tabla publicada de cualquier tema del Observatorio (no solo del suyo).
     const order = new Map(config.sections.map((s, i) => [s, i]));
     const list = allViews
-      .filter((v) => v.topic === row.slug && own.has(v.datasetId) && order.has(v.section))
+      .filter((v) => v.topic === row.slug && pool.has(v.datasetId) && order.has(v.section))
       .sort((a, b) => order.get(a.section)! - order.get(b.section)! || a.position - b.position);
     if (!list.length) continue;
-    const used = [...new Set(list.map((v) => v.datasetId))].map((id) => own.get(id)!);
+    const used = [...new Set(list.map((v) => v.datasetId))].map((id) => pool.get(id)!);
+    const own = new Map(used.map((d) => [d.id, d]));
     byTopic.set(row.slug, {
       config,
       datasets: own,

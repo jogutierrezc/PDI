@@ -28,7 +28,7 @@ import { reduced } from "../../../sostenible/widgets";
 import { findTopic } from "../data";
 import { useCatalogo } from "../catalogo";
 import { useLive } from "../Observatory";
-import { ESTACIONES, MODULOS, PULSO, SALIDAS } from "./datos";
+import { ESTACIONES, ESTACION_EXTRA, MODULOS, PULSO, SALIDAS } from "./datos";
 import type { Modulo } from "./datos";
 import { TEXTOS } from "./textos";
 import type { Idioma, Textos } from "./textos";
@@ -131,7 +131,22 @@ export function PresentacionInstitucional() {
   const root = useRef<HTMLDivElement>(null);
   const primera = useRef(true);
 
-  const cifras = useMemo(() => new Map(MODULOS.map((m) => [m.id, cifraDe(m, lang, live)])), [lang, live]);
+  // Los temas publicados que no están entre los módulos fijos (ni son esta página) se suman solos en una última estación.
+  const extras = useMemo<Modulo[]>(() => {
+    const fijos = new Set<string>(["presentacion-institucional", ...MODULOS.flatMap((m) => (m.slug ? [m.slug] : []))]);
+    const spans = [7, 5, 5, 7];
+    const ids = new Set<string>(MODULOS.map((m) => m.id));
+    const nuevos = catalogo.principal.filter((tm) => !fijos.has(tm.slug));
+    return nuevos.map((tm, i) => {
+      const texto = { n: tm.name, d: tm.summary || tm.question, i: tm.name };
+      const id = ids.has(tm.code) ? tm.slug : tm.code; // la clave de la cifra no puede chocar con un módulo fijo
+      ids.add(id);
+      return { id, slug: tm.slug, estacion: ESTACIONES.length, linea: tm.line, span: nuevos.length === 1 ? 12 : spans[i % 4], color: tm.color, textos: { es: texto, en: texto } };
+    });
+  }, [catalogo.principal]);
+  const todos = useMemo(() => [...MODULOS, ...extras], [extras]);
+  const estaciones = extras.length ? [...ESTACIONES, ESTACION_EXTRA] : ESTACIONES;
+  const cifras = useMemo(() => new Map(todos.map((m) => [m.id, cifraDe(m, lang, live)])), [todos, lang, live]);
   const hayEjemplo = [...cifras.values()].some((c) => c?.ilustrativo);
 
   /* Animación: un momento orquestado en la portada y revelados al desplazar. En reposo todo está puesto. */
@@ -310,7 +325,7 @@ export function PresentacionInstitucional() {
             <p className="pi-sub">{t.jp}</p>
             <div className="pi-route">
               <i className="pi-rail" aria-hidden="true" />
-              {ESTACIONES.map((st, si) => {
+              {estaciones.map((st, si) => {
                 const S = st.textos[lang];
                 return (
                   <article className="pi-station" key={st.romano} aria-labelledby={`pi-st${si}`}>
@@ -322,11 +337,11 @@ export function PresentacionInstitucional() {
                         <p>{S.p}</p>
                       </header>
                       <div className="pi-wall">
-                        {MODULOS.filter((m) => m.estacion === si).map((m) => {
+                        {todos.filter((m) => m.estacion === si).map((m) => {
                           const L = m.textos[lang];
                           const c = cifras.get(m.id) ?? null;
                           const enlazable = Boolean(m.slug && catalogo.buscar(m.slug));
-                          const estilo = lineaStyle(m.linea, { "--s": m.span });
+                          const estilo = lineaStyle(m.linea, { "--s": m.span, ...(m.color ? { "--c": m.color } : {}) });
                           const cuerpo = (
                             <>
                               <span className="pi-pcode pi-cond" aria-hidden="true">{m.id}</span>

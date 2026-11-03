@@ -54,10 +54,11 @@ function draftFrom(dataset: ObsDataset, view: ObsView | undefined): Draft {
 export function DesignStation({ state, topic, canEdit, go }: ObsStationProps) {
   const [params, setParams] = useSearchParams();
   const info = topicInfo(topic)!;
-  const datasets = state.datasets.filter((d) => d.topic === topic).sort((a, b) => a.position - b.position);
+  // Las tablas del tema primero y, después, las de los demás temas: un visual puede usar cualquier tabla del Observatorio.
+  const datasets = [...state.datasets].sort((a, b) => Number(b.topic === topic) - Number(a.topic === topic) || a.position - b.position);
   const topicViews = state.views.filter((v) => v.topic === topic).sort((a, b) => a.position - b.position);
   const editing = topicViews.find((v) => v.id === params.get("visor"));
-  const dataset = datasets.find((d) => d.id === (editing?.datasetId ?? params.get("tabla"))) ?? datasets[0];
+  const dataset = datasets.find((d) => d.id === (editing?.datasetId ?? params.get("tabla"))) ?? datasets.find((d) => d.topic === topic);
   const [draft, setDraft] = useState<Draft>(() => (dataset ? draftFrom(dataset, editing) : EMPTY));
   const [mode, setMode] = useState<"grafica" | "tabla">("grafica");
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -224,7 +225,7 @@ export function DesignStation({ state, topic, canEdit, go }: ObsStationProps) {
           <select value={dataset.id} onChange={(e) => setQuery({ tabla: e.target.value, visor: null })}>
             {datasets.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.title}
+                {d.topic === topic ? d.title : `${d.title} · ${topicInfo(d.topic)?.name ?? d.topic}`}
               </option>
             ))}
           </select>

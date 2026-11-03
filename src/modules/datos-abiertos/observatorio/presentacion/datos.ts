@@ -45,6 +45,15 @@ export const ESTACIONES: Estacion[] = [
   },
 ];
 
+/** Los temas que el Observatorio publica después de esta página: se añaden solos en una estación final. */
+export const ESTACION_EXTRA: Estacion = {
+  romano: "V",
+  textos: {
+    es: { t: "Más temas del Observatorio", q: "¿Qué más estamos midiendo?", p: "Temas nuevos que el Observatorio publica a medida que crecen sus líneas de estudio." },
+    en: { t: "More Observatory topics", q: "What else are we measuring?", p: "New topics the Observatory publishes as its lines of study grow." },
+  },
+};
+
 export interface Modulo {
   /** Código de dos letras (el del tema en data.ts). */
   id: string;
@@ -56,6 +65,8 @@ export interface Modulo {
   /** Columnas del cartel en la rejilla de 12. */
   span: number;
   ancho?: boolean;
+  /** Color propio del tema nuevo (0248); sin él, el de su línea. */
+  color?: string | null;
   textos: Bi<{ n: string; d: string; i: string }>;
 }
 

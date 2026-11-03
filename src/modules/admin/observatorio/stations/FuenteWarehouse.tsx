@@ -30,6 +30,10 @@ const etiqueta = (k: string) => k.replace(/_/g, " ").replace(/^./, (c) => c.toUp
 const fecha = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }) : "");
 const rotuloCarga = (c: CargaVigente) => `${nombreSede(c.sede)} · ${c.periodo}${c.corte ? ` · corte ${c.corte === "f" ? "final" : c.corte}` : ""} · versión ${c.version} · ${c.filas.toLocaleString("es-CO")} filas`;
 
+/** Topes de la agregación: los mismos que valida la base (0250). */
+const MAX_DIMS = 6;
+const MAX_MEDIDAS = 12;
+
 export function FuenteWarehouse({ topic, obsId, onCancel, onSaved }: { topic: string; obsId: string; onCancel: () => void; onSaved: (datasetId: string) => void }) {
   const catalogo = useCatalogoWh(obsId, true);
   const [conjunto, setConjunto] = useState("");
@@ -189,8 +193,7 @@ export function FuenteWarehouse({ topic, obsId, onCancel, onSaved }: { topic: st
             <fieldset className="obs-wh__paso">
               <legend>3 · Agregación</legend>
               <div className="obs-wh__fila">
-                {[0, 1].map((i) =>
-                  i === 0 || dims[0] ? (
+                {Array.from({ length: Math.min(dims.length + 1, MAX_DIMS) }, (_, i) => i).map((i) => (
                     <label className="obs-field" key={i}>
                       <span>{i === 0 ? "Agrupar por" : "Y luego por"}</span>
                       <select value={dims[i] ?? ""} onChange={(e) => ponerDim(i, e.target.value)}>
@@ -202,8 +205,7 @@ export function FuenteWarehouse({ topic, obsId, onCancel, onSaved }: { topic: st
                         ))}
                       </select>
                     </label>
-                  ) : null,
-                )}
+                ))}
               </div>
               <div className="obs-wh__medidas">
                 {medidas.map((m, i) => (
@@ -237,7 +239,7 @@ export function FuenteWarehouse({ topic, obsId, onCancel, onSaved }: { topic: st
                     )}
                   </div>
                 ))}
-                {medidas.length < 3 && (
+                {medidas.length < MAX_MEDIDAS && (
                   <button type="button" className="button-ghost" onClick={() => { setMedidas([...medidas, { op: "contar" }]); cambiar(); }}>
                     Añadir otra medida
                   </button>

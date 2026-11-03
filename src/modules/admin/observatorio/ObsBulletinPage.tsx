@@ -16,8 +16,8 @@ import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { FreeChartEnv } from "../../datos-abiertos/components/free/FreeCharts";
 import { ObsChart, RawTable } from "./ObsCharts";
 import { bulletinContent, describeFilters } from "./bulletin";
-import { DATA_TYPE_LABEL, RESERVED_TEXT, SECTION_LABEL, plural, topicInfo, yearsOfDataset } from "./model";
-import { useObsState } from "./store";
+import { DATA_TYPE_LABEL, RESERVED_TEXT, SECTION_LABEL, plural, topicInfo, topicTone, yearsOfDataset } from "./model";
+import { useObsState, useSyncObsTopics } from "./store";
 import "../../datos-abiertos/datos-abiertos.css";
 import "../../datos-abiertos/components/free-sets.css";
 import "./obs-admin.css";
@@ -27,6 +27,7 @@ const longDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long
 export function ObsBulletinPage() {
   const { id } = useParams();
   const query = useObsState();
+  useSyncObsTopics();
   const bulletin = query.data?.bulletins.find((b) => b.id === id);
   const content = useMemo(() => (query.data && bulletin ? bulletinContent(query.data, bulletin.filters) : []), [query.data, bulletin]);
 
@@ -98,7 +99,7 @@ export function ObsBulletinPage() {
               {sample && <p className="obs-doc__sample">Contiene datos de ejemplo: las cifras marcadas así no son reales.</p>}
               <div className="obs-doc__strip" aria-hidden="true">
                 {content.map((t) => (
-                  <i key={t.config.slug} style={{ "--topic-line": `var(--od-line-${topicInfo(t.config.slug)!.line})` } as CSSProperties} />
+                  <i key={t.config.slug} style={{ "--topic-line": topicTone(topicInfo(t.config.slug)!) } as CSSProperties} />
                 ))}
               </div>
             </section>
@@ -129,7 +130,7 @@ export function ObsBulletinPage() {
                     return (
                       <tr key={info.slug}>
                         <th scope="row">
-                          <span className="oda-code" style={{ "--line": `var(--od-line-${info.line})` } as CSSProperties}>
+                          <span className="oda-code" style={{ "--line": topicTone(info) } as CSSProperties}>
                             {info.code}
                           </span>
                           <a href={`#tema-${info.slug}`}>{info.name}</a>
@@ -151,7 +152,7 @@ export function ObsBulletinPage() {
             const shown = new Set(t.views.map((v) => v.datasetId));
             const orphan = [...t.datasets.values()].filter((d) => !shown.has(d.id));
             return (
-              <section key={info.slug} id={`tema-${info.slug}`} className="obs-doc__topic" data-first={index === 0 || undefined} style={{ "--topic-line": `var(--od-line-${info.line})` } as CSSProperties}>
+              <section key={info.slug} id={`tema-${info.slug}`} className="obs-doc__topic" data-first={index === 0 || undefined} style={{ "--topic-line": topicTone(info) } as CSSProperties}>
                 <header className="obs-doc__topic-head">
                   <span className="oda-code">{info.code}</span>
                   <div>

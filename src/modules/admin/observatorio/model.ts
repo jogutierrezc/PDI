@@ -177,8 +177,34 @@ export const RESERVED_TEXT = "< 5";
 
 /* --- Temas ------------------------------------------------------------------------- */
 
-export const TOPICS = OBS_TOPICS.map(({ slug, code, name, summary, question, line, source }) => ({ slug, code, name, summary, question, line, source }));
-export type ObsTopicInfo = (typeof TOPICS)[number];
+export interface ObsTopicInfo {
+  slug: string;
+  code: string;
+  name: string;
+  summary: string;
+  question: string;
+  /** Color de línea 1-11 (--od-line-n). */
+  line: number;
+  source: string;
+  /** Temas creados en la base (0248): color propio, si lo tienen. */
+  color?: string | null;
+}
+
+/**
+ * Los catorce temas de siempre y, tras ellos, los que se crean en el panel Observatorios.
+ * La lista es una sola y se actualiza en sitio (`syncTopics`) cuando el taller lee la
+ * base: así las estaciones y los selectores ven los temas nuevos sin cambiar de API.
+ */
+export const TOPICS: ObsTopicInfo[] = OBS_TOPICS.map(({ slug, code, name, summary, question, line, source }) => ({ slug, code, name, summary, question, line, source }));
+const BASE_TOPICS = TOPICS.length;
+
+/** Deja en TOPICS los de siempre más los de la base que no están en la constante. */
+export function syncTopics(extra: ObsTopicInfo[]) {
+  TOPICS.splice(BASE_TOPICS, TOPICS.length - BASE_TOPICS, ...extra.filter((t) => !OBS_TOPICS.some((b) => b.slug === t.slug)));
+}
+
+/** Color del tema: el propio (0248) o el de su línea. */
+export const topicTone = (t: Pick<ObsTopicInfo, "line" | "color">) => t.color || `var(--od-line-${t.line})`;
 
 export const topicInfo = (slug: string | undefined) => TOPICS.find((t) => t.slug === slug);
 

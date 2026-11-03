@@ -24,6 +24,8 @@ export interface Linea { id: string; observatorio_id: string; nombre: string; or
 export interface Tema {
   slug: string; observatorio_id: string; linea_id: string | null; codigo: string | null; nombre: string | null; resumen: string | null;
   pregunta: string | null; fuente: string | null; orden: number; archivado: boolean; status: "borrador" | "publicado";
+  /** Color e icono propios del tema (0248); null: los de su línea. */
+  color: string | null; icono: string | null;
 }
 export interface Responsable { observatorio_id: string; persona_id: string; propone_dominios: boolean }
 export type EstadoDominio = "propuesto" | "aprobado" | "rechazado";
@@ -70,7 +72,7 @@ export const useLineas = (obs: string) =>
   useQuery({ queryKey: obsKeys2.lineas(obs), enabled: !!obs, queryFn: async () => revisar<Linea[]>("0230", await supabase.from("obs_lineas").select("*").eq("observatorio_id", obs).order("orden")) });
 
 export const useTemas = (obs: string) =>
-  useQuery({ queryKey: obsKeys2.temas(obs), enabled: !!obs, queryFn: async () => revisar<Tema[]>("0230", await supabase.from("obs_topics").select("slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado,status").eq("observatorio_id", obs).order("orden")) });
+  useQuery({ queryKey: obsKeys2.temas(obs), enabled: !!obs, queryFn: async () => revisar<Tema[]>("0230", await supabase.from("obs_topics").select("slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado,status,color,icono").eq("observatorio_id", obs).order("orden")) });
 
 export const useResponsables = (obs: string) =>
   useQuery({ queryKey: obsKeys2.responsables(obs), enabled: !!obs, queryFn: async () => revisar<Responsable[]>("0230", await supabase.from("obs_responsables").select("*").eq("observatorio_id", obs)) });
@@ -122,6 +124,10 @@ export const useCrearObservatorio = () =>
     "obs_observatorio_crear", "0233", () => [[...obsKeys2.observatorios]]);
 /** Mueve un tema (con sus tablas, visores e insertados) a otra línea u otro observatorio. Migración 0234. */
 export const useMoverTema = () => useRpc<{ p_slug: string; p_obs: string; p_linea: string | null }, Tema>("obs_tema_mover", "0234", () => [["obs-temas"], ["obs-lineas"], ["obs-insertados"], ["obs-conteos"]]);
+/** Crea un tema en borrador con enlace único en todo el portal (se numera si choca). Migración 0248. */
+export const useCrearTema = () =>
+  useRpc<{ p_obs: string; p_nombre: string; p_slug?: string | null; p_linea?: string | null; p_codigo?: string | null; p_resumen?: string | null; p_pregunta?: string | null; p_fuente?: string | null; p_color?: string | null; p_icono?: string | null }, Tema>(
+    "obs_tema_crear", "0248", () => [["obs-temas"], ["obs-lineas"], ["obs-conteos"], ["obs-admin"]]);
 export const useArchivarObservatorio = () => useRpc<{ p_id: string; p_archivar?: boolean }, Observatorio>("obs_observatorio_archivar", "0233", () => [[...obsKeys2.observatorios]]);
 
 /** Cambios directos permitidos por RLS al panel Observatorios (nivel editar): identidad, líneas, temas y personas responsables. */
@@ -135,7 +141,7 @@ export function useEditarObservatorios() {
     identidad: (id: string, c: Partial<Pick<Observatorio, "nombre" | "descripcion" | "color" | "icono" | "responsable" | "estado">>) => run("0231", supabase.from("obs_observatorios").update(c).eq("id", id)),
     linea: (l: Partial<Linea> & { observatorio_id: string }) => run("0230", supabase.from("obs_lineas").upsert(l)),
     quitarLinea: (id: string) => run("0230", supabase.from("obs_lineas").delete().eq("id", id)),
-    tema: (slug: string, c: Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden" | "archivado" | "status">>) => run("0230", supabase.from("obs_topics").update(c).eq("slug", slug)),
+    tema: (slug: string, c: Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden" | "archivado" | "status" | "color" | "icono">>) => run("0230", supabase.from("obs_topics").update(c).eq("slug", slug)),
     /** Tema nuevo (nace en borrador). El enlace es único en todo el portal: si choca, el llamador elige otro. */
     crearTema: (t: Pick<Tema, "slug" | "observatorio_id"> & Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden">>) => run("0230", supabase.from("obs_topics").insert({ ...t, status: "borrador" })),
     asignar: (r: Responsable) => run("0230", supabase.from("obs_responsables").upsert(r)),

@@ -10,12 +10,13 @@
    lo dice en un aviso. Nada del borrador llega a la base ni al portal.
    ========================================================================== */
 
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import { describeDatabaseError } from "../../../data/errors";
 import type { DatabaseError } from "../../../data/errors";
-import { defaultTopic, sampleState } from "./model";
-import type { ObsBulletin, ObsDataset, ObsState, ObsTopicConfig, ObsView } from "./model";
+import { defaultTopic, sampleState, syncTopics } from "./model";
+import type { ObsBulletin, ObsDataset, ObsState, ObsTopicConfig, ObsTopicInfo, ObsView } from "./model";
 
 export const obsKeys = { all: ["obs-admin"] as const };
 /** Caché del portal público (observatorio/live.ts): se invalida al guardar. */
@@ -154,6 +155,43 @@ async function fetchState(): Promise<ObsState> {
 
 export function useObsState() {
   return useQuery({ queryKey: obsKeys.all, queryFn: fetchState, staleTime: 30_000 });
+}
+
+/**
+ * Temas creados en el panel Observatorios (0230/0248): se leen de la base y se añaden a la lista
+ * TOPICS para que las estaciones, los selectores y el boletín los vean. Sin la migración o sin
+ * permiso de lectura, queda la lista de siempre. Llamar antes de pintar nada que lea TOPICS.
+ */
+export function useSyncObsTopics() {
+  const q = useQuery({
+    queryKey: [...obsKeys.all, "temas-nuevos"],
+    staleTime: 30_000,
+    queryFn: async (): Promise<ObsTopicInfo[]> => {
+      const columnas = "slug,codigo,nombre,resumen,pregunta,fuente,orden,linea_id,observatorio_id";
+      const [conColor, lineas] = await Promise.all([
+        supabase.from("obs_topics").select(`${columnas},color`).order("observatorio_id").order("orden"),
+        supabase.from("obs_lineas").select("id,numero"),
+      ]);
+      // Antes de la migración 0248 no existe la columna color: se lee sin ella.
+      const topics = conColor.error ? await supabase.from("obs_topics").select(columnas).order("observatorio_id").order("orden") : conColor;
+      if (topics.error || !topics.data) return [];
+      const numero = new Map(((lineas.data ?? []) as { id: string; numero: number | null }[]).map((l) => [l.id, l.numero]));
+      return (topics.data as { slug: string; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; linea_id: string | null; color: string | null }[])
+        .filter((t) => t.nombre)
+        .map((t, i) => ({
+          slug: t.slug,
+          code: t.codigo ?? (t.nombre as string).slice(0, 2).toUpperCase(),
+          name: t.nombre as string,
+          summary: t.resumen ?? "",
+          question: t.pregunta ?? "",
+          line: (t.linea_id ? numero.get(t.linea_id) : null) ?? (i % 11) + 1,
+          source: t.fuente ?? "",
+          color: t.color,
+        }));
+    },
+  });
+  useMemo(() => syncTopics(q.data ?? []), [q.data]);
+  return q.data;
 }
 
 /* --- Escritura ----------------------------------------------------------------------------- */

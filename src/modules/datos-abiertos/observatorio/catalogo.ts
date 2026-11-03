@@ -27,22 +27,27 @@ export interface TemaPublico extends ObsTopic {
   /** Observatorio al que pertenece (null: la constante, sin base). */
   obsId: string | null;
   lineaId: string | null;
+  /** Color propio del tema (0248); null: el de su línea. */
+  color: string | null;
   /** Tema nuevo de la base: no tiene cifras de ejemplo, solo lo que publique. */
   vacio: boolean;
 }
 
-interface FilaTema { slug: string; observatorio_id: string; linea_id: string | null; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; orden: number; archivado: boolean }
+interface FilaTema { slug: string; observatorio_id: string; linea_id: string | null; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; orden: number; archivado: boolean; color?: string | null }
 
 const ESTATICOS = new Map(OBS_TOPICS.map((t) => [t.slug, t]));
-const estaticoComoTema = (t: ObsTopic): TemaPublico => ({ ...t, obsId: null, lineaId: null, vacio: false });
+const estaticoComoTema = (t: ObsTopic): TemaPublico => ({ ...t, obsId: null, lineaId: null, color: null, vacio: false });
 
 function useTemasPublicos() {
   return useQuery({
     queryKey: ["obs-temas-publicos"],
     staleTime: 60_000,
     queryFn: async (): Promise<FilaTema[]> => {
-      const r = await supabase.from("obs_topics").select("slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado").eq("status", "publicado");
-      return r.error ? [] : (r.data as FilaTema[]);
+      const columnas = "slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado";
+      let r = await supabase.from("obs_topics").select(`${columnas},color`).eq("status", "publicado");
+      // Antes de la migración 0248 no existe la columna color: se lee sin ella.
+      if (r.error) r = await supabase.from("obs_topics").select(columnas).eq("status", "publicado");
+      return r.error ? [] : (r.data as unknown as FilaTema[]);
     },
   });
 }
@@ -68,6 +73,7 @@ function aTema(fila: FilaTema, lineas: Linea[], indice: number): TemaPublico {
     line: linea?.numero ?? base?.line ?? (indice % 11) + 1,
     obsId: fila.observatorio_id,
     lineaId: fila.linea_id,
+    color: fila.color ?? null,
     vacio: !base,
   };
 }

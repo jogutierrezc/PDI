@@ -14,7 +14,7 @@ import { Panel, SaveState } from "../../udes-en-cifras/ui";
 import type { ObsStationProps } from "../ObsAdmin";
 import { ChartThumb } from "../ObsCharts";
 import { bulletinContent, describeFilters, emptyBulletin, filterOptions } from "../bulletin";
-import { DATA_TYPE_LABEL, SECTION_LABEL, TOPICS, newId, plural, topicInfo } from "../model";
+import { DATA_TYPE_LABEL, SECTION_LABEL, TOPICS, newId, plural, topicInfo, topicTone } from "../model";
 import type { ObsBulletin, ObsBulletinFilters, ObsDataType } from "../model";
 import { useObsCommit } from "../store";
 
@@ -205,7 +205,7 @@ export function BulletinStation({ state, canEdit }: ObsStationProps) {
               {content.map((t) => {
                 const info = topicInfo(t.config.slug)!;
                 return (
-                  <li key={info.slug} style={{ "--topic-line": `var(--od-line-${info.line})` } as CSSProperties}>
+                  <li key={info.slug} style={{ "--topic-line": topicTone(info) } as CSSProperties}>
                     <span className="oda-code">{info.code}</span>
                     <div>
                       <b>{info.name}</b>

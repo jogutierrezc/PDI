@@ -20,7 +20,7 @@ import { ErrorBlock, LoadingBlock } from "../../../../components/ui/QueryState";
 import { supabase } from "../../../../lib/supabase";
 import { SelectorPersona } from "../../components/SelectorPersona";
 import { useProfiles } from "../../../tableros/store";
-import { FaltaMigracion, useCrearObservatorio, useEditarObservatorios, useInsertados, useLineas, useMoverTema, useObservatorios, useResponsables, useTemas } from "./api";
+import { FaltaMigracion, useCrearObservatorio, useCrearTema, useEditarObservatorios, useInsertados, useLineas, useMoverTema, useObservatorios, useResponsables, useTemas } from "./api";
 import type { EstadoObservatorio, Linea, Observatorio, Tema } from "./api";
 import { usePermisosObservatorio } from "./permisos";
 import { Chip, COLORES_OBS, Confirmar, Dialogo, EstadoMigracion, ICONOS_OBS, Ico, MenuAcciones, Seg, Vacio, codigoDe, nombreColor, slugify, useAvisos, useCascada, useFlip } from "./ui";
@@ -588,7 +588,8 @@ function FormLinea({ o, linea, total, decir, onCerrar }: { o: Observatorio; line
 
 function FormTema({ o, lineas, tema, linea, decir, onCerrar }: { o: Observatorio; lineas: Linea[]; tema: Tema | null; linea: string | null; decir: (t: string, mala?: boolean) => void; onCerrar: () => void }) {
   const editor = useEditarObservatorios();
-  const [v, setV] = useState({ nombre: tema?.nombre ?? "", pregunta: tema?.pregunta ?? "", fuente: tema?.fuente ?? o.responsable, resumen: tema?.resumen ?? "", codigo: tema?.codigo ?? "", linea: linea ?? "" });
+  const crear = useCrearTema();
+  const [v, setV] = useState({ nombre: tema?.nombre ?? "", pregunta: tema?.pregunta ?? "", fuente: tema?.fuente ?? o.responsable, resumen: tema?.resumen ?? "", codigo: tema?.codigo ?? "", linea: linea ?? "", color: tema?.color ?? "", icono: tema?.icono ?? "" });
   const [codigoTocado, setCodigoTocado] = useState(Boolean(tema));
   const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -599,9 +600,11 @@ function FormTema({ o, lineas, tema, linea, decir, onCerrar }: { o: Observatorio
     if (v.codigo && !/^[A-Za-z0-9]{1,4}$/.test(v.codigo)) return setError("El código lleva de 1 a 4 letras o cifras.");
     setOcupado(true);
     try {
-      const comunes = { nombre, pregunta: v.pregunta.trim() || `¿Qué muestra ${nombre}?`, fuente: v.fuente.trim() || o.responsable, resumen: v.resumen.trim() || null, codigo: v.codigo.toUpperCase() || codigoDe(nombre), linea_id: v.linea || null };
+      const comunes = { nombre, pregunta: v.pregunta.trim() || `¿Qué muestra ${nombre}?`, fuente: v.fuente.trim() || o.responsable, resumen: v.resumen.trim() || null, codigo: v.codigo.toUpperCase() || codigoDe(nombre), linea_id: v.linea || null, color: v.color || null, icono: v.icono || null };
       if (tema) await editor.tema(tema.slug, comunes);
-      else await editor.crearTema({ slug: await slugLibre(slugify(nombre)), observatorio_id: o.id, orden: 999, ...comunes });
+      else {
+        await crear.mutateAsync({ p_obs: o.id, p_nombre: nombre, p_linea: comunes.linea_id, p_codigo: comunes.codigo, p_resumen: comunes.resumen, p_pregunta: comunes.pregunta, p_fuente: comunes.fuente, p_color: comunes.color, p_icono: comunes.icono });
+      }
       decir(tema ? "Tema actualizado" : "Tema creado en borrador");
       cerrar();
     } catch (e) {
@@ -622,7 +625,22 @@ function FormTema({ o, lineas, tema, linea, decir, onCerrar }: { o: Observatorio
           <label className="admin-field"><span>Código (1 a 4 letras)</span><input type="text" value={v.codigo} maxLength={4} onChange={(e) => { setCodigoTocado(true); cambia("codigo", e.target.value.toUpperCase()); }} /></label>
           <label className="admin-field"><span>Resumen para la portada</span><input type="text" value={v.resumen} maxLength={400} onChange={(e) => cambia("resumen", e.target.value)} placeholder="Una línea" /></label>
         </div>
+        <div className="admin-field">
+          <span>Color del tema</span>
+          <div className="obsx-muestras" role="radiogroup" aria-label="Color del tema">
+            <label><input type="radio" name="obsx-t-color" checked={v.color === ""} onChange={() => cambia("color", "")} aria-label="El de su línea" /><i style={{ background: "transparent", border: "1px dashed currentColor" }} title="El de su línea" /></label>
+            {COLORES_OBS.map((c) => <label key={c}><input type="radio" name="obsx-t-color" checked={v.color === c} onChange={() => cambia("color", c)} aria-label={nombreColor(c)} /><i style={{ background: c }} /></label>)}
+          </div>
+        </div>
+        <div className="admin-field">
+          <span>Icono del tema</span>
+          <div className="obsx-iconos" role="radiogroup" aria-label="Icono del tema">
+            <label><input type="radio" name="obsx-t-icono" checked={v.icono === ""} onChange={() => cambia("icono", "")} aria-label="Sin icono" /><span title="Sin icono">—</span></label>
+            {ICONOS_OBS.map((n) => <label key={n}><input type="radio" name="obsx-t-icono" checked={v.icono === n} onChange={() => cambia("icono", n)} aria-label={n} /><span><Icon name={n} size={20} /></span></label>)}
+          </div>
+        </div>
         {!tema && <p className="obsx-ayuda">Nace como borrador. Se publica cuando tenga datos.</p>}
+        {tema && !tema.archivado && <p className="obsx-ayuda">El orden, el estado (borrador o publicado) y el archivo del tema se cambian desde su fila.</p>}
         {error && <p className="obsx-error" role="alert">{error}</p>}
       </div>
     </Dialogo>

@@ -81,7 +81,7 @@ export function ObservatorioPagina() {
                       return (
                         <li key={t.slug}>
                           <Link className="od-row" to={`/datos-abiertos/observatorio/${t.slug}`}>
-                            <span className="od-row__code od-line" style={lineStyle(t.line)}>{t.code}</span>
+                            <span className="od-row__code od-line" style={lineStyle(t.line, (t as { color?: string | null }).color)}>{t.code}</span>
                             <span className="od-row__name">
                               <strong>{t.name}</strong>
                               <span>{t.summary}</span>

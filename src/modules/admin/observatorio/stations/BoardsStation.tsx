@@ -13,7 +13,7 @@ import { Icon } from "../../../../components/ui/Icon";
 import { Panel, SaveState } from "../../udes-en-cifras/ui";
 import type { ObsStationProps } from "../ObsAdmin";
 import { ChartThumb, ObsChart } from "../ObsCharts";
-import { CHARTS, SECTIONS, SECTION_HINT, SECTION_LABEL, TEMPLATES, plural, topicConfig, topicInfo } from "../model";
+import { CHARTS, SECTIONS, SECTION_HINT, SECTION_LABEL, TEMPLATES, plural, topicConfig, topicInfo, topicTone } from "../model";
 import type { ObsDataset, ObsSection, ObsTemplate, ObsTopicConfig, ObsView } from "../model";
 import { useObsCommit } from "../store";
 
@@ -303,7 +303,7 @@ export function BoardPreview({ config, views, datasets }: { config: ObsTopicConf
   const visible = views.filter((v) => v.visible && datasets.has(v.datasetId));
   const sample = visible.some((v) => datasets.get(v.datasetId)!.sample);
   return (
-    <article className="obs-sheet" data-template={config.template} style={{ "--topic-line": `var(--od-line-${info.line})` } as CSSProperties}>
+    <article className="obs-sheet" data-template={config.template} style={{ "--topic-line": topicTone(info) } as CSSProperties}>
       <header className="obs-sheet__head">
         <span className="oda-code">{info.code}</span>
         <div>

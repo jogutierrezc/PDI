@@ -45,7 +45,7 @@ const one = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, maximumFr
 const num = (v: number) => (Number.isInteger(v) ? integer.format(v) : decimal.format(v));
 const headlineText = (t: ObsTopic) =>
   t.headline.format === "porcentaje" ? `${decimal.format(t.headline.value)} %` : num(t.headline.value);
-export const lineStyle = (line: number) => ({ "--line": `var(--od-line-${line})` }) as CSSProperties;
+export const lineStyle = (line: number, color?: string | null) => ({ "--line": color || `var(--od-line-${line})` }) as CSSProperties;
 export const liveText = (s: LiveSummary) => (s.format === "porcentaje" ? `${one.format(s.value)} %` : s.format === "entero" ? integer.format(s.value) : decimal.format(s.value));
 const longDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" });
 
@@ -140,7 +140,7 @@ export function ObservatoryBoard({ standalone = false }: { standalone?: boolean 
                     onMouseEnter={() => setActive(t.slug)}
                     onFocus={() => setActive(t.slug)}
                   >
-                    <span className="od-row__code od-line" style={lineStyle(t.line)}>
+                    <span className="od-row__code od-line" style={lineStyle(t.line, (t as { color?: string | null }).color)}>
                       <SplitFlap value={t.code} size="sm" delay={index * 70} />
                     </span>
                     <span className="od-row__name">
@@ -174,7 +174,7 @@ export function ObservatoryBoard({ standalone = false }: { standalone?: boolean 
           <aside className="od-platform obs-platform" aria-label={`Vista previa: ${topic.name}`}>
             <div className="od-platform__body">
               <div className="od-platform__title">
-                <span className="od-line" style={lineStyle(topic.line)}>
+                <span className="od-line" style={lineStyle(topic.line, (topic as { color?: string | null }).color)}>
                   <SplitFlap value={topic.code} size="md" key={topic.slug} />
                 </span>
                 <h3>{topic.name}</h3>
@@ -308,7 +308,7 @@ export function ObservatoryTopic() {
       <section className="od-report-head obs-head" aria-labelledby="obs-tema">
         <div className="u-container">
           <div className="obs-head__row">
-            <span className="od-report-head__code od-line" style={lineStyle(topic.line)}>
+            <span className="od-report-head__code od-line" style={lineStyle(topic.line, (topic as { color?: string | null }).color)}>
               <SplitFlap key={topic.slug} value={topic.code} size="lg" delay={80} />
             </span>
             <span className="obs-head__count">
@@ -389,13 +389,13 @@ export function ObservatoryTopic() {
       )}
 
       <nav className="obs-pager u-container" aria-label="Otras páginas del Observatorio">
-        <Link to={`/datos-abiertos/observatorio/${prev.slug}`} style={lineStyle(prev.line)}>
+        <Link to={`/datos-abiertos/observatorio/${prev.slug}`} style={lineStyle(prev.line, (prev as { color?: string | null }).color)}>
           <Icon name="arrow-left" size={16} />
           <span>
             <small>Anterior</small> {prev.name}
           </span>
         </Link>
-        <Link to={`/datos-abiertos/observatorio/${next.slug}`} style={lineStyle(next.line)}>
+        <Link to={`/datos-abiertos/observatorio/${next.slug}`} style={lineStyle(next.line, (next as { color?: string | null }).color)}>
           <span>
             <small>Siguiente</small> {next.name}
           </span>

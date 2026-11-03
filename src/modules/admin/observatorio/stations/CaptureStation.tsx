@@ -27,19 +27,24 @@ import type { Analysis, ColumnProfile, Plan } from "../analyze";
 import { CHARTS, DATA_TYPE_LABEL, RESERVE, RESERVED_TEXT, newId, plural, topicInfo } from "../model";
 import type { ObsDataType, ObsDataset, ObsSection, ObsView } from "../model";
 import { useObsCommit } from "../store";
+import { useObsDeTema } from "../fuenteWarehouse";
+import { FuenteWarehouse, OrigenWarehouse } from "./FuenteWarehouse";
 
 export function CaptureStation({ state, topic, canEdit, go }: ObsStationProps) {
   const [params, setParams] = useSearchParams();
   const info = topicInfo(topic)!;
   const datasets = state.datasets.filter((d) => d.topic === topic).sort((a, b) => a.position - b.position);
   const selectedId = params.get("tabla");
-  const selected = datasets.find((d) => d.id === selectedId) ?? (params.get("importar") ? undefined : datasets[0]);
+  const selected = datasets.find((d) => d.id === selectedId) ?? (params.get("importar") || params.get("warehouse") ? undefined : datasets[0]);
   const importing = params.get("importar") === "1";
+  const fromWarehouse = params.get("warehouse") === "1";
+  const obsId = useObsDeTema(topic).data ?? null;
 
-  const pick = (id: string | null, importar = false) => {
+  const pick = (id: string | null, importar = false, warehouse = false) => {
     const next = new URLSearchParams();
     if (id) next.set("tabla", id);
     if (importar) next.set("importar", "1");
+    if (warehouse) next.set("warehouse", "1");
     setParams(next, { replace: true });
   };
 
@@ -51,9 +56,16 @@ export function CaptureStation({ state, topic, canEdit, go }: ObsStationProps) {
         description={<>Cada tabla es un conjunto agregado y anonimizado. Fuente sugerida para este tema: {info.source}.</>}
         actions={
           canEdit && (
-            <button type="button" className="button-primary" onClick={() => pick(null, true)} aria-pressed={importing}>
-              <Icon name="upload" size={15} /> Importar datos
-            </button>
+            <>
+              {obsId && (
+                <button type="button" className="button-secondary" onClick={() => pick(null, false, true)} aria-pressed={fromWarehouse}>
+                  <Icon name="table" size={15} /> Desde el Warehouse
+                </button>
+              )}
+              <button type="button" className="button-primary" onClick={() => pick(null, true)} aria-pressed={importing}>
+                <Icon name="upload" size={15} /> Importar datos
+              </button>
+            </>
           )
         }
       >
@@ -68,7 +80,7 @@ export function CaptureStation({ state, topic, canEdit, go }: ObsStationProps) {
               const views = state.views.filter((v) => v.datasetId === d.id).length;
               return (
                 <li key={d.id}>
-                  <button type="button" className="obs-tables__item" aria-current={d.id === selected?.id && !importing ? "true" : undefined} onClick={() => pick(d.id)}>
+                  <button type="button" className="obs-tables__item" aria-current={d.id === selected?.id && !importing && !fromWarehouse ? "true" : undefined} onClick={() => pick(d.id)}>
                     <Icon name="table" size={16} />
                     <span className="obs-tables__title">
                       {d.title}
@@ -99,7 +111,9 @@ export function CaptureStation({ state, topic, canEdit, go }: ObsStationProps) {
         )}
       </Panel>
 
-      {importing && canEdit ? (
+      {fromWarehouse && canEdit && obsId ? (
+        <FuenteWarehouse topic={topic} obsId={obsId} onCancel={() => pick(selected?.id ?? null)} onSaved={(id) => pick(id)} />
+      ) : importing && canEdit ? (
         <ImportFlow
           topic={topic}
           position={datasets.length}
@@ -123,6 +137,7 @@ function DatasetDetail({ dataset, views, canEdit, go }: { dataset: ObsDataset; v
   const [draft, setDraft] = useState(() => ({ title: dataset.title, description: dataset.description, source: dataset.source, dataType: dataset.dataType, status: dataset.status }));
   const [confirming, setConfirming] = useState(false);
   const commit = useObsCommit();
+  const obsId = useObsDeTema(dataset.topic).data ?? null;
   const dirty =
     draft.title !== dataset.title || draft.description !== dataset.description || draft.source !== dataset.source || draft.dataType !== dataset.dataType || draft.status !== dataset.status;
   const reserved = dataset.rows.reduce((n, r) => n + Object.values(r.cells).filter((c) => c === RESERVED_TEXT).length, 0);
@@ -166,6 +181,7 @@ function DatasetDetail({ dataset, views, canEdit, go }: { dataset: ObsDataset; v
         </div>
       }
     >
+      {obsId && <OrigenWarehouse dataset={dataset} obsId={obsId} canEdit={canEdit} />}
       <div className="obs-detail">
         <div className="obs-detail__main">
           {mode === "tabla" ? (

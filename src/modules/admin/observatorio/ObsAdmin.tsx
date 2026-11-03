@@ -29,9 +29,9 @@ import type { ObsPanel } from "./publicar/permisos";
 import { ObservatoriosPanel } from "./publicar/ObservatoriosPanel";
 import { InsertarPanel } from "./publicar/InsertarPanel";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
-import { TOPICS, plural, topicConfig } from "./model";
+import { TOPICS, plural, topicConfig, topicTone } from "./model";
 import type { ObsState } from "./model";
-import { useObsCommit, useObsState } from "./store";
+import { useObsCommit, useObsState, useSyncObsTopics } from "./store";
 import { CaptureStation } from "./stations/CaptureStation";
 import { DesignStation } from "./stations/DesignStation";
 import { BoardsStation } from "./stations/BoardsStation";
@@ -60,6 +60,7 @@ export function ObsAdmin() {
   const station = (visibles.find((s) => s.id === stationParam)?.id ?? visibles[0]?.id ?? "captura") as ObsStationId;
   const canEdit = hasRole("planeacion") && permisos.puede(`obs_${station}` as const, null, "editar");
   const query = useObsState();
+  useSyncObsTopics();
   const commit = useObsCommit();
   const panel = stationParam === "observatorios" || stationParam === "insertar" ? stationParam : null;
   const panelId: ObsPanel | null = panel ? (panel === "observatorios" ? "obs_observatorios" : "obs_insertar") : null;
@@ -203,7 +204,8 @@ function TopicRail({ state, active, onPick }: { state: ObsState; active: string;
       if (c) c.views += 1;
     }
     return map;
-  }, [state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, TOPICS.length]);
   return (
     <aside className="oda-rail obs-rail" aria-label="Temas del Observatorio">
       <div className="oda-rail__head">
@@ -217,7 +219,7 @@ function TopicRail({ state, active, onPick }: { state: ObsState; active: string;
           return (
             <li key={t.slug}>
               <button type="button" className="oda-rail__item" aria-current={t.slug === active ? "true" : undefined} onClick={() => onPick(t.slug)}>
-                <span className="oda-code" style={{ "--line": `var(--od-line-${t.line})` } as CSSProperties}>
+                <span className="oda-code" style={{ "--line": topicTone(t) } as CSSProperties}>
                   {t.code}
                 </span>
                 <span className="oda-rail__name">

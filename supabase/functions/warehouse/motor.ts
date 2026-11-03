@@ -398,7 +398,16 @@ export function leerUsoAulas(archivos: Record<string, Uint8Array>): Hoja {
   const originales = ["Semana", "Inicio", "Fin"];
   const filas: Fila[] = [];
   for (let i = 0; i < total; i++) {
-    const m = matrizDeHoja(archivos, i);
+    // Galileo deja la columna A vacía (todo empieza en B): se quitan las columnas vacías del borde izquierdo
+    // para que la tabla quede igual con o sin ese margen.
+    const cruda = matrizDeHoja(archivos, i);
+    const vacia = (x: Celda | undefined) => x === null || x === undefined || String(x).trim() === "";
+    let desde = Infinity;
+    for (const f of cruda) {
+      const k = f.findIndex((x) => !vacia(x));
+      if (k >= 0 && k < desde) desde = k;
+    }
+    const m = Number.isFinite(desde) && desde > 0 ? cruda.map((f) => f.slice(desde)) : cruda;
     const valorDe = (rotulo: string) => {
       const f = m.find((x) => normalizarColumna(String(x[0] ?? "")) === rotulo);
       return f ? f[1] ?? null : null;

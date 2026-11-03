@@ -125,6 +125,9 @@ const ObservatoryHub = lazy(() =>
 const ObservatoryTopic = lazy(() =>
   import("./modules/datos-abiertos/observatorio/Observatory").then((m) => ({ default: m.ObservatoryTopic })),
 );
+const PresentacionInstitucional = lazy(() =>
+  import("./modules/datos-abiertos/observatorio/presentacion/PresentacionInstitucional").then((m) => ({ default: m.PresentacionInstitucional })),
+);
 const ObservatorioPagina = lazy(() =>
   import("./modules/datos-abiertos/observatorio/ObservatorioPagina").then((m) => ({ default: m.ObservatorioPagina })),
 );
@@ -358,6 +361,8 @@ export default function App() {
           <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCms><CategoriaPublica vieja={<SostenibleCategory />} /></SostenibleCms>} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />
           <Route path="/datos-abiertos/observatorio" element={<ObservatoryHub />} />
+          {/* Presentación Institucional: página fija hecha en código, antes de :tema. */}
+          <Route path="/datos-abiertos/observatorio/presentacion-institucional" element={<PresentacionInstitucional />} />
           <Route path="/datos-abiertos/observatorio/o/:slug" element={<ObservatorioPagina />} />
           <Route path="/datos-abiertos/observatorio/:tema" element={<ObservatoryTopic />} />
           <Route path="/datos-abiertos/boletines" element={<PublicBulletinList />} />

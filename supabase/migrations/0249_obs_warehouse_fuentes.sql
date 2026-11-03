@@ -189,7 +189,10 @@ begin
   if (select count(distinct x) from unnest(v_dims) x) <> cardinality(v_dims) then
     raise exception 'Las columnas de agrupación no pueden repetirse.' using errcode = '22023';
   end if;
-  if case when jsonb_typeof(p_medidas) = 'array' then jsonb_array_length(p_medidas) not between 1 and 3 else true end then
+  if jsonb_typeof(p_medidas) is distinct from 'array' then
+    raise exception 'Defina de una a tres medidas.' using errcode = '22023';
+  end if;
+  if jsonb_array_length(p_medidas) not between 1 and 3 then
     raise exception 'Defina de una a tres medidas.' using errcode = '22023';
   end if;
 

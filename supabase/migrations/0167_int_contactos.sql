@@ -48,7 +48,7 @@
 
 create table if not exists public.int_invitaciones (
   id                 uuid primary key default gen_random_uuid(),
-  token              text not null unique default translate(encode(gen_random_bytes(9), 'base64'), '+/=', '-_'),
+  token              text not null unique default translate(encode(extensions.gen_random_bytes(9), 'base64'), '+/=', '-_'),
   nombre             text not null,
   periodo_id         uuid not null references public.int_periodos (id) on delete cascade,
   -- Nulo: la persona elige su campus al entrar.

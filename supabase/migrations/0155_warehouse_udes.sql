@@ -114,7 +114,7 @@ create table if not exists public.wh_secretos (
 comment on table public.wh_secretos is 'Warehouse: la sal de los seudónimos. Sin políticas: solo security definer.';
 
 insert into public.wh_secretos (clave, valor)
-values ('sal_seudonimo', gen_random_bytes(32))
+values ('sal_seudonimo', extensions.gen_random_bytes(32))
 on conflict (clave) do nothing;
 
 -- -----------------------------------------------------------------------------

@@ -576,8 +576,8 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
         {/* El ODS 13 conserva su detalle y recibe el relato de Pilo antes de las noticias. */}
         {full && pilo && <OdsPilo o={o} informe={pilo} lang={L} soloRelato />}
 
-        {/* Las notas de udes.edu.co que Planeación aprobó para este ODS (solo la edición 2025: son noticias de 2025). */}
-        {edition === 2025 && <OdsNews n={o.n} recortes={recortesDe(pilo)} lang={L} />}
+        {/* Las notas de udes.edu.co que Planeación aprobó para este ODS: las del año de noticias de la edición (la 2026 reporta las de 2025). */}
+        <OdsNews n={o.n} edicion={edition} recortes={recortesDe(pilo)} lang={L} />
 
         {/* ODS anterior y siguiente: el cartel vecino asoma */}
         <nav className={`ors-pager${prev && next ? "" : " ors-pager--one"}`} aria-label={tr(L, "otros_informes")}>

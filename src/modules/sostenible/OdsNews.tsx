@@ -203,8 +203,8 @@ export function OdsNewsCarousel({ n, notas, recortes, lang = "es" }: { n: number
   );
 }
 
-/** El carrusel del portal: TODAS las notas aprobadas de este ODS. */
-export function OdsNews({ n, recortes, lang = "es" }: { n: number; recortes?: Record<string, Recorte>; lang?: Lang }) {
-  const q = useNoticiasPublicas(n);
+/** El carrusel del portal: las notas aprobadas de este ODS (con `edicion`, solo las de su año de noticias). */
+export function OdsNews({ n, edicion, recortes, lang = "es" }: { n: number; edicion?: number; recortes?: Record<string, Recorte>; lang?: Lang }) {
+  const q = useNoticiasPublicas(n, edicion);
   return <OdsNewsCarousel n={n} notas={q.data ?? []} recortes={recortes} lang={lang} />;
 }

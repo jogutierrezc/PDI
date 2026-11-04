@@ -1,0 +1,1363 @@
+{
+  "decano": "Diana Sarmiento Vesga",
+  "periodo": "2026",
+  "version": "fase1-v4-con-actividades",
+  "acciones": [
+    {
+      "id": "d1_1",
+      "meta": "Documento de propuesta de organización estructural de la Facultad de Ciencias Sociales",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Propuesta de organización estructural de la Facultad de Ciencias Sociales",
+      "recursos": "Recurso Humano",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_1_act_1",
+          "fecha": "2026-07-10",
+          "descripcion": "Proyectar el documento con la propuesta de reestructuración organizacional de la Facultad de Ciencias Sociales",
+          "responsable": "Diana Sarmiento Vesga",
+          "uid": "d1_1_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-07-10",
+      "responsable": "Diana Sarmiento Vesga",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_1",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6h1rxo1",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_2",
+      "meta": "Resolución No. 012390 del 07 de mayo de 2026 del MEN ",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Logro del registro calificado de la Maestrìa en Bioètica",
+      "recursos": "Talento Humano",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "2026-05-07",
+      "responsable": "Joaquin Fontecha, Director Dpto.  Humaninades",
+      "estadoInicial": "Completado",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_2",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll650w9a3",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_3",
+      "meta": "Lograr la renovación del registro calificado del programa mediante la Resolución 003929 del 13 de febrero de 2026 del MEN, con extensión en campus Cúcuta ",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Logro de la renovación del Registro Calificado del Programa de Comunicación Social y Periodismo",
+      "recursos": "Tiempo docentes",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "2026-02-13",
+      "responsable": "Nelson Estrada Vasquez",
+      "estadoInicial": "Completado",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_3",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6jzu4z4",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_4",
+      "meta": "Lograr la Acreditación en Alta Calidad del programa de Psicología, campus Bucaramanga.",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "El Programa de Psicología, campus Bucaramanga, se encuentra en alistamiento de visita de pares evaluadores, en el marco del proceso de Acreditación en Alta Calidad.",
+      "recursos": "Recurso Humano: Estudiantes, profesores, graduados, empleadores, personal aliado de prácticas formativas y directivos de la Universidad. Recursos Físicos: presentaciones, video del programa, infraestrructura UDES (laboratorios, salones, etc.), recursos bibliográficos, entre otros. Recursos Financiero: viáticos para pares académicos, refrigerios, souvenir, etc.  ",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_4_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Grupos Focales con estudiantes, profesores, graduados y empleadores.",
+          "responsable": "Programa de Psicología, campus Bucaramanga",
+          "uid": "d1_4_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_4_act_2",
+          "fecha": "2026-12-15",
+          "descripcion": "Talleres preparatorios con el área de Autorregulación Institucional.",
+          "responsable": "Programa de Psicología, campus Bucaramanga",
+          "uid": "d1_4_act_2",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_4_act_3",
+          "fecha": "2026-12-15",
+          "descripcion": "Talleres preparatorios con Directivos de la Universidad de Santander",
+          "responsable": "Autorregulación",
+          "uid": "d1_4_act_3",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_4_act_4",
+          "fecha": "2026-12-15",
+          "descripcion": "Reuniones profesores",
+          "responsable": "Programa de Psicología, campus Bucaramanga",
+          "uid": "d1_4_act_4",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_4_act_5",
+          "fecha": "2027-12-15",
+          "descripcion": "Socializaciones con estudiantes",
+          "responsable": "Programa de Psicología, campus Bucaramanga",
+          "uid": "d1_4_act_5",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2027-12-15",
+      "responsable": "Programa de Psicología",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_4",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll62bk0h5",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_5",
+      "meta": "Avanzar en el proceso de transformación curricular de los programas académicos de la Facultad de Ciencias Sociales, de conformidad con los lineamientos institucionales.",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Transformación curricular de programas de la Facultad de Ciencias Sociales",
+      "recursos": "Tiempo docente, recurso humano",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_5_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Transformación Curricular de programa Comunicación Social y  Periodismo (campus Bucaramanga y Valledupar)",
+          "responsable": "Programa académico, Nelson Estrada Vásquez (Buc), Johanna Bermudez (Val)",
+          "uid": "d1_5_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_5_act_2",
+          "fecha": "2026-12-15",
+          "descripcion": "Transformación Curricular de programa de Derecho RCU",
+          "responsable": "Diana Sarmiento Vesga (Buc), Karime Lizcano (Cuc), Karen Bermúdez (Val) y equipo de profesores de Autorregulación y aspectos curriculares",
+          "uid": "d1_5_act_2",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_5_act_3",
+          "fecha": "2026-12-15",
+          "descripcion": "Transformación Curricular del programa de Psicología (campus Buc, Cuc y Val)",
+          "responsable": "Dolly Jerez (Buc), Karen Bruges (Val), Miryam Gutierrez(Cuc)",
+          "uid": "d1_5_act_3",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programas académicos",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_5",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll660nszb",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_6",
+      "meta": "Obtención de la renovación del registro calificado del programa - Acto administrativo que apruebe la renovación de registro calificado (Resolución del MEN)",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Avance en el proceso de renovación de registro calificado del programa de Comunicación Social y Periodismo - campus Valledupar",
+      "recursos": "Presupuesto, recurso humano, tiempo docentes ",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_6_act_1",
+          "fecha": "2026-06-30",
+          "descripcion": "Radicar en junio de 2026 la solicitud de renovación del registro calificado ante el Ministerio.",
+          "responsable": "Equipo de autorregulación del programa",
+          "uid": "d1_6_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_6_act_2",
+          "fecha": "2026-12-15",
+          "descripcion": "Realizar seguimiento ante la oficina de Autorregulación el estado actual del programa en la plataforma saces",
+          "responsable": "Coordinación de calidad",
+          "uid": "d1_6_act_2",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_6_act_3",
+          "fecha": "2026-12-15",
+          "descripcion": "Realizar los simulacros y organización de la informacion en torno a la visita de pares",
+          "responsable": "Coordinación de calidad",
+          "uid": "d1_6_act_3",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Johanna Bermudez, directora del programa",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_6",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6nwkz2f",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_7",
+      "meta": "Por definir",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Completar acreditación alta calidad Psicologia, campus Bucaramanga",
+      "recursos": "Recurso Humano: Estudiantes, profesores, graduados, empleadores, personal aliado de prácticas formativas y directivos de la Universidad. Recursos Físicos: presentaciones, video del programa, infraestrructura UDES (laboratorios, salones, etc.), recursos bibliográficos, entre otros. Recursos Financiero: viáticos para pares académicos, refrigerios, souvenir, etc. ",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programa de Psicología",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_7",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6o7dxhj",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_8",
+      "meta": "Obtener el Certificado de servicios de la NTC 5906 del 2012 del Centro de Conciliación",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Lograr la certificación y restauración del Certificado de servicios de la NTC 5906 del 2012 del Centro de Conciliación, campus Bucaramanfa",
+      "recursos": "Presupuesto, recurso humano, tiempo docente",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_8_act_1",
+          "fecha": "",
+          "descripcion": "Gestionar la infraestructura, procedimientos internos, planeación de trabajo anual del Consultorio Jurídico y Centro de Conciliación",
+          "responsable": "Andrea Velandia",
+          "uid": "d1_8_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "Por definir",
+      "responsable": "Por definir",
+      "estadoInicial": "Completado",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_8",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6in9f8k",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_9",
+      "meta": "Certificación de calidad en Consultorios Jurídicos Purpura para los tres campus",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Adelantar los procesos para la certificación de calidad en Consultorios Jurídicos Purpura del Ministerio de Justicia y del Derecho -Dirección de Justicia Formal para los tres campus",
+      "recursos": "Infraestructura, recurso humano, tiempo docente",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_9_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Gestionar la infraestructura, gestión de procedimientos y protocolos",
+          "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+          "uid": "d1_9_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_9_act_2",
+          "fecha": "2026-12-15",
+          "descripcion": "Reuniones con el Ministerio para la evaluación de la Matriz diagnóstica",
+          "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+          "uid": "d1_9_act_2",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_9_act_3",
+          "fecha": "2026-12-15",
+          "descripcion": "Cumplimiento de las gestión de las acciones de matriz",
+          "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+          "uid": "d1_9_act_3",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_9",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll68lpmwm",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_10",
+      "meta": "La unificación de procesos de los Centros de prácticas del Programa de Derecho multicampus",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Unificación multicampus de procedimientos, protocolos en el sistema de Gestión de Calidad",
+      "recursos": "Infraestructura, recurso humano, tiempo docente",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_10_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Gestión de actualización de procesos, protocolos del Consultorio Jurídico y Centro de Conciliación",
+          "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+          "uid": "d1_10_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_10",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d1_11",
+      "meta": "Resolución del Ministerio de Justicia y del Derecho, mediante el cual aprueba el reglamento, el del Consultorio Jurídico por la dirección de Justicia Formal y el Reglamento de Centro de Conciliación por la Dirección de Métodos Alternativos de Solución de Conflictos",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Actualización de los reglamentos del Consultorio Jurídico y Centro Conciliación (multicampus), de acuerdo a la normatividad vigente.",
+      "recursos": "Recurso humano",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_11_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Unificación y revisión de los reglamentos del Consultorio Jurídico y Centro de Conciliación multicampus",
+          "responsable": "Andrea Velandia",
+          "uid": "d1_11_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_11_act_2",
+          "fecha": "2026-12-15",
+          "descripcion": "Sutentación y aprobación por parte del Comité Curricular Nacional",
+          "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+          "uid": "d1_11_act_2",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_11_act_3",
+          "fecha": "2026-12-15",
+          "descripcion": "Gestión ante el Consejo Académico para la aprobación mediante acuerdo",
+          "responsable": "Andrea Velandia (Buc)",
+          "uid": "d1_11_act_3",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d1_11_act_4",
+          "fecha": "2026-12-15",
+          "descripcion": "Radicación ante el Ministerio para aprobación",
+          "responsable": "Andrea Velandia (Buc)",
+          "uid": "d1_11_act_4",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Andrea Velandia (Buc), Sindy Paola Murgas (Vall), Alejandra Sanabria Pabón (Cuc)",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_11",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll61m5g3s",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_12",
+      "meta": "Obtener la renovación del Registro Calificado del Programa de Antropología, mediante Resolución del MEN",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Renovación del registro calificado del Programa de Antropología",
+      "recursos": "Tiempo docente, recurso humano",
+      "dimension": "d1",
+      "actividades": [
+        {
+          "id": "d1_12_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Radicación y envío de documentación ante el Ministerio de Educación",
+          "responsable": "Programa académico",
+          "uid": "d1_12_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Joaquín Fontecha",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d1_12",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6gvbvkx",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d1_13",
+      "meta": "Por definir",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Completar acreditación alta calidad Psicologia multicampus",
+      "recursos": "Por definir",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "Por definir",
+      "responsable": "Por definir",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_13",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d1_14",
+      "meta": "Por definir",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Avanzar acreditación alta calidad Derecho multicampus (post visita CAI)",
+      "recursos": "Por definir",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "Por definir",
+      "responsable": "Por definir",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_14",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d1_15",
+      "meta": "Por definir",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Avanzar acreditación alta calidad Derecho multicampus (post visita CAI)",
+      "recursos": "Por definir",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "Por definir",
+      "responsable": "Por definir",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_15",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d1_16",
+      "meta": "Por definir",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Completar acreditación alta calidad Psicologia multicampus",
+      "recursos": "Por definir",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "Por definir",
+      "responsable": "Por definir",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_16",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d1_17",
+      "meta": "Por definir",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Completar acreditación alta calidad Psicologia multicampus",
+      "recursos": "Por definir",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "Por definir",
+      "responsable": "Por definir",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_17",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d1_19",
+      "meta": "Por definir",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Completar acreditación alta calidad Psicologia multicampus",
+      "recursos": "Por definir",
+      "dimension": "d1",
+      "actividades": [],
+      "fechaLimite": "Por definir",
+      "responsable": "Por definir",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de calidad y autorregulación",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d1_19",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d2_1",
+      "meta": "Desarrollar e implementar al menos una microcertificación en cada programa de pregrado de la Facultad de Ciencias Sociales, articulada con las necesidades de formación, las tendencias del entorno y los lineamientos institucionales.",
+      "pilar": "Personalización",
+      "accion": "Diseñar micro certificaciones al interior de los programas de pregrado",
+      "recursos": "Recurso humano, tempo docente",
+      "dimension": "d2",
+      "actividades": [
+        {
+          "id": "d2_1_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Elaborar la propuesta inicial de microcertificaciones para los programas de pregrado, en articulación con las necesidades académicas y del entorno. (documento)",
+          "responsable": "Comité curricular de cada programa",
+          "uid": "d2_1_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Comite curricular de cada programa",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de la oferta académica y cupos",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d2_1",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6lowv214",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d2_2",
+      "meta": "Apoyar en el fortalecimiento y la captación de estudiantes de primer semestre de todos los programas de la Facultad para el año 2026, mediante la promoción de la oferta académica del programa.",
+      "pilar": "Personalización",
+      "accion": "Fomenar la matrícula de estudiantes, principalmente, de primer semestre, mediante el fortalecimiento de la oferta del programa y la ampliación de los canales de divulgación.",
+      "recursos": "Presupuesto, recurso humano, tiempo docente",
+      "dimension": "d2",
+      "actividades": [],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programas académicos",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de la oferta académica y cupos",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d2_2",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6nivmi16",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d2_3",
+      "meta": "Aprobación de la propuesta de nuevo programa de posgrado:  Especialización en Terapia Familiar y de Pareja",
+      "pilar": "Personalización",
+      "accion": "Creación de la Especialización en Terapia Familiar y de Pareja",
+      "recursos": " profesores, profesionales de Psicología, profesionales de Ciencias de la Salud, graduados, directivos UDES. Recursos Físicos: infraestructura física UDES, Cámara de Gesell, recursos bibliográficos, software, entre otros.",
+      "dimension": "d2",
+      "actividades": [
+        {
+          "id": "d2_3_act_1",
+          "fecha": "2026-07-14",
+          "descripcion": "Socialización de la ideación en Consejo de Facultad, evidencia: acta de consejo",
+          "responsable": "Programa de Psicología",
+          "uid": "d2_3_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programa de Psicología, campus Bucaramanga",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de la oferta académica y cupos",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d2_3",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6ltt5z17",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d2_4",
+      "meta": "Aprobación de la propuesta de nuevo programa de posgrado: Especialización en Psicología Clínica de la Infancia y Adolescencia",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Creación de la Especialización en Psicología Clínica de la Infancia y Adolescencia",
+      "recursos": " profesores, profesionales de Psicología, profesionales de Ciencias de la Salud, graduados, directivos UDES. Recursos Físicos: infraestructura física UDES, Cámara de Gesell, recursos bibliográficos, software, entre otros.",
+      "dimension": "d2",
+      "actividades": [
+        {
+          "id": "d2_4_act_1",
+          "fecha": "2026-07-14",
+          "descripcion": "Socialización de la ideación en Consejo de Facultad, evidencia: acta de consejo",
+          "responsable": "Programa de Psicología",
+          "uid": "d2_4_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programa de Psicología (Buc)",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de la oferta académica y cupos",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d2_4",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6ul6p919",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d2_5",
+      "meta": "Aprobación de la propuesta de nuevo programa de posgrado:  Especialización en Psicología Organizacional y del Trabajo",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Creación de la Especialización en Psicología Organizacional y del Trabajo",
+      "recursos": " profesores, profesionales de Psicología, profesionales de Ciencias de la Salud, graduados, directivos UDES. Recursos Físicos: infraestructura física UDES, Cámara de Gesell, recursos bibliográficos, software, entre otros.",
+      "dimension": "d2",
+      "actividades": [
+        {
+          "id": "d2_5_act_1",
+          "fecha": "2026-07-14",
+          "descripcion": "Socialización de la ideación en Consejo de Facultad, evidencia: acta de consejo",
+          "responsable": "Programa de Psicología",
+          "uid": "d2_5_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programa de Psicología Buc",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de la oferta académica y cupos",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d2_5",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6y5pzh1b",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d3_1",
+      "meta": "El funcionamiento estable y eficaz del instituto de investigaciones ATULAA a lo largo del tiempo.",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Reactivación y proyección del Instituto de Investigaciones ATULAA",
+      "recursos": "Recursos humano y financiero, tiempo docente",
+      "dimension": "d3",
+      "actividades": [
+        {
+          "id": "d3_1_act_1",
+          "fecha": "2026-08-03",
+          "descripcion": "Contratación del profesional que cumpla el perfil de liderazgo del Instituto de Investigaciones ATULAA",
+          "responsable": "Decanatura",
+          "uid": "d3_1_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2027-12-15",
+      "responsable": "Hector Fabian Becerra Fuquen",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión académica",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d3_1",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6zrno31d",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d3_2",
+      "meta": "Construir una cultura de investigación desde el interior de los Programas Académicos (Informe de estrategias para el desarrollo de la investigación)",
+      "pilar": "Apropiación social",
+      "accion": "Fortalecimiento de los procesos de investigación en cada uno de los programas académicos de la Facultad de Ciencias Sociales",
+      "recursos": "Recurso humano, financiero, tiempo docente",
+      "dimension": "d3",
+      "actividades": [
+        {
+          "id": "d3_2_act_1",
+          "fecha": "2027-12-15",
+          "descripcion": "Asignación de actividades en investigación a profesores con perfil investigativo",
+          "responsable": "Director de cada programa",
+          "uid": "d3_2_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2027-12-15",
+      "responsable": "Cada director de programa",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión académica",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d3_2",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6cc8b81f",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d3_3",
+      "meta": "Mejorar la categorización de los grupos de investigación en relación a la última medición realizada por Minciencias. (Registros en la plataforma SIGIIP)",
+      "pilar": "Apropiación social",
+      "accion": "Trabajar para mejorar la categorización de los grupos de investigación de la Facultad de Ciencias Sociales",
+      "recursos": "Recurso Humano, financiero, tiempo docente, software y laboratorios",
+      "dimension": "d3",
+      "actividades": [
+        {
+          "id": "d3_3_act_1",
+          "fecha": "2027-12-15",
+          "descripcion": "Desarrollo y creación de proyectos de investigación y productos dentro de la tipología de Minciencias",
+          "responsable": "Hector Fabián Becerra Fuquen",
+          "uid": "d3_3_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2028-12-15",
+      "responsable": "Hector Fabián Becerra Fuquen",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión académica",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d3_3",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll62tvun1h",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d4_1",
+      "meta": "Lograr que mínimo el 80 % de los profesores participe semestralmente en actividades de formación o actualización, a nivel interno o externo de la Universidad, relacionadas con su ejercicio académico y laboral.",
+      "pilar": "Ambiente tecnológico",
+      "accion": "Promover la participación del equipo profesoral de los programas de la Facultad de Ciencias Sociales en procesos de formación, capacitación y actualización en áreas disciplinares, pedagógicas, didácticas, investigativas y de innovación educativa, con el propósito de fortalecer la calidad de la docencia y contribuir al mejoramiento continuo de los programas académicos.",
+      "recursos": "ecursos Humanos: profesores, funcionarios UDES. Recursos Físicos: infraestructura física, moodle, entre otros.",
+      "dimension": "d4",
+      "actividades": [
+        {
+          "id": "d4_1_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Participación en cursos, diplomados, seminarios, talleres o congresos, ofertados por la UDES o instituciones externas.",
+          "responsable": "Programas académicos",
+          "uid": "d4_1_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d4_1_act_2",
+          "fecha": "2026-12-15",
+          "descripcion": "Formación en investigación, internacionalización y aseguramiento de la calidad.",
+          "responsable": "Programas académicos",
+          "uid": "d4_1_act_2",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d4_1_act_3",
+          "fecha": "2026-12-15",
+          "descripcion": "Seguimiento a la participación y aplicación de las acciones de formación en el desempeño profesoral.",
+          "responsable": "Programas académicos",
+          "uid": "d4_1_act_3",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programas académicos",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión profesoral",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d4_1",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll65jtmz1j",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d4_2",
+      "meta": "Lograr que el 100 % de los profesores de los programas de la Facultad, participen en el proceso institucional de evaluación docente.",
+      "pilar": "Ambiente tecnológico",
+      "accion": "Fortalecer el desempeño docente mediante la evaluación y retroalimentación profesoral en los programas de la Facultad de Ciencias Sociales.",
+      "recursos": "Recursos Humanos: profesores, estudiantes, directivos de la Universidad. Recursos Físicos: plataformas Génesis, Galileo y Máster, infraestructura física UDES, computadores, entre otros. ",
+      "dimension": "d4",
+      "actividades": [],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programas académico ",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión profesoral",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d4_2",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6a9nyt1n",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d4_3",
+      "meta": "Alcanzar la implementación de estrategias de fortalecimiento de competencias en segunda lengua en el 100 % de los programas de la Facultad de Ciencias Sociales al cierre de 2026.",
+      "pilar": "Ambiente tecnológico",
+      "accion": "Implementar estrategias que favorezcan el desarrollo de competencias en segunda lengua en todos los programas de la Facultad",
+      "recursos": "Docente ",
+      "dimension": "d4",
+      "actividades": [],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Directores, coordinadores de enseñanza y comités curriculares",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión profesoral",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d4_3",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll679gzo1o",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d5_1",
+      "meta": "Lograr que el 80% de los profesores de cada uno de los programas de la Facultad implementen la plataforma en cada una de sus clases. ",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Aumentar la participación de los profesores en la implemetación de la plataforma Moodle en sus clases",
+      "recursos": "Tiempo docente, plataforma moodle",
+      "dimension": "d5",
+      "actividades": [],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programas académicos ",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión administrativa",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d5_1",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d5_2",
+      "meta": "Lograr que el 100% de los profesores y directores de los programas de la Facultad reporten sus evidencias para la auditoria en cada corte. Entrega de informe enviado por la oficina de auditoría.",
+      "pilar": "Gobernanza para el buen gobierno",
+      "accion": "Cumplimiento en el reporte de evidencias de las actividades de nómina para la auditoría.",
+      "recursos": "Tiempo docente",
+      "dimension": "d5",
+      "actividades": [
+        {
+          "id": "d5_2_act_1",
+          "fecha": "2026-03-20",
+          "descripcion": "Cargue de evidencias del primer corte del 2026-A",
+          "responsable": "Profesores y directores",
+          "uid": "d5_2_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d5_2_act_2",
+          "fecha": "2026-05-08",
+          "descripcion": "Segundo registro de evindencias del 2026-A",
+          "responsable": "Profesores y directores",
+          "uid": "d5_2_act_2",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d5_2_act_3",
+          "fecha": "2026-05-29",
+          "descripcion": "Tercer registro de evidencia del 2026-A",
+          "responsable": "Profesores y directores",
+          "uid": "d5_2_act_3",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d5_2_act_4",
+          "fecha": "2026-09-14",
+          "descripcion": "Primer registro de evidencia del 2026-B",
+          "responsable": "Profesores y directores",
+          "uid": "d5_2_act_4",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d5_2_act_5",
+          "fecha": "2026-10-26",
+          "descripcion": "Segundo registro de evidencia del 2026-B",
+          "responsable": "Profesores y directores",
+          "uid": "d5_2_act_5",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d5_2_act_6",
+          "fecha": "2026-11-20",
+          "descripcion": "Tercer registro de evidencia del 2026-B",
+          "responsable": "Profesores y directores",
+          "uid": "d5_2_act_6",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Profesores y direcotores de cada programa ",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión administrativa",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d5_2",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6tou3g1q",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d6_1",
+      "meta": "Alcanzar el 100 % de cumplimiento de la meta de Educación Continua definida por la Vicerrectoría de Extensión para los programas de la Facultad de Ciencias Sociales en los tres campus, con corte al 31 de diciembre de 2026.",
+      "pilar": "Apropiación social",
+      "accion": "Cumplir la meta establecida para Educación Continua en todos los programas de la Facultad de Ciencias Sociales de los tres campus para el año 2026, de conformidad con los lineamientos definidos por la Vicerrectoría de Extensión.",
+      "recursos": "Presupuesto, recurso humano, recurso financiero, tiempo docente. ",
+      "dimension": "d6",
+      "actividades": [
+        {
+          "id": "d6_1_act_1",
+          "fecha": "2026-12-15",
+          "descripcion": "Coordinar con las direcciones de programa la formulación, aprobación, promoción y ejecución de la oferta de Educación Continua, realizando seguimiento periódico al cumplimiento de la meta institucional definida por la Vicerrectoría de Extensión.",
+          "responsable": "Decanatura",
+          "uid": "d6_1_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programas de la Facultad ",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de extensión universitaria",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d6_1",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6oj5541x",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d6_2",
+      "meta": "El registro de las piezas arqueológicas custodiadas por la Universidad",
+      "pilar": "Apropiación social",
+      "accion": "Contribuir a la realización del  registro e inventario de las piezas arqueológicas custodiadas por la Universidad, en cumplimiento de la normatividad vigente y de los lineamientos institucionales para la gestión del patrimonio arqueológico.",
+      "recursos": "Recurso humano, tiempo docente",
+      "dimension": "d6",
+      "actividades": [
+        {
+          "id": "d6_2_act_1",
+          "fecha": "2026-11-06",
+          "descripcion": "Contribución al proceso registro de las piezas arqueológicas a completitud. Entrega del documento para llevar a cabo el registro.",
+          "responsable": "Luisa Pinena Burgos",
+          "uid": "d6_2_act_1",
+          "activa": true,
+          "notas": []
+        },
+        {
+          "id": "d6_2_act_2",
+          "fecha": "2026-12-15",
+          "descripcion": "Avanzar en el inventario de las piezas arqueológicas. Entrega del documento final",
+          "responsable": "Luisa Pinena Burgos",
+          "uid": "d6_2_act_2",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programa de Antropología",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de extensión universitaria",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": false,
+      "uid": "d6_2",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6gpc1l1z",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d6_3",
+      "meta": "Aumentar la participación de los programas de la Facultad en proyectos de extensión durante 2026.",
+      "pilar": "Apropiación social",
+      "accion": "Participación de la Facultad en los siguientes proyectos de extensión: MAID UDES, MIUDES, EIP, Maquilando Felicidad y Hola, ¿cómo estás?",
+      "recursos": "Recursos Humanos: estudiantes, profesores, graduados, profesionales de Psicología y población externa. Recursos Físicos: infraestructura física, Cámara de Gesell, computadores, recursos bibliográficos, entre otros.",
+      "dimension": "d6",
+      "actividades": [],
+      "fechaLimite": "2026-06-15",
+      "responsable": "Directores de cada programa",
+      "estadoInicial": "En proceso",
+      "dimensionNombre": "Gestión de extensión universitaria",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d6_3",
+      "activa": true,
+      "notas": [
+        {
+          "id": "nt_mw28vll6dcv3s22",
+          "fecha": "2026-10-20",
+          "estado": "En proceso",
+          "avance": 0,
+          "texto": "",
+          "link": "",
+          "semestre": "I",
+          "autor": ""
+        }
+      ]
+    },
+    {
+      "id": "d6_4",
+      "meta": "Implementar el proyecto de inclusión de Bienestar UDES, liderado por el programa de Licenciatura en Educación Infantil, en articulación con la Especialización en Medicina Familiar.",
+      "pilar": "Apropiación social",
+      "accion": "Construcción de propuesta del proyecto: inclusión de Bienestar UDES",
+      "recursos": "Tiempo docente, recurso humano",
+      "dimension": "d6",
+      "actividades": [
+        {
+          "id": "d6_4_act_1",
+          "fecha": "2026-11-30",
+          "descripcion": "Coordinar actividades de apoyo con los programas titulares de los proyectos, diseñar propuesta para discutir en el Comité de Programa, establecer acuerdos con Medicina Familiar y el Programa de inclusión de bienestar. Envidencia: material fotográficas",
+          "responsable": "Directora del programa",
+          "uid": "d6_4_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-15",
+      "responsable": "Programa de Licenciatura en Educación Infantil ",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión de extensión universitaria",
+      "presupuestoOrdinario": false,
+      "presupuestoMejoramiento": true,
+      "uid": "d6_4",
+      "activa": true,
+      "notas": []
+    },
+    {
+      "id": "d7_1",
+      "meta": "1 programa de educación continua por programa al semestre",
+      "pilar": "Sostenibilidad",
+      "accion": "Diversificar fuentes de ingreso más allá de matrículas",
+      "recursos": "Recurso  humano",
+      "dimension": "d7",
+      "actividades": [
+        {
+          "id": "d7_1_act_1",
+          "fecha": "2026-10-31",
+          "descripcion": "Diseñar y gestionar la oferta de Educación continua por programa cada semestre para presentarlas en la convocatoria",
+          "responsable": "Directores de programa, comité curricular y de programa, coordinadores de enseñanza",
+          "uid": "d7_1_act_1",
+          "activa": true,
+          "notas": []
+        }
+      ],
+      "fechaLimite": "2026-12-16",
+      "responsable": "Directores de  los programas adscritos a la facultad",
+      "estadoInicial": "Pendiente",
+      "dimensionNombre": "Gestión financiera",
+      "presupuestoOrdinario": true,
+      "presupuestoMejoramiento": false,
+      "uid": "d7_1",
+      "activa": true,
+      "notas": []
+    }
+  ],
+  "facultad": {
+    "codigo": "FCS",
+    "nombre": "Facultad de Ciencias Sociales",
+    "tieneInforme": true
+  },
+  "totalAcciones": 36,
+  "fechaElaboracion": "2026-07-07",
+  "fechaExportacion": "2026-10-20",
+  "totalActividades": 43,
+  "ultimaActualizacion": {
+    "fecha": "2026-11-04"
+  },
+  "modeloNotas": 2
+}

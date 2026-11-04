@@ -135,6 +135,9 @@ export function dimsDe(plantilla: Plantilla): DimId[] {
 /** Las claves de cifra que trae una plantilla. */
 export const clavesDe = (plantilla: Plantilla): string[] => dimsDe(plantilla).flatMap((d) => DIMS[d].cifras);
 
+/** Las unidades que escriben informe: todas menos los programas. */
+export const escribeInforme = (kind: string) => kind !== "programa";
+
 /** Plantilla sugerida por el tipo de unidad (units.kind); Planeación decide al abrir. */
 export function plantillaSugerida(kind: string, nombre = ""): Plantilla {
   if (/rector[ií]a general/i.test(nombre)) return "D";

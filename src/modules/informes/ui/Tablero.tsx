@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
 import { useCrecer, useEntrada } from "../../rankings/movimiento";
 import { condicionDe, useAbrirInforme, useGuardarCiclo, useGuardarRequisito, useInstancias, useListas, useUnidades } from "../datos";
-import { DIMS, LETRAS, PLANTILLAS, cifraDef, dimsDe, plantillaSugerida } from "../plantillas";
+import { DIMS, LETRAS, PLANTILLAS, cifraDef, dimsDe, escribeInforme, plantillaSugerida } from "../plantillas";
 import type { CicloRow, Condicion, ConfigCiclo, EstadoCiclo, Plantilla, RequisitoRow } from "../types";
 import { Aviso, Barra, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { configDe } from "./modelo";
@@ -300,9 +300,6 @@ function DatosLibres({ ciclo }: { ciclo: CicloRow }) {
 }
 
 /* ---------- Entrega por unidad ----------------------------------------------------- */
-
-/** Las unidades que escriben informe: todas menos los programas. */
-const escribeInforme = (kind: string) => kind !== "programa";
 
 function Entrega({ ciclo }: { ciclo: CicloRow }) {
   const unidades = useUnidades();

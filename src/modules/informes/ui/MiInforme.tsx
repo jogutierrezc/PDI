@@ -15,6 +15,7 @@ import { esViva } from "../cifras-vivas";
 import {
   piloRedactar,
   usePlanUnidad,
+  useAbrirInforme,
   useAgregarEnlace,
   useAsegurarCifras,
   useCatalogoIndicadores,
@@ -36,9 +37,9 @@ import type { DatosCifra } from "../datos";
 import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
 import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
-import { AYUDA_TIPO, clavesDe, cifraDef } from "../plantillas";
+import { AYUDA_TIPO, LETRAS, PLANTILLAS, cifraDef, clavesDe, escribeInforme, plantillaSugerida } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
-import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, RequisitoRow, RolActor, SeccionDef, UnidadRef } from "../types";
+import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, RolActor, SeccionDef, UnidadRef } from "../types";
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas, TablaPilares } from "./Bloques";
 import { Dimensiones } from "./Dimensiones";
 import { ElementosDrive } from "./ElementosDrive";
@@ -66,10 +67,10 @@ export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: 
   if (!profile || membresias.isPending || unidades.isPending || instancias.isPending) return <Cargando texto="Cargando su informe…" />;
 
   const nombres = new Map((unidades.data ?? []).map((u) => [u.id, u]));
-  // Planeación ve cualquier informe abierto; el resto, los de sus unidades.
+  // Quien gestiona ve todas las facultades, vicerrectorías y oficinas (con o sin informe abierto); el resto, las suyas.
   const opciones: UnidadRef[] = planeacion
-    ? (instancias.data ?? []).map((i) => nombres.get(i.unit_id)).filter((u): u is UnidadRef => Boolean(u))
-    : (membresias.data ?? []).map((m) => nombres.get(m.unidad) ?? { id: m.unidad, name: m.nombre, kind: "", code: null, parent_id: null });
+    ? (unidades.data ?? []).filter((u) => escribeInforme(u.kind))
+    :(membresias.data ?? []).map((m) => nombres.get(m.unidad) ?? { id: m.unidad, name: m.nombre, kind: "", code: null, parent_id: null });
   const elegida = params.get("unidad");
   // Una unidad ajena en la dirección se rechaza: no se carga nada de ella (la base también lo niega).
   if (!planeacion && elegida && !opciones.some((o) => o.id === elegida)) {
@@ -118,16 +119,39 @@ export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: 
       {inst ? (
         <Editor key={inst.id} inst={inst} ciclo={ciclo} requisitos={requisitos} unidad={unidad} actor={actor} />
       ) : (
-        <Vacio>
-          Planeación todavía no abre el informe {ciclo.anio} de {unidad.name}.{" "}
-          {planeacion && (
-            <Link className="inf-link" to={BASE}>
-              Abrirlo en el Tablero del ciclo
-            </Link>
-          )}
-        </Vacio>
+        <SinAbrir ciclo={ciclo} unidad={unidad} puedeAbrir={planeacion} />
       )}
     </>
+  );
+}
+
+/** La unidad aún no tiene informe en el ciclo: quien gestiona lo abre aquí mismo, con la plantilla que le toca. */
+function SinAbrir({ ciclo, unidad, puedeAbrir }: { ciclo: CicloRow; unidad: UnidadRef; puedeAbrir: boolean }) {
+  const abrir = useAbrirInforme();
+  const [plantilla, setPlantilla] = useState<Plantilla>(plantillaSugerida(unidad.kind, unidad.name));
+  if (!puedeAbrir) return <Vacio>Planeación todavía no abre el informe {ciclo.anio} de {unidad.name}.</Vacio>;
+  return (
+    <div className="inf-card inf-pad">
+      <h3 className="inf-t">{unidad.name}</h3>
+      <p className="inf-sub">Esta unidad aún no tiene informe {ciclo.anio}. Ábralo con la plantilla que le corresponde.</p>
+      <div className="inf-row">
+        <select className="inf-in" style={{ width: "auto" }} value={plantilla} onChange={(e) => setPlantilla(e.target.value as Plantilla)} aria-label={`Plantilla de ${unidad.name}`}>
+          {LETRAS.map((l) => (
+            <option key={l} value={l}>
+              {l} · {PLANTILLAS[l].quien}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="inf-btn inf-btn--pri" disabled={abrir.isPending} onClick={() => abrir.mutate({ ciclo: ciclo.id, unidad: unidad.id, plantilla })}>
+          {abrir.isPending ? "Abriendo…" : "Abrir el informe"}
+        </button>
+        {abrir.error && (
+          <span className="inf-error" role="alert">
+            {mensajeDe(abrir.error)}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

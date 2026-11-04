@@ -73,13 +73,15 @@ export interface Convenio {
   cerrado: boolean;
   cerrado_en: string | null;
   estado_excel: string | null;
+  /** Idioma de la contraparte (0256): en el aviso al contacto de la institución. */
+  idioma: "es" | "en";
   origen: "manual" | "excel";
   created_by: string | null;
   created_at: string;
 }
 
 /** Lo que se escribe al crear o importar (el resto lo pone la base). */
-export type ConvenioNuevo = Omit<Convenio, "id" | "created_by" | "created_at" | "drive_carpeta_id" | "cerrado" | "cerrado_en">;
+export type ConvenioNuevo = Omit<Convenio, "id" | "created_by" | "created_at" | "drive_carpeta_id" | "cerrado" | "cerrado_en" | "idioma">;
 
 /* ---------- Vigencia y etapa ---------------------------------------------- */
 

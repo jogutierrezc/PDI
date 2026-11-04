@@ -117,7 +117,7 @@ export function useCrearConvenio() {
 }
 
 export type CambiosConvenio = Partial<
-  Pick<Convenio, "fecha_firma" | "fecha_terminacion" | "indefinido" | "pasos" | "pasos_fechas" | "cerrado" | "cerrado_en" | "carpeta_estado" | "carpeta_url" | "renovacion">
+  Pick<Convenio, "fecha_firma" | "fecha_terminacion" | "indefinido" | "pasos" | "pasos_fechas" | "cerrado" | "cerrado_en" | "carpeta_estado" | "carpeta_url" | "renovacion" | "idioma">
 >;
 
 /** Cambia campos de un convenio y deja sus anotaciones en el historial. */

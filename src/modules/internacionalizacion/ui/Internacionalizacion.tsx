@@ -41,10 +41,11 @@ import { Accesos } from "./Accesos";
 import { Contactos } from "./Contactos";
 import { Relaciones } from "../relaciones/Relaciones";
 import { Convenios } from "../convenios/Convenios";
+import { Gestion } from "../gestion/Gestion";
 import "./internacionalizacion.css";
 
 const BASE = "/admin/internacionalizacion";
-const ICONO: Record<SeccionId, IconName> = { resumen: "grid", cifras: "chart", tablas: "table", contactos: "mail", relaciones: "share", convenios: "document", plantillas: "library", periodos: "clock", accesos: "users" };
+const ICONO: Record<SeccionId, IconName> = { resumen: "grid", cifras: "chart", tablas: "table", contactos: "mail", relaciones: "share", convenios: "document", gestion: "clipboard", plantillas: "library", periodos: "clock", accesos: "users" };
 
 export function Internacionalizacion() {
   const { seccion: param } = useParams();
@@ -187,6 +188,7 @@ export function Internacionalizacion() {
   else if (actual === "contactos") cuerpo = <Contactos ctx={ctx} />;
   else if (actual === "relaciones") cuerpo = <Relaciones ctx={ctx} />;
   else if (actual === "convenios") cuerpo = <Convenios ctx={ctx} />;
+  else if (actual === "gestion") cuerpo = <Gestion ctx={ctx} />;
   else if (actual === "plantillas") cuerpo = <Plantillas ctx={ctx} />;
   else if (actual === "periodos") cuerpo = <Periodos ctx={ctx} />;
   else cuerpo = <Accesos ctx={ctx} />;

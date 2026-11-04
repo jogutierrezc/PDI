@@ -29,7 +29,7 @@ const PESTANAS: { id: Pestana; rotulo: string }[] = [
 
 const CARPETA_TEXTO = { udrive: "En UDrive", enlace: "Con enlace", sin: "Sin carpeta" } as const;
 
-export function Detalle({ c, hoy, crea, abrirRenovacion, avisoInicial = "", onVolver, onAvisar }: { c: Convenio; hoy: string; crea: boolean; abrirRenovacion: boolean; avisoInicial?: string; onVolver: () => void; onAvisar: (c: Convenio) => void }) {
+export function Detalle({ c, hoy, crea, abrirRenovacion, avisoInicial = "", onVolver, onAvisar, onIniciarRenovacion }: { c: Convenio; hoy: string; crea: boolean; abrirRenovacion: boolean; avisoInicial?: string; onVolver: () => void; onAvisar: (c: Convenio) => void; onIniciarRenovacion: (c: Convenio) => void }) {
   const [pestana, setPestana] = useState<Pestana>("resumen");
   const [renovando, setRenovando] = useState(abrirRenovacion);
   const [confirmando, setConfirmando] = useState(false);
@@ -117,7 +117,7 @@ export function Detalle({ c, hoy, crea, abrirRenovacion, avisoInicial = "", onVo
               </p>
             ) : null}
             {pestana === "resumen" ? (
-              <Resumen c={c} crea={crea} renovando={renovando} setRenovando={setRenovando} confirmando={confirmando} setConfirmando={setConfirmando} ocupado={actualizar.isPending} hoy={hoy} aplicar={aplicar} onAvisar={onAvisar} />
+              <Resumen c={c} crea={crea} renovando={renovando} setRenovando={setRenovando} confirmando={confirmando} setConfirmando={setConfirmando} ocupado={actualizar.isPending} hoy={hoy} aplicar={aplicar} onAvisar={onAvisar} onIniciarRenovacion={onIniciarRenovacion} />
             ) : pestana === "docs" ? (
               <Documentos c={c} crea={crea} ocupado={actualizar.isPending} aplicar={aplicar} />
             ) : pestana === "firma" ? (
@@ -167,6 +167,7 @@ function Resumen({
   hoy,
   aplicar,
   onAvisar,
+  onIniciarRenovacion,
 }: {
   c: Convenio;
   crea: boolean;
@@ -178,6 +179,7 @@ function Resumen({
   hoy: string;
   aplicar: Aplicar;
   onAvisar: (c: Convenio) => void;
+  onIniciarRenovacion: (c: Convenio) => void;
 }) {
   const [tipo, setTipo] = useState<string>(TIPOS_RENOVACION[0]);
   const [fecha, setFecha] = useState("");
@@ -203,6 +205,10 @@ function Resumen({
           <button type="button" className="conv-btn conv-btn--pri" onClick={() => setRenovando(!renovando)} aria-expanded={renovando}>
             <Icon name="undo" size={16} />
             Registrar renovación
+          </button>
+          <button type="button" className="conv-btn" onClick={() => onIniciarRenovacion(c)}>
+            <Icon name="document" size={16} />
+            Iniciar renovación
           </button>
           <button type="button" className="conv-btn" onClick={() => onAvisar(c)}>
             <Icon name="mail" size={16} />
@@ -275,6 +281,26 @@ function Resumen({
           <dd>
             {c.tipo}
             {c.tipo_excel && c.tipo_excel !== c.tipo ? <span className="conv-sub"> (en el Excel: {c.tipo_excel})</span> : null}
+          </dd>
+          <dt>Idioma de la contraparte</dt>
+          <dd>
+            {crea ? (
+              <select
+                aria-label="Idioma de la contraparte"
+                value={c.idioma}
+                disabled={ocupado}
+                onChange={(e) => {
+                  const idioma = e.target.value === "en" ? "en" : "es";
+                  aplicar({ idioma }, [{ texto: `Idioma de la contraparte: ${idioma === "en" ? "inglés" : "español"}.` }], "Idioma de la contraparte guardado.");
+                }}
+              >
+                <option value="es">Español</option>
+                <option value="en">Inglés</option>
+              </select>
+            ) : (
+              <>{c.idioma === "en" ? "Inglés" : "Español"}</>
+            )}
+            <span className="conv-sub"> Los avisos al contacto de la institución salen en este idioma.</span>
           </dd>
           <dt>Modalidad</dt>
           <dd>{c.modalidad || "Sin dato"}</dd>

@@ -80,6 +80,13 @@ export function Convenios({ ctx }: { ctx: Ctx }) {
     [navegar, ctx],
   );
 
+  const iniciarRenovacion = useCallback(
+    (c: Convenio) => {
+      navegar(ctx.enlace("gestion", { tab: "modelos", convenio: c.id }));
+    },
+    [navegar, ctx],
+  );
+
   const alRegistro = (f: { estado?: Filtros["estado"]; pais?: string }) => {
     setFiltros({ ...SIN_FILTROS, estado: f.estado ?? "", pais: f.pais ?? "" });
     setPestana("registro");
@@ -144,7 +151,7 @@ export function Convenios({ ctx }: { ctx: Ctx }) {
         />
       ) : null}
 
-      {abierto ? <Detalle key={abierto.id} c={abierto} hoy={hoy} crea={crea} abrirRenovacion={Boolean(estadoNav?.renovar)} avisoInicial={avisoDetalle} onVolver={volver} onAvisar={avisar} /> : null}
+      {abierto ? <Detalle key={abierto.id} c={abierto} hoy={hoy} crea={crea} abrirRenovacion={Boolean(estadoNav?.renovar)} avisoInicial={avisoDetalle} onVolver={volver} onAvisar={avisar} onIniciarRenovacion={iniciarRenovacion} /> : null}
     </div>
   );
 }

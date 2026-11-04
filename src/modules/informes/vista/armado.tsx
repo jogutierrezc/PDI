@@ -449,10 +449,37 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
       break;
     }
     case "matriz": {
+      const sin = s.sintesis;
+      if (sin?.plan) {
+        const p = sin.plan;
+        const av = (v: number | null) => (v === null ? "—" : `${v} %`);
+        u.push(
+          unidadTabla(k("plan"), i, {
+            titulo: "Objetivos y metas: avance del plan de trabajo por dimensión",
+            columnas: [{ etiqueta: "Dimensión" }, { etiqueta: "Acciones", num: true, ancho: "17mm" }, { etiqueta: "Completadas", num: true, ancho: "23mm" }, { etiqueta: "En proceso", num: true, ancho: "21mm" }, { etiqueta: "Avance", num: true, ancho: "18mm" }],
+            filas: [
+              ...p.dimensiones.map((d) => ({ celdas: [d.nombre, String(d.total), String(d.completadas), String(d.enProceso), av(d.avance)] })),
+              { total: true, celdas: ["Total", String(p.total), String(p.completadas), String(p.enProceso), av(p.avance)] },
+            ],
+          }),
+        );
+      }
+      if (sin?.metas) {
+        const c = sin.metas.conteo;
+        u.push(
+          unidadParrafo(
+            k("metas"),
+            i,
+            <>
+              <b>Metas con resultado: {sin.metas.total}.</b> {c.superada} superadas, {c.cumplida} cumplidas, {c.parcial} parciales, {c.rezagada} rezagadas y {c.sinMeta} sin meta para comparar.
+            </>,
+          ),
+        );
+      }
       const grupos = new Map<string, FilaIndicador[]>();
       for (const f of s.matriz) grupos.set(f.dim, [...(grupos.get(f.dim) ?? []), f]);
       if (s.matriz.length) {
-        const nombreDim = (id: string) => (id ? (Object.values(DIMS_TITULOS).find((d) => d.id === id)?.titulo ?? id) : "Datos de la unidad");
+        const nombreDim = (id: string) => (id ? (Object.values(DIMS_TITULOS).find((d) => d.id === id)?.titulo ?? s.matriz.find((f) => f.dim === id)?.dimNombre ?? id) : "Datos de la unidad");
         const filas: FilaT[] = [...grupos.entries()].map(([id, fs]) => {
           const c = contarEstados(fs.map((f) => f.estado));
           const seg = (cls: string, n: number) => (n ? <span key={cls} className={cls} style={{ flex: n }}>{n}</span> : null);
@@ -485,7 +512,7 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
         );
         u.push(unidadFija(k("ley"), i, <div className="vi-u"><Leyenda /></div>));
         u.push(unidadTabla(k("todas"), i, { titulo: "Indicadores del informe", columnas: COLUMNAS_INDICADOR, filas: s.matriz.map(filaIndicadorT) }));
-      } else if (!s.texto) sinContenido("Todavía no hay cifras incluidas en el informe.");
+      } else if (!s.texto && !sin?.plan && !sin?.metas) sinContenido("Todavía no hay cifras incluidas en el informe.");
       if (s.texto) texto("t", s.texto, "Lectura de la unidad");
       break;
     }

@@ -10,6 +10,7 @@
 import { agruparPorDimension, actividadesDe, avanceGeneral, claveAccion, resumenPorDimension, tonoEstado } from "../plan-decanatura";
 import type { PlanAccion, PlanActividad, RespuestaPlan, ResumenDimension } from "../plan-decanatura";
 import { Barra, Cargando, fmtFecha, mensajeDe } from "./comunes";
+import { PiloAyuda } from "./PiloAyuda";
 
 const ETIQUETA_DIM = (d: string) => d.toUpperCase();
 
@@ -26,10 +27,12 @@ interface PropsTabla {
   observaciones: Record<string, string>;
   editable: boolean;
   cambiarObservacion: (clave: string, texto: string) => void;
+  /** Pilo redacta el análisis de una acción (quien elabora lo edita). */
+  redactarAccion?: (a: PlanAccion, actividades: PlanActividad[], actual: string) => Promise<string>;
 }
 
 /** Sección «Objetivos y metas» para una facultad: las acciones del plan. */
-export function TablaPlan({ plan, cargando, error, observaciones, editable, cambiarObservacion }: PropsTabla) {
+export function TablaPlan({ plan, cargando, error, observaciones, editable, cambiarObservacion, redactarAccion }: PropsTabla) {
   if (error) {
     return (
       <p className="inf-error" role="alert">
@@ -69,6 +72,7 @@ export function TablaPlan({ plan, cargando, error, observaciones, editable, camb
               valor={observaciones[claveAccion(a.id)] ?? ""}
               editable={editable}
               cambiar={(t) => cambiarObservacion(claveAccion(a.id), t)}
+              redactar={redactarAccion ? (actual) => redactarAccion(a, actividadesDe(plan.actividades, a.id), actual) : undefined}
             />
           ))}
         </section>
@@ -83,7 +87,9 @@ function Accion({
   valor,
   editable,
   cambiar,
+  redactar,
 }: {
+  redactar?: (actual: string) => Promise<string>;
   accion: PlanAccion;
   actividades: PlanActividad[];
   valor: string;
@@ -156,6 +162,7 @@ function Accion({
           onChange={(e) => cambiar(e.target.value)}
         />
       </label>
+      {editable && redactar && <PiloAyuda texto={valor} onTexto={cambiar} pedir={async (actual) => ({ texto: await redactar(actual) })} />}
     </article>
   );
 }

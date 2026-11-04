@@ -4,9 +4,17 @@
 import { congelado, esViva, vistaCifra } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
 import { condicionDe, useAnexos, useCifras, useCifrasVivas, useSecciones } from "../datos";
+import { useRequeridos } from "../requeridos";
+import { estadoRequeridos, requeridosDePlantilla, requeridosDeSeccion } from "../requeridos-logica";
+import type { DatoRequerido } from "../requeridos-logica";
+import { aCifraVista, esCompleto, normalizar } from "../indicadores-manual";
+import type { IndicadorManual } from "../indicadores-manual";
+import { dimDeConsulta } from "../catalogo";
 import { esMetaDelPrograma, filasMetaPrograma } from "../metas-programa";
+import { armarSintesis, cifrasDeSintesis } from "../sintesis";
+import { estadoMeta } from "../vista/estados";
 import type { PlanAccion } from "../plan-decanatura";
-import { PLANTILLAS, clavesDe, DIMS } from "../plantillas";
+import { PLANTILLAS, cifraDef, clavesDe, DIMS } from "../plantillas";
 import { avanceSeccion } from "../validacion";
 import type { Avance, ContextoSeccion } from "../validacion";
 import type { CicloRow, ConfigCiclo, ContenidoSeccion, InstanciaRow, RequisitoRow, SeccionDef } from "../types";
@@ -17,6 +25,8 @@ export const configDe = (ciclo: CicloRow | null | undefined): ConfigCiclo => ({ 
 /** `acciones`: las del Plan de Trabajo de la facultad (vacío si la unidad no tiene plan). */
 export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos: RequisitoRow[], acciones: PlanAccion[] = []) {
   const secciones = useSecciones(inst.id);
+  const lecturaRequeridos = useRequeridos(ciclo.id);
+  const requeridos = requeridosDePlantilla(lecturaRequeridos.data?.filas ?? [], inst.plantilla);
   const filas = useCifras(inst.id);
   const frio = congelado(inst.estado);
   const vivas = useCifrasVivas(inst.id, !frio);
@@ -37,32 +47,78 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   const delInforme = [...dePlantilla].map(vista);
   /** Una cifra de la plantilla sin indicador conectado no tiene qué mostrar: no entra a la matriz ni al texto. */
   const conectada = (c: CifraVista) => c.valor !== null || c.propia;
+  /** Indicadores que la unidad escribió a mano en Resultados por dimensión, por sección. */
+  const manualesDe = (clave: string): IndicadorManual[] => normalizar(secciones.data?.find((s) => s.clave === clave)?.contenido?.indicadores);
+  const manuales = plantilla.secciones
+    .filter((s) => s.tipo === "dim")
+    .flatMap((s) => manualesDe(s.clave).filter(esCompleto).map((i) => ({ seccion: s.clave, ind: i, vista: aCifraVista(i, s.clave, inst.estado) })));
   /** Las que entran al informe: se pueden citar en el texto y van a la matriz. */
-  const incluidas = [...delInforme.filter((c) => c.incluida && conectada(c)), ...agregadas.filter((a) => a.vista.incluida).map((a) => a.vista), ...propias.map((p) => p.vista)];
+  const incluidas = [...delInforme.filter((c) => c.incluida && conectada(c)), ...agregadas.filter((a) => a.vista.incluida).map((a) => a.vista), ...propias.map((p) => p.vista), ...manuales.map((x) => x.vista)];
 
   /** Las metas que vienen de los indicadores del programa. */
   const metasPrograma = filasMetaPrograma(filas.data ?? [], vista);
 
+  /** La síntesis: lo reportado en Objetivos y metas y en Resultados por dimensión, junto. */
+  const claveMetas = plantilla.secciones.find((s) => s.tipo === "metas")?.clave ?? "";
+  const metasAdicionales = secciones.data?.find((s) => s.clave === claveMetas)?.contenido?.metas ?? [];
+  const nombreCriterio = (id: string, propio?: string) => (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : propio || "Otros datos de la unidad");
+  const entradasSintesis = [
+    ...delInforme.filter((c) => c.incluida && conectada(c)).map((v) => ({ v, id: cifraDef(v.clave)?.dim ?? "otros", propio: "" })),
+    ...agregadas.filter((a) => a.vista.incluida).map((a) => ({ v: a.vista, id: dimDeConsulta(a.fila.consulta) ?? "otros", propio: "" })),
+    ...propias.map((p) => ({ v: p.vista, id: "otros", propio: "" })),
+    ...manuales.map((x) => ({ v: x.vista, id: x.ind.criterio || "otros", propio: x.ind.criterio_nombre ?? "" })),
+  ];
+  const sintesis = armarSintesis({
+    acciones,
+    metas: [
+      ...metasPrograma.map((f) => estadoMeta(f.alcanzado, f.meta, !f.baja)),
+      ...metasAdicionales.filter((x) => x.meta.trim()).map((x) => estadoMeta(x.alcanzado, x.programado, true)),
+    ],
+    indicadores: entradasSintesis.map((e) => ({ criterio: e.id, criterioNombre: nombreCriterio(e.id, e.propio), vista: e.v })),
+  });
+  /** Todo lo que el texto puede citar con [[clave]]: las cifras incluidas y las de la síntesis. */
+  const citables = [...incluidas, ...cifrasDeSintesis(sintesis)];
+
   const contenidoGuardado = (clave: string): ContenidoSeccion => secciones.data?.find((s) => s.clave === clave)?.contenido ?? {};
 
-  const contexto = (def: SeccionDef): ContextoSeccion => ({
+  /** Los datos que Planeación pide y caen en esta sección dim. */
+  const dimsDeSecciones = plantilla.secciones.filter((s) => s.tipo === "dim").map((s) => ({ clave: s.clave, dims: (s.dims ?? []) as string[] }));
+  const requeridosDe = (def: SeccionDef): DatoRequerido[] => (def.tipo === "dim" ? requeridosDeSeccion(requeridos, dimsDeSecciones, def.clave) : []);
+
+  const contexto = (def: SeccionDef, contenido?: ContenidoSeccion): ContextoSeccion => ({
     cifras: [
       ...(def.dims ?? []).flatMap((d) => DIMS[d].cifras).map(vista).filter((c) => c.condicion !== "no"),
       ...agregadas.filter((a) => a.fila.seccion_clave === def.clave && a.vista.incluida).map((a) => a.vista),
     ],
-    propias: propias.filter((p) => p.fila.seccion_clave === def.clave).map((p) => p.vista),
+    propias: [...propias.filter((p) => p.fila.seccion_clave === def.clave).map((p) => p.vista), ...manuales.filter((x) => x.seccion === def.clave).map((x) => x.vista)],
+    // Los indicadores que responden a un dato requerido se cuentan aparte (requeridos), no como «sin cifra».
+    manuales:
+      def.tipo === "dim"
+        ? (() => {
+            const pedidas = new Set(requeridosDe(def).map((r) => r.clave));
+            const t = (contenido ? normalizar(contenido.indicadores) : manualesDe(def.clave)).filter((i) => !(i.requerido && pedidas.has(i.requerido)));
+            return { total: t.length, completos: t.filter(esCompleto).length };
+          })()
+        : undefined,
+    requeridos:
+      def.tipo === "dim"
+        ? (() => {
+            const e = estadoRequeridos((contenido ?? contenidoGuardado(def.clave)).indicadores, requeridosDe(def));
+            return { total: e.total, faltan: e.faltan.length };
+          })()
+        : undefined,
     anexos: anexos.data?.length ?? 0,
     exigirFuente: config.exigir_fuente,
     metasPrograma: metasPrograma.length,
     metasPlan: acciones.length,
   });
 
-  const avance = (def: SeccionDef, contenido?: ContenidoSeccion): Avance => avanceSeccion(def, contenido ?? contenidoGuardado(def.clave), contexto(def));
+  const avance = (def: SeccionDef, contenido?: ContenidoSeccion): Avance => avanceSeccion(def, contenido ?? contenidoGuardado(def.clave), contexto(def, contenido));
 
   const cargando = secciones.isPending || filas.isPending || anexos.isPending;
   const error = [secciones.error, filas.error, anexos.error, vivas.error].find((e): e is Error => e instanceof Error) ?? null;
 
-  return { plantilla, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, contenidoGuardado, contexto, avance, cargando, error };
+  return { plantilla, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, manuales, manualesDe, sintesis, citables, contenidoGuardado, contexto, avance, requeridos, requeridosDe, cargando, error };
 }
 
 export type ModeloInforme = ReturnType<typeof useModeloInforme>;

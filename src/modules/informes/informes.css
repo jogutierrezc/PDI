@@ -1412,3 +1412,33 @@ textarea.inf-in {
 .inf-drv__acc { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); align-items: center; }
 .inf-drv__acc .inf-link { justify-self: start; }
 @media (max-width: 720px) { .inf-drv__acc { grid-template-columns: 1fr; } }
+
+/* Plan de Trabajo: importar y editar a mano */
+.inf-plan__barra { flex-wrap: wrap; }
+.inf-plan__edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); }
+.inf-plan__edit .inf-plan__ancho { grid-column: 1 / -1; }
+.inf-plan__act-edit { display: grid; grid-template-columns: minmax(180px, 3fr) minmax(120px, 1.4fr) 140px 130px auto; gap: var(--space-2); margin: var(--space-2) 0; align-items: center; }
+@media (max-width: 760px) { .inf-plan__act-edit { grid-template-columns: 1fr; } }
+
+/* Resultados por dimensión: indicadores escritos a mano */
+.inf-rm { display: grid; gap: var(--space-4); }
+.inf-rm__tab td { min-width: 84px; }
+.inf-rm__tab td:first-child { min-width: 220px; }
+.inf-rm__tab .inf-in { min-height: 36px; }
+.inf-rm__lectura { margin: 0; font-size: var(--text-sm); color: var(--ink-secondary); }
+.inf-rm__det { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); margin-top: var(--space-2); }
+.inf-rm__nuevo { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.inf-rm__nuevo .inf-row .inf-in { flex: 1; }
+
+/* Síntesis de resultados institucionales */
+.inf-sint { display: grid; gap: var(--space-4); }
+.inf-sint__frase { margin: 0; font-size: var(--text-base); color: var(--ink); }
+.inf-sint__bloque { display: grid; gap: var(--space-2); }
+.inf-sint__bloque h4 { margin: 0; font-family: var(--font-display); font-size: var(--text-sm); color: var(--brand-navy); }
+.inf-stk { display: flex; min-width: 140px; height: 22px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+.inf-stk span { display: grid; place-items: center; min-width: 22px; font-size: var(--text-xs); font-weight: 700; font-variant-numeric: tabular-nums; border-right: 1px solid var(--surface); color: var(--ink); }
+.inf-stk .is-superada { background: #cfe9d6; }
+.inf-stk .is-cumplida { background: #cdeaee; }
+.inf-stk .is-parcial { background: #fbe9b9; }
+.inf-stk .is-rezagada { background: #f6cdc7; }
+.inf-stk .is-sinmeta { background: #e5e8ec; color: var(--ink-secondary); }

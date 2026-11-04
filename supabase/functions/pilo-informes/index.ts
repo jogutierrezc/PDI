@@ -60,6 +60,7 @@ import {
   ACCIONES,
   cifrasValidas,
   leerTexto,
+  mensajesAnalizar,
   mensajesMejorar,
   mensajesRedactar,
   OBJETIVOS,
@@ -125,13 +126,13 @@ Deno.serve(async (request: Request) => {
   // La instancia (redactar, aprender) ------------------------------------------------
   let instancia: datos.Instancia | null = null;
   let rolEnUnidad: string | null = null;
-  if (accion === "redactar" || accion === "aprender") {
+  if (accion === "redactar" || accion === "analizar" || accion === "aprender") {
     const id = String(cuerpo.instancia_id ?? "");
     if (!UUID.test(id)) return json({ error: "Falta el informe (instancia_id)." }, 400);
     try {
       instancia = await datos.leerInstancia(admin, id);
       if (!instancia) return json({ error: "No existe ese informe." }, 404);
-      if (accion === "redactar" && !gestiona) {
+      if ((accion === "redactar" || accion === "analizar") && !gestiona) {
         rolEnUnidad = await datos.rolEnUnidad(comoUsuario, instancia.unit_id);
       }
     } catch (e) {
@@ -142,7 +143,7 @@ Deno.serve(async (request: Request) => {
     const msg =
       accion === "aprender" || accion === "ingerir" || accion === "corpus" || accion === "estado"
         ? "Solo quien gestiona los informes (Planeación con la gestión de Informes, o la administración)."
-        : accion === "redactar"
+        : accion === "redactar" || accion === "analizar"
           ? "Solo quien gestiona los informes o quien diligencia este informe (Gestor o Contribuyente de la unidad)."
           : "Solo quien gestiona los informes o quien diligencia un informe (Gestor o Contribuyente).";
     return json({ error: msg }, 403);
@@ -248,6 +249,50 @@ Deno.serve(async (request: Request) => {
       }
       await bitacora(1, 0, null);
       return json({ ok: true, ...r.valor });
+    } catch (e) {
+      return alto(e);
+    }
+  }
+
+  // analizar: el análisis de cualquier espacio de texto. Pilo recibe tendencias y hechos, nunca valores.
+  if (accion === "analizar") {
+    const inst = instancia!;
+    if (!esPlantilla(inst.plantilla)) return json({ error: `Plantilla desconocida: ${inst.plantilla}.` }, 400);
+    if (inst.estado === "sent" || inst.estado === "ok") return json({ error: inst.estado === "ok" ? "El informe está aprobado: Pilo no lo reescribe." : "El informe está enviado: Pilo no lo reescribe.", code: "cerrado" }, 409);
+    const cortar = (x: unknown, n: number) => (typeof x === "string" ? x.replace(/\s+/g, " ").trim().slice(0, n) : "");
+    const tema = cortar(cuerpo.tema, 200);
+    if (!tema) return json({ error: "Falta el tema del análisis." }, 400);
+    const lista = (x: unknown) => (Array.isArray(x) ? x : []);
+    const cifrasIn = lista(cuerpo.cifras)
+      .slice(0, 40)
+      .map((c) => {
+        const o = (c ?? {}) as Record<string, unknown>;
+        return { clave: cortar(o.clave, 80), etiqueta: cortar(o.etiqueta, 160), fuente: cortar(o.fuente, 120), tendencia: lista(o.tendencia).slice(0, 4).map((t) => cortar(t, 120)).filter(Boolean) };
+      })
+      .filter((c) => /^[a-z0-9_]+$/i.test(c.clave));
+    const hechos = lista(cuerpo.hechos).slice(0, 30).map((h) => cortar(h, 300)).filter(Boolean);
+    const largo = cuerpo.largo === "medio" ? { texto: "uno o dos párrafos", parrafos: [1, 2] as [number, number], palabras: [60, 180] as [number, number] } : { texto: "un párrafo breve", parrafos: [1, 1] as [number, number], palabras: [25, 110] as [number, number] };
+    const actual = typeof cuerpo.actual === "string" ? cuerpo.actual.slice(0, 3000) : "";
+    const instruccion = cortar(cuerpo.instruccion, 600);
+    try {
+      const contexto = [tema, instruccion, actual, ...hechos, ...cifrasIn.flatMap((c) => [c.etiqueta, c.fuente])].join("\n");
+      const reglas = { claves: cifrasIn.map((c) => c.clave), anio: inst.anio, extension: largo, ejemplos: [] as string[], contexto };
+      const r = await ia.llamarVerificado(
+        mensajesAnalizar({ unidad: inst.unidad, plantilla: inst.plantilla, anio: inst.anio, tema, cifras: cifrasIn, hechos, largo, actual, instruccion }),
+        1200,
+        (crudo) => {
+          const l = leerTexto(crudo);
+          if (!l.ok) return l;
+          const v = verificarRedaccion(l.valor, reglas);
+          return v.ok ? { ok: true, valor: { texto: l.valor, avisos: v.avisos } } : v;
+        },
+      );
+      if (!r.ok) {
+        await bitacora(0, 1, r.error);
+        return json({ error: `Pilo no logró un borrador que cumpla las reglas: ${r.error}`, code: "verificacion" }, 422);
+      }
+      await bitacora(1, 0, null);
+      return json({ ok: true, texto: r.valor.texto, usadas: [...new Set(tokensDe(r.valor.texto))].map((k) => ({ clave: k, etiqueta: cifrasIn.find((c) => c.clave === k)?.etiqueta ?? k })), ejemplos_usados: [], avisos: r.valor.avisos });
     } catch (e) {
       return alto(e);
     }

@@ -12,6 +12,10 @@ import { formatoCifra, variacion } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
 import type { ModeloInforme } from "../ui/modelo";
 import { resolverDe } from "../ui/Texto";
+import { esClaveIndicador } from "../indicadores-manual";
+import { hayDatosDeSintesis } from "../sintesis";
+import type { Sintesis } from "../sintesis";
+import type { IndicadorManual } from "../indicadores-manual";
 import { cifraDef, DIMS } from "../plantillas";
 import { resolverTexto } from "../tokens";
 import type { ElementoDrive, Logro, Meta, PilarRef, TipoSeccion } from "../types";
@@ -33,6 +37,8 @@ export interface FilaIndicador {
   origen: string;
   dim: string;
   justificacion: string;
+  /** Nombre del criterio o dimensión cuando no es una de las base. */
+  dimNombre?: string;
 }
 
 export interface GrupoDimension {
@@ -71,6 +77,8 @@ export interface SeccionLibro {
   /** Todas las cifras incluidas del informe (matriz). */
   matriz: FilaIndicador[];
   drive: ElementoDrive[];
+  /** Síntesis armada con lo reportado (solo en secciones de tipo matriz y si hay datos). */
+  sintesis: Sintesis | null;
   /** Fuente al pie: «UDES en Cifras · corte 31 dic 2025». */
   fuente: string;
 }
@@ -85,6 +93,12 @@ const fecha = (iso: string | null): string => {
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
 };
+
+/** Un indicador escrito a mano, agrupado por su criterio. */
+function filaManual(c: CifraVista, ind: IndicadorManual): FilaIndicador {
+  const id = ind.criterio || "otros";
+  return { ...filaIndicador(c), dim: id, dimNombre: (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : ind.criterio_nombre) || "Otros indicadores" };
+}
 
 function filaIndicador(c: CifraVista): FilaIndicador {
   return {
@@ -113,7 +127,7 @@ function fuenteDe(cifras: CifraVista[]): string {
 }
 
 export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string): EntradaLibro {
-  const resolver = resolverDe(m.incluidas);
+  const resolver = resolverDe(m.citables);
   const marcados = (ids: string[] | undefined) => pilares.filter((p) => ids?.includes(p.id));
 
   const secciones = m.plantilla.secciones.map((def, i): SeccionLibro => {
@@ -136,8 +150,19 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
     const dePlantilla = new Set((def.dims ?? []).flatMap((d) => DIMS[d].cifras));
     const otros =
       def.tipo === "dim"
-        ? enSeccion.filter((x) => !dePlantilla.has(x.clave)).map(filaIndicador)
+        ? enSeccion.filter((x) => !dePlantilla.has(x.clave) && !esClaveIndicador(x.clave)).map(filaIndicador)
         : [];
+    // Los indicadores escritos a mano se agrupan por criterio, junto a las dimensiones base.
+    if (def.tipo === "dim") {
+      for (const ind of m.manuales.filter((x) => x.seccion === def.clave)) {
+        const fila = filaManual(ind.vista, ind.ind);
+        const id = fila.dim;
+        const nombre = fila.dimNombre ?? "";
+        const grupo = dimensiones.find((g) => g.id === id);
+        if (grupo) grupo.filas.push(fila);
+        else dimensiones.push({ id, titulo: nombre, funcion: "Indicadores de la unidad", filas: [fila] });
+      }
+    }
 
     const metasPrograma = def.tipo === "metas" ? m.metasPrograma : [];
     const metas = [
@@ -181,8 +206,15 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
       filas: def.tipo === "filas" ? (c.filas ?? []).filter((f) => f.some((v) => String(v ?? "").trim())).map((f) => f.map((v) => String(v ?? "").trim())) : [],
       logros: def.tipo === "logros" ? (c.logros ?? []).filter((l) => l.titulo.trim() || l.resultado.trim()) : [],
       anexos: anexos.map((a) => ({ n: a.n, nombre: a.nombre, descripcion: a.descripcion, enlace: a.tipo === "url" ? a.ruta : "" })),
-      matriz: def.tipo === "matriz" ? m.incluidas.map(filaIndicador) : [],
+      matriz:
+        def.tipo === "matriz"
+          ? m.incluidas.map((x) => {
+              const man = m.manuales.find((y) => y.vista.clave === x.clave);
+              return man ? filaManual(x, man.ind) : filaIndicador(x);
+            })
+          : [],
       drive: c.drive ?? [],
+      sintesis: def.tipo === "matriz" && hayDatosDeSintesis(m.sintesis) ? m.sintesis : null,
       fuente: fuenteDe(cifrasFuente),
     };
   });

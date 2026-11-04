@@ -28,6 +28,7 @@ import {
   usePilares,
   useQuitarAnexo,
   useQuitarCifra,
+  useSecciones,
   useSedesCifras,
   useSincronizarMetas,
   useSubirAnexo,
@@ -37,14 +38,24 @@ import type { DatosCifra } from "../datos";
 import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
 import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
-import { AYUDA_TIPO, LETRAS, PLANTILLAS, cifraDef, clavesDe, escribeInforme, plantillaSugerida } from "../plantillas";
+import { ImportarFilas } from "./ImportarFilas";
+import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, escribeInforme, plantillaSugerida } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
 import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, RolActor, SeccionDef, UnidadRef } from "../types";
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas, TablaPilares } from "./Bloques";
 import { Dimensiones } from "./Dimensiones";
 import { ElementosDrive } from "./ElementosDrive";
 import { TablaMetasPrograma } from "./MetasPrograma";
-import { ResumenPlan, TablaPlan } from "./PlanFacultad";
+import { ResumenPlan } from "./PlanFacultad";
+import { PlanUnidad } from "./PlanUnidad";
+import { PiloAyuda } from "./PiloAyuda";
+import { pedidoDeAccion, pedidoDeCifras } from "../analisis-pilo";
+import { piloAnalizar } from "../datos";
+import type { PedidoAnalisisPilo } from "../datos";
+import { ResultadosManuales } from "./ResultadosManuales";
+import { PanelSintesis } from "./Sintesis";
+import { aprobadosPara, useCriterios, useSugerirCriterio } from "../criterios";
+import { planVigente } from "../plan-importar";
 import type { NuevoPropio } from "./Cifras";
 import { Aviso, Barra, Cargando, Controles, EstadoPill, Tag, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { useModeloInforme } from "./modelo";
@@ -161,7 +172,12 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
   // Facultad: el Plan de Trabajo (API) trae las acciones de las secciones de metas y de dimensiones.
   const esFacultad = unidad.kind === "facultad";
   const plan = usePlanUnidad(unidad.id, esFacultad);
-  const m = useModeloInforme(inst, ciclo, requisitos, plan.data?.acciones ?? []);
+  const [borradores, setBorradores] = useState<Record<string, ContenidoSeccion>>({});
+  const filasSecciones = useSecciones(inst.id);
+  const claveMetas = PLANTILLAS[inst.plantilla].secciones.find((x) => x.tipo === "metas")?.clave ?? "";
+  const planLocal = (borradores[claveMetas] ?? filasSecciones.data?.find((x) => x.clave === claveMetas)?.contenido)?.plan;
+  const vigente = planVigente(plan.data, planLocal);
+  const m = useModeloInforme(inst, ciclo, requisitos, vigente?.acciones ?? []);
   const editable = puedeEditar(inst.estado, actor);
   const pilares = usePilares();
   const fuentes = useFuentes();
@@ -180,7 +196,6 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
   const idx = Math.min(Math.max(Number(params.get("s") ?? 1) - 1, 0), secciones.length - 1) || 0;
   const def = secciones[idx];
 
-  const [borradores, setBorradores] = useState<Record<string, ContenidoSeccion>>({});
   const [estadoGuardado, setEstadoGuardado] = useState("");
   const pendientes = useRef(new Map<string, { def: SeccionDef; c: ContenidoSeccion; reloj: number }>());
   const sincronizando = useRef(new Set<string>());
@@ -272,7 +287,7 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cuenta lo leído
-  }, [m.secciones.data, m.filas.data, m.anexos.data, m.vivas.data, plan.data, editable, m.cargando]);
+  }, [m.secciones.data, m.filas.data, m.anexos.data, m.vivas.data, plan.data, vigente?.acciones.length, editable, m.cargando]);
 
   if (m.error) return <Aviso error={m.error} />;
   if (m.cargando) return <Cargando texto="Cargando las secciones…" />;
@@ -281,7 +296,7 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
   const listas = avances.filter((a) => a === 2).length;
   const motivos = motivosNoEnviar({ estado: inst.estado, rol: actor, listas, total: secciones.length });
   const nota = leerNota(inst.nota_revision);
-  const resolver = resolverDe(m.incluidas);
+  const resolver = resolverDe(m.citables);
   const ctx = m.contexto(def);
   const c = contenido(def.clave);
 
@@ -412,9 +427,11 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
           c={c}
           m={m}
           inst={inst}
+          anio={ciclo.anio}
           recibeMetas={recibeMetasDeImpacto(unidad.kind)}
           esFacultad={esFacultad}
           plan={plan}
+          vigente={vigente}
           editable={editable}
           resolver={resolver}
           pilares={pilares.data ?? []}
@@ -446,7 +463,7 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
           <Controles
             items={controlesSeccion(def, c, {
               ...ctx,
-              claves: m.incluidas.map((x) => x.clave),
+              claves: m.citables.map((x) => x.clave),
               congelada: m.frio,
               corte: ciclo.corte ? fmtFecha(ciclo.corte) : null,
             })}
@@ -545,9 +562,11 @@ function CuerpoSeccion({
   c,
   m,
   inst,
+  anio,
   recibeMetas,
   esFacultad,
   plan,
+  vigente,
   editable,
   resolver,
   pilares,
@@ -564,11 +583,14 @@ function CuerpoSeccion({
   c: ContenidoSeccion;
   m: ModeloInforme;
   inst: InstanciaRow;
+  anio: number;
   /** Programa o facultad: sus metas vienen de los indicadores del programa. */
   recibeMetas: boolean;
   /** Facultad: metas y resultados por dimensión salen del Plan de Trabajo. */
   esFacultad: boolean;
   plan: ReturnType<typeof usePlanUnidad>;
+  /** El plan que rige: el propio de la unidad o, si no tiene, el sincronizado. */
+  vigente: ReturnType<typeof planVigente>;
   editable: boolean;
   resolver: ReturnType<typeof resolverDe>;
   pilares: PilarRef[];
@@ -581,17 +603,23 @@ function CuerpoSeccion({
   quitarAnexo: (a: AnexoRow) => void;
   ocupado: boolean;
 }) {
-  const texto = (etiqueta: string, opciones: { minimo?: number; placeholder?: string; pilo?: boolean } = {}) => (
+  const criteriosBase = useCriterios();
+  const sugerirCriterio = useSugerirCriterio();
+  /** Pilo redacta el análisis de este apartado; quien elabora el informe lo edita. */
+  const ayudaPilo = (pedido: () => Omit<PedidoAnalisisPilo, "actual">) => (
+    <PiloAyuda texto={c.texto ?? ""} onTexto={(t) => cambiar({ ...c, texto: t })} pedir={(actual) => piloAnalizar(inst.id, def.clave, { ...pedido(), actual })} />
+  );
+  const texto = (etiqueta: string, opciones: { minimo?: number; placeholder?: string; pilo?: boolean; analisis?: () => Omit<PedidoAnalisisPilo, "actual"> } = {}) => (
     <CampoTexto
       etiqueta={etiqueta}
       valor={c.texto ?? ""}
       onChange={(t) => cambiar({ ...c, texto: t })}
-      cifras={m.incluidas}
+      cifras={m.citables}
       resolver={resolver}
       editable={editable}
       minimo={opciones.minimo}
       placeholder={opciones.placeholder}
-      pie={opciones.pilo && editable ? <PiloRedacta inst={inst} def={def} c={c} cambiar={cambiar} /> : undefined}
+      pie={editable ? (opciones.pilo ? <PiloRedacta inst={inst} def={def} c={c} cambiar={cambiar} /> : opciones.analisis ? ayudaPilo(opciones.analisis) : undefined) : undefined}
     />
   );
   const anexos = m.anexos.data ?? [];
@@ -622,7 +650,15 @@ function CuerpoSeccion({
               <Tag />
               <span className="inf-src">Media página: cómo contribuye su unidad a los pilares marcados (se recomiendan al menos 3)</span>
             </div>
-            {texto("Contribución a los pilares", { placeholder: "Cuente cómo se conecta su trabajo con los pilares que marcó…" })}
+            {texto("Contribución a los pilares", {
+              placeholder: "Cuente cómo se conecta su trabajo con los pilares que marcó…",
+              analisis: () => ({
+                tema: "Contribución de la unidad a los pilares del Plan de Desarrollo que marcó",
+                cifras: [],
+                hechos: pilares.filter((p) => c.pilares?.includes(p.id)).map((p) => `Se articula con el pilar «${p.name.replace(/\d+/g, "").trim()}»`),
+                largo: "medio",
+              }),
+            })}
           </div>
         </>
       );
@@ -630,19 +666,22 @@ function CuerpoSeccion({
       const delPrograma = recibeMetas || m.metasPrograma.length > 0;
       return (
         <>
-          {esFacultad && (
+          {(esFacultad || editable || c.plan) && (
             <div className="inf-blk">
               <div className="inf-blk__lab">
-                <Tag auto />
-                <span className="inf-src">Plan de Trabajo 2026 · las acciones vienen del plan; las filas no se editan, añada su análisis</span>
+                <Tag auto={!c.plan} />
+                <span className="inf-src">
+                  Plan de Trabajo 2026 · {c.plan ? "plan propio de la unidad: se importa o se escribe aquí y se corrige fila por fila" : "sincronizado con el plan; importe el seguimiento (JSON o PDF) o edítelo a mano"}
+                </span>
               </div>
-              <TablaPlan
-                plan={plan.data}
-                cargando={plan.isPending}
-                error={plan.error instanceof Error ? plan.error : null}
-                observaciones={c.observaciones ?? {}}
+              <PlanUnidad
+                api={{ data: plan.data, isPending: plan.isPending, error: plan.error instanceof Error ? plan.error : null, activo: esFacultad }}
+                local={c.plan}
                 editable={editable}
+                observaciones={c.observaciones ?? {}}
                 cambiarObservacion={(clave, t) => cambiar({ ...c, observaciones: { ...c.observaciones, [clave]: t } })}
+                cambiarPlan={(p) => cambiar({ ...c, plan: p })}
+                redactarAccion={editable ? async (a, acts, actual) => (await piloAnalizar(inst.id, def.clave, { ...pedidoDeAccion(a, acts), actual })).texto : undefined}
               />
             </div>
           )}
@@ -682,18 +721,40 @@ function CuerpoSeccion({
         <>
           <div className="inf-blk">
             <div className="inf-blk__lab">
+              <Tag />
+              <span className="inf-src">Indicadores que escribe la unidad: cifra actual, anterior y meta. El estado se calcula solo.</span>
+            </div>
+            <ResultadosManuales
+              def={def}
+              c={c}
+              editable={editable}
+              aprobados={aprobadosPara(criteriosBase.data?.filas ?? [], inst.plantilla, anio)}
+              exigirFuente={m.config.exigir_fuente}
+              cambiar={cambiar}
+              puedeSugerir={!criteriosBase.data?.falta}
+              requeridos={m.requeridosDe(def)}
+              sugerir={(p) => sugerirCriterio.mutateAsync({ nombre: p.nombre, descripcion: "", unidad: inst.unit_id })}
+            />
+          </div>
+          <details className="inf-blk inf-sug">
+            <summary>Conectar indicadores de UDES en Cifras o del PDI (opcional)</summary>
+            <div className="inf-blk__lab">
               <Tag auto />
               <span className="inf-src">{m.frio ? "Foto tomada al enviar" : "En vivo hasta que envíe"} · UDES en Cifras y PDI</span>
             </div>
             <DimensionesConectadas def={def} m={m} propias={propias} editable={editable} pilares={pilares} guardar={guardar} agregarPropio={agregarPropio} quitarPropio={quitarPropio} />
-          </div>
-          {esFacultad && (
+          </details>
+          {vigente && vigente.acciones.length > 0 && (
             <div className="inf-blk">
               <div className="inf-blk__lab">
                 <Tag auto />
                 <span className="inf-src">Avance del Plan de Trabajo por dimensión</span>
               </div>
-              <ResumenPlan plan={plan.data} cargando={plan.isPending} error={plan.error instanceof Error ? plan.error : null} />
+              <ResumenPlan
+                plan={{ facultad: "", decano: vigente.decano, plan: null, acciones: vigente.acciones, actividades: vigente.actividades, seguimientos: [], traido_en: vigente.traido_en ?? "" }}
+                cargando={false}
+                error={null}
+              />
             </div>
           )}
           {def.consolida && (
@@ -710,7 +771,15 @@ function CuerpoSeccion({
               <Tag />
               <span className="inf-src">{def.consolida ? "Análisis de la rectoría" : "Logros y lo que las cifras no cuentan"}</span>
             </div>
-            {texto(`Análisis de ${def.titulo}`, { placeholder: "Escriba su lectura de estos resultados…" })}
+            {texto(`Análisis de ${def.titulo}`, {
+              placeholder: "Escriba su lectura de estos resultados…",
+              analisis: () => {
+                const ctx = m.contexto(def);
+                const cifras = [...ctx.cifras.filter((x) => x.incluida && m.conectada(x)), ...ctx.propias];
+                const notas = cifras.filter((x) => x.justificacion.trim()).map((x) => `Nota de la unidad sobre «${x.etiqueta}»: ${x.justificacion.trim()}`);
+                return pedidoDeCifras(`Análisis de ${def.titulo}`, cifras, notas);
+              },
+            })}
           </div>
         </>
       );
@@ -718,6 +787,13 @@ function CuerpoSeccion({
     case "matriz":
       return (
         <>
+          <div className="inf-blk">
+            <div className="inf-blk__lab">
+              <Tag auto />
+              <span className="inf-src">Se arma sola con Objetivos y metas y con Resultados por dimensión. Sus cifras se pueden citar en el texto («Insertar una cifra viva»).</span>
+            </div>
+            <PanelSintesis s={m.sintesis} />
+          </div>
           <div className="inf-blk">
             <div className="inf-blk__lab">
               <Tag auto />
@@ -730,7 +806,18 @@ function CuerpoSeccion({
               <Tag />
               <span className="inf-src">Comentario de media página (mínimo 10 palabras)</span>
             </div>
-            {texto("Comentario de la matriz", { minimo: 10, placeholder: "¿Qué explica los semáforos amarillos y rojos?" })}
+            {texto("Comentario de la matriz", {
+              minimo: 10,
+              placeholder: "¿Qué explica los semáforos amarillos y rojos?",
+              analisis: () =>
+                pedidoDeCifras(
+                  def.titulo,
+                  m.citables.filter((x) => x.clave.startsWith("sint_")),
+                  m.sintesis.criterios.map((g) =>
+                    g.conteo.rezagada ? `En «${g.nombre}» hay indicadores rezagados frente a su meta` : g.conteo.parcial ? `En «${g.nombre}» hay indicadores con cumplimiento parcial` : `En «${g.nombre}» los indicadores con meta la cumplen o superan`,
+                  ),
+                ),
+            })}
           </div>
         </>
       );
@@ -741,6 +828,14 @@ function CuerpoSeccion({
             <Tag />
             <span className="inf-src">Una fila por punto. Se recomienda con acción y fecha.</span>
           </div>
+          <ImportarFilas
+            columnas={def.columnas ?? []}
+            filas={c.filas ?? []}
+            editable={editable}
+            archivo={def.columnas?.[0] === "Dimensión" ? "puntos-criticos" : "retos-oportunidades"}
+            dimensiones={def.columnas?.[0] === "Dimensión" ? Object.values(DIMS).map((d) => d.titulo) : undefined}
+            cambiar={(filas) => cambiar({ ...c, filas })}
+          />
           <TablaFilas columnas={def.columnas ?? []} filas={c.filas ?? []} editable={editable} cambiar={(filas) => cambiar({ ...c, filas })} />
         </div>
       );

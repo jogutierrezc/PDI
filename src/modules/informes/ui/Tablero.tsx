@@ -13,6 +13,9 @@ import { DIMS, LETRAS, PLANTILLAS, cifraDef, dimsDe, escribeInforme, plantillaSu
 import type { CicloRow, Condicion, ConfigCiclo, EstadoCiclo, Plantilla, RequisitoRow } from "../types";
 import { Aviso, Barra, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { configDe } from "./modelo";
+import { CriteriosAdmin } from "./CriteriosAdmin";
+import { RequisitosConfig } from "./RequisitosConfig";
+import { copiarDeCiclo } from "../requeridos";
 
 const BASE = "/admin/informes-gestion";
 const CONDICIONES: { id: Condicion; texto: string }[] = [
@@ -43,9 +46,13 @@ function TableroGestion({ ciclo, ciclos, requisitos, elegirAnio }: PropsTablero)
       <FichaCiclo key={ciclo?.id ?? "nuevo"} ciclo={ciclo} ciclos={ciclos} elegirAnio={elegirAnio} />
       {ciclo && (
         <div className="inf-two">
-          <Requisitos ciclo={ciclo} requisitos={requisitos} />
+          <div className="inf-stack">
+            <RequisitosConfig ciclo={ciclo} requisitos={requisitos} />
+            <Requisitos ciclo={ciclo} requisitos={requisitos} />
+          </div>
           <div className="inf-stack">
             <DatosLibres ciclo={ciclo} />
+            <CriteriosAdmin ciclo={ciclo} />
             <Entrega ciclo={ciclo} />
           </div>
         </div>
@@ -148,7 +155,7 @@ function FichaCiclo({ ciclo, ciclos, elegirAnio }: { ciclo: CicloRow | null; cic
               setF({ anio, nombre: `Informe de gestión ${anio}`, fecha_limite: "", corte: "", estado: "preparacion" });
               guardar.mutate(
                 { anio, nombre: `Informe de gestión ${anio}`, fecha_limite: null, corte: null, estado: "preparacion", config: configDe(ciclo) },
-                { onSuccess: (c) => elegirAnio(c.anio) },
+                { onSuccess: (c) => void copiarDeCiclo(ciclo.id, c.id).finally(() => elegirAnio(c.anio)) },
               );
             }}
             disabled={guardar.isPending}

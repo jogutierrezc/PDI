@@ -6,6 +6,8 @@
    ========================================================================== */
 
 export type { RolActor } from "../rankings/reporte/tipos";
+import type { PlanLocal } from "./plan-importar";
+import type { CriterioPropio, IndicadorManual } from "./indicadores-manual";
 
 export type Plantilla = "A" | "B" | "C" | "D";
 export type TipoSeccion = "narr" | "pdi" | "metas" | "dim" | "matriz" | "filas" | "logros" | "evid" | "anexos";
@@ -142,6 +144,12 @@ export interface ContenidoSeccion {
   borrador_pilo?: string | null;
   /** Tablas y gráficas de UDrive de esta sección. */
   drive?: ElementoDrive[];
+  /** Objetivos y metas: plan propio (importado de JSON o PDF, o escrito a mano). Manda sobre la sincronización. */
+  plan?: PlanLocal;
+  /** Resultados por dimensión: indicadores que escribe la unidad (actual, anterior y meta). */
+  indicadores?: IndicadorManual[];
+  /** Criterios que la unidad creó para su propio informe (además de los base y los aprobados). */
+  criterios_propios?: CriterioPropio[];
 }
 
 export interface SeccionRow {

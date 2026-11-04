@@ -23,10 +23,17 @@ export interface ContextoSeccion {
   metasPrograma?: number;
   /** Acciones del Plan de Trabajo de la facultad (API del plan). */
   metasPlan?: number;
+  /** Indicadores de resultados por dimensión escritos a mano (total y con nombre y cifra actual). */
+  manuales?: { total: number; completos: number };
+  /** Datos que Planeación pide a esta plantilla (0253): cuántos se piden y cuántos «Justificar» aún faltan por llenar. */
+  requeridos?: { total: number; faltan: number };
 }
 
 /** Cifras que Planeación pide justificar y aún no tienen la línea. */
 export const sinJustificar = (cifras: CifraVista[]) => cifras.filter((c) => c.condicion === "justificar" && !c.justificacion.trim());
+
+/** Una cifra pedida sin indicador conectado (o escrito) no tiene qué justificar. */
+const pedidasDe = (cifras: CifraVista[]) => cifras.filter((c) => c.condicion === "justificar" && (c.valor !== null || c.propia));
 
 export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | undefined, ctx: ContextoSeccion): Avance {
   const x = c ?? {};
@@ -46,10 +53,11 @@ export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | unde
       return grado(n, n > 0 && m.every((f) => f.meta.trim() && f.alcanzado !== null));
     }
     case "dim": {
-      const pedidas = ctx.cifras.filter((v) => v.condicion === "justificar");
-      if (!pedidas.length) return 2;
-      const hechas = pedidas.length - sinJustificar(ctx.cifras).length;
-      return grado(hechas, hechas === pedidas.length);
+      const pedidas = pedidasDe(ctx.cifras);
+      const hechas = pedidas.length - sinJustificar(pedidas).length;
+      const man = ctx.manuales ?? { total: 0, completos: 0 };
+      const req = ctx.requeridos ?? { total: 0, faltan: 0 };
+      return grado(hechas + man.total + (req.total - req.faltan), hechas === pedidas.length && man.completos === man.total && req.faltan === 0);
     }
     case "matriz": {
       const n = palabras(x.texto);
@@ -75,7 +83,20 @@ export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | u
   const x = c ?? {};
   const out: Control[] = [];
   if (def.tipo === "dim") {
-    const n = sinJustificar(ctx.cifras).length;
+    const man = ctx.manuales ?? { total: 0, completos: 0 };
+    if (man.total) {
+      const falta = man.total - man.completos;
+      out.push(falta ? { nivel: "warn", texto: `${falta} ${falta === 1 ? "indicador sin nombre o sin cifra actual" : "indicadores sin nombre o sin cifra actual"}` } : { nivel: "ok", texto: `${man.total} ${man.total === 1 ? "indicador escrito" : "indicadores escritos"} con su estado calculado` });
+    }
+    const req = ctx.requeridos;
+    if (req && req.total) {
+      out.push(
+        req.faltan
+          ? { nivel: "warn", texto: `${req.faltan} ${req.faltan === 1 ? "dato que pide" : "datos que pide"} Planeación sin cifra actual, meta o justificación` }
+          : { nivel: "ok", texto: `Los ${req.total} datos que pide Planeación están respondidos` },
+      );
+    }
+    const n = sinJustificar(pedidasDe(ctx.cifras)).length;
     out.push(n ? { nivel: "warn", texto: `${n} ${n === 1 ? "cifra que pide" : "cifras que pide"} Planeación aún sin justificación` } : { nivel: "ok", texto: "Todas las cifras pedidas están justificadas" });
     const sinFuente = [...ctx.cifras, ...ctx.propias].filter((v) => v.propia && !v.fuente.trim()).length;
     if (ctx.exigirFuente || sinFuente) {

@@ -33,8 +33,8 @@ const sinMarcadores = (t: string) => String(t ?? "").replace(MARCADOR_RE, " ");
 
 /* ---------- Quién puede ---------------------------------------------------- */
 
-export type Accion = "estado" | "redactar" | "mejorar" | "aprender" | "ingerir" | "corpus";
-export const ACCIONES: Accion[] = ["estado", "redactar", "mejorar", "aprender", "ingerir", "corpus"];
+export type Accion = "estado" | "redactar" | "analizar" | "mejorar" | "aprender" | "ingerir" | "corpus";
+export const ACCIONES: Accion[] = ["estado", "redactar", "analizar", "mejorar", "aprender", "ingerir", "corpus"];
 
 /**
  * Quien gestiona los informes (informe_gestiona(), 0192: la administración, o
@@ -54,7 +54,7 @@ export function puedeUsar(
   if (accion === "aprender" || accion === "ingerir" || accion === "corpus" || accion === "estado") return false;
   if (!p.pantalla) return false;
   const diligencia = (r: string | null | undefined) => r === "jefe" || r === "editor";
-  if (accion === "redactar") return diligencia(p.rolEnUnidad);
+  if (accion === "redactar" || accion === "analizar") return diligencia(p.rolEnUnidad);
   return p.rolesUnidad.some(diligencia);
 }
 
@@ -334,6 +334,51 @@ export function mensajesReintento(mensajes: Mensaje[], crudo: string, error: str
     ...mensajes,
     { role: "assistant", content: String(crudo ?? "").slice(0, 6000) },
     { role: "user", content: `Tu respuesta no pasó la verificación: ${error} Corrígela. Recuerda: ninguna cifra fuera de los tokens [[clave]] y nada que no esté en los datos. Responde solo el JSON.` },
+  ];
+}
+
+/* ---------- Análisis de la unidad (cualquier espacio de texto) -------------------- */
+
+export interface PedidoAnalisis {
+  unidad: string;
+  plantilla: string;
+  anio: number;
+  /** Qué se analiza: «Análisis de Gestión académica», «Acción: …», «Contribución a los pilares». */
+  tema: string;
+  /** Datos que el texto puede citar, con su tendencia en palabras (nunca el valor). */
+  cifras: { clave: string; etiqueta: string; fuente: string; tendencia: string[] }[];
+  /** Hechos sin cifras que la unidad ya reportó (estado, responsable, actividades…). */
+  hechos: string[];
+  largo: Extension;
+  actual?: string;
+  instruccion?: string;
+}
+
+export function mensajesAnalizar(p: PedidoAnalisis): Mensaje[] {
+  const { parrafos, palabras: w, texto: ext } = p.largo;
+  const system = [
+    "Eres Mr. Pilo, la IA de la Universidad de Santander (UDES). Ayudas a una unidad a redactar el análisis de un apartado de su informe de gestión anual. La persona que elabora el informe revisará y editará lo que escribas. Escribes en español institucional, claro y sobrio, en tercera persona, sin adornos, sin relleno y sin superlativos.",
+    "Reglas que no se rompen:",
+    `1. NUNCA escribes una cifra: ni con dígitos ni con palabras. Cada cifra va como token [[clave]], copiado tal cual de la lista. Solo puedes escribir los años ${p.anio - 1}, ${p.anio} y ${p.anio + 1}.`,
+    "2. Usa solo lo que aparece en los datos de abajo. No inventas hechos, premios, convenios, acreditaciones ni causas; lo que falte (causas, contexto, ejemplos) lo dejas con el marcador exacto [La unidad debe completar: lo que falta].",
+    `3. Extensión: ${ext}; entre ${parrafos[0]} y ${parrafos[1]} párrafos separados por una línea en blanco, unas ${w[0]} a ${w[1]} palabras.`,
+    "4. Sin títulos, viñetas, markdown ni otros corchetes.",
+    'Responde solo un JSON: {"texto": "…"}',
+  ].join("\n");
+  const linea = (c: PedidoAnalisis["cifras"][number]) =>
+    `[[${c.clave}]] — ${ocultarCifras(c.etiqueta)}${c.fuente ? ` (fuente: ${ocultarCifras(c.fuente)})` : ""}${c.tendencia.length ? ` · ${c.tendencia.join("; ")}` : ""}`;
+  const partes = [
+    `Unidad: ${p.unidad} (plantilla ${p.plantilla}, informe ${p.anio}).`,
+    `Apartado: ${p.tema}.`,
+    p.cifras.length ? `Cifras citables (usa solo estos tokens):\n${p.cifras.map(linea).join("\n")}` : "No hay cifras citables: no escribas ninguna cifra.",
+  ];
+  if (p.hechos.length) partes.push(`Lo que la unidad ya reportó:\n${p.hechos.map((h) => `· ${ocultarCifras(h)}`).join("\n")}`);
+  if (p.actual?.trim()) partes.push(`Lo que la persona ya escribió (respeta sus hechos y mejóralo):\n«${ocultarCifras(p.actual).slice(0, 3000)}»`);
+  if (p.instruccion?.trim()) partes.push(`Pedido de la persona: ${ocultarCifras(p.instruccion).slice(0, 600)}`);
+  partes.push("Escribe el análisis.");
+  return [
+    { role: "system", content: system },
+    { role: "user", content: partes.join("\n\n") },
   ];
 }
 

@@ -17,6 +17,7 @@ import { Aviso, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comun
 import { TablaMetasPrograma } from "./MetasPrograma";
 import { useModeloInforme } from "./modelo";
 import type { ModeloInforme } from "./modelo";
+import { PanelSintesis } from "./Sintesis";
 import { LecturaTexto, resolverDe } from "./Texto";
 import { ElementosDriveLectura } from "./ElementosDrive";
 
@@ -117,7 +118,7 @@ function Detalle({ inst, ciclo, requisitos, unidad, esFacultad }: { inst: Instan
   if (m.error) return <Aviso error={m.error} />;
   if (m.cargando) return <Cargando texto="Cargando el informe…" />;
 
-  const resolver = resolverDe(m.incluidas);
+  const resolver = resolverDe(m.citables);
   const decidir = (a: Extract<EstadoInstancia, "ok" | "back">) => {
     const nota = a === "back" ? componerNota(general, m.plantilla.secciones.map((s) => ({ clave: s.clave, titulo: s.titulo, nota: notas[s.clave] ?? "" }))) : "";
     revisar.mutate(
@@ -278,6 +279,7 @@ function LecturaBase({ def, c, m, pilares, resolver }: { def: SeccionDef; c: Con
     case "matriz":
       return (
         <>
+          <PanelSintesis s={m.sintesis} />
           <Matriz cifras={m.incluidas} />
           {texto}
         </>

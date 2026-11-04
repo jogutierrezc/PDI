@@ -598,6 +598,19 @@ export interface RedaccionPilo {
 export const piloRedactar = (instancia_id: string, seccion_clave: string, instruccion?: string) =>
   pilo<RedaccionPilo>({ action: "redactar", instancia_id, seccion_clave, ...(instruccion?.trim() ? { instruccion: instruccion.trim() } : {}) });
 
+/** Lo que Pilo recibe para analizar un apartado: tendencias y hechos, nunca los valores. */
+export interface PedidoAnalisisPilo {
+  tema: string;
+  cifras: { clave: string; etiqueta: string; fuente: string; tendencia: string[] }[];
+  hechos: string[];
+  largo?: "corto" | "medio";
+  actual?: string;
+  instruccion?: string;
+}
+
+export const piloAnalizar = (instancia_id: string, seccion_clave: string, p: PedidoAnalisisPilo) =>
+  pilo<RedaccionPilo>({ action: "analizar", instancia_id, seccion_clave, ...p });
+
 export const piloAprender = (instancia_id: string) => pilo<Record<string, unknown>>({ action: "aprender", instancia_id });
 
 export interface ArchivoParaPilo {

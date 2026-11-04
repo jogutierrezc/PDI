@@ -30,7 +30,7 @@ import type {
 
 /* ---------- Secciones ------------------------------------------------------ */
 
-export type SeccionId = "resumen" | "cifras" | "tablas" | "contactos" | "relaciones" | "plantillas" | "periodos" | "accesos";
+export type SeccionId = "resumen" | "cifras" | "tablas" | "contactos" | "relaciones" | "convenios" | "plantillas" | "periodos" | "accesos";
 
 export interface Seccion {
   id: SeccionId;
@@ -49,6 +49,7 @@ export const SECCIONES: readonly Seccion[] = [
   { id: "tablas", rotulo: "Tablas", titulo: "Tablas del repositorio", descripcion: "Las hojas de captura de cada campus, su envío y su validación" },
   { id: "contactos", rotulo: "Contactos", titulo: "Contactos de personas invitadas", descripcion: "Enlaces de invitación, quién aportó y la exportación con las plantillas de Rua", crea: true },
   { id: "relaciones", rotulo: "Relaciones", titulo: "Relaciones", descripcion: "Directorio único de contactos, plantillas de correo, envío masivo y validación de correos", crea: true },
+  { id: "convenios", rotulo: "Convenios", titulo: "Convenios", descripcion: "Registro de convenios con su tablero, vencimientos, ruta de firma e importación del Excel institucional" },
   { id: "plantillas", rotulo: "Plantillas", titulo: "Plantillas y cobertura", descripcion: "Qué responde el repositorio de SNIES, CNA y rankings" },
   { id: "periodos", rotulo: "Periodos", titulo: "Periodos y ventanas", descripcion: "Cuándo captura cada campus y qué se reabrió" },
   { id: "accesos", rotulo: "Accesos", titulo: "Accesos al módulo", descripcion: "Director, coordinadores de campus y gestores", director: true },

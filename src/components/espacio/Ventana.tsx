@@ -23,6 +23,7 @@ export function Ventana({
   cabecera,
   ancho = "grande",
   etiqueta,
+  clase,
 }: {
   titulo: string;
   onCerrar: () => void;
@@ -31,6 +32,8 @@ export function Ventana({
   cabecera?: ReactNode;
   ancho?: "grande" | "chica";
   etiqueta?: string;
+  /** Clase extra de la caja (p. ej. para un ancho propio). */
+  clase?: string;
 }) {
   const fondo = useRef<HTMLDivElement>(null);
   const caja = useRef<HTMLDivElement>(null);
@@ -73,7 +76,7 @@ export function Ventana({
 
   return (
     <div ref={fondo} className="es-scrim" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
-      <div ref={caja} className={`es-dlg${ancho === "chica" ? " es-dlg--sm" : ""}`} role="dialog" aria-modal="true" aria-label={etiqueta ?? titulo} tabIndex={-1}>
+      <div ref={caja} className={`es-dlg${ancho === "chica" ? " es-dlg--sm" : ""}${clase ? ` ${clase}` : ""}`} role="dialog" aria-modal="true" aria-label={etiqueta ?? titulo} tabIndex={-1}>
         <header>
           <h2>{titulo}</h2>
           {cabecera}

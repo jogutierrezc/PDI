@@ -7,8 +7,9 @@
    cuatro pestañas se desmontan al salir (no hay estado oculto que se pierda).
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FaltaMigracion } from "../datos";
 import { AvisoMigracion, Cargando, ErrorCaja } from "../ui/comunes";
 import type { Ctx } from "../ui/comunes";
@@ -27,15 +28,44 @@ const PESTANAS: { id: Pestana; rotulo: string }[] = [
   { id: "validar", rotulo: "Validar correos" },
 ];
 
+const norma = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toLowerCase().trim();
+
 export function Relaciones({ ctx }: { ctx: Ctx }) {
   const directorio = useDirectorio();
   const plantillas = usePlantillasRel();
   const [pestana, setPestana] = useState<Pestana>("directorio");
   const [seleccion, setSeleccion] = useState<ReadonlySet<string>>(new Set());
   const [plantillaId, setPlantillaId] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [llegada, setLlegada] = useState("");
+  const atendido = useRef(false);
 
   const contactos = useMemo(() => directorio.data ?? [], [directorio.data]);
   const elegidos = useMemo(() => contactos.filter((c) => seleccion.has(c.id)), [contactos, seleccion]);
+
+  // Llegada desde Convenios › Avisar: ?plantilla=<nombre>&institucion=<texto>. Abre Envío masivo con esa
+  // plantilla y los contactos de la institución ya elegidos. No envía nada: el envío sigue siendo manual.
+  useEffect(() => {
+    const nombrePlantilla = params.get("plantilla");
+    if (atendido.current || !nombrePlantilla || !directorio.data || !plantillas.data) return;
+    atendido.current = true;
+    const institucion = params.get("institucion") ?? "";
+    const plantilla = plantillas.data.find((p) => p.nombre === nombrePlantilla);
+    const k = norma(institucion);
+    const coinciden = k.length >= 4 ? directorio.data.filter((c) => { const i = norma(c.institucion); return i.length >= 4 && (i.includes(k) || k.includes(i)); }) : [];
+    if (plantilla) setPlantillaId(plantilla.id);
+    setSeleccion(new Set(coinciden.map((c) => c.id)));
+    setPestana("envio");
+    setLlegada(
+      coinciden.length
+        ? `Se eligieron ${coinciden.length} contactos de ${institucion} para la plantilla «${nombrePlantilla}». Revise la lista antes de enviar.`
+        : `No hay contactos de ${institucion} en el Directorio. Agréguelos en la pestaña Directorio o elija a quién enviar.${plantilla ? "" : ` La plantilla «${nombrePlantilla}» no existe: aplique la migración 0255.`}`,
+    );
+    const p = new URLSearchParams(params);
+    p.delete("plantilla");
+    p.delete("institucion");
+    setParams(p, { replace: true });
+  }, [params, setParams, directorio.data, plantillas.data]);
 
   const alTeclear = (e: KeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -60,6 +90,11 @@ export function Relaciones({ ctx }: { ctx: Ctx }) {
           </button>
         ))}
       </div>
+      {llegada ? (
+        <p className="rel-nota-caja" role="status">
+          {llegada}
+        </p>
+      ) : null}
       <section id="rel-panel" role="tabpanel" aria-labelledby={`rel-t-${pestana}`} className="rel-panel">
         {pestana === "directorio" ? (
           <Directorio ctx={ctx} contactos={contactos} seleccion={seleccion} onSeleccion={setSeleccion} onIr={setPestana} />

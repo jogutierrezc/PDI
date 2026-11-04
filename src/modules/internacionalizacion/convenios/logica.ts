@@ -41,7 +41,7 @@ export const TIPOS_RENOVACION = ["Prórroga", "Renovación automática", "Nuevo 
 
 export type Tipo = (typeof TIPOS)[number];
 export type Naturaleza = "Internacional" | "Nacional";
-export type EstadoCarpeta = "enlace" | "udrive_solicitada" | "sin";
+export type EstadoCarpeta = "udrive" | "enlace" | "sin";
 
 /** Una fila de conv_convenios. */
 export interface Convenio {
@@ -66,7 +66,8 @@ export interface Convenio {
   observaciones: string;
   carpeta_estado: EstadoCarpeta;
   carpeta_url: string | null;
-  carpeta_solicitada_en: string | null;
+  /** Carpeta del convenio en la unidad «Internacionalización» de UDrive (estado «udrive»). */
+  drive_carpeta_id: string | null;
   pasos: number;
   pasos_fechas: (string | null)[];
   cerrado: boolean;
@@ -78,7 +79,7 @@ export interface Convenio {
 }
 
 /** Lo que se escribe al crear o importar (el resto lo pone la base). */
-export type ConvenioNuevo = Omit<Convenio, "id" | "created_by" | "created_at" | "carpeta_solicitada_en" | "cerrado" | "cerrado_en"> & { carpeta_solicitada_en?: string | null };
+export type ConvenioNuevo = Omit<Convenio, "id" | "created_by" | "created_at" | "drive_carpeta_id" | "cerrado" | "cerrado_en">;
 
 /* ---------- Vigencia y etapa ---------------------------------------------- */
 
@@ -378,13 +379,24 @@ function normCampus(raw: string): string {
   return t;
 }
 
-/** «AAAA-MM-DD» o «DD/MM/AAAA»; si no se entiende, nulo. */
+/** Fecha de calendario real y en un rango razonable (rechaza «29/02/2027» y años como 3031). */
+function fechaReal(a: number, m: number, d: number): string | null {
+  if (a < 1990 || a > 2100 || m < 1 || m > 12 || d < 1) return null;
+  if (d > new Date(Date.UTC(a, m, 0)).getUTCDate()) return null;
+  return `${a}-${pad2(m)}-${pad2(d)}`;
+}
+
+/** «AAAA-MM-DD» o «DD/MM/AAAA» (también «MM/DD/AAAA» cuando el primer número no puede ser mes); si no se entiende o no existe, nulo. */
 function leerFecha(s: string): string | null {
   const t = s.trim();
   let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (m) return fechaReal(Number(m[1]), Number(m[2]), Number(m[3]));
   m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(t);
-  if (m) return `${m[3]}-${pad2(Number(m[2]))}-${pad2(Number(m[1]))}`;
+  if (m) {
+    const p = Number(m[1]), q = Number(m[2]), a = Number(m[3]);
+    // Colombia escribe día/mes; si el segundo número no cabe como mes pero el primero sí, viene en mes/día.
+    return q > 12 && p <= 12 ? fechaReal(a, p, q) : fechaReal(a, q, p);
+  }
   return null;
 }
 

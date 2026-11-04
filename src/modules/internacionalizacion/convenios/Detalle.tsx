@@ -10,10 +10,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { useNombres } from "../datos";
 import { Pildora, useAviso } from "./comunes";
-import { useActualizarConvenio, useHistorialConvenio } from "./datos";
+import { abrirArchivoSubido, useActualizarConvenio, useArchivosConvenio, useCrearCarpetaUdrive, useHistorialConvenio } from "./datos";
 import type { CambiosConvenio, AnotacionHistorial } from "./datos";
 import { diasFaltantes, ENLACE_VALIDO, ESPACIOS_DOCUMENTOS, etapaDe, fechaLarga, PASOS, proximoPaso, terminaTexto, TIPOS_RENOVACION, vigenciaDe } from "./logica";
 import type { Convenio } from "./logica";
@@ -26,14 +27,14 @@ const PESTANAS: { id: Pestana; rotulo: string }[] = [
   { id: "hist", rotulo: "Historial" },
 ];
 
-const CARPETA_TEXTO = { enlace: "Con enlace", udrive_solicitada: "Creación solicitada", sin: "Sin carpeta" } as const;
+const CARPETA_TEXTO = { udrive: "En UDrive", enlace: "Con enlace", sin: "Sin carpeta" } as const;
 
-export function Detalle({ c, hoy, crea, abrirRenovacion, onVolver, onAvisar }: { c: Convenio; hoy: string; crea: boolean; abrirRenovacion: boolean; onVolver: () => void; onAvisar: (c: Convenio) => void }) {
+export function Detalle({ c, hoy, crea, abrirRenovacion, avisoInicial = "", onVolver, onAvisar }: { c: Convenio; hoy: string; crea: boolean; abrirRenovacion: boolean; avisoInicial?: string; onVolver: () => void; onAvisar: (c: Convenio) => void }) {
   const [pestana, setPestana] = useState<Pestana>("resumen");
   const [renovando, setRenovando] = useState(abrirRenovacion);
   const [confirmando, setConfirmando] = useState(false);
   const [aviso, decir] = useAviso();
-  const [error, setError] = useState("");
+  const [error, setError] = useState(avisoInicial);
   const actualizar = useActualizarConvenio();
   const volver = useRef<HTMLButtonElement>(null);
 
@@ -301,12 +302,18 @@ function Resumen({
 
 /* ---------- Documentos ------------------------------------------------------- */
 
+const tamanoLegible = (n: number | null) => (n == null ? "" : n >= 1048576 ? `${(n / 1048576).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
 function Documentos({ c, crea, ocupado, aplicar }: { c: Convenio; crea: boolean; ocupado: boolean; aplicar: Aplicar }) {
   const [editando, setEditando] = useState(false);
   const [enlace, setEnlace] = useState("");
   const [falta, setFalta] = useState("");
+  const [fallo, setFallo] = useState("");
+  const crear = useCrearCarpetaUdrive();
+  const enUdrive = c.carpeta_estado === "udrive" && Boolean(c.drive_carpeta_id);
   const conEnlace = c.carpeta_estado === "enlace" && Boolean(c.carpeta_url) && ENLACE_VALIDO.test(c.carpeta_url ?? "");
-  const pedir = !conEnlace || editando;
+  const archivos = useArchivosConvenio(enUdrive ? c.drive_carpeta_id : null);
+  const rutaCarpeta = enUdrive ? `/admin/udrive?c=${c.drive_carpeta_id}` : "";
 
   const guardar = () => {
     const l = enlace.trim();
@@ -316,15 +323,29 @@ function Documentos({ c, crea, ocupado, aplicar }: { c: Convenio; crea: boolean;
     setEnlace("");
     aplicar({ carpeta_estado: "enlace", carpeta_url: l }, [{ texto: conEnlace ? "Se cambió el enlace de la carpeta digital." : "Se registró el enlace de la carpeta digital." }], "Enlace guardado.");
   };
-  const ruta = `Convenios_redes / ${c.naturaleza === "Nacional" ? "Convenios_nacionales" : "Convenios_internacionales"} / ${c.pais}`;
+  const crearEnUdrive = () => {
+    setFallo("");
+    crear.mutate(c.id, { onError: (e) => setFallo(e.message) });
+  };
+  const ruta = `Internacionalización › Convenios › ${c.pais} › ${c.codigo} · ${c.institucion}`;
 
   return (
     <>
       <section className="conv-panel conv-bloque">
         <h2>Carpeta digital</h2>
-        {conEnlace && !editando ? (
+        {enUdrive ? (
           <>
-            <p className="conv-sub">Los documentos de este convenio viven en esta carpeta.</p>
+            <p className="conv-sub">Los documentos viven en UDrive: {ruta}.</p>
+            <div className="conv-acciones">
+              <Link className="conv-btn conv-btn--pri" to={rutaCarpeta}>
+                <Icon name="folder" size={16} />
+                Abrir carpeta en UDrive
+              </Link>
+            </div>
+          </>
+        ) : conEnlace && !editando ? (
+          <>
+            <p className="conv-sub">Los documentos de este convenio viven en esta carpeta externa.</p>
             <div className="conv-acciones">
               <a className="conv-btn conv-btn--pri" href={c.carpeta_url as string} target="_blank" rel="noopener noreferrer">
                 <Icon name="folder" size={16} />
@@ -339,18 +360,19 @@ function Documentos({ c, crea, ocupado, aplicar }: { c: Convenio; crea: boolean;
           </>
         ) : (
           <>
-            {c.carpeta_estado === "udrive_solicitada" ? (
-              <p>
-                <span className="conv-pill conv-pill--warn">Solicitud registrada</span> Creación pedida en UDrive{c.carpeta_solicitada_en ? ` el ${fechaLarga(c.carpeta_solicitada_en)}` : ""}. Cuando esté lista, pegue aquí el enlace.
-              </p>
-            ) : (
-              <p className="conv-sub">{editando ? "Pegue el enlace nuevo de la carpeta." : "Este convenio no tiene carpeta. Sin carpeta no se pueden guardar documentos."}</p>
-            )}
+            <p className="conv-sub">{editando ? "Pegue el enlace nuevo de la carpeta." : "Este convenio no tiene carpeta. Sin carpeta no se pueden guardar documentos."}</p>
             {crea ? (
               <>
+                <div className="conv-acciones">
+                  <button type="button" className="conv-btn conv-btn--pri" disabled={ocupado || crear.isPending} onClick={crearEnUdrive}>
+                    <Icon name="folder" size={16} />
+                    {crear.isPending ? "Creando…" : "Crear en UDrive"}
+                  </button>
+                  <span className="conv-sub">Se crea en {ruta}</span>
+                </div>
                 <div className="conv-enlace-fila">
-                  <input type="text" value={enlace} placeholder="https://…" aria-label="Enlace de la carpeta" onChange={(e) => setEnlace(e.target.value)} />
-                  <button type="button" className="conv-btn conv-btn--pri" disabled={ocupado} onClick={guardar}>
+                  <input type="text" value={enlace} placeholder="O pegue el enlace de una carpeta existente: https://…" aria-label="Enlace de la carpeta" onChange={(e) => setEnlace(e.target.value)} />
+                  <button type="button" className="conv-btn" disabled={ocupado} onClick={guardar}>
                     Guardar enlace
                   </button>
                   {editando ? (
@@ -359,24 +381,10 @@ function Documentos({ c, crea, ocupado, aplicar }: { c: Convenio; crea: boolean;
                     </button>
                   ) : null}
                 </div>
-                {falta ? (
+                {falta || fallo ? (
                   <p className="conv-error" role="alert">
-                    {falta}
+                    {falta || fallo}
                   </p>
-                ) : null}
-                {c.carpeta_estado === "sin" ? (
-                  <div className="conv-acciones">
-                    <button
-                      type="button"
-                      className="conv-btn"
-                      disabled={ocupado}
-                      onClick={() => aplicar({ carpeta_estado: "udrive_solicitada", carpeta_solicitada_en: new Date().toISOString() }, [{ texto: "Se solicitó crear la carpeta en UDrive." }], "Solicitud registrada.")}
-                    >
-                      <Icon name="folder" size={16} />
-                      Crear en UDrive
-                    </button>
-                    <span className="conv-sub">Se crea en {ruta}</span>
-                  </div>
                 ) : null}
               </>
             ) : null}
@@ -387,16 +395,64 @@ function Documentos({ c, crea, ocupado, aplicar }: { c: Convenio; crea: boolean;
       <section className="conv-panel conv-docs">
         <div className="conv-bar">
           <h2>Documentos del convenio</h2>
-          <span className="conv-sub">La carga de archivos llega en la etapa de gestión.</span>
+          <span className="conv-sub">{enUdrive ? "La carga se hace en la carpeta de UDrive." : "Se activan al crear la carpeta en UDrive."}</span>
         </div>
-        <ul>
+        {enUdrive ? (
+          <>
+            {archivos.isPending ? (
+              <p className="conv-sub conv-docs-nota" role="status">
+                Leyendo la carpeta…
+              </p>
+            ) : archivos.error ? (
+              <p className="conv-error conv-docs-nota" role="alert">
+                {archivos.error.message}
+              </p>
+            ) : !archivos.data?.length ? (
+              <p className="conv-sub conv-docs-nota">La carpeta todavía no tiene archivos.</p>
+            ) : (
+              <ul>
+                {archivos.data.map((a) => (
+                  <li key={a.id}>
+                    <span className="conv-corto" title={a.nombre}>
+                      {a.nombre}
+                    </span>
+                    <span className="conv-sub">
+                      {tamanoLegible(a.tamano) || a.tipo} · {fechaLarga(a.updated_at)}
+                    </span>
+                    {a.tipo === "archivo" && a.ruta_storage ? (
+                      <button type="button" className="conv-btn conv-btn--sm" onClick={() => void abrirArchivoSubido(a.ruta_storage as string).catch((e: Error) => setFallo(e.message))}>
+                        Abrir
+                      </button>
+                    ) : (
+                      <Link className="conv-btn conv-btn--sm" to={`/admin/udrive/${a.tipo}/${a.id}`}>
+                        Abrir
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {fallo ? (
+              <p className="conv-error conv-docs-nota" role="alert">
+                {fallo}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+        <ul className="conv-espacios">
           {ESPACIOS_DOCUMENTOS.map((n) => (
             <li key={n}>
               <span>{n}</span>
-              <span className="conv-sub">Sin cargar</span>
-              <button type="button" className="conv-btn conv-btn--sm" disabled>
-                Cargar
-              </button>
+              <span className="conv-sub">Espacio</span>
+              {enUdrive && crea ? (
+                <Link className="conv-btn conv-btn--sm" to={rutaCarpeta}>
+                  Cargar
+                </Link>
+              ) : (
+                <button type="button" className="conv-btn conv-btn--sm" disabled>
+                  Cargar
+                </button>
+              )}
             </li>
           ))}
         </ul>

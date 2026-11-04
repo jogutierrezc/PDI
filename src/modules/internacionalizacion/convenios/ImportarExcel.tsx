@@ -9,6 +9,7 @@ import { useMemo, useRef, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { textoDeCelda } from "../contactos/archivos";
 import { useImportarConvenios } from "./datos";
+import type { ResultadoImportacion } from "./datos";
 import { ErrorLectura, leerConvenios } from "./logica";
 import type { Convenio, InformeLectura } from "./logica";
 
@@ -50,7 +51,9 @@ export function ImportarExcel({ convenios, onVerRevision, onHecho }: { convenios
   const [nombre, setNombre] = useState("");
   const [informe, setInforme] = useState<InformeLectura | null>(null);
   const [avance, setAvance] = useState(0);
-  const [resultado, setResultado] = useState<{ nuevos: number; yaEstaban: number } | null>(null);
+  const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
+  const [conCarpetas, setConCarpetas] = useState(false);
+  const [avanceCarpetas, setAvanceCarpetas] = useState<[number, number] | null>(null);
   const importar = useImportarConvenios();
 
   const existentes = useMemo(() => new Set(convenios.map((c) => c.codigo)), [convenios]);
@@ -78,7 +81,7 @@ export function ImportarExcel({ convenios, onVerRevision, onHecho }: { convenios
     if (!informe) return;
     setError("");
     importar.mutate(
-      { filas: informe.filas, alAvanzar: setAvance },
+      { filas: informe.filas, crearCarpetas: conCarpetas, alAvanzar: setAvance, alAvanzarCarpetas: (a, b) => setAvanceCarpetas([a, b]) },
       {
         onSuccess: (r) => {
           setResultado(r);
@@ -172,11 +175,18 @@ export function ImportarExcel({ convenios, onVerRevision, onHecho }: { convenios
               </p>
             ) : null}
 
+            {!resultado ? (
+              <label className="conv-radio" htmlFor="conv-carpetas">
+                <input id="conv-carpetas" type="checkbox" checked={conCarpetas} disabled={importar.isPending} onChange={(e) => setConCarpetas(e.target.checked)} />
+                Crear carpetas en UDrive para los convenios nuevos que no traen enlace ({nuevos.filter((f) => !f.carpeta_url).length}). Genera cientos de carpetas y tarda; se hace por tandas.
+              </label>
+            ) : null}
             <div className="conv-acciones">
               {resultado ? (
                 <>
                   <p className="conv-ok" role="status">
                     Listo: {resultado.nuevos} convenios nuevos{resultado.yaEstaban ? `; ${resultado.yaEstaban} ya estaban y no se tocaron` : ""}.
+                    {resultado.carpetas ? ` Carpetas en UDrive: ${resultado.carpetas.creadas} creadas${resultado.carpetas.fallidas ? `, ${resultado.carpetas.fallidas} con error (${resultado.carpetas.primerError}). Las que faltan se crean desde el detalle de cada convenio.` : "."}` : ""}
                   </p>
                   <button type="button" className="conv-btn" onClick={onVerRevision}>
                     Ver los que necesitan revisión
@@ -185,7 +195,7 @@ export function ImportarExcel({ convenios, onVerRevision, onHecho }: { convenios
               ) : (
                 <button type="button" className="conv-btn conv-btn--pri" disabled={importar.isPending || !nuevos.length} onClick={hacer}>
                   <Icon name="upload" size={16} />
-                  {importar.isPending ? `Importando… ${avance} de ${informe.filas.length}` : nuevos.length ? `Importar ${nuevos.length} convenios` : "No hay convenios nuevos"}
+                  {importar.isPending ? (avanceCarpetas ? `Creando carpetas… ${avanceCarpetas[0]} de ${avanceCarpetas[1]}` : `Importando… ${avance} de ${informe.filas.length}`) : nuevos.length ? `Importar ${nuevos.length} convenios` : "No hay convenios nuevos"}
                 </button>
               )}
             </div>

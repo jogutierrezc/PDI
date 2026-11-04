@@ -35,6 +35,7 @@ export function Convenios({ ctx }: { ctx: Ctx }) {
   const [pestana, setPestana] = useState<Pestana>("tablero");
   const [filtros, setFiltros] = useState<Filtros>(SIN_FILTROS);
   const [nuevo, setNuevo] = useState(false);
+  const [avisoDetalle, setAvisoDetalle] = useState("");
   const animado = useRef(false);
 
   const crea = ctx.director || ctx.planeacion || puedeCrear(ctx.yo);
@@ -134,15 +135,16 @@ export function Convenios({ ctx }: { ctx: Ctx }) {
           ctx={ctx}
           convenios={convenios}
           onCerrar={() => setNuevo(false)}
-          onCreado={(id) => {
+          onCreado={(id, _cod, errorCarpeta) => {
             setNuevo(false);
+            setAvisoDetalle(errorCarpeta ? `El convenio se creó, pero no se pudo crear la carpeta en UDrive: ${errorCarpeta} Puede intentarlo de nuevo en la pestaña Documentos.` : "");
             setFiltros(SIN_FILTROS);
             abrir(id);
           }}
         />
       ) : null}
 
-      {abierto ? <Detalle key={abierto.id} c={abierto} hoy={hoy} crea={crea} abrirRenovacion={Boolean(estadoNav?.renovar)} onVolver={volver} onAvisar={avisar} /> : null}
+      {abierto ? <Detalle key={abierto.id} c={abierto} hoy={hoy} crea={crea} abrirRenovacion={Boolean(estadoNav?.renovar)} avisoInicial={avisoDetalle} onVolver={volver} onAvisar={avisar} /> : null}
     </div>
   );
 }

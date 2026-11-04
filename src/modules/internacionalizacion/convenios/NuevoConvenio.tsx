@@ -14,7 +14,7 @@ import { useCrearConvenio } from "./datos";
 import { CODIGO_VALIDO, DOCUMENTOS, ENLACE_VALIDO, leerPais, MODALIDADES, NOMBRES_PAISES, RENOVACIONES, sugerirCodigo, TIPOS } from "./logica";
 import type { Convenio, ConvenioNuevo, Naturaleza } from "./logica";
 
-export function NuevoConvenio({ ctx, convenios, onCerrar, onCreado }: { ctx: Ctx; convenios: Convenio[]; onCerrar: () => void; onCreado: (id: string, codigo: string) => void }) {
+export function NuevoConvenio({ ctx, convenios, onCerrar, onCreado }: { ctx: Ctx; convenios: Convenio[]; onCerrar: () => void; onCreado: (id: string, codigo: string, errorCarpeta: string | null) => void }) {
   const crear = useCrearConvenio();
   const [codigo, setCodigo] = useState("");
   const [documento, setDocumento] = useState<string>("Convenio");
@@ -29,7 +29,7 @@ export function NuevoConvenio({ ctx, convenios, onCerrar, onCreado }: { ctx: Ctx
   const [termina, setTermina] = useState("");
   const [indefinido, setIndefinido] = useState(false);
   const [objeto, setObjeto] = useState("");
-  const [via, setVia] = useState<"enlace" | "udrive">("enlace");
+  const [via, setVia] = useState<"enlace" | "udrive">("udrive");
   const [enlace, setEnlace] = useState("");
   const [error, setError] = useState("");
 
@@ -75,17 +75,17 @@ export function NuevoConvenio({ ctx, convenios, onCerrar, onCreado }: { ctx: Ctx
       facultad: "",
       programas: "",
       observaciones: "",
-      carpeta_estado: via === "enlace" ? "enlace" : "udrive_solicitada",
+      // «udrive» se marca al crear la carpeta (conv_asegurar_carpeta), justo después de guardar el convenio.
+      carpeta_estado: via === "enlace" ? "enlace" : "sin",
       carpeta_url: via === "enlace" ? enlace.trim() : null,
-      carpeta_solicitada_en: via === "udrive" ? new Date().toISOString() : null,
       pasos: firmado ? 5 : 1,
       pasos_fechas: firmado ? [null, null, null, null, null] : [hoy, null, null, null, null],
       estado_excel: null,
       origen: "manual",
     };
     crear.mutate(
-      { convenio, nota: `Creado en la plataforma.${via === "udrive" ? " Carpeta solicitada en UDrive." : ""}` },
-      { onSuccess: (id) => onCreado(id, cod), onError: (e) => setError(e.message) },
+      { convenio, nota: "Creado en la plataforma.", carpetaUdrive: via === "udrive" },
+      { onSuccess: (r) => onCreado(r.id, cod, r.errorCarpeta), onError: (e) => setError(e.message) },
     );
   };
 
@@ -100,7 +100,7 @@ export function NuevoConvenio({ ctx, convenios, onCerrar, onCreado }: { ctx: Ctx
             Cancelar
           </button>
           <button type="button" className="es-btn es-btn--pri" disabled={crear.isPending} onClick={guardar}>
-            {crear.isPending ? "Creando…" : "Crear convenio"}
+            {crear.isPending ? (via === "udrive" ? "Creando convenio y carpeta…" : "Creando…") : "Crear convenio"}
           </button>
         </>
       }
@@ -212,15 +212,15 @@ export function NuevoConvenio({ ctx, convenios, onCerrar, onCreado }: { ctx: Ctx
         <fieldset className="conv-carpeta">
           <legend>Carpeta digital *</legend>
           <label className="conv-radio">
-            <input type="radio" name="cn-via" checked={via === "enlace"} onChange={() => setVia("enlace")} />
-            Ya tengo el enlace
-          </label>
-          <input type="text" value={enlace} placeholder="https://…" aria-label="Enlace de la carpeta" disabled={via !== "enlace"} onChange={(e) => setEnlace(e.target.value)} />
-          <label className="conv-radio">
             <input type="radio" name="cn-via" checked={via === "udrive"} onChange={() => setVia("udrive")} />
             Crear la carpeta en UDrive
           </label>
-          {via === "udrive" ? <p className="conv-sub">Se registra la solicitud con el código y el nombre de la institución. Cuando la carpeta esté lista, se pega su enlace en el convenio.</p> : null}
+          {via === "udrive" ? <p className="conv-sub">Se crea ahora en Internacionalización › Convenios › {pais || "país"} › {codigo.trim().toLowerCase() || sugerido} · {institucion.trim() || "institución"}.</p> : null}
+          <label className="conv-radio">
+            <input type="radio" name="cn-via" checked={via === "enlace"} onChange={() => setVia("enlace")} />
+            Ya tengo el enlace (convenios con carpeta en SharePoint)
+          </label>
+          <input type="text" value={enlace} placeholder="https://…" aria-label="Enlace de la carpeta" disabled={via !== "enlace"} onChange={(e) => setEnlace(e.target.value)} />
         </fieldset>
         {error ? (
           <p className="conv-error" role="alert">

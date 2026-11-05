@@ -558,6 +558,17 @@ export function Launcher() {
             </span>
             <Icon name="arrow-right" size={16} />
           </Link>
+          {/* Monitor de alertas: mismas reglas que el item del grupo «monitor» en AdminShell. */}
+          {hasRole("consulta") && canSee("monitor") && (
+            <Link to="/admin/monitor-alertas" className="ln__portal" data-tour="launcher-monitor" data-anim>
+              <PiloAvatar mood="piensa" size={48} />
+              <span>
+                <strong>Monitor de alertas</strong>
+                <small>Semáforo NE · ED · RS de cada nivel, con análisis de Pilo.</small>
+              </span>
+              <Icon name="spark-chart" size={16} />
+            </Link>
+          )}
           {pending.length > 0 && (
             <section className="ln__pending" aria-labelledby="ln-pending-title" data-anim>
               <h2 id="ln-pending-title">

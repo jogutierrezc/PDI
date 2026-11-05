@@ -18,7 +18,9 @@
    ========================================================================== */
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
+import { supabase } from "../../../lib/supabase";
 import { AdminRail, AdminRailTab, AdminShell } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { useProfiles } from "../../../data/queries";
@@ -44,6 +46,12 @@ export function UserManagement() {
   const memberships = useMemberships();
   const units = useUnitOptions();
   const [notice, setNotice] = useState("");
+  // Perfiles nuevos de Pilo At Work por revisar (0261): la bandeja vive en /work/admin/roles.
+  const perfilesNuevos = useQuery({
+    queryKey: ["pw-perfiles-pendientes"],
+    staleTime: 60_000,
+    queryFn: async () => (await supabase.from("pw_solicitudes").select("user_id", { count: "exact", head: true }).eq("perfil_completo", true).eq("estado", "pendiente")).count ?? 0,
+  });
 
   return (
     <AdminShell
@@ -61,9 +69,14 @@ export function UserManagement() {
         </AdminRail>
       }
       actions={
+        <>
+        <button className="button-secondary" type="button" onClick={() => navigate("/work/admin/roles")}>
+          Perfiles de Pilo At Work{perfilesNuevos.data ? ` (${perfilesNuevos.data})` : ""}
+        </button>
         <button className="button-primary" type="button" onClick={() => navigate("/admin/usuarios?nueva=1")}>
           <Icon name="plus" size={16} /> Crear usuario
         </button>
+        </>
       }
     >
       {notice && (

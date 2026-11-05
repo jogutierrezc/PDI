@@ -1,6 +1,6 @@
 # Pilo at Work: guía del dueño
 
-Pilo at Work es el agente de IA para las oficinas de la universidad. Vive dentro del portal, en `/work`, como una app de escritorio instalable (su propio manifiesto, su service worker y su alcance, independientes de la app móvil de Pilo en `/app`). Solo entran personas con un **rol asignado**.
+Pilo at Work es el agente de IA para las oficinas de la universidad. Vive dentro del portal, en `/work`, como una app de escritorio instalable (su propio manifiesto, su service worker y su alcance, independientes de la app móvil de Pilo en `/app`). Entran personas con un **rol asignado** y, desde la 0261, **invitados** (cuenta UDES verificada con perfil completo).
 
 ## Qué hay
 
@@ -44,7 +44,7 @@ Quien administra el portal (rol `admin` en la intranet) **es administración de 
 | Coordinación | Como el anterior |
 | Administración | Asigna roles, cura la memoria colectiva, ve el uso (sin contenidos) y «Cómo está construido» |
 
-Quien crea su cuenta y verifica el código queda como «Pide rol» en esa pantalla.
+Quien crea su cuenta, verifica el código y completa su perfil entra como **invitado** y aparece en «Perfiles nuevos de Pilo At Work» (arriba de esa pantalla y desde Usuarios y roles).
 
 En Supabase Auth, añada `https://planeacion.udes.edu.co/work` (o `https://planeacion.udes.edu.co/**`) a las **URL de redirección permitidas**, para «Continuar con Microsoft» desde `/work`.
 
@@ -75,7 +75,7 @@ Desplegar el portal como siempre. `vercel.json` ya sirve `work-sw.js` con `Servi
 
 ## Reglas que el servidor impone
 
-- Sin fila en `pw_roles`, ninguna tabla `pw_*` se lee ni se escribe y las funciones responden 403. La interfaz solo lo refleja.
+- Sin fila en `pw_roles`, ninguna tabla `pw_*` se lee ni se escribe y las funciones `pw-microsoft` y `pw-avisos` responden 403 (el invitado cae aquí: `pw_mi_rol()` no cambió). La interfaz solo lo refleja.
 - «Acceso y roles», «Memoria colectiva» y «Cómo está construido» dependen de `pw_es_admin()`; sus rutas no abren para los demás.
 - La memoria personal es de cada persona. El Pilo de un equipo solo lee las reglas que su dueña aceptó compartir (una fila en `pw_equipo_aportes`), y la colectiva.
 - Nunca se envía ni se borra correo. Organizar, borradores y reuniones piden aprobación en cada caso y las etiquetas se pueden deshacer.
@@ -105,3 +105,12 @@ Fuentes: learn.microsoft.com/graph/api/driveitem-createuploadsession y driveitem
 
 ### Configuración desde Planeación
 `/admin/pilo-work` (Sistema, junto a Mr. Pilo): modelos por nivel, umbrales, límites, funciones habilitadas, estado de Microsoft 365 y uso. En el panel de Mr. Pilo debe estar el proveedor = Mistral con su modelo rápido y la **clave de NVIDIA** presente.
+
+## Invitados y perfil (migración 0261)
+
+- **Acceso**: Cuenta (Microsoft, o correo UDES y contraseña; el usuario sale del correo) · Código (Microsoft lo salta) · Perfil · Listo. El Perfil (`PerfilPaso.tsx`) pide nombre completo, sede, tipo (administrativo o profesor), dependencia (selector con búsqueda sobre `units`), cargo y, si es profesor, vinculación; y los datos opcionales del carnet. Guarda con `pw_guardar_perfil` (solicitud para Planeación, con `unit_id`) y en `pilo_user_perfil` (reutiliza `pilo-app/carnet`).
+- **Invitado**: `pw_mi_nivel()` devuelve el rol de `pw_roles` o `invitado` (correo UDES verificado y `pw_solicitudes.perfil_completo`). `pw_mi_rol()` sigue devolviendo solo roles reales, así que todas las políticas RLS siguen cerradas para el invitado. Solo ve Inicio, Chat y Datos en este equipo; lo demás dice «Disponible con rol». La función `pilo-work` le deja chat (sin equipo), redactar, sugerir, transformar y revisar, sin memoria colectiva, skills, herramientas del servidor ni Microsoft.
+- **Límite del invitado**: `pw_config.limite_hora_invitado` (10 por defecto), en `/admin/pilo-work` · Límites de uso.
+- **Administración**: «Perfiles nuevos de Pilo At Work» en Acceso y roles (`AdmRoles.tsx`). «Aprobar y asignar» llama a `pw_asignar_rol(user, rol, unidad, papel)`: crea/actualiza `profiles` (sin tocar el rol de intranet), `unit_members` (visor, editor o jefe; en pantalla Consulta, Contribuyente, Gestor) y `pw_roles`. «Dejar como invitado» llama a `pw_dejar_invitado`.
+- **Sin hacer**: el aviso por correo al aprobar (la función `correos` no tiene una acción para esto).
+- **Para activarlo**: aplicar `0261_pw_invitados_perfil.sql` y volver a copiar la carpeta `supabase/functions/pilo-work` (`index.ts` y `proveedor.ts`) al servidor, y reiniciar.

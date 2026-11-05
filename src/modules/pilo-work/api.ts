@@ -8,9 +8,10 @@
 
 import { supabase } from "../../lib/supabase";
 
-export type Rol = "colaborador" | "colaborador_correo" | "coordinacion" | "admin";
+export type Rol = "invitado" | "colaborador" | "colaborador_correo" | "coordinacion" | "admin";
 
 export const ROL_ETIQUETA: Record<Rol, string> = {
+  invitado: "Invitado",
   colaborador: "Colaborador",
   colaborador_correo: "Colaborador con correo",
   coordinacion: "Coordinación",
@@ -61,8 +62,9 @@ export const callWork = <T>(body: Record<string, unknown>) => callFn<T>("pilo-wo
 
 /* --- Rol --------------------------------------------------------------------------------- */
 
+/** El rol de la persona o «invitado» (cuenta UDES con perfil completo, sin rol); null si no entra (0261). */
 export async function miRol(): Promise<Rol | null> {
-  const { data, error } = await supabase.rpc("pw_mi_rol");
+  const { data, error } = await supabase.rpc("pw_mi_nivel");
   if (error) return null;
   return (typeof data === "string" ? data : null) as Rol | null;
 }
@@ -80,11 +82,25 @@ export async function leerPerfil(rol: Rol): Promise<Perfil | null> {
   const user = s.session?.user;
   if (!user) return null;
   const [{ data: r }, { data: u }] = await Promise.all([
-    supabase.from("pw_roles").select("nombre, dependencia, correo").eq("user_id", user.id).maybeSingle(),
+    // Un invitado no tiene fila en pw_roles: su nombre y su dependencia salen de su solicitud.
+    rol === "invitado" ? supabase.from("pw_solicitudes").select("nombre, dependencia, correo").eq("user_id", user.id).maybeSingle() : supabase.from("pw_roles").select("nombre, dependencia, correo").eq("user_id", user.id).maybeSingle(),
     supabase.from("pilo_users").select("full_name, email").eq("id", user.id).maybeSingle(),
   ]);
   const nombre = (r?.nombre as string) || (u?.full_name as string) || (user.user_metadata?.full_name as string) || (user.email ?? "").split("@")[0];
   return { userId: user.id, nombre, correo: (r?.correo as string) || (u?.email as string) || user.email || "", dependencia: (r?.dependencia as string) ?? "", rol };
+}
+
+export interface Unidad {
+  id: string;
+  kind: string;
+  code: string;
+  name: string;
+}
+
+/** El organigrama (public.units; lectura abierta) para elegir la dependencia. */
+export async function leerUnidades(): Promise<Unidad[]> {
+  const { data } = await supabase.from("units").select("id, kind, code, name").order("position");
+  return (data ?? []) as Unidad[];
 }
 
 /* --- Tipos de las tablas ------------------------------------------------------------------- */

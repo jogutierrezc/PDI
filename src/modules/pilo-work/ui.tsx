@@ -190,6 +190,8 @@ export const IC = {
   panel: svg(<><rect x="3" y="4" width="14" height="12" rx="2" /><path d="M8 4v12" /></>),
   out: svg(<path d="M8 4H5a1 1 0 00-1 1v10a1 1 0 001 1h3M12 7l3 3-3 3M15 10H8" />),
   plus: svg(<path d="M10 4v12M4 10h12" />),
+  check: svg(<path d="M4 10.5l4 4 8-9" />),
+  warn: svg(<path d="M10 3L2 17h16zM10 8v4m0 2.5h.01" />),
   arrow: <svg width="14" height="14" viewBox="0 0 14 14" {...P} strokeWidth={1.8}><path d="M2 7h9M7 3l4 4-4 4" /></svg>,
 };
 

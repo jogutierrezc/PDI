@@ -1,10 +1,11 @@
 /* =============================================================================
    Pilo at Work · acceso.
 
-   Entrar, crear cuenta, código de seis dígitos, verificación, rol. Reutiliza las
+   Cuenta (Microsoft, o correo UDES y contraseña) · Código · Perfil · Listo. Reutiliza las
    cuentas de Pilo (función pilo-cuentas, 0120/0175): el código llega por correo y
-   «Continuar con Microsoft» ya existen. Pilo at Work solo añade el ROL: sin fila en
-   pw_roles la cuenta queda verificada y sin acceso.
+   «Continuar con Microsoft» ya existen; el usuario se deriva del correo, sin pedirlo.
+   Con la cuenta verificada y el perfil completo (PerfilPaso, 0261) la persona entra como
+   INVITADA aunque no tenga fila en pw_roles; Planeación revisa el perfil y le da el rol.
    ========================================================================== */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,15 +13,27 @@ import gsap from "gsap";
 import { supabase } from "../../lib/supabase";
 import { movimientoReducido } from "../rankings/movimiento";
 import { asCuentaError, createMicrosoftAccount, loginAccount, prepareMicrosoft, registerAccount, sendRegisterCode, verifyRegisterCode } from "../pilo-app/account/api";
-import { CAMPUSES, EMPTY_REG, cleanUsername, emailRule } from "../pilo-app/account/rules";
-import type { Campus } from "../pilo-app/account/rules";
+import { EMPTY_REG, cleanUsername, emailRule, passwordProblem, usernameProblem } from "../pilo-app/account/rules";
+import type { PiloRol } from "../pilo-app/account/rules";
 import { miRol, ROL_ETIQUETA } from "./api";
 import type { Rol } from "./api";
+import { PerfilPaso } from "./PerfilPaso";
 import { IC, Logo, MOOD } from "./ui";
 
-type Paso = "entrar" | "crear" | "otp" | "verif" | "ok" | "norol" | "ms";
-const DEPENDENCIAS = ["Planeación Institucional", "Talento Humano", "Bienestar Institucional", "Investigación", "Extensión y Proyección Social", "Secretaría General", "Otra dependencia"];
-const GUARDA = "pilo-work-dependencia";
+type Paso = "entrar" | "crear" | "otp" | "verif" | "perfil" | "listo";
+
+/* El usuario, el nombre provisional y el tipo salen del correo: no se piden (el nombre real se pide en el Perfil). */
+const local = (correo: string) => correo.trim().toLowerCase().split("@")[0] ?? "";
+function usuarioDe(correo: string): string {
+  let u = local(correo).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9._]/g, "").replace(/^[._]+|[._]+$/g, "").replace(/[._]{2,}/g, ".").slice(0, 20).replace(/[._]+$/, "");
+  if (u.length < 4) u = `${u}udes`.slice(0, 20);
+  return usernameProblem(u) ? `${u.slice(0, 14)}.udes` : u;
+}
+const nombreDe = (correo: string): string => {
+  const n = local(correo).split(/[._-]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+  return n.length >= 3 ? n : "Persona UDES";
+};
+const tipoDe = (correo: string): PiloRol => (emailRule(correo)?.roles.includes("administrativo") ? "administrativo" : "profesor");
 
 const Microsoft = () => (
   <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
@@ -32,14 +45,16 @@ const Microsoft = () => (
 );
 
 export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (rol: Rol) => void; aviso: (m: string) => void; tema: string; onTema: () => void; inicial?: "verif" | "ms" }) {
-  const [paso, setPaso] = useState<Paso>(inicial ?? "entrar");
+  const [paso, setPaso] = useState<Paso>(inicial === "verif" ? "verif" : "entrar");
   const [rol, setRol] = useState<Rol | null>(null);
   const [nombre, setNombre] = useState("");
+  const [ses, setSes] = useState({ id: "", correo: "", nombre: "", sede: "" });
+  const via = useRef("");
   const panel = useRef<HTMLDivElement>(null);
   const primera = useRef(true);
 
-  // Reg: lo que se pide al crear.
-  const [f, setF] = useState({ nombre: "", correo: "", usuario: "", dependencia: DEPENDENCIAS[0], campus: "bucaramanga" as Campus, clave: "", ok: false });
+  // Lo que se pide al crear la cuenta: correo y contraseña.
+  const [f, setF] = useState({ correo: "", clave: "", ok: false });
   const [u, setU] = useState({ usuario: "", clave: "" });
   const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -63,35 +78,36 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
     setPaso(p);
   };
 
-  /* --- Verificación y rol --------------------------------------------------------------- */
+  /* --- Verificación y perfil ----------------------------------------------------------- */
   const [marcas, setMarcas] = useState<number>(0);
   const verificar = useCallback(async () => {
     setPaso("verif");
     setMarcas(0);
     const pausa = (ms: number) => new Promise((r) => setTimeout(r, movimientoReducido() ? 0 : ms));
     const { data } = await supabase.auth.getSession();
-    setNombre(String(data.session?.user.user_metadata?.full_name ?? data.session?.user.email ?? "").split(" ")[0]);
+    const usuario = data.session?.user;
+    const correo = (usuario?.email ?? "").toLowerCase();
+    if (!emailRule(correo)) {
+      await supabase.auth.signOut();
+      setError("Pilo at Work es para cuentas de la UDES. Entre con su correo institucional.");
+      return setPaso("entrar");
+    }
+    setNombre(String(usuario?.user_metadata?.full_name ?? correo).split(" ")[0]);
     setMarcas(1);
     await pausa(550);
     const r = await miRol();
     setMarcas(2);
+    const { data: p } = await supabase.from("pilo_users").select("full_name, campus").eq("id", usuario?.id ?? "").maybeSingle();
     await pausa(700);
     setMarcas(3);
     await pausa(450);
+    if (p?.full_name) setNombre(String(p.full_name).split(" ")[0]);
     if (r) {
       setRol(r);
-      const { data: p } = await supabase.from("pilo_users").select("full_name").eq("id", data.session?.user.id ?? "").maybeSingle();
-      if (p?.full_name) setNombre(String(p.full_name).split(" ")[0]);
-      setPaso("ok");
+      setPaso("listo");
     } else {
-      let dep = "";
-      try {
-        dep = sessionStorage.getItem(GUARDA) ?? "";
-      } catch {
-        /* sin almacenamiento */
-      }
-      await supabase.rpc("pw_solicitar_rol", { p_dependencia: dep });
-      setPaso("norol");
+      setSes({ id: usuario?.id ?? "", correo, nombre: String(p?.full_name ?? usuario?.user_metadata?.full_name ?? ""), sede: String(p?.campus ?? "") });
+      setPaso("perfil");
     }
   }, []);
 
@@ -101,14 +117,16 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, []);
 
-  /* --- Microsoft ------------------------------------------------------------------------- */
+  /* --- Microsoft: el correo ya viene comprobado; se crea la cuenta sin pedir nada más ---- */
   async function preparar() {
     try {
       const p = await prepareMicrosoft();
+      via.current = "Microsoft";
       if (p.kind === "nuevo") {
-        setF((x) => ({ ...x, correo: p.email, nombre: p.fullName, campus: p.campus || x.campus }));
-        setPaso("ms");
-      } else await verificar();
+        const roles = p.roles.filter((r) => r !== "estudiante");
+        await createMicrosoftAccount({ ...EMPTY_REG, email: p.email, rol: roles[0] ?? tipoDe(p.email), campus: p.campus || "bucaramanga", fullName: p.fullName || nombreDe(p.email), username: usuarioDe(p.email), nick: (p.fullName || nombreDe(p.email)).split(" ")[0], terms: true, ms: true });
+      }
+      await verificar();
     } catch (e) {
       setError(asCuentaError(e).message);
       setPaso("entrar");
@@ -118,29 +136,10 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
     setOcupado(true);
     const { error: e } = await supabase.auth.signInWithOAuth({ provider: "azure", options: { scopes: "email", redirectTo: `${window.location.origin}/work?ms=1` } });
     if (e) {
-      setError("No se pudo abrir Microsoft. Intente con su cuenta de Pilo.");
+      setError("No se pudo abrir Microsoft. Intente con su correo de la UDES.");
       setOcupado(false);
     }
   }
-  async function crearMs() {
-    setError("");
-    setOcupado(true);
-    try {
-      guardarDep();
-      await createMicrosoftAccount({ ...EMPTY_REG, email: f.correo, rol: "administrativo", campus: f.campus, fullName: f.nombre, username: f.usuario, nick: f.nombre.split(" ")[0], terms: true, ms: true });
-      await verificar();
-    } catch (e) {
-      setError(asCuentaError(e).message);
-    }
-    setOcupado(false);
-  }
-  const guardarDep = () => {
-    try {
-      sessionStorage.setItem(GUARDA, f.dependencia);
-    } catch {
-      /* sin almacenamiento */
-    }
-  };
 
   /* --- Entrar ------------------------------------------------------------------------------ */
   async function entrar() {
@@ -167,14 +166,12 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
   })();
   async function pedirCodigo() {
     setError("");
-    if (!f.nombre.trim()) return setError("Escriba su nombre.");
     if (!dominio) return setError("Use un correo de la UDES.");
-    if (!f.usuario.trim()) return setError("Elija un nombre de usuario.");
-    if (f.clave.length < 8) return setError("La contraseña lleva mínimo 8 caracteres.");
+    const mala = passwordProblem(f.clave);
+    if (mala) return setError(mala);
     if (!f.ok) return setError("Confirme lo de los archivos locales.");
     setOcupado(true);
     try {
-      guardarDep();
       const r = await sendRegisterCode(f.correo);
       setEspera(r.wait);
       setPaso("otp");
@@ -217,8 +214,21 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
         dig.current.forEach((d, i) => tl.to(d, { y: -8, duration: 0.12, ease: "power2.out" }, i * 0.05).to(d, { y: 0, duration: 0.22, ease: "back.out(2.6)" }, i * 0.05 + 0.12));
         await tl.then();
       }
-      const salida = await registerAccount({ ...EMPTY_REG, email: f.correo, rol: "administrativo", campus: f.campus, fullName: f.nombre, username: f.usuario, password: f.clave, nick: f.nombre.split(" ")[0], terms: true, ticket: ticket.current });
-      if (salida === "ingresar") await loginAccount(cleanUsername(f.usuario), f.clave);
+      // El usuario sale del correo; si ya existe, se prueba con un número al final.
+      const base = usuarioDe(f.correo);
+      let usuario = base;
+      let salida: Awaited<ReturnType<typeof registerAccount>>;
+      for (let intento = 0; ; intento++) {
+        try {
+          salida = await registerAccount({ ...EMPTY_REG, email: f.correo, rol: tipoDe(f.correo), campus: emailRule(f.correo)?.campus || "bucaramanga", fullName: nombreDe(f.correo), username: usuario, password: f.clave, nick: nombreDe(f.correo).split(" ")[0], terms: true, ticket: ticket.current });
+          break;
+        } catch (e) {
+          if (intento >= 2 || asCuentaError(e).code !== "usuario") throw e;
+          usuario = `${base.slice(0, 16)}${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+      }
+      via.current = "Código al correo";
+      if (salida === "ingresar") await loginAccount(cleanUsername(usuario), f.clave);
       if (salida === "confirmar") {
         setPaso("entrar");
         setError("Le enviamos un correo para confirmar la cuenta. Ábralo y luego entre aquí.");
@@ -250,11 +260,11 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
     }
   }
 
-  const n = ({ crear: 1, otp: 2, verif: 3, ok: 3, norol: 3 } as Partial<Record<Paso, number>>)[paso] ?? 0;
-  const pasos = ["Cuenta", "Código", "Rol"];
+  const n = ({ entrar: 1, crear: 1, otp: 2, verif: 3, perfil: 3, listo: 4 } as Record<Paso, number>)[paso];
+  const pasos = ["Cuenta", "Código", "Perfil", "Listo"];
 
   return (
-    <section className="screen" id="auth" aria-label="Acceso a Pilo at Work">
+    <section className={`screen${paso === "perfil" ? " wide" : ""}`} id="auth" aria-label="Acceso a Pilo at Work">
       <div className="hero">
         <Logo alto={34} variante="blanco" />
         <div className="hero__mid">
@@ -269,14 +279,14 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
             <li>{IC.lock}Lee sus archivos en su equipo, no en la nube</li>
           </ul>
         </div>
-        <p className="hero__foot">Acceso solo para personas con rol asignado por la administración de la universidad.</p>
+        <p className="hero__foot">Entra con correo de la UDES o con Microsoft. Si aún no tiene rol, entra como invitado.</p>
         <div className="hero__pilo" aria-hidden="true">
           <img src={MOOD.feliz} alt="" />
         </div>
       </div>
       <div className="access">
         <div className="access__top">
-          {n > 0 && (
+          {(
             <div className="steps" aria-label="Progreso de la cuenta">
               {pasos.map((p, i) => (
                 <span key={p} style={{ display: "contents" }}>
@@ -284,7 +294,7 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
                     <i>{i + 1}</i>
                     {p}
                   </span>
-                  {i < 2 && (
+                  {i < 3 && (
                     <span className="sln">
                       <b style={{ transform: `scaleX(${i + 1 < n ? 1 : 0})`, transition: "transform .45s cubic-bezier(.23,1,.32,1)" }} />
                     </span>
@@ -299,7 +309,7 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
           </span>
         </div>
         <div className="stage">
-          <div className="panel" ref={panel} key={paso}>
+          <div className={paso === "perfil" ? "perfil" : "panel"} ref={panel} key={paso}>
             {paso === "entrar" && (
               <>
                 <h2>Bienvenido a su espacio de trabajo</h2>
@@ -329,49 +339,21 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
             {paso === "crear" && (
               <>
                 <h2>Cree su cuenta de trabajo</h2>
-                <p className="sub">Le enviaremos un código de seis dígitos para comprobar su correo.</p>
-                <div className="field">
-                  <label htmlFor="c-nom">Nombre completo</label>
-                  <input className="inp" id="c-nom" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} placeholder="Ana María Rojas" />
-                </div>
+                <p className="sub">Le enviaremos un código de seis dígitos para comprobar su correo. Después le pedimos su perfil.</p>
                 <div className="field">
                   <label htmlFor="c-mail">Correo institucional</label>
                   <input className="inp" id="c-mail" type="email" value={f.correo} onChange={(e) => setF({ ...f, correo: e.target.value })} placeholder="nombre@udes.edu.co" autoComplete="email" />
                   <span className={`dom${f.correo ? (dominio ? " ok" : " bad") : ""}`} aria-live="polite">
-                    {!f.correo ? "Use su correo de la UDES" : dominio ? "Dominio de la UDES reconocido" : "Este correo no es de la UDES"}
+                    {!f.correo ? "Use su correo de la UDES" : dominio ? `Dominio de la UDES reconocido${dominio.campus ? ` · sede ${dominio.campus}` : ""}` : "Este correo no es de la UDES"}
                   </span>
                 </div>
-                <div className="row2">
-                  <div className="field">
-                    <label htmlFor="c-us">Usuario</label>
-                    <input className="inp" id="c-us" value={f.usuario} onChange={(e) => setF({ ...f, usuario: e.target.value.toLowerCase() })} placeholder="ana.rojas" autoComplete="username" />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="c-camp">Sede</label>
-                    <select className="inp" id="c-camp" value={f.campus} onChange={(e) => setF({ ...f, campus: e.target.value as Campus })}>
-                      {CAMPUSES.map((c) => (
-                        <option key={c.id} value={c.id}>{c.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="row2">
-                  <div className="field">
-                    <label htmlFor="c-dep">Dependencia</label>
-                    <select className="inp" id="c-dep" value={f.dependencia} onChange={(e) => setF({ ...f, dependencia: e.target.value })}>
-                      {DEPENDENCIAS.map((d) => (
-                        <option key={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="c-pass">Contraseña</label>
-                    <input className="inp" id="c-pass" type="password" value={f.clave} onChange={(e) => setF({ ...f, clave: e.target.value })} placeholder="Mínimo 8" autoComplete="new-password" />
-                    <div className="meter" aria-hidden="true">
-                      {[0, 1, 2, 3].map((i) => (
-                        <i key={i} style={{ ["--f" as string]: i < fuerza ? 1 : 0, ["--c" as string]: ["var(--risk)", "var(--warn)", "var(--blue)", "var(--ok)"][Math.max(0, fuerza - 1)] }} />
-                      ))}
-                    </div>
+                <div className="field">
+                  <label htmlFor="c-pass">Contraseña</label>
+                  <input className="inp" id="c-pass" type="password" value={f.clave} onChange={(e) => setF({ ...f, clave: e.target.value })} placeholder="Mínimo 8 caracteres, con letra y número" autoComplete="new-password" />
+                  <div className="meter" aria-hidden="true">
+                    {[0, 1, 2, 3].map((i) => (
+                      <i key={i} style={{ ["--f" as string]: i < fuerza ? 1 : 0, ["--c" as string]: ["var(--risk)", "var(--warn)", "var(--blue)", "var(--ok)"][Math.max(0, fuerza - 1)] }} />
+                    ))}
                   </div>
                 </div>
                 <label className="chk">
@@ -385,34 +367,6 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
                 <p className="hint">
                   ¿Ya tiene cuenta? <button type="button" className="link" onClick={() => ir("entrar")}>Entre aquí</button>
                 </p>
-              </>
-            )}
-            {paso === "ms" && (
-              <>
-                <h2>Complete su cuenta de Pilo</h2>
-                <p className="sub">Su correo de Microsoft ya está comprobado. Falta elegir un usuario.</p>
-                <div className="field">
-                  <label htmlFor="m-nom">Nombre completo</label>
-                  <input className="inp" id="m-nom" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
-                </div>
-                <div className="row2">
-                  <div className="field">
-                    <label htmlFor="m-us">Usuario</label>
-                    <input className="inp" id="m-us" value={f.usuario} onChange={(e) => setF({ ...f, usuario: e.target.value.toLowerCase() })} placeholder="ana.rojas" />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="m-dep">Dependencia</label>
-                    <select className="inp" id="m-dep" value={f.dependencia} onChange={(e) => setF({ ...f, dependencia: e.target.value })}>
-                      {DEPENDENCIAS.map((d) => (
-                        <option key={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {error && <p className="err" role="alert">{error}</p>}
-                <button type="button" className="btn primary" onClick={() => void crearMs()} disabled={ocupado}>
-                  Continuar
-                </button>
               </>
             )}
             {paso === "otp" && (
@@ -479,9 +433,9 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
                 <div className="pilo-big">
                   <img src={MOOD.piensa} alt="" />
                 </div>
-                <h2>Preparando su acceso</h2>
+                <h2>Comprobando que es de la UDES</h2>
                 <ul className="checks">
-                  {["Correo comprobado", "Buscando su rol en Pilo at Work", "Abriendo su memoria de trabajo"].map((t, i) => (
+                  {["Correo de la UDES comprobado", "Buscando si ya tiene perfil", "Preparando su formulario"].map((t, i) => (
                     <li key={t} className={marcas > i + 1 ? "ok" : marcas === i + 1 ? "run" : ""}>
                       <span className="ic" />
                       {t}
@@ -490,7 +444,32 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
                 </ul>
               </div>
             )}
-            {paso === "ok" && rol && (
+            {paso === "perfil" && <PerfilPaso userId={ses.id} correo={ses.correo} nombreInicial={ses.nombre} sedeInicial={ses.sede} via={via.current} aviso={aviso} onListo={(n) => { setNombre(n.split(" ")[0]); setRol("invitado"); setPaso("listo"); }} />}
+            {paso === "listo" && rol === "invitado" && (
+              <>
+                <span className="badge blue" style={{ justifySelf: "start" }}>Perfil guardado</span>
+                <h2>Listo, {nombre || "bienvenido"}. Entra como invitado</h2>
+                <p className="sub">Su cuenta es de la UDES y su perfil ya está con Planeación. Mientras le asignan rol puede usar esto:</p>
+                <ul className="tier">
+                  {["Redactar, resumir y revisar textos", "Leer archivos en su equipo, sin subirlos a la nube", "Hablar con Pilo con un límite diario básico"].map((t) => (
+                    <li key={t} className="yes">{IC.check}<span>{t}</span></li>
+                  ))}
+                </ul>
+                <ul className="tier">
+                  {["Correo y calendario de Microsoft 365", "Memoria compartida de su oficina", "Pantallas de la intranet de su unidad"].map((t) => (
+                    <li key={t} className="no">{IC.close}<span>{t} <span className="hint">(con rol)</span></span></li>
+                  ))}
+                </ul>
+                <div className="note">
+                  {IC.warn}
+                  <span>Planeación revisa su perfil. Cuando le dé un rol le escribimos a su correo y se abre el resto, sin repetir nada.</span>
+                </div>
+                <button type="button" className="btn primary" onClick={() => onListo("invitado")} autoFocus>
+                  Entrar a Pilo at Work
+                </button>
+              </>
+            )}
+            {paso === "listo" && rol && rol !== "invitado" && (
               <>
                 <div className="pilo-big">
                   <img src={MOOD.excelente} alt="" />
@@ -500,26 +479,6 @@ export function Acceso({ onListo, aviso, tema, onTema, inicial }: { onListo: (ro
                 <span className="role">{ROL_ETIQUETA[rol]}</span>
                 <button type="button" className="btn primary" onClick={() => onListo(rol)} autoFocus>
                   Entrar al espacio de trabajo
-                </button>
-              </>
-            )}
-            {paso === "norol" && (
-              <>
-                <div className="pilo-big">
-                  <img src={MOOD.idea} alt="" />
-                </div>
-                <h2>Su cuenta está verificada, falta su rol</h2>
-                <p className="sub">Pilo at Work es solo para personas con un rol asignado. Avisamos a la administración y le escribiremos a su correo cuando lo tenga.</p>
-                <span className="badge warn">Solicitud enviada · en espera</span>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    ir("entrar");
-                  }}
-                >
-                  Salir
                 </button>
               </>
             )}

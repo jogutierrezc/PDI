@@ -41,6 +41,7 @@ interface Cfg {
   max_tokens: number;
   max_pasos: number;
   limite_hora: number;
+  limite_hora_invitado: number;
   subida_max_mb: number;
   retencion_dias: number;
   funciones: Record<string, boolean>;
@@ -55,6 +56,7 @@ const PARTIDA: Cfg = {
   max_tokens: 1500,
   max_pasos: 5,
   limite_hora: 60,
+  limite_hora_invitado: 10,
   subida_max_mb: 100,
   retencion_dias: 180,
   funciones: { chat: true, cowork: true, datos: true, correo: true, agenda: true, archivos: true, equipos: true, perfil: true },
@@ -259,6 +261,7 @@ export function PiloWorkSettings() {
           <Group title="Límites de uso">
             <div className="pis-grid pis-grid--3">
               <NumField label="Mensajes por hora y persona" value={cfg.limite_hora} min={5} max={500} whole def={60} disabled={off} onCommit={(v) => guardar({ limite_hora: v })} />
+              <NumField label="Mensajes por hora, invitados" hint="Cuenta UDES con perfil y sin rol: solo chat y redacción" value={cfg.limite_hora_invitado} min={1} max={200} whole def={10} disabled={off} onCommit={(v) => guardar({ limite_hora_invitado: v })} />
               <NumField label="Tamaño máximo de subida (MB)" hint="El tope duro del servidor es 100 MB" value={cfg.subida_max_mb} min={1} max={100} whole def={100} disabled={off} onCommit={(v) => guardar({ subida_max_mb: v })} />
               <NumField label="Retención de la bitácora (días)" hint="Se aplica con pw_purgar_bitacora() programada" value={cfg.retencion_dias} min={7} max={1095} whole def={180} disabled={off} onCommit={(v) => guardar({ retencion_dias: v })} />
             </div>

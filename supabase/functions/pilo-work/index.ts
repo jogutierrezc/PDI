@@ -106,11 +106,12 @@ async function capacidades(admin: Any, userId: string, rol: string, funciones: R
   const { data } = await admin.from("pw_ms_tokens").select("scopes").eq("user_id", userId).maybeSingle();
   const sc = String(data?.scopes ?? "").toLowerCase();
   const on = (f: string) => funciones[f] !== false;
-  const conCorreo = rol !== "colaborador";
+  const invitado = rol === "invitado";
+  const conCorreo = rol !== "colaborador" && !invitado;
   const modulos = {
     correo: on("correo") && conCorreo && sc.includes("mail.read"),
-    agenda: on("agenda") && sc.includes("calendars"),
-    archivos: on("archivos") && sc.includes("files.readwrite"),
+    agenda: on("agenda") && !invitado && sc.includes("calendars"),
+    archivos: on("archivos") && !invitado && sc.includes("files.readwrite"),
     datos: on("datos"),
     perfil: on("perfil"),
   };
@@ -123,10 +124,11 @@ async function capacidades(admin: Any, userId: string, rol: string, funciones: R
   if (modulos.agenda) si.push("Ver su agenda, proponer horarios libres y crear reuniones de Teams con su aprobación.");
   if (modulos.archivos) si.push("Listar y leer archivos de OneDrive y SharePoint, crear carpetas y guardar archivos con su aprobación.");
   const no: string[] = [];
-  if (!conCorreo) no.push("Correo: su rol no lo incluye (lo asigna la administración).");
+  if (invitado) no.push("Correo, agenda y archivos de Microsoft 365, memoria de la oficina y documentos guardados: disponibles cuando la administración le asigne un rol.");
+  else if (!conCorreo) no.push("Correo: su rol no lo incluye (lo asigna la administración).");
   else if (!modulos.correo) no.push(on("correo") ? "Correo: falta conectar Microsoft 365 en Conectores." : "Correo: la administración lo apagó por ahora.");
-  if (!modulos.agenda) no.push(on("agenda") ? "Agenda: falta conectar Microsoft 365 en Conectores." : "Agenda: la administración la apagó por ahora.");
-  if (!modulos.archivos) no.push(on("archivos") ? "Archivos de OneDrive y SharePoint: falta pulsar «Conectar archivos» en Conectores." : "Archivos: la administración los apagó por ahora.");
+  if (!invitado && !modulos.agenda) no.push(on("agenda") ? "Agenda: falta conectar Microsoft 365 en Conectores." : "Agenda: la administración la apagó por ahora.");
+  if (!invitado && !modulos.archivos) no.push(on("archivos") ? "Archivos de OneDrive y SharePoint: falta pulsar «Conectar archivos» en Conectores." : "Archivos: la administración los apagó por ahora.");
   const texto = `
 CAPACIDADES REALES DE ESTA PERSONA AHORA (no afirme nada fuera de esta lista):
 ${si.map((x) => `- ${x}`).join("\n")}${no.length ? `\nNO DISPONIBLE AHORA (si lo piden, diga qué falta):\n${no.map((x) => `- ${x}`).join("\n")}` : ""}
@@ -175,7 +177,7 @@ async function memoriaRelevante(admin: Any, userId: string, consulta: string, li
   } else {
     await buscar("pw_memoria", (b) => b.eq("user_id", userId).eq("activa", true).eq("estado", "aceptada"), (r) => ({ id: r.id, texto: r.texto, fuente: "Mi memoria" }));
   }
-  await buscar("pw_memoria_colectiva", (b) => b.eq("activa", true), (r) => ({ id: r.id, texto: r.texto, fuente: "Colectiva" }));
+  if (!admin.__invitado) await buscar("pw_memoria_colectiva", (b) => b.eq("activa", true), (r) => ({ id: r.id, texto: r.texto, fuente: "Colectiva" }));
   return out;
 }
 
@@ -388,9 +390,15 @@ Deno.serve(async (request) => {
   const action = typeof body?.action === "string" ? body.action : Array.isArray(body?.messages) ? "chat" : "";
 
   // Las dos acciones de administración de Planeación (/admin/pilo-work) no piden rol de Pilo at Work: las valida el rol del portal.
-  const { data: rol } = await mine.rpc("pw_mi_rol");
+  const { data: rol } = await mine.rpc("pw_mi_nivel"); // pw_mi_rol o «invitado» (0261)
   if (!rol && action !== "ruteo" && action !== "probar_modelos") return json({ error: "Su cuenta no tiene un rol en Pilo at Work.", code: "sin_rol" }, 403);
 
+  // «invitado» (0261): cuenta UDES con perfil completo y sin rol. Solo chat y redacción, sin Microsoft ni memoria colectiva.
+  const invitado = rol === "invitado";
+  if (invitado) {
+    (admin as Any).__invitado = true;
+    if (["resumir_correo", "equipo_responder", "codigo"].includes(action) || body?.forwardedProps?.equipo_id) return json({ error: "Esa función se abre cuando la administración le asigne un rol.", code: "solo_rol" }, 403);
+  }
   const cfg = await leerConfig(admin);
   const destinos = await leerProveedores(admin, cfg);
   if (action === "estado") return json({ rol, ia: Boolean(destinos.principal), funciones: cfg.funciones });
@@ -420,7 +428,7 @@ Deno.serve(async (request) => {
   if (!destinos.principal) return json({ error: "Pilo con IA aún no está conectado.", advice: "La administración debe poner la clave del proveedor en Pilo (Conexión).", code: "sin_ia" }, 503);
 
   // Un tope por hora y persona (cuenta llamadas, no contenidos). pw_config manda; PW_LIMITE_HORA solo si pw_config no existe.
-  const limite = cfg.limite_hora || Number(Deno.env.get("PW_LIMITE_HORA") ?? 60) || 60;
+  const limite = invitado ? cfg.limite_hora_invitado : cfg.limite_hora || Number(Deno.env.get("PW_LIMITE_HORA") ?? 60) || 60;
   const { count } = await admin.from("pw_bitacora").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("creado_en", new Date(Date.now() - 3600_000).toISOString());
   if ((count ?? 0) >= limite) return json({ error: "Ya usó Pilo muchas veces en esta hora. Intente de nuevo en un rato.", code: "limite" }, 429);
 
@@ -468,8 +476,8 @@ Deno.serve(async (request) => {
       const [caps, recuerdos, skillsP, skillsO, perfilIA] = await Promise.all([
         capacidades(admin, user.id, String(rol), cfg.funciones),
         memoriaRelevante(admin, user.id, ultimoTxt, 8, equipoId),
-        admin.from("pw_skills").select("id, nombre, cuando, instrucciones").eq("user_id", user.id).eq("activa", true).limit(20),
-        admin.from("pw_skills").select("id, nombre, cuando, instrucciones").eq("alcance", "oficina").eq("activa", true).limit(20),
+        invitado ? Promise.resolve({ data: [] }) : admin.from("pw_skills").select("id, nombre, cuando, instrucciones").eq("user_id", user.id).eq("activa", true).limit(20),
+        invitado ? Promise.resolve({ data: [] }) : admin.from("pw_skills").select("id, nombre, cuando, instrucciones").eq("alcance", "oficina").eq("activa", true).limit(20),
         equipoId ? Promise.resolve({ texto: "", puedeProponer: false }) : resumenPerfil(admin, user.id),
       ]);
       const skills = [...(skillsP.data ?? []), ...(skillsO.data ?? [])] as Any[];
@@ -490,7 +498,7 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
           const m = MODULO_DE[n];
           return !m || caps.modulos[m];
         });
-      const herramientas = [...HERRAMIENTAS_SERVIDOR, ...clientes];
+      const herramientas = [...(invitado ? [] : HERRAMIENTAS_SERVIDOR), ...clientes];
 
       // El nivel se decide por reglas simples (sin gastar una llamada al modelo).
       const caracteres = mensajes.reduce((n, m) => n + String(m.content ?? "").length, 0);

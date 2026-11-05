@@ -61,6 +61,7 @@ export interface Config {
   max_tokens: number;
   max_pasos: number;
   limite_hora: number;
+  limite_hora_invitado: number;
   subida_max_mb: number;
   retencion_dias: number;
   funciones: Record<string, boolean>;
@@ -76,6 +77,7 @@ export const CONFIG_BASE: Config = {
   max_tokens: 1500,
   max_pasos: 5,
   limite_hora: 60,
+  limite_hora_invitado: 10,
   subida_max_mb: 100,
   retencion_dias: 180,
   funciones: { chat: true, cowork: true, datos: true, correo: true, agenda: true, archivos: true, equipos: true, perfil: true },
@@ -97,6 +99,7 @@ export async function leerConfig(admin: Admin): Promise<Config> {
       max_tokens: num(data.max_tokens, CONFIG_BASE.max_tokens),
       max_pasos: num(data.max_pasos, CONFIG_BASE.max_pasos),
       limite_hora: num(data.limite_hora, CONFIG_BASE.limite_hora),
+      limite_hora_invitado: num(data.limite_hora_invitado, CONFIG_BASE.limite_hora_invitado),
       subida_max_mb: num(data.subida_max_mb, CONFIG_BASE.subida_max_mb),
       retencion_dias: num(data.retencion_dias, CONFIG_BASE.retencion_dias),
       funciones: { ...CONFIG_BASE.funciones, ...((data.funciones && typeof data.funciones === "object" ? data.funciones : {}) as Record<string, boolean>) },

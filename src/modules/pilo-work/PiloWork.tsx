@@ -52,6 +52,8 @@ interface Item {
   /** Función global de pw_config que la administración puede apagar. */
   funcion?: string;
 }
+/* Lo único que abre un invitado (0261): redactar y revisar textos en el chat, y archivos locales. Lo demás pide rol. */
+const RUTAS_INVITADO = new Set(["", "chat", "datos"]);
 const GRUPOS: { nombre: string; items: Item[] }[] = [
   { nombre: "Panel", items: [{ ruta: "", titulo: "Inicio", icono: IC.home }] },
   {
@@ -215,7 +217,8 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
   const navigate = useNavigate();
   const loc = useLocation();
   const esAdmin = perfil.rol === "admin";
-  const conCorreo = perfil.rol !== "colaborador";
+  const invitado = perfil.rol === "invitado";
+  const conCorreo = perfil.rol !== "colaborador" && !invitado;
   const [filas, setFilas] = useState(0);
   const [pedido, setPedido] = useState("");
   const [esquema, setEsquema] = useState<unknown>(null);
@@ -260,6 +263,13 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
     });
     void cargarPerfil();
   }, [cargarPerfil]);
+
+  /* Perfiles nuevos por revisar (solo administración). */
+  const [perfilesNuevos, setPerfilesNuevos] = useState(0);
+  useEffect(() => {
+    if (!esAdmin) return;
+    void supabase.from("pw_solicitudes").select("user_id", { count: "exact", head: true }).eq("estado", "pendiente").eq("perfil_completo", true).then(({ count }) => setPerfilesNuevos(count ?? 0));
+  }, [esAdmin, versionNav, loc.pathname]);
 
   /* Propuestas por revisar (solo administración). */
   useEffect(() => {
@@ -391,16 +401,19 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
               <div key={g.nombre} style={{ display: "contents" }}>
                 <h3>{g.nombre}</h3>
                 {g.items.map((i) => {
-                  const cuenta = i.ruta === "admin/memoria" ? pendientes : 0;
+                  const cuenta = i.ruta === "admin/memoria" ? pendientes : i.ruta === "admin/roles" ? perfilesNuevos : 0;
+                  const cerrado = invitado && !RUTAS_INVITADO.has(i.ruta);
                   return (
                     <button
                       key={i.ruta}
                       type="button"
                       className="nav"
                       aria-current={actual === i.ruta ? "page" : undefined}
+                      aria-disabled={cerrado || undefined}
+                      style={cerrado ? { opacity: 0.55 } : undefined}
                       aria-label={cuenta > 0 ? `${i.titulo}, ${cuenta} por revisar` : i.titulo}
                       title={plegado ? i.titulo : undefined}
-                      onClick={() => ir(i.ruta)}
+                      onClick={() => (cerrado ? toast("Disponible con rol") : ir(i.ruta))}
                     >
                       {i.icono}
                       <span>{i.titulo}</span>
@@ -425,7 +438,7 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
             </button>
           </div>
           <div className="rail__me">
-            <button type="button" className="rail__perfil" onClick={abrirPerfil} aria-label={`Mi perfil: ${nombreMostrar}`} title={plegado ? `${nombreMostrar} · ${ROL_ETIQUETA[perfil.rol]} · Mi perfil` : "Mi perfil"} disabled={funciones.perfil === false}>
+            <button type="button" className="rail__perfil" onClick={abrirPerfil} aria-label={`Mi perfil: ${nombreMostrar}`} title={plegado ? `${nombreMostrar} · ${ROL_ETIQUETA[perfil.rol]} · Mi perfil` : "Mi perfil"} disabled={funciones.perfil === false || invitado}>
               <span className="avatar">{iniciales(nombreMostrar) || "?"}</span>
               <span className="rail__who">
                 <b>{nombreMostrar}</b>
@@ -467,6 +480,7 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
           </header>
           <div className="view" ref={vista}>
             <Suspense fallback={<div className="pad muted">Cargando…</div>}>
+              {invitado && !RUTAS_INVITADO.has(actual) && <Navigate to="/work" replace />}
               <Routes>
                 <Route index element={<Inicio />} />
                 <Route path="chat" element={<Chat />} />

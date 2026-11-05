@@ -240,6 +240,8 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
   });
   const app = useRef<HTMLElement>(null);
   const [pendientes, setPendientes] = useState(0);
+  /* Móvil: hoja inferior con todas las secciones, el perfil, el tema y la salida. */
+  const [mas, setMas] = useState(false);
   const idN = useRef(0);
 
   const ir = useCallback((ruta: string) => navigate(`/work${ruta ? `/${ruta.replace(/^\/+/, "")}` : ""}`), [navigate]);
@@ -339,7 +341,10 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPal((p) => !p);
-      } else if (e.key === "Escape") setPal(false);
+      } else if (e.key === "Escape") {
+        setPal(false);
+        setMas(false);
+      }
     };
     document.addEventListener("keydown", f);
     return () => document.removeEventListener("keydown", f);
@@ -359,6 +364,18 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
   const grupos = GRUPOS.map((g) => ({ ...g, items: g.items.filter((i) => (i.solo === "admin" ? esAdmin : true) && (!i.funcion || funciones[i.funcion] !== false)) })).filter((g) => g.items.length);
   const actual = loc.pathname.replace(/^\/work\/?/, "").replace(/\/+$/, "");
   const titulo = grupos.flatMap((g) => g.items).find((i) => i.ruta === actual)?.titulo ?? (actual.startsWith("microsoft") ? "Microsoft 365" : "Pilo at Work");
+  /* En el móvil, la barra inferior muestra las cuatro primeras secciones; el resto vive en «Más». */
+  const principales = new Set(grupos.flatMap((g) => g.items).slice(0, 4).map((i) => i.ruta));
+  useEffect(() => setMas(false), [actual]);
+  useEffect(() => {
+    if (mas && !movimientoReducido()) {
+      gsap.fromTo(".pwk .mas", { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "power2.out" });
+      gsap.fromTo(".pwk .mas__sheet", { y: 48 }, { y: 0, duration: 0.3, ease: "expo.out", clearProps: "transform" });
+    }
+  }, [mas]);
+  const salir = async () => {
+    await supabase.auth.signOut();
+  };
 
   /* El indicador que se desliza entre secciones (no se anima si lo pidió el teclado). */
   const nav = useRef<HTMLElement>(null);
@@ -407,7 +424,7 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
                     <button
                       key={i.ruta}
                       type="button"
-                      className="nav"
+                      className={principales.has(i.ruta) ? "nav" : "nav nav--s"}
                       aria-current={actual === i.ruta ? "page" : undefined}
                       aria-disabled={cerrado || undefined}
                       style={cerrado ? { opacity: 0.55 } : undefined}
@@ -423,6 +440,10 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
                 })}
               </div>
             ))}
+            <button type="button" className="nav nav--mas" aria-haspopup="dialog" aria-expanded={mas} onClick={() => setMas(true)}>
+              {IC.panel}
+              <span>Más</span>
+            </button>
           </nav>
           <div className="rail__fold">
             <button
@@ -450,15 +471,69 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
               className="tbtn rail__out"
               aria-label="Salir"
               title="Salir"
-              onClick={async () => {
-                await supabase.auth.signOut();
-              }}
+              onClick={() => void salir()}
             >
               {IC.out}
               <span>Salir</span>
             </button>
           </div>
         </aside>
+        {mas && (
+          <div
+            className="mas"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú de Pilo at Work"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setMas(false);
+            }}
+          >
+            <div className="mas__sheet">
+              <div className="mas__grip" aria-hidden="true" />
+              <div className="mas__me">
+                <span className="avatar">{iniciales(nombreMostrar) || "?"}</span>
+                <span className="rail__who">
+                  <b>{nombreMostrar}</b>
+                  <small>{ROL_ETIQUETA[perfil.rol]}</small>
+                </span>
+                <button type="button" className="tbtn" onClick={() => setMas(false)} aria-label="Cerrar el menú" autoFocus>
+                  Cerrar
+                </button>
+              </div>
+              <div className="mas__list">
+                {grupos.map((g) => (
+                  <div key={g.nombre} className="mas__grp">
+                    <h3>{g.nombre}</h3>
+                    <div className="mas__grid">
+                      {g.items.map((i) => {
+                        const cuenta = i.ruta === "admin/memoria" ? pendientes : i.ruta === "admin/roles" ? perfilesNuevos : 0;
+                        const cerrado = invitado && !RUTAS_INVITADO.has(i.ruta);
+                        return (
+                          <button key={i.ruta} type="button" className="nav" aria-current={actual === i.ruta ? "page" : undefined} aria-disabled={cerrado || undefined} style={cerrado ? { opacity: 0.55 } : undefined} onClick={() => (cerrado ? toast("Disponible con rol") : ir(i.ruta))}>
+                            {i.icono}
+                            <span>{i.titulo}</span>
+                            {cuenta > 0 && <em>{cuenta}</em>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mas__acc">
+                <button type="button" className="btn" onClick={() => { setMas(false); abrirPerfil(); }} disabled={funciones.perfil === false || invitado}>
+                  Mi perfil
+                </button>
+                <button type="button" className="btn" onClick={onTema}>
+                  Tema {tema === "dark" ? "oscuro" : "claro"}
+                </button>
+                <button type="button" className="btn danger" onClick={() => void salir()}>
+                  Salir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="main">
           <header className="top">
             <h1>{titulo}</h1>
@@ -471,11 +546,11 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
               <i style={{ background: modelo?.conmutado ? "var(--warn)" : "var(--blue)" }} />
               {modelo ? `${modelo.proveedor === "nvidia" ? (modelo.conmutado ? "NVIDIA (apoyo)" : "NVIDIA") : "Mistral"}${modelo.nivel === "capacidad" ? " · capacidad" : ""}` : "Mistral"}
             </span>
-            <button type="button" className="tbtn" onClick={onTema} aria-label="Cambiar entre tema claro y oscuro">
+            <button type="button" className="tbtn top__tema" onClick={onTema} aria-label="Cambiar entre tema claro y oscuro">
               Tema {tema === "dark" ? "oscuro" : "claro"}
             </button>
             <button type="button" className="tbtn" onClick={() => setPal(true)}>
-              Buscar o ir a… <span className="kbd">Ctrl K</span>
+              Buscar<span className="top__ir"> o ir a…</span> <span className="kbd">Ctrl K</span>
             </button>
           </header>
           <div className="view" ref={vista}>

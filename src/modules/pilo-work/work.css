@@ -843,3 +843,53 @@
 @media (max-width:980px){
 .pwk .perfil{grid-template-columns:minmax(0,1fr)}
 .pwk .pv{position:static}}
+
+/* =============================================================================
+   Riel y móvil (2026-11-05)
+   El riel es una grilla de una sola columna con texto sin salto de línea: sin
+   `minmax(0,1fr)` la columna crecía al contenido más ancho y «Plegar menú», el
+   perfil y «Salir» quedaban recortados fuera del riel. En el móvil el riel pasa
+   a una barra inferior con cuatro secciones y «Más», que abre una hoja con todo.
+   ========================================================================== */
+.pwk .rail{grid-template-columns:minmax(0,1fr)}
+.pwk .rail__nav{overflow-x:hidden}
+.pwk .rail__me{min-width:0}
+.pwk .rail__out{flex:none}
+.pwk .nav:focus-visible,.pwk .rail__perfil:focus-visible,.pwk .rail__out:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.pwk .nav--mas{display:none}
+@media (min-width:821px){.pwk .mas{display:none}}
+
+.pwk .mas{position:fixed;inset:0;z-index:40;background:rgba(7,20,40,.45);display:flex;align-items:flex-end}
+.pwk .mas__sheet{width:100%;max-height:86dvh;overflow:auto;overscroll-behavior:contain;background:var(--surface);border-radius:20px 20px 0 0;padding:8px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;gap:14px;box-shadow:var(--sh-3)}
+.pwk .mas__grip{width:36px;height:4px;border-radius:4px;background:var(--line-2);justify-self:center}
+.pwk .mas__me{display:flex;align-items:center;gap:10px}
+.pwk .mas__me .rail__who{flex:1;min-width:0}
+.pwk .mas__list{display:grid;gap:12px}
+.pwk .mas__grp h3{font-size:11px;font-weight:700;color:var(--ink-3);padding:0 4px 6px}
+.pwk .mas__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.pwk .mas .nav{flex-direction:row;justify-content:flex-start;gap:10px;width:100%;min-height:46px;padding:0 12px;font-size:13px;background:var(--surface-2);border:1px solid var(--line);white-space:nowrap}
+.pwk .mas .nav[aria-current="page"]{background:var(--blue-soft);border-color:var(--blue);color:var(--blue-strong)}
+.pwk .mas__acc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pwk .mas__acc .btn{justify-content:center;min-height:44px}
+
+@media (max-width:820px){
+.pwk #app{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);height:100%}
+.pwk .rail{position:fixed;left:0;right:0;bottom:0;z-index:20;grid-template-rows:auto;border:0;border-top:1px solid var(--rail-line);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -6px 20px rgba(10,34,73,.08)}
+.pwk .rail__brand,.pwk .rail__fold,.pwk .rail__me,.pwk .rail__nav h3,.pwk .rail__nav>[data-ind]{display:none}
+.pwk .rail__nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:6px 8px;overflow:visible}
+.pwk .rail__nav>div{display:contents}
+.pwk .rail__nav .nav{flex-direction:column;justify-content:center;gap:3px;min-height:52px;width:100%;padding:6px 2px;font-size:11px;border-radius:12px}
+.pwk .rail__nav .nav span{max-width:100%}
+.pwk .rail__nav .nav svg{width:20px;height:20px}
+.pwk .rail__nav .nav--s{display:none}
+.pwk .rail__nav .nav--mas{display:flex}
+.pwk .rail__nav .nav[aria-current="page"]{background:var(--rail-on)}
+.pwk .rail__nav .nav em{position:absolute;top:3px;right:calc(50% - 22px)}
+.pwk .main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+.pwk .top{padding:10px 14px;gap:8px}
+.pwk .top h1{font-size:15px}
+.pwk .top .chip,.pwk .top .top__tema,.pwk .top .top__ir,.pwk .top .kbd{display:none}
+.pwk .top .tbtn{min-height:36px}
+.pwk .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+.pwk .notifs{top:56px;left:12px;right:12px}
+}

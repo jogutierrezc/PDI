@@ -143,6 +143,13 @@ export function SiteFooter({ note }: { note?: ReactNode }) {
           </nav>
         </div>
 
+        <div className="sf-aluna sf-r" style={{ "--i": 3 } as React.CSSProperties}>
+          <img src="/Logo%20Aluna/pwa-512.png" alt="Aluna UDES" width={64} height={64} loading="lazy" decoding="async" />
+          <small>
+            Software Aluna es un Desarrollo de la Oficina de Planeación Institucional de la Universidad de Santander, Derechos Reservados, Registro en trámite ante la DNDA con el No. 1-2026-215846 y 2026
+          </small>
+        </div>
+
         <div className="sf-bar sf-r" style={{ "--i": 3 } as React.CSSProperties}>
           <small>
             © {new Date().getFullYear()} {office.university} · {office.name}. Datos publicados para consulta y reutilización citando la fuente.

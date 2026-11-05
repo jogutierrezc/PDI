@@ -48,10 +48,14 @@
   text-decoration: none;
 }
 
-.ln__brand span {
-  font-size: var(--text-lg);
-  font-weight: 800;
-  font-stretch: var(--sign-stretch);
+/* La maskable trae margen de seguridad: se recorta a una banda horizontal. */
+.ln__brand img {
+  width: 144px;
+  height: 52px;
+  object-fit: cover;
+  object-position: 50% 51%;
+  background: var(--logo-plate);
+  border-radius: var(--radius-xs);
 }
 
 .ln__spacer { flex: 1; }

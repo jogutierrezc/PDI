@@ -585,7 +585,7 @@ export function AdminShell({
   }, [profileOpen]);
 
   useEffect(() => {
-    document.title = `${title} | Intranet UDES`;
+    document.title = `${title} | Aluna UDES`;
     return () => {
       document.title = "PDI 2024-2028 | Universidad de Santander";
     };
@@ -609,12 +609,8 @@ export function AdminShell({
 
       <aside ref={sidebarRef} className="admin-sidebar" id="admin-nav">
         <div className="admin-sidebar__head">
-          <Link className="admin-brand" to="/admin" aria-label="Intranet UDES · inicio">
-            <img src="/logo-udes.svg" alt="" width={95} height={34} />
-            <span>
-              <strong>Intranet UDES</strong>
-              <small>Planeación institucional</small>
-            </span>
+          <Link className="admin-brand" to="/admin" aria-label="Aluna UDES · inicio">
+            <img src="/Logo%20Aluna/pwa-512-maskable.png" alt="" width={168} height={60} />
           </Link>
           <button
             type="button"

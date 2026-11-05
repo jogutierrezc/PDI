@@ -332,8 +332,7 @@ export function Launcher() {
     <div ref={root} className="ln">
       <header className="ln__top" data-anim>
         <Link to="/" className="ln__brand">
-          <img src="/logo-udes.svg" alt="UDES" width={86} height={31} />
-          <span>Intranet</span>
+          <img src="/Logo%20Aluna/pwa-512-maskable.png" alt="Aluna UDES" width={144} height={52} />
         </Link>
         <span className="ln__spacer" />
         {tour && (

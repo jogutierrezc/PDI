@@ -82,11 +82,8 @@
 
 .lg-brand img {
   display: block;
-  height: 42px;
+  height: 53px;
   width: auto;
-  padding: var(--space-2) var(--space-3);
-  background: #ffffff;
-  border-radius: var(--radius-sm);
 }
 
 .lg-pitch {
@@ -113,8 +110,10 @@
 
 .lg-zone__foot {
   margin: 0;
+  max-width: 60ch;
   color: var(--lg-muted);
   font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
 /* --- El tablero --- */
@@ -588,7 +587,6 @@
 
   .lg-zone::after,
   .lg-pitch p,
-  .lg-zone__foot,
   .lg-row--module {
     display: none;
   }

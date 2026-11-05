@@ -223,7 +223,7 @@ export function LoginPortal() {
         </div>
 
         <div className="lg-brand">
-          <img src="/logo-udes.svg" alt="Universidad de Santander" width={116} height={42} />
+          <img src="/Logo%20Aluna/pwa-512-blanco.png" alt="Aluna UDES" width={150} height={53} />
         </div>
 
         <div className="lg-pitch" ref={pitch}>
@@ -232,7 +232,7 @@ export function LoginPortal() {
         </div>
 
         <ArrivalsBoard text={boardText} tone={boardTone} boardRef={board} />
-        <p className="lg-zone__foot">Oficina de Planeación Institucional · Universidad de Santander</p>
+        <p className="lg-zone__foot">Software Aluna es un Desarrollo de la Oficina de Planeación Institucional de la Universidad de Santander, Derechos Reservados, Registro en trámite ante la DNDA con el No. 1-2026-215846 y 2026</p>
       </section>
 
       <section className="lg-pane" aria-labelledby="login-title" id="lg-form">
@@ -245,7 +245,7 @@ export function LoginPortal() {
         <div className="lg-wrap">
           <header className="lg-head lg-rise">
             <h1 id="login-title">Iniciar sesión</h1>
-            <p>Intranet PDI · Oficina de Planeación Institucional</p>
+            <p>Plataforma Aluna UDES - Oficina de Planeación Institucional</p>
           </header>
 
           {!isSupabaseConfigured && (

@@ -17,7 +17,7 @@
              ventana de la regla la cancela;
            · tope de convenios por ejecución (config) y error por convenio sin detener el resto.
      { action: "enviar", convenio_id, regla_id? }   «Enviar ahora»: sesión + int_puede_crear().
-     { action: "prueba", asunto, cuerpo, idioma, para, destino: "mailpit"|"smtp", convenio_id? }
+     { action: "prueba", asunto, cuerpo, idioma, para, convenio_id? }
          Un correo de prueba de una plantilla (aunque no esté guardada), con un convenio real o de ejemplo.
 
    Destinatarios por regla: responsable (quien creó el convenio), coordinación (coordinadores de
@@ -26,15 +26,18 @@
    el correo en el idioma del convenio; los internos, en español. Sin contacto: se avisa solo a los
    internos y la bitácora lo marca «sin_contacto».
 
-   Servidores de salida, igual que rel-correos: modo «prueba» → Mailpit (REL_MAILPIT_HOST,
-   REL_MAILPIT_PORT); modo «real» → SMTP institucional (Sistema › Correos o SMTP_*).
+   Salida: esta función NO abre conexiones SMTP. Cada correo se entrega a la función `correos`
+   (acción conv_envio, con la clave de servicio), que aplica el interruptor general, los dominios
+   permitidos, el tope por hora y la bitácora de Sistema › Correos. Modo «prueba»: los avisos no
+   van a las direcciones reales sino a quien pulsa «Enviar ahora» (o, en el cron, a la dirección
+   de Internacionalización), con el asunto «[PRUEBA]»; modo «real»: a los destinatarios reales.
 
-   Variables: CONV_AVISOS_CRON, CONV_URL_APP, CONV_LOGO_URL (todas opcionales salvo la primera
-   para el cron), ALLOWED_ORIGIN. Despliegue:  supabase functions deploy conv-avisos --no-verify-jwt
+   Variables: CONV_AVISOS_CRON, CONV_URL_APP, CONV_LOGO_URL, CONV_CORREOS_URL (la dirección de
+   `correos`; por defecto SUPABASE_URL/functions/v1/correos y, si no conecta, CONV_URL_APP/functions/v1/correos),
+   ALLOWED_ORIGIN. Despliegue:  supabase functions deploy conv-avisos --no-verify-jwt
    ========================================================================== */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import nodemailer from "npm:nodemailer@6.9.16";
 import { asuntoDe, fechaLegible, formatoCorreo, htmlDe, textoDe } from "./plantilla.ts";
 import type { Idioma, Variables } from "./plantilla.ts";
 
@@ -72,75 +75,86 @@ const utc = (f: string) => {
 const diasEntre = (hasta: string, desde: string) => Math.round((utc(hasta) - utc(desde)) / 86_400_000);
 const sumarDias = (f: string, n: number) => new Date(utc(f) + n * 86_400_000).toISOString().slice(0, 10);
 
-/* ---------- Servidores de salida (como rel-correos) ------------------------------------------- */
+/* ---------- Salida: la función `correos` -------------------------------------------------------------
+   Esta función ya no abre ninguna conexión SMTP: cada correo se le entrega a `correos` (acción
+   conv_envio, con la clave de servicio), que aplica el interruptor general, los dominios permitidos,
+   el tope por hora y la bitácora enmascarada de Sistema › Correos. */
 
-interface Conexion {
-  host: string;
-  port: number;
-  seguridad: "none" | "ssl" | "starttls";
-  user: string;
-  pass: string;
+const ESPERA_CORREOS_MS = 20_000;
+
+/** Las direcciones a las que se intenta llegar, en orden. Solo se pasa a la segunda si la primera ni siquiera conectó. */
+function urlsCorreos(url: string): string[] {
+  const fija = ENV("CONV_CORREOS_URL").trim();
+  if (fija) return [fija];
+  const lista = [`${url.replace(/\/+$/, "")}/functions/v1/correos`];
+  const publica = `${appUrl()}/functions/v1/correos`;
+  if (!lista.includes(publica)) lista.push(publica);
+  return lista;
 }
 
-const MAILPIT = (): Conexion | null => (ENV("REL_MAILPIT_HOST") ? { host: ENV("REL_MAILPIT_HOST"), port: Number(ENV("REL_MAILPIT_PORT")) || 1025, seguridad: "none", user: "", pass: "" } : null);
-
-function smtpInstitucional(ctx: { settings?: Record<string, unknown> | null; password?: string } | null): Conexion | null {
-  const a = ctx?.settings ?? {};
-  const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-  const puerto = (v: unknown, def: number) => (Number.isInteger(Number(v)) && Number(v) > 0 && Number(v) < 65536 ? Number(v) : def);
-  if (s(a.smtp_host)) {
-    const seg = a.smtp_security === "ssl" ? "ssl" : a.smtp_security === "none" ? "none" : "starttls";
-    return { host: s(a.smtp_host), port: puerto(a.smtp_port, 587), seguridad: seg, user: s(a.smtp_user), pass: (typeof ctx?.password === "string" && ctx.password) || ENV("SMTP_PASS") };
-  }
-  if (!ENV("SMTP_HOST")) return null;
-  const port = puerto(ENV("SMTP_PORT"), 587);
-  const modo = ENV("SMTP_SECURE").toLowerCase();
-  const ssl = modo ? ["ssl", "tls", "true", "1"].includes(modo) : port === 465;
-  return { host: ENV("SMTP_HOST"), port, seguridad: ["none", "no", "false", "0", "plain"].includes(modo) ? "none" : ssl ? "ssl" : "starttls", user: ENV("SMTP_USER"), pass: ENV("SMTP_PASS") };
+interface Salida {
+  ok: boolean;
+  /** Mensaje para la pantalla; nunca trae direcciones de correo. */
+  error?: string;
+  code?: string;
+  /** Falla del servicio de correo (se reintenta más tarde) y no del destinatario (rebote). */
+  delServidor?: boolean;
 }
 
-function transporteDe(c: Conexion) {
-  return nodemailer.createTransport({
-    host: c.host,
-    port: c.port,
-    secure: c.seguridad === "ssl",
-    requireTLS: c.seguridad === "starttls",
-    ...(c.seguridad === "none" ? { ignoreTLS: true } : {}),
-    ...(c.user ? { auth: { user: c.user, pass: c.pass } } : {}),
-    connectionTimeout: 4_000,
-    greetingTimeout: 4_000,
-    socketTimeout: 12_000,
-    disableFileAccess: true,
-    disableUrlAccess: true,
-    logger: false,
+interface Envio {
+  para: string[];
+  asunto: string;
+  html: string;
+  texto: string;
+  remitente: string;
+  referencia: string;
+  tipo: "aviso" | "prueba";
+}
+
+function remitenteDe(r: string): { nombre: string; direccion: string } | undefined {
+  const direccion = (r.match(/<([^<>]+)>\s*$/)?.[1] ?? r).trim();
+  if (!formatoCorreo(direccion)) return undefined;
+  const nombre = r.includes("<") ? r.slice(0, r.indexOf("<")).replace(/["]/g, "").trim() : "";
+  return { nombre, direccion };
+}
+
+const remitenteValido = (r: string) => r.length <= 254 && remitenteDe(r) !== undefined;
+
+async function enviarPorCorreos(url: string, service: string, e: Envio): Promise<Salida> {
+  const cuerpo = JSON.stringify({
+    action: "conv_envio",
+    to: e.para,
+    asunto: e.asunto,
+    html: e.html,
+    texto: e.texto,
+    tipo: e.tipo,
+    referencia: e.referencia,
+    ...(remitenteDe(e.remitente) ? { remitente: remitenteDe(e.remitente) } : {}),
   });
-}
-
-/** El motivo en palabras y si es del servidor (se reintenta) o del destinatario (rebote). */
-function motivoDe(error: unknown): { texto: string; delServidor: boolean } {
-  const e = (error && typeof error === "object" ? error : {}) as Record<string, unknown>;
-  const code = typeof e.code === "string" ? e.code.toUpperCase() : "";
-  const n = Number(e.responseCode) || 0;
-  if (code === "EAUTH" || [530, 534, 535].includes(n)) return { texto: "El servidor rechazó el usuario o la contraseña.", delServidor: true };
-  if (["ECONNECTION", "ESOCKET", "ETIMEDOUT", "ECONNREFUSED", "EDNS", "ENOTFOUND", "ETLS", "EAI_AGAIN"].includes(code)) return { texto: "No se pudo conectar con el servidor de salida.", delServidor: true };
-  if (n === 553 || n === 550 || code === "EENVELOPE") return { texto: `Rechazado por el servidor (${n || "destinatario o remitente"}).`, delServidor: false };
-  if (n >= 400 && n < 500) return { texto: `El servidor pidió esperar (${n}).`, delServidor: true };
-  return { texto: n ? `El servidor no aceptó el mensaje (${n}).` : "El servidor no aceptó el mensaje.", delServidor: false };
-}
-
-const remitenteValido = (r: string) => r.length <= 254 && formatoCorreo((r.match(/<([^<>]+)>\s*$/)?.[1] ?? r).trim());
-
-async function enviarUno(c: Conexion, remitente: string, para: string, asunto: string, html: string, texto: string) {
-  const transporte = transporteDe(c);
-  try {
-    await transporte.sendMail({ from: remitente, to: para, subject: asunto, text: texto, html, replyTo: (remitente.match(/<([^<>]+)>\s*$/)?.[1] ?? remitente).trim() });
-  } finally {
+  const urls = urlsCorreos(url);
+  for (const [i, destino] of urls.entries()) {
+    const control = new AbortController();
+    const reloj = setTimeout(() => control.abort(), ESPERA_CORREOS_MS);
     try {
-      transporte.close();
-    } catch {
-      // ya estaba cerrada
+      const r = await fetch(destino, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${service}`, apikey: service }, body: cuerpo, signal: control.signal });
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string; code?: string; msg?: string; message?: string } | null;
+      if (r.ok && j?.ok === true) return { ok: true };
+      const code = j?.code ?? `http_${r.status}`;
+      if (r.status === 404) return { ok: false, code: "correos_no_desplegada", delServidor: true, error: "La función «correos» no tiene la acción de convenios: hay que desplegarla de nuevo (supabase functions deploy correos)." };
+      if (r.status === 401 || (r.status === 403 && code !== "dominio")) return { ok: false, code, delServidor: true, error: j?.error ?? "La función «correos» no aceptó la clave de servicio." };
+      return { ok: false, code, delServidor: code !== "buzon" && code !== "dominio" && code !== "datos", error: j?.error ?? j?.msg ?? j?.message ?? `La función «correos» respondió con un error (${r.status}).` };
+    } catch (err) {
+      if ((err as { name?: string })?.name === "AbortError") {
+        return { ok: false, code: "tiempo", delServidor: true, error: `La función «correos» no respondió en ${ESPERA_CORREOS_MS / 1000} segundos. El correo puede haber salido: revise la bitácora de Sistema › Correos antes de reintentar.` };
+      }
+      // No conectó: si hay otra dirección, se prueba; si no, se dice cuál es el problema.
+      if (i < urls.length - 1) continue;
+      return { ok: false, code: "red", delServidor: true, error: "No se pudo llegar a la función «correos» desde esta función. Defina CONV_CORREOS_URL con su dirección pública (https://…/functions/v1/correos)." };
+    } finally {
+      clearTimeout(reloj);
     }
   }
+  return { ok: false, code: "red", delServidor: true, error: "No se pudo llegar a la función «correos»." };
 }
 
 /* ---------- Datos ------------------------------------------------------------------------------- */
@@ -193,8 +207,10 @@ interface Contexto {
   cfg: Config;
   reglas: Regla[];
   plantillas: Map<string, Plantilla>;
-  conexion: Conexion | null;
-  errorConexion: string;
+  /** A dónde van los avisos en modo de prueba. */
+  correoPrueba: string;
+  url: string;
+  service: string;
   coordinadores: { correo: string; campus: string }[] | null;
 }
 
@@ -208,27 +224,16 @@ async function leerConfig(admin: Cliente): Promise<Config | null> {
   return (data as Config | null) ?? null;
 }
 
-async function conexionPara(admin: Cliente, modo: "prueba" | "real"): Promise<{ conexion: Conexion | null; error: string }> {
-  if (modo === "prueba") {
-    const m = MAILPIT();
-    return m ? { conexion: m, error: "" } : { conexion: null, error: "Falta configurar Mailpit en la función (REL_MAILPIT_HOST)." };
-  }
-  const { data: ctx } = await admin.rpc("correo_context", { p_hash: "", p_hook: "" });
-  const c = (ctx && typeof ctx === "object" ? ctx : null) as { settings?: Record<string, unknown> | null; password?: string } | null;
-  if (c?.settings && c.settings.enabled === false) return { conexion: null, error: "El envío de correos está apagado en la intranet (Correos)." };
-  const s = smtpInstitucional(c);
-  return s ? { conexion: s, error: "" } : { conexion: null, error: "Falta configurar el servidor de correo en la intranet (Correos › Remitentes y conexión)." };
-}
-
-async function armarContexto(admin: Cliente, cfg: Config): Promise<Contexto> {
+async function armarContexto(admin: Cliente, cfg: Config, url: string, service: string, correoUsuario = ""): Promise<Contexto> {
   const [r, p] = await Promise.all([
     admin.from("conv_aviso_reglas").select("id, dias, activa, destinatarios, plantilla_clave, orden").order("orden"),
     admin.from("conv_correo_plantillas").select("clave, idioma, audiencia, asunto, cuerpo"),
   ]);
   const plantillas = new Map<string, Plantilla>();
   for (const x of (p.data ?? []) as Plantilla[]) plantillas.set(`${x.clave}:${x.idioma}`, x);
-  const { conexion, error } = await conexionPara(admin, cfg.modo);
-  return { admin, cfg, reglas: (r.data ?? []) as Regla[], plantillas, conexion, errorConexion: error, coordinadores: null };
+  const direccion = (cfg.correo_direccion ?? "").trim().toLowerCase();
+  const correoPrueba = formatoCorreo(correoUsuario) ? correoUsuario.toLowerCase() : formatoCorreo(direccion) ? direccion : "";
+  return { admin, cfg, reglas: (r.data ?? []) as Regla[], plantillas, correoPrueba, url, service, coordinadores: null };
 }
 
 async function coordinadoresDe(ctx: Contexto): Promise<{ correo: string; campus: string }[]> {
@@ -329,10 +334,13 @@ async function procesar(ctx: Contexto, c: Convenio, regla: Regla, hoy: string, o
     await ctx.admin.from("conv_aviso_envios").update({ estado, destinatarios, error }).eq("id", envioId);
   };
 
-  if (!ctx.conexion) {
-    await cerrar("error", [], ctx.errorConexion);
-    return { ...base, estado: "error", enviados: 0, detalle: ctx.errorConexion };
+  const prueba = ctx.cfg.modo === "prueba";
+  if (prueba && !ctx.correoPrueba) {
+    const m = "Los avisos están en modo de prueba y falta la dirección de Internacionalización para recibirlos (Gestión › Avisos › Ajustes).";
+    await cerrar("error", [], m);
+    return { ...base, estado: "error", enviados: 0, detalle: m };
   }
+  let servicioCaido = false;
   const { lista, sinContacto } = await destinosDe(ctx, c, regla);
   const resultados: { rol: string; correo: string; idioma: Idioma; ok: boolean; error?: string; rebote?: boolean }[] = [];
   for (const [i, d] of lista.entries()) {
@@ -343,13 +351,25 @@ async function procesar(ctx: Contexto, c: Convenio, regla: Regla, hoy: string, o
       continue;
     }
     const v = variablesDe(c, hoy, plantilla.idioma);
-    const op = { idioma: plantilla.idioma, logo: logoUrl(), prueba: ctx.cfg.modo === "prueba" };
-    try {
-      await enviarUno(ctx.conexion, ctx.cfg.remitente, d.correo, `${op.prueba ? "[Prueba] " : ""}${asuntoDe(plantilla.asunto, v)}`, htmlDe(plantilla.cuerpo, v, op), textoDe(plantilla.cuerpo, v, op));
-      resultados.push({ rol: d.rol, correo: d.correo, idioma: plantilla.idioma, ok: true });
-    } catch (e) {
-      const m = motivoDe(e);
-      resultados.push({ rol: d.rol, correo: d.correo, idioma: plantilla.idioma, ok: false, error: m.texto, rebote: !m.delServidor });
+    const op = { idioma: plantilla.idioma, logo: logoUrl(), prueba };
+    if (servicioCaido) {
+      resultados.push({ rol: d.rol, correo: d.correo, idioma: plantilla.idioma, ok: false, error: "No se intentó: el servicio de correo falló con el destinatario anterior.", rebote: false });
+      continue;
+    }
+    const asunto = asuntoDe(plantilla.asunto, v);
+    const salida = await enviarPorCorreos(ctx.url, ctx.service, {
+      para: [prueba ? ctx.correoPrueba : d.correo],
+      asunto: prueba ? `[PRUEBA] ${asunto} (para: ${d.rol})` : asunto,
+      html: htmlDe(plantilla.cuerpo, v, op),
+      texto: textoDe(plantilla.cuerpo, v, op),
+      remitente: ctx.cfg.remitente,
+      referencia: `conv-aviso:${c.codigo}:${regla.dias}`,
+      tipo: prueba ? "prueba" : "aviso",
+    });
+    if (salida.ok) resultados.push({ rol: d.rol, correo: d.correo, idioma: plantilla.idioma, ok: true });
+    else {
+      servicioCaido = salida.delServidor === true;
+      resultados.push({ rol: d.rol, correo: d.correo, idioma: plantilla.idioma, ok: false, error: salida.error ?? "No se pudo enviar.", rebote: !salida.delServidor });
     }
     if (ctx.cfg.modo === "real" && i < lista.length - 1) await dormir(PAUSA_SMTP_MS);
   }
@@ -369,7 +389,7 @@ async function procesar(ctx: Contexto, c: Convenio, regla: Regla, hoy: string, o
 
   if (enviados) {
     const cuando = regla.dias > 0 ? `${regla.dias} días antes` : regla.dias === 0 ? "el día del vencimiento" : `${-regla.dias} días después`;
-    const texto = `Aviso de vencimiento (${cuando}) enviado a ${enviados} ${enviados === 1 ? "destinatario" : "destinatarios"}${ctx.cfg.modo === "prueba" ? " en modo de prueba" : ""}${sinContacto ? "; la institución no tiene contacto en el Directorio" : ""}.`;
+    const texto = `Aviso de vencimiento (${cuando}) enviado a ${enviados} ${enviados === 1 ? "destinatario" : "destinatarios"}${prueba ? " a la dirección de prueba (modo de prueba)" : ""}${sinContacto ? "; la institución no tiene contacto en el Directorio" : ""}.`;
     await ctx.admin.from("conv_historial").insert({ convenio_id: c.id, fecha: hoy, texto: texto.slice(0, 1000), autor: usuario });
   }
   return { ...base, estado, enviados, ...(error ? { detalle: error } : {}) };
@@ -395,7 +415,7 @@ async function ejecutar(url: string, service: string): Promise<Response> {
   if (ahora.minutos < h * 60 + (m || 0)) return json({ omitido: "Todavía no es la hora de envío." });
 
   const hoy = ahora.fecha;
-  const ctx = await armarContexto(admin, cfg);
+  const ctx = await armarContexto(admin, cfg, url, service);
   const reglas = ctx.reglas.filter((r) => r.activa);
   if (!reglas.length) return json({ omitido: "No hay reglas activas." });
 
@@ -461,7 +481,7 @@ async function ejecutar(url: string, service: string): Promise<Response> {
   });
 }
 
-async function enviarAhora(url: string, service: string, usuario: string, body: Record<string, unknown>): Promise<Response> {
+async function enviarAhora(url: string, service: string, usuario: string, correoUsuario: string, body: Record<string, unknown>): Promise<Response> {
   const admin = cliente(url, service);
   const cfg = await leerConfig(admin);
   if (!cfg) return json({ error: "Falta la configuración de avisos (¿se aplicó la migración 0256?)." }, 503);
@@ -470,7 +490,7 @@ async function enviarAhora(url: string, service: string, usuario: string, body: 
   const c = data as Convenio | null;
   if (!c) return json({ error: "No encontré ese convenio." }, 404);
   if (c.cerrado || c.indefinido || !c.fecha_terminacion) return json({ error: "Este convenio no tiene una fecha de terminación vigente para avisar." }, 409);
-  const ctx = await armarContexto(admin, cfg);
+  const ctx = await armarContexto(admin, cfg, url, service, correoUsuario);
   const activas = ctx.reglas.filter((r) => r.activa);
   const hoy = ahoraBogota().fecha;
   const faltan = diasEntre(c.fecha_terminacion, hoy);
@@ -491,8 +511,6 @@ async function prueba(url: string, service: string, anon: string, authorization:
   const admin = cliente(url, service);
   const cfg = await leerConfig(admin);
   const remitente = cfg?.remitente && remitenteValido(cfg.remitente) ? cfg.remitente : "Relaciones Internacionales UDES <relaciones.internacionales@udes.edu.co>";
-  const { conexion, error } = await conexionPara(admin, body.destino === "smtp" ? "real" : "prueba");
-  if (!conexion) return json({ error, code: "config" }, 503);
   const hoy = ahoraBogota().fecha;
   let v: Variables = {
     institucion: idioma === "es" ? "Universidad de Ejemplo" : "Example University",
@@ -512,12 +530,17 @@ async function prueba(url: string, service: string, anon: string, authorization:
     if (data) v = { ...v, ...variablesDe(data as Convenio, hoy, idioma) };
   }
   const op = { idioma, logo: logoUrl(), prueba: true };
-  try {
-    await enviarUno(conexion, remitente, para, `[Prueba] ${asuntoDe(asunto, v)}`, htmlDe(cuerpo, v, op), textoDe(cuerpo, v, op));
-    return json({ ok: true });
-  } catch (e) {
-    return json({ error: motivoDe(e).texto, code: "servidor" }, 502);
-  }
+  const salida = await enviarPorCorreos(url, service, {
+    para: [para],
+    asunto: `[PRUEBA] ${asuntoDe(asunto, v)}`,
+    html: htmlDe(cuerpo, v, op),
+    texto: textoDe(cuerpo, v, op),
+    remitente,
+    referencia: "conv-aviso:prueba",
+    tipo: "prueba",
+  });
+  if (salida.ok) return json({ ok: true });
+  return json({ error: salida.error ?? "No se pudo enviar la prueba.", code: salida.code ?? "servidor" }, 502);
 }
 
 /* ---------- Entrada --------------------------------------------------------------------------------- */
@@ -547,11 +570,12 @@ Deno.serve(async (request) => {
     const permiso = await caller.rpc("int_puede_crear");
     if (permiso.error || permiso.data !== true) return json({ error: "No tiene permiso para enviar avisos de convenios." }, 403);
 
-    if (body.action === "enviar") return await enviarAhora(url, service, quien.data.user.id, body);
+    if (body.action === "enviar") return await enviarAhora(url, service, quien.data.user.id, quien.data.user.email ?? "", body);
     if (body.action === "prueba") return await prueba(url, service, anon, authorization, body);
     return json({ error: "Acción desconocida." }, 400);
-  } catch {
-    // Sin detalle: podría traer una dirección.
-    return json({ error: "Algo falló al atender el pedido." }, 500);
+  } catch (e) {
+    // Un código y el tipo de falla, sin el mensaje: podría traer una dirección.
+    const tipo = (e as { name?: string } | null)?.name ?? "Error";
+    return json({ error: `Algo falló al atender el pedido en la función de avisos (${tipo}). Revise los registros de la función conv-avisos.`, code: "interno" }, 500);
   }
 });

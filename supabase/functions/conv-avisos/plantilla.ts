@@ -13,7 +13,7 @@
 export type Idioma = "es" | "en";
 
 export const VARIABLES_AVISO = ["institucion", "pais", "codigo", "fecha_termino", "dias", "tipo", "enlace_renovacion"] as const;
-export const VARIABLES_FIRMA = ["enlace_firma", "vence", "nombre_firmante", "institucion", "codigo_certificado"] as const;
+export const VARIABLES_FIRMA = ["enlace_firma", "vence", "nombre_firmante", "institucion", "codigo_certificado", "codigo_verificacion"] as const;
 
 /** Claves de plantilla que la pantalla reconoce, con el conjunto de variables que ofrece cada una. */
 export const CLAVES_FIRMA = ["firma_solicitud", "firma_certificado"] as const;

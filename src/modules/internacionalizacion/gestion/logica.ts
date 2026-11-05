@@ -356,10 +356,11 @@ export function variablesAviso(c: Pick<Convenio, "id" | "codigo" | "institucion"
     dias: String(dias),
     tipo: c.tipo,
     enlace_renovacion: `${base}/admin/internacionalizacion/gestion?tab=modelos&convenio=${c.id}`,
-    enlace_firma: `${base}/firmar/ejemplo`,
+    enlace_firma: `${base}/firma/ejemplo`,
     vence: fechaLegible(sumarDias(hoy, 7), idioma),
     nombre_firmante: idioma === "es" ? "Persona de ejemplo" : "Sample Person",
-    codigo_certificado: "UDES-0000-0000",
+    codigo_certificado: "UDES-CV-2026-000000",
+    codigo_verificacion: "123456",
   };
 }
 

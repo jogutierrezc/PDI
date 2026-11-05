@@ -38,7 +38,7 @@ export function Vencimientos({ convenios, hoy, crea, vencidos, onRenovar, onAvis
       {pendiente ? (
         <Confirmar
           pregunta={`¿Enviar el aviso de vencimiento a ${pendiente.institucion}?`}
-          detalle={`Sale la plantilla que corresponde a los ${diasFaltantes(pendiente, hoy) ?? 0} días que faltan (${pendiente.codigo.toUpperCase()}). Según el modo de Gestión › Avisos llega a Mailpit (prueba) o al SMTP institucional. Queda anotado en la bitácora y en el historial del convenio.`}
+          detalle={`Sale la plantilla que corresponde a los ${diasFaltantes(pendiente, hoy) ?? 0} días que faltan (${pendiente.codigo.toUpperCase()}). Según el modo de Gestión › Avisos llega a su propia dirección con [PRUEBA] o a los destinatarios reales, siempre por Sistema › Correos. Queda anotado en la bitácora y en el historial del convenio.`}
           si="Enviar el aviso"
           ocupado={enviar.isPending}
           onNo={() => setPendiente(null)}
@@ -47,7 +47,7 @@ export function Vencimientos({ convenios, hoy, crea, vencidos, onRenovar, onAvis
             enviar.mutate(
               { convenio_id: c.id },
               {
-                onSuccess: (r) => aviso.ok(`Aviso enviado a ${r.resultado.enviados} ${r.resultado.enviados === 1 ? "destinatario" : "destinatarios"} de ${c.institucion}${r.modo === "prueba" ? " (modo de prueba, llegó a Mailpit)" : ""}. Quedó en la bitácora de Gestión › Avisos.`),
+                onSuccess: (r) => aviso.ok(`Aviso enviado a ${r.resultado.enviados} ${r.resultado.enviados === 1 ? "destinatario" : "destinatarios"} de ${c.institucion}${r.modo === "prueba" ? " (modo de prueba: llegó a su propia dirección)" : ""}. Quedó en la bitácora de Gestión › Avisos.`),
                 onError: aviso.mal,
                 onSettled: () => setPendiente(null),
               },

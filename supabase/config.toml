@@ -78,3 +78,9 @@ verify_jwt = false
 # comparte contactos académicos o de empleadores por un enlace con token. La función valida
 # por su cuenta el token, la sesión por persona y el tope de peticiones por IP.
 verify_jwt = false
+
+[functions.conv-firma]
+# Firma electrónica de convenios (0258). Los firmantes externos no tienen cuenta: el token del enlace, el código de
+# 6 dígitos y la sesión corta se validan dentro de la función. Las acciones internas comprueban la sesión
+# y los permisos (int_puede_crear / int_ve_modulo); «vencer» exige el secreto CONV_FIRMA_CRON o la clave de servicio.
+verify_jwt = false

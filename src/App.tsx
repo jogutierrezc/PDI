@@ -24,6 +24,9 @@ const Launcher = lazy(() => import("./modules/admin/launcher/Launcher").then((m)
 const PlaneacionHome = lazy(() => import("./modules/planeacion/PlaneacionHome").then((m) => ({ default: m.PlaneacionHome })));
 const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ContactosPublico = lazy(() => import("./modules/internacionalizacion/contactos/publico/ContactosPublico").then((m) => ({ default: m.ContactosPublico })));
+const Firmante = lazy(() => import("./modules/internacionalizacion/firma/Firmante").then((m) => ({ default: m.Firmante })));
+const FirmaMovil = lazy(() => import("./modules/internacionalizacion/firma/Movil").then((m) => ({ default: m.Movil })));
+const VerificarFirma = lazy(() => import("./modules/internacionalizacion/firma/Verificar").then((m) => ({ default: m.Verificar })));
 const AskPilo = lazy(() => import("./modules/pregunta/AskPilo").then((m) => ({ default: m.AskPilo })));
 const ObsEmbed = lazy(() => import("./modules/obs-embed/ObsEmbed").then((m) => ({ default: m.ObsEmbed })));
 const PiloEmbed = lazy(() => import("./modules/pilo-embed/PiloEmbed").then((m) => ({ default: m.PiloEmbed })));
@@ -315,6 +318,11 @@ export default function App() {
           <Route path="/rutas" element={<RutasPublico />} />
           {/* Contactos (0167): el enlace de invitación de Internacionalización; sin iniciar sesión, con el token como llave. */}
           <Route path="/contactos/i/:token" element={<ContactosPublico />} />
+          {/* Firma electrónica de convenios (0258): páginas públicas sin sesión; el token del enlace es la llave. */}
+          <Route path="/firma/movil/:token" element={<FirmaMovil />} />
+          <Route path="/firma/:token" element={<Firmante />} />
+          <Route path="/verificar" element={<VerificarFirma />} />
+          <Route path="/verificar/:codigo" element={<VerificarFirma />} />
           <Route path="/encuesta/:slug" element={<EncuestaPublica />} />
           {/* El chat emergente de Pilo, para verse dentro de un marco en otros portales (public/pilo.js). */}
           <Route path="/pilo-embed" element={<PiloEmbed />} />

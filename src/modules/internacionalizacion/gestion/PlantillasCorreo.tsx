@@ -80,7 +80,6 @@ function Editor({ plantilla, convenios, crea }: { plantilla: PlantillaCorreo; co
   const [cuerpo, setCuerpo] = useState(plantilla.cuerpo);
   const [convenioId, setConvenioId] = useState("");
   const [para, setPara] = useState("");
-  const [destino, setDestino] = useState<"mailpit" | "smtp">("mailpit");
   const [enviando, setEnviando] = useState(false);
 
   const firma = plantilla.clave.startsWith("firma_");
@@ -114,8 +113,8 @@ function Editor({ plantilla, convenios, crea }: { plantilla: PlantillaCorreo; co
   const probar = async () => {
     setEnviando(true);
     try {
-      await enviarPruebaAviso({ asunto, cuerpo, idioma: plantilla.idioma, para: para.trim(), destino, ...(conv ? { convenio_id: conv.id } : {}) });
-      aviso.ok(destino === "mailpit" ? `Prueba enviada a Mailpit (${para.trim()}).` : `Prueba enviada a ${para.trim()}.`);
+      await enviarPruebaAviso({ asunto, cuerpo, idioma: plantilla.idioma, para: para.trim(), ...(conv ? { convenio_id: conv.id } : {}) });
+      aviso.ok(`Prueba enviada a ${para.trim()}. Sale por la función de Correos de la intranet; si no llega, revise su bitácora en Sistema › Correos.`);
     } catch (e) {
       aviso.mal(e);
     } finally {
@@ -209,19 +208,12 @@ function Editor({ plantilla, convenios, crea }: { plantilla: PlantillaCorreo; co
             <span>Enviar prueba a</span>
             <input id="gp-para" type="text" inputMode="email" autoComplete="email" value={para} placeholder="nombre@udes.edu.co" onChange={(e) => setPara(e.target.value)} />
           </label>
-          <label className="it-campo" htmlFor="gp-dest">
-            <span>Servidor</span>
-            <select id="gp-dest" value={destino} onChange={(e) => setDestino(e.target.value as "mailpit" | "smtp")}>
-              <option value="mailpit">Mailpit (prueba, no sale)</option>
-              <option value="smtp">SMTP institucional (sale de verdad)</option>
-            </select>
-          </label>
           <button type="button" className="conv-btn" disabled={!crea || enviando || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(para.trim())} onClick={() => void probar()}>
             <Icon name="mail" size={14} />
             {enviando ? "Enviando…" : "Enviar prueba"}
           </button>
         </div>
-        {config.data?.modo === "prueba" && destino === "smtp" ? <p className="conv-sub">Los avisos automáticos están en modo de prueba, pero esta prueba sí saldrá por el SMTP institucional.</p> : null}
+        <p className="conv-sub">La prueba sale de verdad, con el asunto «[PRUEBA]», por la función de Correos de la intranet (Sistema › Correos). Solo llega a dominios permitidos allí.</p>
       </div>
     </div>
   );

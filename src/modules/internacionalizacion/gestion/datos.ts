@@ -206,21 +206,34 @@ export class ErrorAvisos extends Error {
 }
 
 async function llamarAvisos<T>(cuerpo: Record<string, unknown>): Promise<T> {
-  const r = await supabase.functions.invoke("conv-avisos", { body: cuerpo });
-  if (r.error) {
-    const ctx = (r.error as { context?: Response }).context;
-    let mensaje = "No se pudo conectar con el servicio de avisos. Revise que la función conv-avisos esté desplegada.";
-    let codigo: string | undefined;
-    try {
-      const j = ctx ? ((await ctx.json()) as { error?: string; code?: string }) : null;
-      if (j?.error) mensaje = j.error;
-      codigo = j?.code;
-    } catch {
-      // Sin cuerpo JSON: queda el mensaje general.
+  // La función espera hasta 20 s a `correos`; si nada responde en 45 s, la pantalla lo dice en vez de quedarse esperando.
+  let reloj: ReturnType<typeof setTimeout> | undefined;
+  const espera = new Promise<never>((_, rechazo) => {
+    reloj = setTimeout(() => rechazo(new ErrorAvisos("El servicio de avisos no respondió a tiempo (45 s). Revise la bitácora de Gestión › Avisos y los registros de la función conv-avisos antes de reintentar.", "tiempo")), 45_000);
+  });
+  try {
+    const r = await Promise.race([supabase.functions.invoke("conv-avisos", { body: cuerpo }), espera]);
+    if (r.error) {
+      // En supabase-js el cuerpo de una respuesta con error (no 2xx) viene en error.context, que es la Response.
+      const ctx = (r.error as { context?: Response }).context;
+      let mensaje = ctx && typeof ctx.status === "number"
+        ? `El servicio de avisos respondió con un error (${ctx.status}).`
+        : "No se pudo conectar con el servicio de avisos. Revise que la función conv-avisos esté desplegada.";
+      let codigo: string | undefined;
+      try {
+        const j = ctx ? ((await ctx.json()) as { error?: string; code?: string; msg?: string; message?: string }) : null;
+        const texto = j?.error ?? j?.msg ?? j?.message;
+        if (texto) mensaje = texto;
+        codigo = j?.code;
+      } catch {
+        // Sin cuerpo JSON: queda el mensaje general con el estado.
+      }
+      throw new ErrorAvisos(mensaje, codigo);
     }
-    throw new ErrorAvisos(mensaje, codigo);
+    return r.data as T;
+  } finally {
+    clearTimeout(reloj);
   }
-  return r.data as T;
 }
 
 export interface ResultadoEnvio {
@@ -239,7 +252,7 @@ export function useEnviarAviso() {
   });
 }
 
-export const enviarPruebaAviso = (a: { asunto: string; cuerpo: string; idioma: Idioma; para: string; destino: "mailpit" | "smtp"; convenio_id?: string }) => llamarAvisos<{ ok: true }>({ action: "prueba", ...a });
+export const enviarPruebaAviso = (a: { asunto: string; cuerpo: string; idioma: Idioma; para: string; convenio_id?: string }) => llamarAvisos<{ ok: true }>({ action: "prueba", ...a });
 
 /* ---------- Modelos ---------------------------------------------------------------------- */
 

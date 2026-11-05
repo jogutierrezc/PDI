@@ -34,6 +34,12 @@
         { action: "thi_cola", limite? }                         → igual que ugm_cola
             THE Impact (0241): la cola `thi_notificaciones` con las plantillas
             `c-thi-*`. Misma lógica y mismas protecciones (colaDeRanking).
+        { action: "conv_envio", to[], asunto, html, texto, remitente?, adjuntos?, referencia?, tipo? }
+            Gestión de convenios (conv-avisos, conv-firma): solo con la clave de servicio. Envía un correo ya
+            armado con las mismas protecciones. Responde { ok:true, enviados } o { ok:false, error, code }
+            (code: sesion, datos, adjuntos, dominio, apagado, tope, config, o el del servidor de correo).
+            Para escribirle a instituciones externas, «Dominios permitidos» en Sistema › Correos debe estar
+            vacío o incluir sus dominios.
 
    Decisiones que conviene conocer:
      · La identidad sale de la cuenta: con `user_metadata.pilo` es Mr. Pilo; si
@@ -1872,6 +1878,142 @@ async function colaDeRanking(perfil: PerfilCola, request: Request, body: Record<
   return json({ ok: true, enviados, fallidos, pendientes: Math.max(0, lote.length - enviados - fallidos) });
 }
 
+/* --- Un correo de Gestión de convenios (conv-avisos, conv-firma): destinatarios, asunto y cuerpo ya armados ------ */
+
+const MAX_ADJUNTOS_CONV = 3;
+const MAX_ADJUNTOS_CONV_BYTES = 5 * 1024 * 1024;
+const MAX_DESTINOS_CONV = 10;
+/** Lo más que puede tardar un envío de convenios (con adjuntos); conv-avisos espera 20 s. */
+const SMTP_TOTAL_CONV_MS = 15_000;
+
+/** Comparación en tiempo constante, para que la clave de servicio no se adivine por el tiempo de respuesta. */
+function igualesCT(a: string, b: string): boolean {
+  if (!a || a.length !== b.length) return false;
+  let x = 0;
+  for (let i = 0; i < a.length; i++) x |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return x === 0;
+}
+
+/**
+ * { action: "conv_envio", to: string[], asunto, html, texto, remitente?: { nombre, direccion }, adjuntos?: [{ nombre, base64, tipo? }],
+ *   referencia?, tipo?: "aviso" | "prueba" }  →  { ok:true, enviados:n } | { ok:false, error, code }
+ * Solo con la clave de servicio. El texto lo arman conv-avisos o conv-firma; aquí solo se aplican las protecciones de siempre:
+ * interruptor general, dominios permitidos, tope por hora y bitácora enmascarada (sin contenido ni enlaces).
+ * La referencia queda en la columna hook_id de la bitácora.
+ */
+async function envioDeConvenios(request: Request, body: Record<string, unknown>, url: string, serviceKey: string): Promise<Response> {
+  const fallo = (http: number, code: string, error: string) => json({ ok: false, code, error }, http);
+  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer /, "");
+  if (!igualesCT(bearer, serviceKey)) return fallo(401, "sesion", "Falta la sesión.");
+
+  const crudos = Array.isArray(body.to) ? body.to : typeof body.to === "string" ? [body.to] : [];
+  const para = [...new Set(crudos.map((v) => (typeof v === "string" ? v.trim().toLowerCase().slice(0, 254) : "")))];
+  if (para.length === 0 || para.length > MAX_DESTINOS_CONV || !para.every(correoValido)) return fallo(400, "datos", `Falta el destinatario, o alguno no es un correo válido (máximo ${MAX_DESTINOS_CONV}).`);
+  const asunto = typeof body.asunto === "string" ? body.asunto.replace(/[\r\n]+/g, " ").trim().slice(0, 250) : "";
+  const html = typeof body.html === "string" ? body.html : "";
+  const textoPlano = typeof body.texto === "string" ? body.texto : "";
+  if (!asunto || !html || html.length > 300_000 || textoPlano.length > 100_000) return fallo(400, "datos", "Faltan el asunto o el mensaje, o el mensaje es demasiado largo.");
+  const tipo: Tipo = body.tipo === "prueba" ? "prueba" : "aviso";
+  const referencia = typeof body.referencia === "string" ? body.referencia.replace(/[^\w:.\- ]/g, "").slice(0, 120) : "";
+
+  const adjuntos: { filename: string; content: Uint8Array; contentType?: string }[] = [];
+  const crudosAdj = Array.isArray(body.adjuntos) ? body.adjuntos : [];
+  if (crudosAdj.length > MAX_ADJUNTOS_CONV) return fallo(400, "adjuntos", `Se admiten hasta ${MAX_ADJUNTOS_CONV} adjuntos.`);
+  let bytesAdj = 0;
+  for (const a of crudosAdj) {
+    const o = (a && typeof a === "object" ? a : {}) as Record<string, unknown>;
+    const nombre = typeof o.nombre === "string" ? o.nombre.replace(/[^\w.\- ()áéíóúñÁÉÍÓÚÑ]/g, "_").slice(0, 120) : "";
+    if (!nombre || typeof o.base64 !== "string" || !/^[A-Za-z0-9+/=\s]+$/.test(o.base64)) return fallo(400, "adjuntos", "Un adjunto no trae nombre o contenido válido.");
+    let contenido: Uint8Array;
+    try {
+      contenido = Uint8Array.from(atob(o.base64.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+    } catch {
+      return fallo(400, "adjuntos", "Un adjunto no está bien codificado.");
+    }
+    bytesAdj += contenido.length;
+    if (bytesAdj > MAX_ADJUNTOS_CONV_BYTES) return fallo(413, "adjuntos", "Los adjuntos pasan de 5 MB en total.");
+    adjuntos.push({ filename: nombre, content: contenido, ...(typeof o.tipo === "string" && /^[\w.+-]+\/[\w.+-]+$/.test(o.tipo) ? { contentType: o.tipo } : {}) });
+  }
+
+  const admin = cliente(url, serviceKey);
+  const sal = ENV("SEND_EMAIL_HOOK_SECRET") || serviceKey;
+  const hashes = await Promise.all(para.map((p) => huella(p, sal)));
+  const ctx = await contextoDe(admin, hashes[0], "");
+  const ajustes = ctx?.settings ?? null;
+  const dominios = dominiosDe(ajustes?.allowed_domains ?? []);
+  const base = { kind: tipo, identity: "plan" as Identidad, template: "conv-aviso", rol: "", action: "conv_envio", hook: referencia };
+  const anotarTodos = async (result: Resultado, reason: string) => {
+    for (const [i, p] of para.entries()) await anotar(admin, { ...base, para: p, hash: hashes[i], result, reason });
+  };
+
+  // Un destinatario fuera de los dominios permitidos frena el envío completo y lo explica, sin nombrar la dirección.
+  const fuera = para.filter((p) => !dominioPermitido(p, dominios));
+  if (fuera.length) {
+    for (const p of fuera) await anotar(admin, { ...base, para: p, hash: hashes[para.indexOf(p)], result: "rechazado", reason: "Dominio no permitido." });
+    return fallo(
+      403,
+      "dominio",
+      `${fuera.length === 1 ? "Un destinatario no es" : `${fuera.length} destinatarios no son`} de un dominio permitido. Para escribirle a instituciones externas, la administración debe agregar ese dominio (o dejar vacía la lista) en Sistema › Correos › Dominios permitidos.`,
+    );
+  }
+  const decision = decidirEnvio({
+    tipo: "aviso",
+    encendido: ajustes ? ajustes.enabled !== false : true,
+    permitido: true,
+    enHora: Number(ctx?.in_hour ?? 0) + para.length - 1,
+    topeHora: Number(ajustes?.hourly_limit ?? 0),
+    dePersonaHoy: 0,
+    topePersona: 0,
+  });
+  if (!decision.sale) {
+    await anotarTodos(decision.resultado, decision.motivo);
+    return fallo(decision.http, decision.http === 429 ? "tope" : "apagado", decision.motivo);
+  }
+
+  const conexion = conexionDe(ajustes, ctx?.password ?? "", variablesSmtp());
+  const porDefecto = remitenteDe(ctx, "plan", conexion);
+  const sinConfig = conexion.origen === "ninguno"
+    ? "Falta configurar el servidor de correo en la intranet (Correos › Remitentes y conexión)."
+    : !porDefecto.direccion
+      ? "Falta la dirección del remitente: escríbala en la intranet (Correos › Remitentes y conexión)."
+      : "";
+  if (sinConfig) {
+    await anotarTodos("rechazado", sinConfig);
+    return fallo(503, "config", sinConfig);
+  }
+  // El remitente que pide la función solo vale si es de un dominio permitido (y, con la lista vacía, si es el de la intranet).
+  const r = (body.remitente && typeof body.remitente === "object" ? body.remitente : {}) as Record<string, unknown>;
+  const dirR = typeof r.direccion === "string" ? r.direccion.trim().toLowerCase() : "";
+  const nombreR = typeof r.nombre === "string" ? r.nombre.replace(/[\r\n"<>]+/g, " ").trim().slice(0, 100) : "";
+  const propio = correoValido(dirR) && (dominios.length > 0 ? dominioPermitido(dirR, dominios) : dirR === porDefecto.direccion.toLowerCase());
+  const desde = { name: (propio && nombreR) || porDefecto.nombre, address: propio ? dirR : porDefecto.direccion };
+  const responder = propio ? dirR : porDefecto.responder;
+
+  const transporte = transporteDe(conexion);
+  try {
+    await conTope(
+      SMTP_TOTAL_CONV_MS,
+      transporte,
+      transporte.sendMail({
+        from: desde,
+        to: para,
+        ...(responder ? { replyTo: responder } : {}),
+        subject: asunto,
+        ...(textoPlano ? { text: textoPlano } : {}),
+        html,
+        ...(adjuntos.length ? { attachments: adjuntos } : {}),
+        headers: { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" },
+      }),
+    );
+  } catch (error) {
+    const f = falloSmtp(error);
+    await anotarTodos("rechazado", f.mensaje);
+    return fallo(502, f.codigo, f.mensaje);
+  }
+  await anotarTodos("aceptado", "Aceptado por el servidor");
+  return json({ ok: true, enviados: para.length });
+}
+
 /* --- La intranet: probar la conexión y enviar una prueba --------------------------------------- */
 
 async function panel(request: Request, crudo: string, url: string, anonKey: string, serviceKey: string): Promise<Response> {
@@ -1888,6 +2030,7 @@ async function panel(request: Request, crudo: string, url: string, anonKey: stri
   if (action === "gm") return await avisoDeGestionMaster(request, body, url, serviceKey);
   if (action === "ugm_cola") return await colaDeUgm(request, body, url, anonKey, serviceKey);
   if (action === "thi_cola") return await colaDeThi(request, body, url, anonKey, serviceKey);
+  if (action === "conv_envio") return await envioDeConvenios(request, body, url, serviceKey);
   if (action !== "probar" && action !== "prueba") return json({ error: "Acción desconocida.", code: "datos" }, 400);
 
   // Solo la administración, con su sesión.

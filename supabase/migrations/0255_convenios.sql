@@ -317,4 +317,16 @@ grant execute on function public.conv_asegurar_carpeta(uuid) to authenticated;
 -- Reparte los papeles de la oficina ahora (quienes ya están en int_miembros y Planeación).
 select public.conv_sincronizar_unidad();
 
+-- -----------------------------------------------------------------------------
+-- Reparación para bases que aplicaron la PRIMERA versión de esta migración (carpeta «udrive_solicitada»,
+-- sin drive_carpeta_id): `create table if not exists` no agrega columnas, así que se agregan aquí.
+-- En una base nueva no hace nada. Idempotente.
+-- -----------------------------------------------------------------------------
+alter table public.conv_convenios
+  add column if not exists drive_carpeta_id uuid references public.drive_carpetas (id) on delete set null;
+alter table public.conv_convenios drop constraint if exists conv_carpeta;
+update public.conv_convenios set carpeta_estado = 'sin' where carpeta_estado = 'udrive_solicitada';
+alter table public.conv_convenios
+  add constraint conv_carpeta check (carpeta_estado in ('udrive', 'enlace', 'sin'));
+
 notify pgrst, 'reload schema';

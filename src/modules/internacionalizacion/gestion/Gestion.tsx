@@ -18,16 +18,17 @@ import { puedeCrear, hoyBogota } from "../lib/permisos";
 import { AvisoMigracion, Cargando, ErrorCaja } from "../ui/comunes";
 import type { Ctx } from "../ui/comunes";
 import { Avisos } from "./Avisos";
+import { Firma } from "./Firma";
 import { Modelos } from "./Modelos";
 import "../convenios/convenios.css";
 import "./gestion.css";
 
-type Pestana = "avisos" | "modelos";
+type Pestana = "avisos" | "modelos" | "firma";
 
-// La segunda parte agrega aquí { id: "firma", rotulo: "Firma" } y su componente.
 const PESTANAS: { id: Pestana; rotulo: string }[] = [
   { id: "avisos", rotulo: "Avisos" },
   { id: "modelos", rotulo: "Modelos" },
+  { id: "firma", rotulo: "Firma" },
 ];
 
 export function Gestion({ ctx }: { ctx: Ctx }) {
@@ -80,6 +81,8 @@ export function Gestion({ ctx }: { ctx: Ctx }) {
               animado.current = true;
             }}
           />
+        ) : pestana === "firma" ? (
+          <Firma convenios={convenios} crea={crea} />
         ) : (
           <Modelos convenios={convenios} hoy={hoy} crea={crea} convenioInicial={convenioInicial} />
         )}

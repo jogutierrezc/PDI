@@ -97,7 +97,7 @@ export function Avisos({ convenios, hoy, crea, animar, onAnimado }: { convenios:
           <div className="conv-bar">
             <h2>Bitácora de envíos</h2>
             <span className="conv-grow" />
-            <span className="conv-sub">{config.data?.modo === "real" ? "Salen por el SMTP institucional" : "Hoy los correos llegan a Mailpit, no a la contraparte"}</span>
+            <span className="conv-sub">{config.data?.modo === "real" ? "Salen a los destinatarios reales, por Sistema › Correos" : "Modo de prueba: los correos llegan a la dirección de prueba, no a la contraparte"}</span>
           </div>
           {!(bitacora.data ?? []).length ? (
             <p className="conv-vacio">
@@ -287,8 +287,8 @@ function Ajustes({ config, crea }: { config: ConfigAvisos; crea: boolean }) {
         <label className="it-campo" htmlFor="ga-modo">
           <span>Modo</span>
           <select id="ga-modo" value={config.modo} disabled={!crea} onChange={(e) => (e.target.value === "real" ? setConfirmarReal(true) : poner({ modo: "prueba" }))}>
-            <option value="prueba">Prueba (todo a Mailpit)</option>
-            <option value="real">Real (SMTP institucional)</option>
+            <option value="prueba">Prueba (todo a una dirección propia, con «[PRUEBA]»)</option>
+            <option value="real">Real (a los destinatarios, por Sistema › Correos)</option>
           </select>
         </label>
       </div>
@@ -417,7 +417,7 @@ function Cola({ cola, elegida, onElegir, crea, modo, hoy }: { cola: FilaCola[]; 
       {pendiente?.proxima ? (
         <Confirmar
           pregunta={`¿Enviar ahora el aviso de ${textoRegla(pendiente.proxima.regla.dias)}?`}
-          detalle={`Convenio con ${pendiente.convenio.institucion} (${pendiente.convenio.codigo.toUpperCase()}), que termina el ${fechaLarga(pendiente.convenio.fecha_terminacion)} (hoy: ${fechaLarga(hoy)}). ${modo === "prueba" ? "Está en modo de prueba: el correo llega a Mailpit." : "Está en modo real: el correo sale por el SMTP institucional."}`}
+          detalle={`Convenio con ${pendiente.convenio.institucion} (${pendiente.convenio.codigo.toUpperCase()}), que termina el ${fechaLarga(pendiente.convenio.fecha_terminacion)} (hoy: ${fechaLarga(hoy)}). ${modo === "prueba" ? "Está en modo de prueba: el correo llega a su propia dirección con el asunto [PRUEBA]." : "Está en modo real: el correo sale a los destinatarios reales por Sistema › Correos."}`}
           si="Enviar el aviso"
           ocupado={enviar.isPending}
           onNo={() => setPendiente(null)}

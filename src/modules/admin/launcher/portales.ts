@@ -13,7 +13,7 @@
      when     condición propia (p. ej. el lado de Impacto de la persona)
    ========================================================================== */
 
-import type { AdminScreen, AppRole, GmNivel } from "../../../types/database";
+import type { AdminScreen, AppRole, CtNivel, GmNivel } from "../../../types/database";
 import type { ImpactoSide } from "../../../lib/auth";
 import { navigation, type AdminSection, type NavGroup } from "../components/AdminShell";
 import { STATIONS } from "../udes-en-cifras/progress";
@@ -33,6 +33,8 @@ export interface PortalContext {
   intDirector?: boolean;
   /** Nivel en Gestión Master (0194): gestor ve Flujos y Conexión. */
   gmNivel?: GmNivel;
+  /** Nivel en Cumplimiento de Tipología (0260). */
+  ctNivel?: CtNivel;
 }
 
 export interface PortalCard {
@@ -235,19 +237,27 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
         {
           title: "Gestión de Actividades",
           cards: [
-            { key: "gm-bandeja", title: "Bandeja de solicitudes", text: "Revisar, aprobar, devolver con nota o rechazar, una por una o por lote", to: `${base}/bandeja` },
-            { key: "gm-nueva", title: "Nueva solicitud", text: "Nuevo, mejorar o mantener, o eliminar, con los datos del código desde el Warehouse", to: `${base}/nueva` },
-            { key: "gm-estructura", title: "Estructura de actividades", text: "El catálogo del Master por periodo y sede, y su comparación entre periodos", to: `${base}/estructura` },
-            { key: "gm-periodo", title: "Actividades del periodo", text: "Profesores, horas y promedio por actividad, por departamento y por docente", to: `${base}/periodo` },
+            { key: "gm-bandeja", title: "Bandeja de solicitudes", text: "Revisar, aprobar, devolver con nota o rechazar, una por una o por lote", to: `${base}/bandeja`, screen: "gestion_master" },
+            { key: "gm-nueva", title: "Nueva solicitud", text: "Nuevo, mejorar o mantener, o eliminar, con los datos del código desde el Warehouse", to: `${base}/nueva`, screen: "gestion_master" },
+            { key: "gm-estructura", title: "Estructura de actividades", text: "El catálogo del Master por periodo y sede, y su comparación entre periodos", to: `${base}/estructura`, screen: "gestion_master" },
+            { key: "gm-periodo", title: "Actividades del periodo", text: "Profesores, horas y promedio por actividad, por departamento y por docente", to: `${base}/periodo`, screen: "gestion_master" },
+          ],
+        },
+        {
+          title: "Cumplimiento de Tipología",
+          cards: [
+            { key: "ct-programa", title: "Cumplimiento por programa", text: "Cuántos profesores cumplen la tipología de su contrato, por qué no y qué perfil conviene planear", to: "/admin/cumplimiento-tipologia", screen: "cumplimiento_tipologia" },
+            { key: "ct-sedes", title: "Programas por sede", text: "El cumplimiento de cada programa en Bucaramanga, Valledupar, Cúcuta y Bogotá", to: "/admin/cumplimiento-tipologia?vista=sedes", screen: "cumplimiento_tipologia", when: (ctx) => ctx.ctNivel === "vicerrectoria" || ctx.ctNivel === "admin" },
+            { key: "ct-corte", title: "Calcular el corte", text: "Lee el Warehouse, corre el motor y deja el corte del periodo y la sede", to: "/admin/cumplimiento-tipologia?vista=corte", screen: "cumplimiento_tipologia", when: (ctx) => ctx.ctNivel === "admin" },
           ],
         },
         {
           title: "Seguimiento y control",
           cards: [
-            { key: "gm-seguimiento", title: "Seguimiento", text: "Línea de tiempo, vencimientos y cuellos de botella", to: `${base}/seguimiento` },
-            { key: "gm-flujos", title: "Flujos de aprobación", text: "Pasos, funciones, suplentes y plazos", to: `${base}/flujos`, when: (ctx) => ctx.gmNivel === "gestor" },
-            { key: "gm-conexion", title: "Conexión con el Warehouse", text: "Lo capturado del Master, lo que falta aplicar y el corte", to: `${base}/conexion`, when: (ctx) => ctx.gmNivel === "gestor" },
-            { key: "gm-rua", title: "Histórico de Rua", text: "Las solicitudes que se tramitaron en Rua, solo para consultar", to: `${base}/rua` },
+            { key: "gm-seguimiento", title: "Seguimiento", text: "Línea de tiempo, vencimientos y cuellos de botella", to: `${base}/seguimiento`, screen: "gestion_master" },
+            { key: "gm-flujos", title: "Flujos de aprobación", text: "Pasos, funciones, suplentes y plazos", to: `${base}/flujos`, when: (ctx) => ctx.gmNivel === "gestor", screen: "gestion_master" },
+            { key: "gm-conexion", title: "Conexión con el Warehouse", text: "Lo capturado del Master, lo que falta aplicar y el corte", to: `${base}/conexion`, when: (ctx) => ctx.gmNivel === "gestor", screen: "gestion_master" },
+            { key: "gm-rua", title: "Histórico de Rua", text: "Las solicitudes que se tramitaron en Rua, solo para consultar", to: `${base}/rua`, screen: "gestion_master" },
           ],
         },
       ];

@@ -234,6 +234,7 @@ const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default:
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
 const UDrive = lazy(() => import("./modules/udrive/ui/UDrive").then((m) => ({ default: m.UDrive })));
 const GestionMaster = lazy(() => import("./modules/gestion-master/GestionMaster").then((m) => ({ default: m.GestionMaster })));
+const CumplimientoTipologia = lazy(() => import("./modules/cumplimiento-tipologia/CumplimientoTipologia").then((m) => ({ default: m.CumplimientoTipologia })));
 const ProgramasEnCifras = lazy(() => import("./modules/programas-en-cifras/ui/ProgramasEnCifras").then((m) => ({ default: m.ProgramasEnCifras })));
 const Encuestas = lazy(() => import("./modules/encuestas/ui/Encuestas").then((m) => ({ default: m.Encuestas })));
 const EncuestaPublica = lazy(() => import("./modules/encuestas/publico/EncuestaPublica").then((m) => ({ default: m.EncuestaPublica })));
@@ -537,6 +538,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="gestion_master">
                 <GestionMaster />
+              </RequireRole>
+            }
+          />
+          {/* Cumplimiento de Tipología (0260): carpeta Gestión Master. El acceso es el nivel del rol (ct_nivel), no la capacidad. */}
+          <Route
+            path="/admin/cumplimiento-tipologia"
+            element={
+              <RequireRole minimum="consulta" screen="cumplimiento_tipologia">
+                <CumplimientoTipologia />
               </RequireRole>
             }
           />

@@ -14,6 +14,7 @@
    guardar la personalización exige aplicarla.
    ========================================================================== */
 
+import { AyudaPilo } from "../guia/AyudaPilo";
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
@@ -192,7 +193,8 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
     <>
       {modo === "libro" && (
         <>
-          <div className="vi-bar">
+          <div className="vi-bar" data-guia="v-papel">
+            <AyudaPilo zona="v-papel" borde />
             <Segmentado
               etiqueta="Papel"
               valor={diseno.papel}

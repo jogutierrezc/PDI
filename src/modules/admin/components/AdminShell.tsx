@@ -63,6 +63,7 @@ export type AdminSection =
   | "encuestas"
   | "udrive"
   | "gestion_master"
+  | "cumplimiento_tipologia"
   | "cms"
   | "obs_observatorios"
   | "obs_insertar";
@@ -230,6 +231,7 @@ export const navigation: NavGroup[] = [
     label: "Gestión Master",
     items: [
       { id: "gestion_master", label: "Gestión de Actividades", icon: "clipboard", to: "/admin/gestion-master", minimum: "consulta" },
+      { id: "cumplimiento_tipologia", label: "Cumplimiento de Tipología", icon: "spark-chart", to: "/admin/cumplimiento-tipologia", minimum: "consulta" },
     ],
   },
   {
@@ -959,9 +961,9 @@ export function AdminShell({
  * El riel de una pantalla: sus vistas o estaciones, colgadas del borde bajo de
  * la cabecera. Va en la prop `rail` de AdminShell.
  */
-export function AdminRail({ label, children }: { label: string; children: ReactNode }) {
+export function AdminRail({ label, children, guia }: { label: string; children: ReactNode; guia?: string }) {
   return (
-    <nav className="admin-rail" aria-label={label}>
+    <nav className="admin-rail" aria-label={label} data-guia={guia}>
       {children}
     </nav>
   );

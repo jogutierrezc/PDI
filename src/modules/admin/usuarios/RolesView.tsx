@@ -30,6 +30,7 @@ import type { Plantilla } from "../../informes/types";
 import { useProgramOffer, useUnitOptions, type UnitOption } from "./people-db";
 import { reason, roleMatrix } from "./summary";
 import {
+  CT_NIVELES,
   EXPLICIT_ONLY,
   LEVEL_LABEL,
   MODULES,
@@ -501,6 +502,8 @@ function RoleEditor({
           informe_gestion: columns.informe_gestion,
           gm_nivel: columns.gm_nivel,
           gm_funcion: columns.gm_funcion,
+          // Sin la migración 0260 la columna no existe: solo se envía si el rol usa Cumplimiento de Tipología o ya la traía.
+          ...(columns.ct_nivel !== "none" || role?.ct_nivel !== undefined ? { ct_nivel: columns.ct_nivel } : {}),
           // Sin la migración 0231 la columna no existe: solo se envía si el rol usa el Observatorio o ya la traía.
           ...(columns.obs_nivel !== "none" || role?.obs_nivel !== undefined ? { obs_nivel: columns.obs_nivel, all_obs: columns.all_obs } : {}),
         },
@@ -745,8 +748,22 @@ function RoleEditor({
                       el informe de una o varias unidades, deje «Ver».
                     </small>
                   )}
-                  {module.id === "gestion-master" && (choice.level === "editar" || choice.level === "administrar") && (
+                  {module.id === "gestion-master" && (choice.level === "editar" || choice.level === "administrar") && choice.screens.includes("gestion_master") && (
                     <GmPicker level={choice.level} scope={matrix.gm} onChange={(change) => update((draft) => change(draft.gm))} />
+                  )}
+                  {module.id === "gestion-master" && choice.screens.includes("cumplimiento_tipologia") && (
+                    <div className="us-reports" role="group" aria-label="Nivel en Cumplimiento de Tipología">
+                      <strong>Nivel en Cumplimiento de Tipología</strong>
+                      <div className="us-screens">
+                        {CT_NIVELES.map((nivel) => (
+                          <label key={nivel.id} className="oda-check" title={nivel.hint}>
+                            <input type="radio" name="nivel-ct" checked={matrix.ct.nivel === nivel.id} onChange={() => update((draft) => void (draft.ct.nivel = nivel.id))} />
+                            {nivel.label}
+                          </label>
+                        ))}
+                      </div>
+                      <small>{CT_NIVELES.find((nivel) => nivel.id === matrix.ct.nivel)?.hint}</small>
+                    </div>
                   )}
                   {module.id === "observatorio" && (
                     <div className="us-reports" role="group" aria-label="Alcance en el Observatorio">

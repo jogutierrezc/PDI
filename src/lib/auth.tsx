@@ -15,7 +15,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import type { AccessRole, AdminScreen, AppRole, GmNivel, Profile } from "../types/database";
+import type { AccessRole, AdminScreen, AppRole, CtNivel, GmNivel, Profile } from "../types/database";
 
 const RANK: Record<AppRole, number> = {
   consulta: 1,
@@ -69,6 +69,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   encuestas: "/admin/encuestas",
   udrive: "/admin/udrive",
   gestion_master: "/admin/gestion-master",
+  cumplimiento_tipologia: "/admin/cumplimiento-tipologia",
   cms: "/admin/cms",
   // Paneles del Observatorio (0231): las cuatro estaciones y los dos paneles nuevos.
   obs_captura: "/admin/observatorio/captura",
@@ -155,6 +156,19 @@ export function gmNivelDe(profile: Profile | null, access: AccessScope | null): 
 }
 
 /**
+ * ¿Entra a Cumplimiento de Tipología? Espejo de ct_nivel_actual() (0260): la administración general siempre (como
+ * administrador del módulo); los demás, solo si su rol de acceso marca la pantalla «cumplimiento_tipologia» y lleva un
+ * nivel (programa, vicerrectoria o admin). La capacidad global NO basta, igual que en Gestión Master.
+ */
+export function ctNivelDe(profile: Profile | null, access: AccessScope | null): CtNivel {
+  if (!profile?.is_active) return "none";
+  if (RANK[profile.role] >= RANK.admin) return "admin";
+  if (!access) return "none";
+  const marcada = access.role.all_screens || access.role.screens.includes("cumplimiento_tipologia");
+  return marcada ? (access.role.ct_nivel ?? "none") : "none";
+}
+
+/**
  * ¿Ve esta pantalla de la intranet? Espejo de has_screen(), en una función
  * pura para que el menú, el lanzador y las pruebas usen la misma regla.
  */
@@ -185,6 +199,8 @@ export function screenVisible(
   }
   // Gestión Master: el permiso es el nivel del rol de acceso (gm_nivel), nunca la capacidad (0194).
   if (screen === "gestion_master") return gmNivelDe(profile, access) !== "none";
+  // Cumplimiento de Tipología: el permiso es el nivel del rol (ct_nivel), nunca la capacidad (0260).
+  if (screen === "cumplimiento_tipologia") return ctNivelDe(profile, access) !== "none";
   // Warehouse UDES: datos de las plataformas institucionales; solo por el rol, como en la base (0155).
   if (screen === "warehouse") return RANK[profile.role] >= RANK.planeacion && listed;
   // Monitor de alertas tempranas: quien pertenece a una facultad o programa ve lo suyo; Planeación, todo. La base (0160) lo exige también.

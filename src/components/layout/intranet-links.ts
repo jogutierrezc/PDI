@@ -42,6 +42,7 @@ const SCREENS: { screen: AdminScreen; label: string; icon: IconName }[] = [
   { screen: "programas-en-cifras", label: "Programas en Cifras", icon: "folder" },
   { screen: "udrive", label: "UDrive", icon: "folder" },
   { screen: "gestion_master", label: "Gestión Master", icon: "clipboard" },
+  { screen: "cumplimiento_tipologia", label: "Cumplimiento de Tipología", icon: "spark-chart" },
   { screen: "encuestas", label: "Encuestas con Pilo", icon: "mail" },
   { screen: "structure", label: "Normalizar estructura", icon: "settings" },
   { screen: "parameters", label: "Parámetros globales", icon: "settings" },

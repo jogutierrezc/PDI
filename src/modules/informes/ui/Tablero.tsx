@@ -11,6 +11,7 @@ import { useCrecer, useEntrada } from "../../rankings/movimiento";
 import { condicionDe, useAbrirInforme, useGuardarCiclo, useGuardarRequisito, useInstancias, useListas, useUnidades } from "../datos";
 import { DIMS, LETRAS, PLANTILLAS, cifraDef, dimsDe, escribeInforme, plantillaSugerida } from "../plantillas";
 import type { CicloRow, Condicion, ConfigCiclo, EstadoCiclo, Plantilla, RequisitoRow } from "../types";
+import { AyudaPilo } from "../guia/AyudaPilo";
 import { Aviso, Barra, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { configDe } from "./modelo";
 import { CriteriosAdmin } from "./CriteriosAdmin";
@@ -88,12 +89,12 @@ function FichaCiclo({ ciclo, ciclos, elegirAnio }: { ciclo: CicloRow | null; cic
     );
 
   return (
-    <section className="inf-card inf-pad" aria-labelledby="inf-ciclo">
+    <section className="inf-card inf-pad" aria-labelledby="inf-ciclo" data-guia="t-head">
       <div className="inf-row" style={{ justifyContent: "space-between" }}>
         <div>
           <span className="inf-eyebrow">{ciclo ? `Ciclo ${ciclo.anio}` : "Sin ciclo"}</span>
           <h3 id="inf-ciclo" className="inf-t">
-            {ciclo ? ciclo.nombre : "Abrir el ciclo del informe de gestión"}
+            {ciclo ? ciclo.nombre : "Abrir el ciclo del informe de gestión"} <AyudaPilo zona="t-head" />
           </h3>
         </div>
         {ciclos.length > 1 && (
@@ -183,9 +184,9 @@ function Requisitos({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: Requis
   const cuenta = (c: Condicion) => claves.filter((k) => condicionDe(requisitos, plantilla, k) === c).length;
 
   return (
-    <section className="inf-card inf-pad" aria-labelledby="inf-req">
+    <section className="inf-card inf-pad" aria-labelledby="inf-req" data-guia="t-req">
       <h3 id="inf-req" className="inf-t">
-        Qué datos debe justificar cada unidad
+        Qué datos debe justificar cada unidad <AyudaPilo zona="t-req" />
       </h3>
       <p className="inf-sub">
         Para la {PLANTILLAS[plantilla].nombre.toLowerCase()} ({PLANTILLAS[plantilla].quien.toLowerCase()}). Lo que marque como «Justificar» aparece bloqueado en el
@@ -341,9 +342,9 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
   };
 
   return (
-    <section className="inf-card inf-pad" aria-labelledby="inf-entrega">
+    <section className="inf-card inf-pad" aria-labelledby="inf-entrega" data-guia="t-tabla">
       <h3 id="inf-entrega" className="inf-t">
-        Entrega por unidad
+        Entrega por unidad <AyudaPilo zona="t-tabla" />
       </h3>
       <p className="inf-sub">
         Fecha límite {fmtFecha(ciclo.fecha_limite)}. {porUnidad.size} de {lista.length} informes abiertos.

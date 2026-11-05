@@ -48,6 +48,8 @@ export interface Contexto {
   usuario: string;
   /** Edificio, solo para la auditoría de horarios. */
   edificio?: { code: string; name: string };
+  /** Número de página (0, 1, 2…) en los reportes `paginado`: la plataforma recibe el desplazamiento (página × tamaño). */
+  pagina?: number;
 }
 
 export interface Peticion {
@@ -85,6 +87,11 @@ export interface Reporte {
   /** Se pide una vez por edificio y se juntan. */
   porEdificio?: boolean;
   verificado: boolean;
+  /**
+   * La lista llega por páginas (POST con `page` = desplazamiento): se pide cada página hasta que venga vacía, hasta
+   * juntar `count` o hasta `maximo` páginas, y cada pedido (`armar` y `extra`) se recorre por separado.
+   */
+  paginado?: { tamano: number; maximo: number };
   /** Pedidos adicionales que se juntan con el primero (departamentos de pregrado y de posgrado). */
   armar: (c: Contexto) => Peticion;
   extra?: ((c: Contexto) => Peticion)[];
@@ -135,6 +142,17 @@ const json = (id: string, sistema: SistemaApi, ruta: string, periodoVia: Reporte
   verificado: true,
   armar: () => ({ metodo: "GET", ruta }),
   extra,
+});
+
+const PLANTA_TAMANO = 50;
+/**
+ * El cuerpo de `approve_payroll/filter` tal como lo arma master-sync de Roomy: `is_active` y `to_confirm` en blanco para
+ * traer la planta completa, `page` es un DESPLAZAMIENTO (0, 50, 100…) y no un índice.
+ */
+const plantaDeMaster = (tipo: "pre" | "post", pagina: number): Peticion => ({
+  metodo: "POST",
+  ruta: "/master/mod_approve_payroll/approve_payroll/filter/",
+  cuerpo: { code: "", name: "", is_active: "", to_confirm: "", professor_type: tipo, cp: "cp", limit: PLANTA_TAMANO, page: pagina * PLANTA_TAMANO, orderField: "name", orderReverse: 1 },
 });
 
 export const REPORTES: Reporte[] = [
@@ -581,6 +599,25 @@ export const REPORTES: Reporte[] = [
         is_postgraduate: "1",
       },
     }),
+  },
+  {
+    // Estado de aprobación de la nómina (aprobado, preaprobado, por confirmar) de cada profesor: es la lista «Aprobar
+    // nómina» de Master, la misma que lee Roomy en master-sync (fetchPlantaPages / buildPlantaBody). La nómina consolidada
+    // nueva (ms_nom) ya no trae la columna ESTADO, así que de aquí sale el estado en Master del módulo «Cumplimiento de
+    // Tipología». Ningún HAR del Warehouse muestra esta petición ni su respuesta: la ruta, el cuerpo y los nombres de
+    // campo (identification, approved, pre_approved, to_confirm, manual_preapproval) son los de master-sync. Sin verificar:
+    // «Sondear» dice qué columnas llegan; la política solo guarda las que reconoce.
+    id: "ms_aprob",
+    sistema: "master",
+    entrega: "json",
+    lector: "json",
+    // La lista no recibe periodo: es el de la sesión (el abierto en Master). Solo vale para ese periodo.
+    periodoVia: "sesion",
+    verificado: false,
+    paginado: { tamano: 50, maximo: 120 },
+    avisos: ["Sin HAR: la petición se copió de master-sync de Roomy. Pida «Sondear» antes de confiar en las columnas y compruebe que el número de filas es el de la pantalla «Aprobar nómina» de Master."],
+    armar: (c) => plantaDeMaster("pre", c.pagina ?? 0),
+    extra: [(c) => plantaDeMaster("post", c.pagina ?? 0)],
   },
   json("ms_doc", "master", "/master/mod_reports/reports/prepare_professors/", "sesion"),
   json("gl_eq", "galileo", "/galileo/mod_reports/reports/equipments/", "sesion"),

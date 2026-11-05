@@ -54,6 +54,7 @@ Estado: **funciona** (coincide con un HAR), **corregido** (el HAR mostró otra c
 | `ms_posgmat` | Master · `postgraduate_enrollments_groups/download/` | archivo | nuevo (distinto de `ms_posg`) |
 | `ms_nom` | Master · `paysheet/consolidated/download/` (antes `consolidated_table`) | tarea | corregido (ruta, cuerpo, lector y política) |
 | `ms_comp`, `ms_eval` | Master · `get_consolidated_by_competence_xls`, `get_consolidated_report` | archivo | funciona; lector corregido (títulos antes de la tabla). El HAR no lleva `selected_period` en la URL |
+| `ms_aprob` | Master · `mod_approve_payroll/approve_payroll/filter/` (pregrado y posgrado, paginado) | json | **sin verificar**: copiado de master-sync de Roomy, sin HAR; lo usa Cumplimiento de Tipología (0259) |
 | `ms_hordep` | Master · `excel/departments_schedules/download/` | archivo | funciona |
 | `ms_hor`, `ms_audit`, `ms_posg`, `gl_uso` | Master / Galileo | archivo | sin HAR nuevo |
 | `ms_doc`, `gl_eq`, `dm_*` | catálogos JSON | json | sin HAR nuevo (las listas de periodos `periods_applicants` y `periods_to_student_desertion_report` se usan para validar aspirantes y deserciones) |

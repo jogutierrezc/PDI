@@ -296,7 +296,7 @@ export const useImportarRua = () => useAccion((filas: unknown[]) => rpc<number>(
 
 /* --- Los nombres de los docentes: en vivo, sin guardarlos (decisión 11) ------------------------- */
 
-export async function nombresDeDocentes(p: { sede: string; periodo: string; codigo: string; seudonimos: string[] }): Promise<{ nombres: Record<string, string>; total: number; encontrados: number }> {
+export async function nombresDeDocentes(p: { sede: string; periodo: string; codigo: string; seudonimos: string[]; /** «cumplimiento»: lo pide Cumplimiento de Tipología (mismo mecanismo; la función comprueba su propio permiso). */ modulo?: "cumplimiento" }): Promise<{ nombres: Record<string, string>; total: number; encontrados: number }> {
   const r = await supabase.functions.invoke("warehouse", { body: { action: "docentes", ...p } });
   if (r.error) {
     const detalle = await readFunctionError(r.error);

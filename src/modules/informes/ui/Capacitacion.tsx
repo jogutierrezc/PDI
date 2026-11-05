@@ -17,6 +17,7 @@ import { piloIngerir, useCorpus } from "../datos";
 import type { ArchivoParaPilo, RespuestaIngesta } from "../datos";
 import { LETRAS, PLANTILLAS } from "../plantillas";
 import type { Plantilla } from "../types";
+import { AyudaPilo } from "../guia/AyudaPilo";
 import { Vacio, mensajeDe } from "./comunes";
 
 interface Leido {
@@ -102,9 +103,9 @@ function CapacitacionGestion() {
 
   return (
     <div className="inf-stack" ref={raiz}>
-      <section className="inf-card inf-pad" aria-labelledby="inf-cap">
+      <section className="inf-card inf-pad" aria-labelledby="inf-cap" data-guia="k-corpus">
         <h3 id="inf-cap" className="inf-t">
-          Enseñarle a Pilo con los informes ya escritos
+          Enseñarle a Pilo con los informes ya escritos <AyudaPilo zona="k-corpus" />
         </h3>
         <p className="inf-sub">
           Suba los informes de gestión en Word o PDF. El texto se lee en este computador, se divide por sus títulos y usted decide qué entra. Pilo guarda los

@@ -1442,3 +1442,117 @@ textarea.inf-in {
 .inf-stk .is-parcial { background: #fbe9b9; }
 .inf-stk .is-rezagada { background: #f6cdc7; }
 .inf-stk .is-sinmeta { background: #e5e8ec; color: var(--ink-secondary); }
+
+/* ---------- Guía con Pilo (guia/) ------------------------------------------- */
+
+/* Los elementos señalados son la referencia del «?» sobre su borde; con :where (especificidad 0) no pisan el sticky de otras reglas. */
+:where([data-guia]) { position: relative; }
+
+.guia-q {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: var(--space-1);
+  padding: 0;
+  vertical-align: middle;
+  color: var(--brand-blue-strong);
+  background: var(--surface);
+  border: 1px solid var(--brand-blue);
+  border-radius: var(--radius-pill);
+  font: 800 var(--text-xs) / 1 var(--font-sans);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-press) ease;
+}
+.guia-q:active { transform: scale(0.92); }
+.guia-q--borde { position: absolute; top: -13px; right: var(--space-3); z-index: 2; margin: 0; }
+@media (hover: hover) and (pointer: fine) { .guia-q:hover { background: var(--brand-blue-soft); } }
+
+.guia-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-md);
+}
+.guia-banner p { flex: 1 1 260px; color: var(--ink-secondary); font-size: var(--text-sm); }
+.guia-banner b { color: var(--ink); }
+
+.guia-foco {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: var(--z-overlay);
+  width: 0;
+  height: 0;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  pointer-events: none;
+  /* El aro marca el elemento; el velo oscurece el resto sin bloquear nada. */
+  box-shadow: 0 0 0 3px var(--brand-blue), 0 0 0 9999px color-mix(in srgb, var(--brand-navy) 42%, transparent);
+}
+
+.guia {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: calc(var(--z-overlay) + 1);
+  display: flex;
+  flex-direction: column;
+  width: 392px;
+  max-width: calc(100vw - 24px);
+  max-height: min(620px, calc(100dvh - 32px));
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  font-family: var(--font-sans);
+}
+.guia:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.guia__cab { display: flex; gap: var(--space-3); align-items: center; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; user-select: none; }
+.guia__cab:active { cursor: grabbing; }
+.guia__tit { display: grid; flex: 1; min-width: 0; }
+.guia__tit b { font: 800 var(--text-base) / 1.2 var(--font-display); }
+.guia__tit span { color: var(--ink-muted); font-size: var(--text-xs); }
+.guia__x { display: grid; flex: none; place-items: center; width: 34px; height: 34px; padding: 0; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-pill); cursor: pointer; transition: transform var(--dur-press) var(--ease-out); }
+.guia__x:active { transform: scale(0.94); }
+.guia__x svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+.guia__prog { height: 4px; background: var(--track); }
+.guia__prog i { display: block; height: 100%; background: var(--brand-blue); transform-origin: left; transition: transform var(--dur-slow) var(--ease-out); }
+
+.guia__cuerpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) var(--space-5); }
+.guia__paso { display: grid; gap: var(--space-2); align-content: start; }
+.guia__paso h2 { margin: 0; color: var(--brand-navy); font: 800 var(--text-lg) / var(--leading-snug) var(--font-display); letter-spacing: var(--tracking-tight); text-wrap: balance; }
+.guia__txt { margin: 0; font-size: var(--text-base); line-height: var(--leading-relaxed); border-radius: var(--radius-xs); transition: background-color var(--dur-fast) ease; }
+.guia__txt.is-leyendo, .guia-globo p.is-leyendo { background: var(--brand-blue-soft); }
+.guia__nota { margin: 0; padding: var(--space-2) var(--space-3); color: var(--status-pending); background: var(--status-pending-soft); border-radius: var(--radius-xs); font-size: var(--text-sm); }
+.guia-aviso { margin: 0; color: var(--ink-secondary); font-size: var(--text-sm); }
+
+.guia__pie { display: grid; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--surface-2); border-top: 1px solid var(--line); }
+.guia-fila { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: space-between; }
+.guia__leer { display: inline-flex; gap: var(--space-2); align-items: center; color: var(--ink-secondary); font-size: var(--text-sm); font-weight: 600; }
+.guia__leer input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+.guia__caps { display: flex; flex-wrap: wrap; gap: 6px; }
+.guia__caps button { padding: 3px 10px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-pill); font: 600 var(--text-xs) var(--font-sans); cursor: pointer; }
+.guia__caps button[aria-pressed="true"] { color: var(--ink-on-accent); background: var(--brand-navy); border-color: var(--brand-navy); }
+
+.guia-globo { position: fixed; z-index: calc(var(--z-overlay) + 2); display: grid; gap: var(--space-3); width: min(340px, calc(100vw - 24px)); padding: var(--space-4); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); font-family: var(--font-sans); transform-origin: top right; }
+.guia-globo__cab { display: flex; gap: var(--space-3); align-items: center; }
+.guia-globo p { margin: 0; color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-relaxed); border-radius: var(--radius-xs); }
+
+
+@media (max-width: 700px) {
+  /* En el teléfono la tarjeta es una hoja inferior y el contenido deja espacio para verla. */
+  .guia { top: auto; right: 0; bottom: 0; left: 0; width: 100%; max-width: 100%; max-height: 46dvh; padding-bottom: env(safe-area-inset-bottom, 0px); border-radius: var(--radius-md) var(--radius-md) 0 0; transform: none !important; }
+  .guia__cab { cursor: default; }
+  body.guia-abierta { padding-bottom: 48dvh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guia__prog i, .guia__x, .guia-q { transition: none; }
+}

@@ -448,6 +448,27 @@ function juntar(partes: { rotulo: string; hoja: Hoja }[], columna: string): Hoja
  * esperarla: seguirla es cosa del navegador (acción `estado_tarea`).
  */
 async function obtenerFuente(r: Reporte, ctx: Contexto, s: Sesion): Promise<{ fuente: Fuente | null; tareaId: string | null }> {
+  if (r.entrega === "json" && r.paginado) {
+    // Listas paginadas (ms_aprob): cada pedido se recorre página por página y se juntan, con el origen en cada fila.
+    const pedidos = [r.armar, ...(r.extra ?? [])];
+    const partes: { rotulo: string; hoja: Hoja }[] = [];
+    for (const [i, armar] of pedidos.entries()) {
+      const documentos: Record<string, unknown>[] = [];
+      let total = 0;
+      for (let pagina = 0; pagina < r.paginado.maximo; pagina++) {
+        const respuesta = await pedirJson(s, armar({ ...ctx, pagina }), s);
+        if (respuesta.code !== undefined && respuesta.code !== 200) throw new ErrorPlataforma("La plataforma no entregó la lista.");
+        const bloque = (respuesta.msg ?? {}) as { documents?: unknown; count?: unknown };
+        const lote = Array.isArray(bloque.documents) ? (bloque.documents as Record<string, unknown>[]).filter((x) => x && typeof x === "object") : [];
+        if (Number.isFinite(Number(bloque.count))) total = Number(bloque.count);
+        documentos.push(...lote);
+        if (lote.length === 0 || (total > 0 && documentos.length >= total)) break;
+      }
+      if (documentos.length) partes.push({ rotulo: i === 0 ? "pregrado" : i === 1 ? "posgrado" : `otro${i + 1}`, hoja: aplanarJson(documentos) });
+    }
+    if (partes.length === 0) throw sinDatos(`la plataforma de ${SEDES[s.sede].nombre} no devolvió profesores`);
+    return { fuente: fuenteDeHoja(juntar(partes, "origen")), tareaId: null };
+  }
   if (r.entrega === "json") {
     const primero = await pedirJson(s, r.armar(ctx), s);
     if (primero.code !== undefined && primero.code !== 200) throw new ErrorPlataforma("La plataforma no entregó la lista.");
@@ -728,16 +749,29 @@ function nombreDe(o: Record<string, unknown>): string {
 async function docentesDeCodigo(db: any, admin: any, cuerpo: Record<string, unknown>, limite: number): Promise<Response> {
   const sede = String(cuerpo.sede ?? "");
   const periodo = String(cuerpo.periodo ?? "");
-  const codigo = String(cuerpo.codigo ?? "").trim().slice(0, 32);
-  const pedidos = (Array.isArray(cuerpo.seudonimos) ? cuerpo.seudonimos : []).filter((x): x is string => typeof x === "string" && /^x-[0-9a-f]{10}$/.test(x)).slice(0, 80);
+  // «Cumplimiento de Tipología» usa el mismo mecanismo: la lectura en vivo y el registro en gm_consultas_nombres. Cambia quién
+  // puede (ct_permitir_nombres: el nivel del módulo y solo los profesores de los programas que la persona ve) y el tope.
+  const delModulo = cuerpo.modulo === "cumplimiento";
+  const codigo = String(cuerpo.codigo ?? "").trim().slice(0, delModulo ? 120 : 32);
+  let pedidos = (Array.isArray(cuerpo.seudonimos) ? cuerpo.seudonimos : []).filter((x): x is string => typeof x === "string" && /^x-[0-9a-f]{10}$/.test(x)).slice(0, delModulo ? 400 : 80);
   if (!SEDES[sede] || !periodoValido(periodo) || !codigo || pedidos.length === 0) return json({ error: "Faltan la sede, el periodo, el código o los profesores." }, 400);
 
-  const registro = await db.rpc("gm_registrar_consulta_nombres", { p_periodo: periodo, p_sede: sede, p_codigo: codigo, p_cantidad: pedidos.length });
-  if (registro.error) {
-    const falta = registro.error.code === "PGRST202" || /gm_registrar_consulta_nombres/.test(registro.error.message);
-    return json({ error: falta ? "Falta aplicar la migración 0194 (Gestión Master)." : "No se pudo registrar la consulta." }, 500);
+  if (delModulo) {
+    const permitidos = await db.rpc("ct_permitir_nombres", { p_periodo: periodo, p_sede: sede, p_programa: codigo, p_seudonimos: pedidos });
+    if (permitidos.error) {
+      const falta = permitidos.error.code === "PGRST202" || /ct_permitir_nombres/.test(permitidos.error.message);
+      return json({ error: falta ? "Falta aplicar la migración 0260 (Cumplimiento de Tipología)." : "No se pudo registrar la consulta." }, 500);
+    }
+    pedidos = Array.isArray(permitidos.data) ? (permitidos.data as string[]) : [];
+    if (pedidos.length === 0) return json({ error: "Los nombres de los profesores son solo para quien tiene acceso a Cumplimiento de Tipología y a ese programa." }, 403);
+  } else {
+    const registro = await db.rpc("gm_registrar_consulta_nombres", { p_periodo: periodo, p_sede: sede, p_codigo: codigo, p_cantidad: pedidos.length });
+    if (registro.error) {
+      const falta = registro.error.code === "PGRST202" || /gm_registrar_consulta_nombres/.test(registro.error.message);
+      return json({ error: falta ? "Falta aplicar la migración 0194 (Gestión Master)." : "No se pudo registrar la consulta." }, 500);
+    }
+    if (registro.data !== true) return json({ error: "Los nombres de los docentes son solo para quien tiene acceso a Gestión Master." }, 403);
   }
-  if (registro.data !== true) return json({ error: "Los nombres de los docentes son solo para quien tiene acceso a Gestión Master." }, 403);
 
   const reporte = reportePorId("ms_doc");
   if (!reporte) return json({ error: "El reporte de docentes no está en el catálogo." }, 500);

@@ -26,6 +26,10 @@ import { MiInforme } from "./ui/MiInforme";
 import { Revision } from "./ui/Revision";
 import { Tablero } from "./ui/Tablero";
 import { VistaInforme } from "./vista/VistaInforme";
+import { AyudaPilo } from "./guia/AyudaPilo";
+import { BannerGuia } from "./guia/BannerGuia";
+import { GuiaProvider, useGuia } from "./guia/contexto";
+import { GuiaPilo } from "./guia/GuiaPilo";
 import "../rankings/layout.css";
 import "./informes.css";
 
@@ -44,6 +48,16 @@ const TITULOS: Record<Seccion, [string, string]> = {
 };
 
 export function InformesAdmin() {
+  return (
+    <GuiaProvider>
+      <Pantalla />
+      <GuiaPilo />
+    </GuiaProvider>
+  );
+}
+
+function Pantalla() {
+  const guia = useGuia();
   const { seccion: param } = useParams();
   const { puedeGestionarInformes } = useAuth();
   const gestiona = puedeGestionarInformes;
@@ -61,7 +75,7 @@ export function InformesAdmin() {
 
   const porRevisar = instancias.data?.filter((i) => i.estado === "sent").length;
   const rail = (
-    <AdminRail label="Secciones de Informes Institucionales">
+    <AdminRail label="Secciones de Informes Institucionales" guia="tabs">
       {gestiona && (
         <AdminRailTab current={seccion === "tablero"} to={BASE}>
           Tablero del ciclo
@@ -88,6 +102,11 @@ export function InformesAdmin() {
       <AdminRailTab current={seccion === "vista"} to={`${BASE}/vista`}>
         Vista del informe
       </AdminRailTab>
+      {seccion === "mi-informe" && (
+        <AdminRailTab current={guia.abierta} onSelect={() => (guia.abierta ? guia.cerrar() : guia.abrir())}>
+          Guía con Pilo
+        </AdminRailTab>
+      )}
     </AdminRail>
   );
 
@@ -95,10 +114,13 @@ export function InformesAdmin() {
   let cuerpo: ReactNode;
   if (seccion === "consolidador") {
     cuerpo = (
-      <ProximaFase titulo="El consolidador llega en la próxima fase">
-        Las rectorías de campus y la Rectoría General recibirán aquí las secciones aprobadas de las unidades que les entregan, por función sustantiva, y
-        decidirán qué entra en su informe. El aporte se cita; no se copia el texto.
-      </ProximaFase>
+      <div data-guia="c-arbol" className="guia-zona">
+        <AyudaPilo zona="c-arbol" />
+        <ProximaFase titulo="El consolidador llega en la próxima fase">
+          Las rectorías de campus y la Rectoría General recibirán aquí las secciones aprobadas de las unidades que les entregan, por función sustantiva, y
+          decidirán qué entra en su informe. El aporte se cita; no se copia el texto.
+        </ProximaFase>
+      </div>
     );
   } else if (seccion === "capacitacion") {
     cuerpo = <Capacitacion />;
@@ -132,7 +154,10 @@ export function InformesAdmin() {
   const [titulo, descripcion] = TITULOS[seccion];
   return (
     <AdminShell section="informes" kicker={ciclo ? `Informes Institucionales · ${ciclo.anio}` : "Informes Institucionales"} title={titulo} description={descripcion} rail={rail}>
-      <div className="rk inf">{cuerpo}</div>
+      <div className="rk inf">
+        {seccion === "mi-informe" && <BannerGuia />}
+        {cuerpo}
+      </div>
     </AdminShell>
   );
 }

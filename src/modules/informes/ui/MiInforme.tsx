@@ -61,6 +61,8 @@ import { Aviso, Barra, Cargando, Controles, EstadoPill, Tag, Vacio, fmtFecha, me
 import { useModeloInforme } from "./modelo";
 import type { ModeloInforme } from "./modelo";
 import { CampoTexto, resolverDe } from "./Texto";
+import { AyudaPilo } from "../guia/AyudaPilo";
+import { useGuia } from "../guia/contexto";
 
 const BASE = "/admin/informes-gestion";
 
@@ -193,6 +195,10 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
 
   const [params, setParams] = useSearchParams();
   const secciones = m.plantilla.secciones;
+  // La guía solo lee: cuenta qué secciones tiene la plantilla y pinta el estado de demostración sin tocar datos.
+  const { registrar, demo } = useGuia();
+  useEffect(() => registrar({ tipos: secciones.map((s) => s.tipo), visor: actor === "visor" }), [registrar, secciones, actor]);
+  const estadoVista = demo ?? inst.estado;
   const idx = Math.min(Math.max(Number(params.get("s") ?? 1) - 1, 0), secciones.length - 1) || 0;
   const def = secciones[idx];
 
@@ -327,34 +333,42 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
   return (
     <div className="inf-ed">
       {/* Secciones y envío */}
-      <div className="inf-card inf-rail">
+      <div className="inf-card inf-rail" data-guia="estado">
         <div className="inf-unit">
           <span className="inf-eyebrow">
             {m.plantilla.nombre} · {m.plantilla.quien}
           </span>
-          <b>{unidad.name}</b>
+          <b>
+            {unidad.name} <AyudaPilo zona="estado" />
+          </b>
           <span>
             Informe {ciclo.anio} · su papel: {nombreRol(actor)}
           </span>
         </div>
         <div className="inf-row">
-          <EstadoPill estado={inst.estado} />
+          <EstadoPill estado={estadoVista} />
           <span className="inf-num" style={{ fontSize: "var(--text-xs)", fontWeight: 700 }}>
             {listas} de {secciones.length} listas
           </span>
         </div>
         <Barra valor={listas / secciones.length} etiqueta="Secciones listas" />
-        <small className="inf-muted">{m.frio ? "Las cifras quedaron congeladas al enviar." : "Las cifras siguen en vivo hasta que envíe."}</small>
+        <small className="inf-muted">{m.frio || estadoVista === "sent" || estadoVista === "ok" ? "Las cifras quedaron congeladas al enviar." : "Las cifras siguen en vivo hasta que envíe."}</small>
         <Link className="inf-link" to={`${BASE}/vista?unidad=${unidad.id}`}>
           Vista del informe en papel
         </Link>
-        {inst.estado === "back" && nota.general && (
+        {demo && (
+          <small className="inf-muted" role="status">
+            Demostración de la guía: su informe no cambió.
+          </small>
+        )}
+        {estadoVista === "back" && (nota.general || demo) && (
           <div className="inf-nota" role="note">
             <b>Planeación lo devolvió</b>
-            {nota.general}
+            {nota.general || "Ejemplo: falta justificar la deserción y completar los puntos críticos."}
           </div>
         )}
-        <nav className="inf-secs" aria-label="Secciones del informe">
+        <nav className="inf-secs" aria-label="Secciones del informe" data-guia="secs">
+          <AyudaPilo zona="secs" borde />
           {secciones.map((d, i) => (
             <button key={d.clave} type="button" aria-current={i === idx} onClick={(e) => irA(i, e.detail > 0)}>
               <span className="n">{i + 1}</span>
@@ -365,14 +379,15 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
             </button>
           ))}
         </nav>
-        <div className="inf-send">
-          {inst.estado === "sent" || inst.estado === "ok" ? (
+        <div className="inf-send" data-guia="enviar">
+          <AyudaPilo zona="enviar" borde />
+          {estadoVista === "sent" || estadoVista === "ok" ? (
             <>
               <button type="button" className="inf-btn inf-btn--pri" disabled>
-                {inst.estado === "ok" ? "Aprobado" : `Enviado a ${m.plantilla.destino}`}
+                {estadoVista === "ok" ? "Aprobado" : `Enviado a ${m.plantilla.destino}`}
               </button>
               <small>
-                {inst.estado === "ok" ? `Aprobado el ${fmtFecha(inst.aprobado_en)}. Queda congelado.` : `Enviado el ${fmtFecha(inst.enviado_en)}. Esperando la revisión de Planeación.`}
+                {estadoVista === "ok" ? `Aprobado${inst.aprobado_en ? ` el ${fmtFecha(inst.aprobado_en)}` : ""}. Queda congelado.` : `Enviado${inst.enviado_en ? ` el ${fmtFecha(inst.enviado_en)}` : ""}. Esperando la revisión de Planeación.`}
               </small>
             </>
           ) : (
@@ -405,13 +420,15 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
       </div>
 
       {/* La sección abierta */}
-      <div className="inf-card inf-editor" ref={editorRef}>
+      <div className="inf-card inf-editor" ref={editorRef} data-guia="sec-body">
         <div className="inf-ehd">
           <div>
             <span className="inf-eyebrow">
               Sección {idx + 1} de {secciones.length}
             </span>
-            <h2>{def.titulo}</h2>
+            <h2>
+              {def.titulo} <AyudaPilo zona="sec-body" />
+            </h2>
           </div>
           {def.tipo !== "anexos" && <span className={`inf-pill${avances[idx] === 2 ? " is-ok" : ""}`}>{ETIQUETA_AVANCE[avances[idx]]}</span>}
         </div>
@@ -458,8 +475,10 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
 
       {/* Controles y conexiones */}
       <aside className="inf-side" aria-label="Controles de la sección">
-        <div className="inf-card">
-          <h3>Controles</h3>
+        <div className="inf-card" data-guia="controles">
+          <h3>
+            Controles <AyudaPilo zona="controles" />
+          </h3>
           <Controles
             items={controlesSeccion(def, c, {
               ...ctx,
@@ -469,8 +488,10 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
             })}
           />
         </div>
-        <div className="inf-card">
-          <h3>Datos que puede consultar</h3>
+        <div className="inf-card" data-guia="datos">
+          <h3>
+            Datos que puede consultar <AyudaPilo zona="datos" />
+          </h3>
           <ul className="inf-conx">
             <li>
               <b>UDES en Cifras</b>
@@ -891,7 +912,7 @@ function PiloRedacta({ inst, def, c, cambiar }: { inst: InstanciaRow; def: Secci
     }
   };
   return (
-    <span className="inf-row" style={{ justifyContent: "flex-end" }}>
+    <span className="inf-row" style={{ justifyContent: "flex-end" }} data-guia="pilo-btn">
       {esDePilo && <span className="inf-pill is-teal">Borrador de Pilo · confirme cada cifra</span>}
       <button type="button" className="inf-btn inf-btn--sm" onClick={() => void pedir()} disabled={estado.cargando}>
         {estado.cargando ? "Pilo está escribiendo…" : "Pilo redacta un borrador"}

@@ -55,7 +55,7 @@
    función en esa pertenencia (unit_members.role).
    ========================================================================== */
 
-import type { AccessRole, AdminScreen, AppRole, GmNivel, ImpactLevel, InformeLevel, ObsNivel } from "../../../types/database";
+import type { AccessRole, AdminScreen, AppRole, CtNivel, GmNivel, ImpactLevel, InformeLevel, ObsNivel } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
@@ -230,7 +230,10 @@ export const MODULES: ModuleDef[] = [
   {
     id: "gestion-master",
     label: "Gestión Master",
-    screens: [{ id: "gestion_master", label: "Gestión de Actividades", note: "el acceso lo da el nivel del rol, no la capacidad; quien aprueba lo hace por la función del rol" }],
+    screens: [
+      { id: "gestion_master", label: "Gestión de Actividades", note: "el acceso lo da el nivel del rol, no la capacidad; quien aprueba lo hace por la función del rol" },
+      { id: "cumplimiento_tipologia", label: "Cumplimiento de Tipología", note: "el acceso lo da el nivel que se elige abajo (programa o decano, vicerrectoría o administrador del módulo), no la capacidad; no depende del nivel de Gestión de Actividades" },
+    ],
     levels: {
       ver: { hint: "Aparece en el menú, pero sin acceso al módulo: elija Editar o Administrar para dar un papel en Gestión Master.", needs: "consulta" },
       editar: { hint: "Solicita actividades (directivo o vicerrector) o revisa y decide el paso que le toca por su función, según el papel que elija abajo.", needs: "consulta" },
@@ -398,9 +401,23 @@ export interface Matrix {
   informe: InformeScope;
   /** Gestión Master (0194). */
   gm: GmScope;
+  /** Cumplimiento de Tipología (0260): el nivel del rol; vale solo si la pantalla está marcada. */
+  ct: CtScope;
   /** Observatorio (0231): todos los observatorios, o solo los que se asignen a la persona. */
   obs: ObsScope;
 }
+
+/** Cumplimiento de Tipología (0260): none · programa o decano · vicerrectoría · administrador del módulo. */
+export interface CtScope {
+  nivel: CtNivel;
+}
+
+export const CT_NIVELES: { id: CtNivel; label: string; hint: string }[] = [
+  { id: "none", label: "Sin acceso", hint: "La pantalla está marcada pero la persona no entra: elija un nivel." },
+  { id: "programa", label: "Programa o decano", hint: "Ve los profesores de los programas de su unidad (la que le asigna Estructura y usuarios)." },
+  { id: "vicerrectoria", label: "Vicerrectoría", hint: "Además compara programas y sedes: los programas de su vicerrectoría." },
+  { id: "admin", label: "Administrador del módulo", hint: "Además calcula el corte, asigna programas a unidades y es el único que ve las observaciones para Master." },
+];
 
 /** Observatorio (0231): sobre qué observatorios actúa el rol. */
 export interface ObsScope {
@@ -426,6 +443,8 @@ export interface RoleColumns {
   gm_nivel: GmNivel;
   /** La función que firma (vaf, planeacion…); solo si el nivel es revisor o gestor. */
   gm_funcion: string | null;
+  /** Cumplimiento de Tipología (0260): none sin la pantalla; programa · vicerrectoria · admin con ella. */
+  ct_nivel: CtNivel;
   /** Observatorio (0231): none sin el módulo; ver · editar · administrar con él. */
   obs_nivel: ObsNivel;
   /** Observatorio (0231): todos los observatorios o solo los asignados (obs_responsables). */
@@ -435,6 +454,7 @@ export interface RoleColumns {
 const emptyImpact = (): ImpactScope => ({ allUnits: false, units: [] });
 const emptyInforme = (): InformeScope => ({ level: "none", allUnits: false, units: [] });
 const emptyGm = (): GmScope => ({ papel: "solicitante", funcion: "" });
+const emptyCt = (): CtScope => ({ nivel: "none" });
 const emptyObs = (): ObsScope => ({ allObs: true });
 
 /** Nivel de la matriz → gm_nivel. «Ver» no da acceso (como Impacto): el permiso es explícito. */
@@ -549,6 +569,8 @@ export function compile(matrix: Matrix): RoleColumns {
     informe_gestion: informeGestion,
     gm_nivel: gmNivel,
     gm_funcion: (gmNivel === "revisor" || gmNivel === "gestor") && matrix.gm.funcion ? matrix.gm.funcion : null,
+    // Cumplimiento de Tipología: con la pantalla marcada, el nivel elegido; sin ella, ninguno (0260).
+    ct_nivel: matrix.modules["gestion-master"].screens.includes("cumplimiento_tipologia") ? matrix.ct.nivel : "none",
     obs_nivel: obsNivel,
     all_obs: obsOn ? matrix.obs.allObs : true,
   };
@@ -557,7 +579,7 @@ export function compile(matrix: Matrix): RoleColumns {
 /** Columnas de un rol guardado → matriz, para editarlo. */
 export function decompile(
   role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports"> &
-    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion" | "gm_nivel" | "gm_funcion" | "obs_nivel" | "all_obs">>,
+    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion" | "gm_nivel" | "gm_funcion" | "ct_nivel" | "obs_nivel" | "all_obs">>,
   reports: string[],
   units: string[] = [],
   informeUnits: string[] = [],
@@ -572,6 +594,7 @@ export function decompile(
     impact: { allUnits: role.all_impact_units ?? false, units: [...units] },
     informe: { level: role.informe_level ?? "none", allUnits: role.all_informe_units ?? false, units: [...informeUnits] },
     gm: { papel: role.gm_nivel === "revisor" ? "revisor" : "solicitante", funcion: role.gm_funcion ?? "" },
+    ct: { nivel: role.ct_nivel ?? "none" },
     obs: { allObs: role.all_obs ?? true },
   };
   for (const module of MODULES) {
@@ -626,7 +649,7 @@ function full(id: ModuleId, level: Level): ModuleChoice {
 /** La matriz de una plantilla. */
 export function templateMatrix(template: Exclude<TemplateId, "personalizada">): Matrix {
   const modules = emptyModules();
-  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme(), gm: emptyGm(), obs: emptyObs() };
+  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme(), gm: emptyGm(), ct: emptyCt(), obs: emptyObs() };
   if (template === "consulta") {
     for (const module of MODULES) modules[module.id] = full(module.id, "ver");
     return base;
@@ -674,6 +697,7 @@ const sameColumns = (a: RoleColumns, b: RoleColumns) =>
   a.informe_level === b.informe_level &&
   a.informe_gestion === b.informe_gestion &&
   a.gm_nivel === b.gm_nivel &&
+  a.ct_nivel === b.ct_nivel &&
   a.obs_nivel === b.obs_nivel &&
   a.all_obs === b.all_obs &&
   (a.gm_funcion ?? "") === (b.gm_funcion ?? "") &&
@@ -755,6 +779,18 @@ export function describe(
     const does = obs === "administrar" ? "administra (además crea y archiva observatorios, autoriza dominios y revoca insertados)" : obs === "editar" ? "edita" : "consulta";
     lines.push(
       `En el Observatorio ${does}: ${panels.length ? list(panels) : "ningún panel (solo la entrada)"}; ${matrix.obs.allObs ? "en todos los observatorios" : "solo en los observatorios donde figure como persona responsable"}.`,
+    );
+  }
+  if (matrix.modules["gestion-master"].screens.includes("cumplimiento_tipologia")) {
+    const ct = matrix.ct.nivel;
+    lines.push(
+      ct === "none"
+        ? "En Cumplimiento de Tipología la pantalla aparece, pero sin acceso (falta elegir un nivel)."
+        : ct === "programa"
+          ? "En Cumplimiento de Tipología ve los profesores de los programas de su unidad (programa o decano)."
+          : ct === "vicerrectoria"
+            ? "En Cumplimiento de Tipología compara programas y sedes de su vicerrectoría."
+            : "En Cumplimiento de Tipología administra: calcula el corte, asigna programas a unidades y ve las observaciones para Master.",
     );
   }
   const gm = effectiveLevel(matrix, "gestion-master");

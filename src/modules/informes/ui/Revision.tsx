@@ -13,6 +13,7 @@ import { useInstancias, usePilares, usePlanUnidad, useRevisar, useUnidades } fro
 import { componerNota, leerNota } from "../estados";
 import type { CicloRow, ContenidoSeccion, EstadoInstancia, InstanciaRow, PilarRef, RequisitoRow, SeccionDef } from "../types";
 import { Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
+import { AyudaPilo } from "../guia/AyudaPilo";
 import { Aviso, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { TablaMetasPrograma } from "./MetasPrograma";
 import { useModeloInforme } from "./modelo";
@@ -61,7 +62,8 @@ function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
 
   return (
     <div className="inf-rev">
-      <div className="inf-card">
+      <div className="inf-card" data-guia="r-cola">
+        <AyudaPilo zona="r-cola" borde />
         <div style={{ padding: "var(--space-3) var(--space-3) 0" }}>
           <div className="rk-seg" role="group" aria-label="Filtrar informes">
             {FILTROS.map((f) => (
@@ -138,13 +140,15 @@ function Detalle({ inst, ciclo, requisitos, unidad, esFacultad }: { inst: Instan
   const hayNotas = general.trim() || Object.values(notas).some((n) => n.trim());
 
   return (
-    <article className="inf-card inf-pad" aria-labelledby="inf-det">
+    <article className="inf-card inf-pad" aria-labelledby="inf-det" data-guia="r-detalle">
       <div className="inf-ehd">
         <div>
           <span className="inf-eyebrow">
             {m.plantilla.nombre} · {m.plantilla.quien} · {ciclo.anio}
           </span>
-          <h2 id="inf-det">{unidad}</h2>
+          <h2 id="inf-det">
+            {unidad} <AyudaPilo zona="r-detalle" />
+          </h2>
         </div>
         <EstadoPill estado={inst.estado} />
       </div>

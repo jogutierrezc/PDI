@@ -13,7 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
-import type { Aporte, BitacoraFila, CambiosEncuesta, Cifra, EditorEncuesta, Encuesta, EstadoAporte, InfoEncuesta, AporteEnvio, CuentaMicrosoft, RespuestaEnvio, RespuestaModelo, Version } from "./tipos";
+import type { Aporte, BitacoraFila, CambiosEncuesta, Cifra, EditorEncuesta, Encuesta, EstadoAporte, InfoEncuesta, AporteEnvio, CuentaMicrosoft, EnvioHist, RespuestaEnvio, RespuestaModelo, Version } from "./tipos";
 import type { Estructura, Valores } from "./lib/estructura";
 import { cuerpoEnvio } from "./lib/validacion";
 
@@ -149,6 +149,12 @@ export const datosMicrosoft = (slug: string, jwt: string) => llamar<CuentaMicros
 
 export const enviarAportes = (slug: string, pase: string, dependencia: string, aportes: readonly AporteEnvio[]) =>
   llamar<RespuestaEnvio>("enviar", { ...cuerpoEnvio(slug, dependencia, aportes), pase });
+
+/** Lo que esta persona ya envió (con el pase de Microsoft). `todas` suma las demás encuestas con el mismo correo. */
+export const misEnvios = (slug: string, pase: string, alcance: "esta" | "todas") => llamar<{ envios: EnvioHist[] }>("mis_envios", { slug, pase, alcance }).then((r) => r.envios);
+
+/** Quita un envío propio; el servidor solo lo permite mientras siga «recibido». */
+export const quitarEnvio = (slug: string, pase: string, origen: "aporte" | "respuesta", id: string) => llamar<{ ok: true }>("quitar_envio", { slug, pase, origen, id });
 
 /** Verificación contra robots de la encuesta abierta: una cuenta sencilla y su pase. */
 export const pedirReto = (slug: string) => llamar<{ pregunta: string; pase: string }>("reto", { slug });

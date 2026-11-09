@@ -17,10 +17,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cerrarSesionMicrosoft, consumirRegresoMicrosoft, iniciarMicrosoft, tokenDeMicrosoft } from "../../internacionalizacion/contactos/api";
 import { datosMicrosoft, enviarAportes, ErrorEncuestas, esCerrada, esDeRed, infoEncuesta, sesionVencida } from "../api";
 import { guardarBorrador, leerBorrador } from "../lib/borrador";
+import { caben } from "../lib/validacion";
 import { estaCerrada } from "../lib/tabla";
 import type { AporteEnvio, CuentaMicrosoft, InfoEncuesta, TipoAporte } from "../tipos";
 import { Bienvenida } from "./Bienvenida";
@@ -30,6 +31,7 @@ import type { ResumenEnvio } from "./Despedida";
 import { GUIA } from "./frases";
 import { Guia } from "./Guia";
 import type { MensajeGuia } from "./Guia";
+import { AccesoMisEnvios, MisEnvios } from "./MisEnvios";
 import { Detalle, Elegir, Identificacion } from "./Pasos";
 import type { EstadoMicrosoft } from "./Pasos";
 import type { DecirGuia } from "./tipos-pub";
@@ -114,6 +116,9 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [despedida, setDespedida] = useState<ResumenEnvio | null>(null);
   const [cerrada, setCerrada] = useState(false);
+  /** Mostrando «Mis envíos» en la hoja. */
+  const [verMis, setVerMis] = useState(false);
+  const cliente = useQueryClient();
   const [mensaje, setMensaje] = useState<MensajeGuia>({ id: 1, texto: GUIA.identificar, gesto: "feliz" });
   const hueco = useRef<HTMLDivElement>(null);
   const principal = useRef<HTMLDivElement>(null);
@@ -226,11 +231,13 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
       };
       setAportes([]);
       guardarBorrador(slug, { dependencia, visto: true, aportes: [] });
+      void cliente.invalidateQueries({ queryKey: ["encuestas", "mis", slug] });
       setDespedida(resumen);
     } catch (e) {
       if (sesionVencida(e)) {
         setCuenta(null);
         setPase(null);
+        setVerMis(false);
         setPaso("id");
         setMs({ fase: "inactivo" });
         decir(GUIA.vencida, "neutral");
@@ -277,7 +284,35 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
         <main className="ep-escena">
           <Guia ref={hueco} mensaje={mensaje} oculta={bienvenida} />
           <section className="ep-hoja">
-            {paso === "id" || !cuenta ? (
+            {verMis && cuenta && pase ? (
+              <MisEnvios
+                slug={slug}
+                pase={pase}
+                correo={cuenta.correo}
+                decir={decir}
+                onVolver={() => {
+                  setVerMis(false);
+                  decir(GUIA.sinPrisa, "feliz");
+                }}
+                onSesionVencida={() => {
+                  setCuenta(null);
+                  setPase(null);
+                  setVerMis(false);
+                  setPaso("id");
+                  setMs({ fase: "inactivo" });
+                  decir(GUIA.vencida, "neutral");
+                }}
+                onCopiar={(a) => {
+                  if (!caben(aportes.length)) return decir("Ya llegó al máximo de aportes por envío. Envíe estos y vuelva a empezar.", "neutral");
+                  setAportes((l) => [...l, a]);
+                  setTipo(a.tipo);
+                  setEditando(aportes.length);
+                  setVerMis(false);
+                  setPaso("detalle");
+                  decir("Lo copié. Cambie lo que haga falta y guárdelo.", "feliz");
+                }}
+              />
+            ) : paso === "id" || !cuenta ? (
               <Identificacion
                 dependencia={dependencia}
                 onDependencia={setDependencia}
@@ -292,6 +327,7 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
               />
             ) : paso === "elegir" ? (
               <Elegir
+                acceso={<AccesoMisEnvios slug={slug} pase={pase} onAbrir={() => setVerMis(true)} />}
                 cuenta={cuenta}
                 dependencia={dependencia}
                 aportes={aportes}
@@ -341,7 +377,7 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
       </div>
 
       {bienvenida && <Bienvenida titulo={info.titulo} intro={info.intro} destino={hueco} onFin={alTerminarBienvenida} />}
-      {despedida && <Despedida despedida={info.despedida} resumen={despedida} onOtro={otroAporte} />}
+      {despedida && <Despedida despedida={info.despedida} resumen={despedida} onOtro={otroAporte} onMisEnvios={() => { setDespedida(null); setPaso("elegir"); setVerMis(true); }} />}
     </div>
   );
 }

@@ -20,6 +20,9 @@
                                                     → { ok, id }                   (encuestas del modelo nuevo, 0184)
                    Con Microsoft lleva el pase de microsoft_datos; abierta, el reto resuelto. Sin sesión.
 
+     mis_envios    { slug, pase, alcance: "esta" | "todas" } → { envios }   (historial de quien envió, historial.ts)
+     quitar_envio  { slug, pase, origen: "aporte" | "respuesta", id } → { ok }  (solo mientras siga «recibido»)
+
    Reglas:
      · El correo sale SIEMPRE del token verificado en Supabase Auth (identidad de
        Azure y dominio de la UDES), nunca del cuerpo.
@@ -36,6 +39,7 @@ import { correoPermitido, limpiar, normalizarAporte, validarEnvio } from "./encu
 import type { AporteEnvio } from "./encuesta.ts";
 import { comprobarReto, crearReto, dominioPermitido, huellaDe, MENSAJE_CIERRE, motivoCierre } from "./acceso.ts";
 import type { AccesoEncuesta, EstadoEncuesta } from "./acceso.ts";
+import { leerEnvios, quitarEnvio } from "./historial.ts";
 import { validarEstructura, validarRespuestas, valoresVisibles } from "./estructura.ts";
 import type { Estructura, Valores } from "./estructura.ts";
 
@@ -245,6 +249,29 @@ Deno.serve(async (request: Request) => {
       return json({ error: "No se pudo guardar su respuesta. Intente de nuevo." }, 500);
     }
     return json({ ok: true, id: (r.data as { id: string }).id });
+  }
+
+  // «Mis envíos»: lo que esta persona ya envió. El correo sale del pase firmado, no del cuerpo.
+  if (accion === "mis_envios" || accion === "quitar_envio") {
+    const p = await abrirPase(limpiar(c.pase), serviceKey);
+    if (!p || p.slug !== slug) return json({ error: "La confirmación de Microsoft venció. Vuelva a pulsar «Continuar con Microsoft».", code: "microsoft" }, 401);
+    const correo = p.correo.toLowerCase();
+    if (accion === "mis_envios") {
+      const r = await leerEnvios(admin, slug, correo, c.alcance === "todas" ? "todas" : "esta");
+      if (!Array.isArray(r)) {
+        if (/does not exist|schema cache|permission denied|column/i.test(r.error)) return json({ error: "Falta aplicar la migración 0184 (Editor de encuestas con Pilo).", code: "migracion" }, 500);
+        if (r.error === "Esta encuesta no existe.") return json({ error: r.error }, 404);
+        console.error("encuestas mis_envios", r.error);
+        return json({ error: "No se pudo leer su historial. Intente de nuevo." }, 500);
+      }
+      return json({ envios: r });
+    }
+    const origen = c.origen === "respuesta" ? "respuesta" : c.origen === "aporte" ? "aporte" : null;
+    const id = limpiar(c.id);
+    if (!origen || !/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Envío no válido." }, 400);
+    const falla = await quitarEnvio(admin, correo, origen, id);
+    if (falla) return json({ error: falla.error, code: falla.code }, falla.estado);
+    return json({ ok: true });
   }
 
   if (accion === "microsoft_datos" || accion === "enviar") {

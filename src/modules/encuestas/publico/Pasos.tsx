@@ -10,7 +10,7 @@
    ========================================================================== */
 
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { TIPOS_CIFRA, textoTipoAporte } from "../tipos";
 import type { AporteEnvio, CuentaMicrosoft, TipoAporte } from "../tipos";
 import { aBorradorCifra, caben, formatearValor, leerNumero, LIMITES, validarCifras, validarDependencia, validarDescripcion, validarTitulo } from "../lib/validacion";
@@ -182,7 +182,10 @@ export function Elegir({
   onEditar,
   onQuitar,
   onEnviar,
+  acceso,
 }: {
+  /** El acceso a «Mis envíos», si lo hay. */
+  acceso?: ReactNode;
   cuenta: CuentaMicrosoft;
   dependencia: string;
   aportes: readonly AporteEnvio[];
@@ -206,6 +209,7 @@ export function Elegir({
           {cuenta.correo} · {dependencia}
         </span>
       </div>
+      {acceso}
       <h2>¿Qué quiere contar?</h2>
       <p className="ep-lede">Elija uno. Al guardarlo podrá registrar otro logro, otro reto o enviar todo.</p>
       <div className="ep-elegir">

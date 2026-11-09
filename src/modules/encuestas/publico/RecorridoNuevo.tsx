@@ -11,6 +11,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { cerrarSesionMicrosoft, consumirRegresoMicrosoft, iniciarMicrosoft, tokenDeMicrosoft } from "../../internacionalizacion/contactos/api";
 import { datosMicrosoft, enviarRespuesta, ErrorEncuestas, esCerrada, esDeRed, pedirReto, sesionVencida } from "../api";
 import { leerConfig } from "../lib/config";
@@ -22,6 +23,7 @@ import { Formulario } from "./Formulario";
 import { GUIA } from "./frases";
 import { Guia } from "./Guia";
 import type { MensajeGuia } from "./Guia";
+import { AccesoMisEnvios, MisEnvios } from "./MisEnvios";
 import { IconoMicrosoft } from "./Pasos";
 import { estiloTema, resumenDe, Salida } from "./Salida";
 import type { LineaResumen } from "./Salida";
@@ -61,6 +63,9 @@ export function RecorridoNuevo({ slug, info, estructura }: { slug: string; info:
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [lineas, setLineas] = useState<LineaResumen[] | null>(null);
   const [cerrada, setCerrada] = useState(false);
+  /** Mostrando «Mis envíos» en lugar del formulario (que sigue montado para no perder lo escrito). */
+  const [verMis, setVerMis] = useState(false);
+  const cliente = useQueryClient();
   const [mensaje, setMensaje] = useState<MensajeGuia>({ id: 1, texto: GUIA.identificar, gesto: config.presentacion.pose });
   const hueco = useRef<HTMLDivElement>(null);
   const principal = useRef<HTMLDivElement>(null);
@@ -133,12 +138,14 @@ export function RecorridoNuevo({ slug, info, estructura }: { slug: string; info:
         ...(abierta ? { reto_pase: reto?.pase, reto_respuesta: respuestaReto, nombre: config.datosPersonales ? nombre : undefined, consentimiento: config.datosPersonales ? consentimiento : undefined } : { pase: pase ?? undefined }),
       });
       setLineas(resumenDe(visibles, limpios));
+      void cliente.invalidateQueries({ queryKey: ["encuestas", "mis", slug] });
       setValores({});
       guardar(slug, {}, true);
     } catch (e) {
       if (!abierta && sesionVencida(e)) {
         setCuenta(null);
         setPase(null);
+        setVerMis(false);
         decir(GUIA.vencida, "neutral");
       } else if (esCerrada(e)) setCerrada(true);
       else {
@@ -201,7 +208,7 @@ export function RecorridoNuevo({ slug, info, estructura }: { slug: string; info:
           {guiado && <Guia ref={hueco} mensaje={mensaje} oculta={bienvenida} />}
           <section className="ep-hoja">
             {lineas ? (
-              <Salida titulo={info.titulo} despedida={info.despedida} config={config} lineas={lineas} onOtra={() => setLineas(null)} />
+              <Salida titulo={info.titulo} despedida={info.despedida} config={config} lineas={lineas} onOtra={() => setLineas(null)} onMisEnvios={pase ? () => { setLineas(null); setVerMis(true); } : undefined} />
             ) : !identificado ? (
               <div className="ep-panel">
                 <h2>Identifíquese con su correo institucional</h2>
@@ -221,14 +228,35 @@ export function RecorridoNuevo({ slug, info, estructura }: { slug: string; info:
               </div>
             ) : (
               <>
-                {cuenta && (
-                  <div className="ep-verificado" role="status">
-                    <span>
-                      Correo confirmado por Microsoft: <b>{cuenta.correo}</b>
-                    </span>
-                  </div>
+                {cuenta && pase && verMis && (
+                  <MisEnvios
+                    slug={slug}
+                    pase={pase}
+                    correo={cuenta.correo}
+                    decir={decir}
+                    onVolver={() => {
+                      setVerMis(false);
+                      decir("Aquí sigo. Continúe cuando quiera.", "feliz");
+                    }}
+                    onSesionVencida={() => {
+                      setCuenta(null);
+                      setPase(null);
+                      setVerMis(false);
+                      decir(GUIA.vencida, "neutral");
+                    }}
+                  />
                 )}
-                <Formulario estructura={estructura} config={config} modo={guiado ? "guiado" : "clasico"} valores={valores} onValores={setValores} enviando={enviando} errorEnvio={errorEnvio} onEnviar={() => void enviar()} extra={extra} />
+                <div hidden={verMis}>
+                  {cuenta && (
+                    <div className="ep-verificado" role="status">
+                      <span>
+                        Correo confirmado por Microsoft: <b>{cuenta.correo}</b>
+                      </span>
+                    </div>
+                  )}
+                  {cuenta && <AccesoMisEnvios slug={slug} pase={pase} onAbrir={() => setVerMis(true)} />}
+                  <Formulario estructura={estructura} config={config} modo={guiado ? "guiado" : "clasico"} valores={valores} onValores={setValores} enviando={enviando} errorEnvio={errorEnvio} onEnviar={() => void enviar()} extra={extra} />
+                </div>
               </>
             )}
           </section>

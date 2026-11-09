@@ -122,3 +122,32 @@ export const TIPOS_CIFRA: readonly { id: TipoCifra; texto: string }[] = [
 
 export const textoEstado = (e: EstadoAporte): string => ESTADOS.find((x) => x.id === e)?.texto ?? e;
 export const textoTipoAporte = (t: TipoAporte): string => (t === "logro" ? "Logro" : "Reto");
+
+/* ---------- Mis envíos (función pública, historial.ts) ---------- */
+
+export interface CifraHist {
+  que: string;
+  valor: number;
+  unidad: string;
+}
+export interface ItemHist {
+  tipo: "logro" | "reto";
+  titulo: string;
+  descripcion: string;
+  cifras: CifraHist[];
+}
+export type TipoEnvio = "logro" | "reto" | "respuesta";
+export interface EnvioHist {
+  id: string;
+  origen: "aporte" | "respuesta";
+  encuesta: { slug: string; titulo: string };
+  creado: string;
+  /** 1 recibido, 2 revisado, 3 elegido para el video. */
+  etapa: 1 | 2 | 3;
+  quitable: boolean;
+  tipos: TipoEnvio[];
+  titulo: string;
+  items: ItemHist[];
+  lineas: { etiqueta: string; texto: string }[];
+  copiable: AporteEnvio | null;
+}

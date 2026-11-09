@@ -24,7 +24,7 @@ export function estiloTema(c: ConfigPilo): CSSProperties {
   return { "--ep-blue": c.tema.acento, "--ep-bg": fondo } as CSSProperties;
 }
 
-export function Salida({ titulo, despedida, config, lineas, onOtra }: { titulo: string; despedida: string; config: ConfigPilo; lineas: readonly LineaResumen[]; onOtra?: () => void }) {
+export function Salida({ titulo, despedida, config, lineas, onOtra, onMisEnvios }: { titulo: string; despedida: string; config: ConfigPilo; lineas: readonly LineaResumen[]; onOtra?: () => void; onMisEnvios?: () => void }) {
   const raiz = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = raiz.current;
@@ -85,6 +85,11 @@ export function Salida({ titulo, despedida, config, lineas, onOtra }: { titulo: 
         {onOtra && (
           <button type="button" className="ep-btn ep-btn--suave" onClick={onOtra}>
             Enviar otra respuesta
+          </button>
+        )}
+        {onMisEnvios && (
+          <button type="button" className="ep-btn ep-btn--suave" onClick={onMisEnvios}>
+            Ver mis envíos
           </button>
         )}
       </div>

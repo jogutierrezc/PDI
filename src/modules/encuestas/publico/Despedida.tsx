@@ -24,7 +24,7 @@ export interface ResumenEnvio {
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-export function Despedida({ despedida, resumen, onOtro }: { despedida: string; resumen: ResumenEnvio; onOtro: () => void }) {
+export function Despedida({ despedida, resumen, onOtro, onMisEnvios }: { despedida: string; resumen: ResumenEnvio; onOtro: () => void; onMisEnvios?: () => void }) {
   const escena = useRef<HTMLDivElement>(null);
   const vuelo = useRef<HTMLDivElement>(null);
   const cara = useRef<PiloFaceHandle>(null);
@@ -153,6 +153,11 @@ export function Despedida({ despedida, resumen, onOtro }: { despedida: string; r
           <button type="button" className="ep-btn ep-d-otro" onClick={onOtro}>
             Enviar otro aporte
           </button>
+          {onMisEnvios && (
+            <button type="button" className="ep-btn ep-btn--suave" onClick={onMisEnvios}>
+              Ver mis envíos
+            </button>
+          )}
         </div>
       )}
     </div>

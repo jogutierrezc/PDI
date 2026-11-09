@@ -49,10 +49,11 @@ import type { CitaBloque, Descartado, Grafico, KindFuente, Profundidad, SpecGraf
 import { cortar, formatoValor, serieDeCifra, type CifraLibro } from "./libro.ts";
 import type { IndicadorRanking } from "./unidades.ts";
 
-export const MAX_KPIS = 4;
-export const MAX_GRAFICOS = 6;
+export const MAX_KPIS = 12;
+export const MAX_GRAFICOS = 12;
 /** Gráficos mínimos: si el estadístico propone menos válidos, el código completa con sugerencias deterministas. */
-export const MIN_GRAFICOS = 3;
+/** Si el estadístico deja menos, el código completa con gráficos de reglas fijas de TODAS las fuentes del libro. */
+export const MIN_GRAFICOS = 8;
 export const MAX_TITULO = 70;
 export const MAX_ENTRADA = 650;
 /** Fuentes por eje en profundidad (defecto). Copia local: pilo-rankingsod no se toca. */
@@ -555,6 +556,22 @@ export function leerPortada(crudo: string): Lectura<Portada> {
   if (p.lead_es.length > MAX_ENTRADA || p.lead_en.length > MAX_ENTRADA + 80) return { ok: false, error: `La entrada pasa de ${MAX_ENTRADA} caracteres.` };
   if (p.lead_en.length < 60) return { ok: false, error: "Falta la entrada en inglés." };
   return { ok: true, valor: p };
+}
+
+/**
+ * El modelo a veces escribe una cifra del libro sin ponerla en «figs». Si el número del texto coincide con una
+ * cifra del informe, se agrega su key (queda trazable). Un número que no sale de ninguna cifra sigue rechazándose.
+ */
+export function completarFigs(p: Portada, candidatas: CifraLibro[]): Portada {
+  const texto = numerosDe(`${p.title_es} ${p.lead_es}`);
+  const figs = new Set(p.figs);
+  const cubiertos = numerosDeCifras([...figs], new Map(candidatas.map((c) => [c.key, c])));
+  for (const n of texto) {
+    if (cubiertos.has(n) || esAnio(n)) continue;
+    const c = candidatas.find((x) => numerosDeCifras([x.key], new Map([[x.key, x]])).has(n));
+    if (c) figs.add(c.key);
+  }
+  return { ...p, figs: [...figs] };
 }
 
 export function verificarPortada(p: Portada, libro: Map<string, CifraLibro>, textos: NotaInforme[], fijos: string[]): { ok: boolean; error?: string; warn: string | null } {

@@ -10,7 +10,7 @@ import { formato } from "./tipos";
 import type { CifraPP } from "./tipos";
 import { BotonPilo, Campo, ErrorAviso, Tarjeta, Vacio } from "./ui";
 
-const MAX_CLAVE = 4;
+const MAX_CLAVE = 12;
 const GRUPOS_POR_PAGINA = 30;
 
 const valorTexto = (c: CifraPP): string => (c.value === null ? "—" : `${formato(c.value, "es")}${c.unit.trim() === "%" ? " %" : c.unit.trim() ? ` ${c.unit.trim()}` : ""}`);

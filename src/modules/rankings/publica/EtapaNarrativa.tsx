@@ -67,7 +67,16 @@ export function EtapaNarrativa(p: EtapaProps) {
   const redactar = async (extra: Record<string, unknown>, etiqueta: string) => {
     setResumen(null);
     const r = await p.corrida.correr<RespuestaRedactar>(etiqueta, "redactar", { profundidad, ...extra });
-    if (r) setResumen(`Pilo escribió ${r.escritos}.${r.sin_usar ? ` ${r.sin_usar} fuentes quedaron sin usar.` : ""}`);
+    if (r) {
+      const sinUsar = Array.isArray(r.sin_usar) ? r.sin_usar.length : Number(r.sin_usar ?? 0);
+      const fallos = Array.isArray(r.fallos) ? r.fallos : [];
+      const motivo = fallos
+        .map((f) => (typeof f === "string" ? f : String((f as { motivo?: string }).motivo ?? "")))
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(" ");
+      setResumen(`Pilo escribió ${r.escritos}.${sinUsar ? ` ${sinUsar} fuentes quedaron sin usar.` : ""}${motivo ? ` No pudo: ${motivo}` : ""}`);
+    }
   };
   const traducir = async () => {
     setResumen(null);

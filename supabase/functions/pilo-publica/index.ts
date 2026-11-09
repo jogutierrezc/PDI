@@ -102,6 +102,7 @@ import {
   trabajosEje,
   verificarEje,
   verificarPortada,
+  completarFigs,
   type Descripcion,
   type Eje,
   type FuentePendiente,
@@ -1145,7 +1146,7 @@ Deno.serve(async (request: Request) => {
     const fallos: { key: string; motivo: string }[] = [];
     try {
       const libro = await cargarLibro();
-      if (!libro.length) return fallo("El libro de cifras está vacío: primero arma el libro.", "sin_libro", 409);
+      if (!libro.length) return json({ ok: true, descritas: 0, quedan: 0, fallos, aviso: "No hay cifras que describir: el informe seguirá solo con el relato." });
       const ahora = Date.now();
       /** Con «rehacer», las descritas por Pilo hace menos de 15 minutos no se repiten (el cliente puede repetir hasta quedan = 0). */
       const reciente = (s: SourceCifra | null | undefined) => {
@@ -1261,7 +1262,8 @@ Deno.serve(async (request: Request) => {
   if (accion === "analizar") {
     try {
       const libro = await cargarLibro();
-      if (!libro.length) return fallo("El libro de cifras está vacío: primero arma el libro.", "sin_libro", 409);
+      // Sin cifras no hay tablero ni gráficos, y no es un error: el informe se construye con el relato.
+      if (!libro.length) return json({ ok: true, kpis: 0, graficos: 0, descartados: [], propuestos: [], aviso: "No hay cifras del ODS en el libro: el informe no llevará tablero ni gráficos." });
       const bloques = await cargarBloques(["kpi", "grafico"]);
       const dePilo = bloques.filter((b) => b.origin === "pilo");
       if (dePilo.length && !cuerpo.rehacer) return fallo("Pilo ya propuso el tablero y los gráficos: usa «rehacer» para reemplazar los suyos.", "ya_hecho", 409);
@@ -1270,10 +1272,19 @@ Deno.serve(async (request: Request) => {
       const inds = await indicadores(c);
       // Primero las que responden a un indicador y las más recientes.
       const orden = [...libro].sort((a, b) => Number(Boolean(b.indicator)) - Number(Boolean(a.indicator)) || (b.year ?? 0) - (a.year ?? 0) || a.key.localeCompare(b.key));
-      const r = await llamarVerificado(mensajesTablero(unidad, informe.ranking, inds, orden), 2400, (crudo) => leerTablero(crudo, libro, usadas));
+      const r = await llamarVerificado(mensajesTablero(unidad, informe.ranking, inds, orden), 5000, (crudo) => leerTablero(crudo, libro, usadas));
       if (!r.ok) {
         await bitacora({ error: r.error }, 0, 1, r.error);
-        return fallo(`Pilo no logró un tablero legible: ${r.error}`, "verificacion", 422);
+        // No es un impedimento: el código arma los gráficos con reglas fijas y, si no hay, el informe sale sin ellos.
+        const deOtrosR = bloques.filter((b) => b.origin !== "pilo" && b.kind === "grafico").map((b) => b.spec as unknown as SpecGrafico).filter((s) => Array.isArray(s?.series));
+        const solo = sugerirGraficos(libro, deOtrosR, MAX_GRAFICOS);
+        if (cuerpo.rehacer && dePilo.length) await admin.from("pp_bloques").delete().eq("informe_id", informeId).eq("origin", "pilo").in("kind", ["kpi", "grafico"]);
+        let posR = siguientePos(SECCIONES.grafico, bloques.filter((b) => b.origin !== "pilo"));
+        if (solo.length) {
+          const w = await admin.from("pp_bloques").insert(solo.map((g) => ({ informe_id: informeId, kind: "grafico", sec: SECCIONES.grafico, pos: posR++, origin: "pilo", enabled: true, spec: g, heading_es: g.title_es, heading_en: g.title_en, figs: g.series.map((s) => s.cifra) })), { defaultToNull: false });
+          if (w.error) throw w.error;
+        }
+        return json({ ok: true, kpis: 0, graficos: solo.length, descartados: [{ motivo: `Pilo no entregó un tablero legible (${r.error.slice(0, 160)}): se usaron gráficos de reglas fijas.` }], propuestos: [] });
       }
       const t = r.valor;
       // Menos de 3 gráficos válidos: el código completa con sugerencias deterministas (origen «codigo»), sin repetir
@@ -1349,8 +1360,9 @@ Deno.serve(async (request: Request) => {
         const r = await llamarVerificado<Portada>(mensajesPortada(unidad, informe.ranking, voz, notas, sub, edition), 1200, (crudo) => {
           const l = leerPortada(crudo);
           if (!l.ok) return l;
-          const v = verificarPortada(l.valor, porKey, notas, fijos);
-          return v.ok ? l : { ok: false, error: v.error ?? "No pasó la verificación." };
+          const completa = completarFigs(l.valor, sub);
+          const v = verificarPortada(completa, porKey, notas, fijos);
+          return v.ok ? { ok: true as const, valor: completa } : { ok: false, error: v.error ?? "No pasó la verificación." };
         });
         if (!r.ok) {
           fallos.push({ refs: ["portada"], motivo: r.error });

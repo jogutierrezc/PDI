@@ -35,7 +35,8 @@ export function EtapaGraficos(p: EtapaProps) {
   const analizar = async () => {
     setResumen(null);
     const r = await p.corrida.correr<RespuestaAnalizar>("Pilo propone el tablero y los gráficos", "analizar", rehacer ? { rehacer: true } : {});
-    if (r) setResumen(`Pilo propuso ${r.kpis} cifras clave y ${r.graficos} gráficos.${(Array.isArray(r.descartados) ? r.descartados.length : r.descartados) ? ` Descartó ${Array.isArray(r.descartados) ? r.descartados.length : r.descartados} (${Array.isArray(r.descartados) ? r.descartados.slice(0, 2).map((d) => d.motivo).join(" ") : "sin cifras verificables"}).` : ""}`);
+    if (r?.aviso) setResumen(r.aviso);
+    else if (r) setResumen(`Pilo propuso ${r.kpis} cifras clave y ${r.graficos} gráficos.${(Array.isArray(r.descartados) ? r.descartados.length : r.descartados) ? ` Descartó ${Array.isArray(r.descartados) ? r.descartados.length : r.descartados} (${Array.isArray(r.descartados) ? r.descartados.slice(0, 2).map((d) => d.motivo).join(" ") : "sin cifras verificables"}).` : ""}`);
   };
 
   /** Inserta un gráfico nuevo (origen persona). Lanza el error para que quien llama lo muestre sin perder lo elegido. */

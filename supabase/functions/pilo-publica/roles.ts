@@ -59,8 +59,8 @@ export function mensajesTablero(u: Unidad, ranking: Ranking, indicadores: Indica
     indicadores.length ? `Indicadores del ranking a los que responde:\n${indicadores.slice(0, 40).map((i) => `· ${i.id} — ${i.titulo}`).join("\n")}` : "",
     "El libro llega agrupado por SERIE: cada serie [S1], [S2]… es la MISMA medida en distintos años, con su nombre, su unidad y, si la hay, una descripción de qué mide. Usa el nombre y la descripción para entender cada cifra; no adivines.",
     "Propón:",
-    "· «kpis»: hasta 4 cifras clave (las más claras y propias de la UDES), cada una {\"cifra\":\"<key>\"}.",
-    "· «graficos»: entre 3 y 6, cada uno {\"chart\":\"bar\"|\"line\"|\"donut\",\"title_es\":\"…\",\"title_en\":\"…\",\"series\":[{\"x\":\"2024\",\"cifra\":\"<key>\"}]}.",
+    "· «kpis»: entre 6 y 12 cifras clave (las más claras y propias de la UDES, de medidas distintas entre sí: no repitas la misma serie en dos años), cada una {\"cifra\":\"<key>\"}.",
+    "· «graficos»: entre 8 y 12, usando la mayor cantidad posible de fuentes y tablas distintas del libro (no te quedes en las 2 o 3 series más conocidas), cada uno {\"chart\":\"bar\"|\"line\"|\"donut\",\"title_es\":\"…\",\"title_en\":\"…\",\"series\":[{\"x\":\"2024\",\"cifra\":\"<key>\"}]}.",
     "  - line: los años de UNA serie (2 o más puntos); «x» es el año de la cifra, tal cual.",
     "  - bar: al menos 2 puntos con la MISMA unidad. Sirve para los años de una serie («x» = el año) o para comparar series distintas de la misma unidad y del mismo año («x» = nombre corto de la medida o de la parte, de menos de 30 caracteres).",
     "  - donut: un solo porcentaje (1 punto) o las partes de un mismo total del mismo año (las «Participación de …» o las partes de un desglose); «x» es el nombre corto de la porción.",
@@ -72,7 +72,7 @@ export function mensajesTablero(u: Unidad, ranking: Ranking, indicadores: Indica
   ].filter(Boolean);
   return [
     { role: "system", content: SISTEMA_ESTADISTICO },
-    { role: "user", content: `${reglas.join("\n")}\n\n${libroPorSeries(libro)}` },
+    { role: "user", content: `${reglas.join("\n")}\n\n${libroPorSeries(libro, 300)}` },
   ];
 }
 
@@ -170,7 +170,7 @@ export function mensajesPortada(u: Unidad, ranking: Ranking, voz: AjustesVoz, te
     "· «title_es»: un título de menos de 60 caracteres, concreto, sin signos de exclamación ni adjetivos promocionales.",
     "· «lead_es»: una entrada de 2 o 3 frases y menos de 600 caracteres que diga qué hizo la UDES y a qué responde.",
     instruccionesVoz(voz.tone, voz.person),
-    libro.length ? "Cifras: SOLO las del libro, escritas tal cual; cada una que uses va en «figs» por su key." : "No escribas cifras (solo el año de la edición).",
+    libro.length ? "Cifras: SOLO las del libro, escritas tal cual; cada una que uses va en «figs» por su key. No escribas ningún otro número: no cuentes ejes, fuentes, cifras ni noticias." : "No escribas cifras (solo el año de la edición).",
     `«title_en» y «lead_en»: lo mismo en inglés. ${REGLAS_INGLES}`,
     'Formato: {"title_es":"…","title_en":"…","lead_es":"…","lead_en":"…","figs":["<key>"]}',
   ];

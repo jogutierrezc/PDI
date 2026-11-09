@@ -49,13 +49,16 @@ export interface RespuestaAnalizar {
   graficos: number;
   /** Lo que se descartó, con su motivo (el servidor manda la lista; versiones viejas mandaban solo el número). */
   descartados: { motivo: string }[] | number;
+  /** Sin cifras del ODS no hay tablero: no es un error. */
+  aviso?: string;
 }
 export interface RespuestaRedactar {
   ok: boolean;
   escritos: number;
   quedan: number;
-  fallos?: { ref?: string; error?: string }[] | number;
-  sin_usar?: number;
+  fallos?: { refs?: string[]; motivo?: string }[] | number;
+  /** El servidor manda la lista de fuentes sin citar (versiones viejas mandaban el número). */
+  sin_usar?: { ref: string; label: string; motivo: string }[] | number;
 }
 export interface PropuestaImagen {
   news_id: string;

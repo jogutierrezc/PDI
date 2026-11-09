@@ -10,7 +10,7 @@ import type { AjustesPP, BloquePP, EstadoInforme, Idioma, SeccionVista } from ".
 import { ErrorAviso, Interruptor, Tarjeta } from "./ui";
 
 const SECCIONES: Record<SeccionVista, { t: string; d: string }> = {
-  kpis: { t: "Cifras clave", d: "Hasta 4 cifras del libro, con conteo animado" },
+  kpis: { t: "Cifras clave", d: "Hasta 12 cifras del libro, con conteo animado" },
   graficos: { t: "Gráficos dinámicos", d: "Barras, línea o anillo con las cifras del libro" },
   ejes: { t: "Narrativa por eje", d: "Texto de Pilo y de la persona, con imágenes de las noticias" },
   noticias: { t: "Noticias relacionadas", d: "Carrusel final con las noticias de las imágenes" },
@@ -224,8 +224,9 @@ export function EtapaPublicar(p: EtapaProps) {
 
   const checks: { ok: boolean; t: string; bloquea: boolean }[] = [
     { ok: Boolean(p.informe.title_es.trim() && p.informe.lead_es.trim()), t: "Título e introducción en español", bloquea: true },
-    { ok: kpis.length > 0 && kpisSin.length === 0, t: kpis.length ? `${kpis.length} cifras clave${kpisSin.length ? ` (${kpisSin.length} sin valor en el libro)` : ""}` : "Al menos una cifra clave", bloquea: true },
-    { ok: graficos.length > 0 && graficosMal.length === 0, t: graficos.length ? `${graficos.length} gráficos${graficosMal.length ? ` (${graficosMal.length} sin datos)` : ""}` : "Al menos un gráfico con datos", bloquea: true },
+    /* Los tableros y gráficos son opcionales: sin datos del ODS el informe sale solo con el relato. Lo que no se puede dibujar no se muestra. */
+    { ok: kpisSin.length === 0, t: kpisSin.length ? `${kpisSin.length} de ${kpis.length} cifras clave no tienen valor en el libro: no se mostrarán` : kpis.length ? `${kpis.length} cifras clave` : "Sin cifras clave: el informe se publica sin tablero", bloquea: false },
+    { ok: graficosMal.length === 0, t: graficosMal.length ? `${graficosMal.length} de ${graficos.length} gráficos no tienen datos: no se mostrarán` : graficos.length ? `${graficos.length} gráficos` : "Sin gráficos: el informe se publica sin la sección de datos", bloquea: false },
     { ok: ejes.length > 0, t: `${ejes.length} ejes narrativos visibles`, bloquea: true },
     { ok: sinCita.length === 0, t: sinCita.length ? `${sinCita.length} ejes sin cita o sin texto` : "Todos los ejes tienen cita", bloquea: true },
     { ok: !ejes.some((b) => (b.warn ?? "").startsWith("SIN VERIFICAR")), t: ejes.some((b) => (b.warn ?? "").startsWith("SIN VERIFICAR")) ? "Hay ejes marcados «SIN VERIFICAR»: revisa las citas y las cifras y borra el aviso antes de publicar" : "Ningún eje está sin verificar", bloquea: true },

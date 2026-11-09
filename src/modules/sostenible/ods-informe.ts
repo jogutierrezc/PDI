@@ -122,7 +122,7 @@ export function aInformePublico(d: InformePublicoCompleto, ods: number): Informe
     .map((b) => (b.spec.cifra ? cifras.get(b.spec.cifra) : undefined))
     .map((c) => (c ? aCifra(c) : null))
     .filter((c): c is Cifra => c !== null)
-    .slice(0, 4);
+    .slice(0, 12);
   if (figs.length) poner({ id: `${inf.id}:kpis`, sec: "cifras", text: "", figs });
 
   /* Imágenes: la del eje que nombran (spec.eje) o, si no, por orden; las manuales primero. Las que sobran, galería. */

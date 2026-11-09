@@ -97,8 +97,8 @@ export function cifrasDelInforme(o: Ods, inf: InformePublico, lang: Lang): { gra
     .sort(porPos)
     .flatMap((b) => b.figs)
     .filter((f) => f.v);
-  /* Pilo Publica: sus cifras clave (hasta 4) mandan siempre, también en los ODS con cifras reales. */
-  if (inf.origen === "pilo-publica") return { grandes: delBloque.slice(0, 4), margen: [] };
+  /* Pilo Publica: sus cifras clave (hasta 12) mandan siempre, también en los ODS con cifras reales. */
+  if (inf.origen === "pilo-publica") return { grandes: delBloque.slice(0, 12), margen: [] };
   if (!o.real) return { grandes: delBloque.slice(0, 2), margen: delBloque.slice(2) };
   const grandes = o.figures.map((f, i) => {
     const en = ODS_CIFRAS_EN[o.n - 1]?.[i];

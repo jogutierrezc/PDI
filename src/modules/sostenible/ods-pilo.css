@@ -208,6 +208,56 @@
   .ors .opi-next .opi-h2 { max-width: 100%; }
 }
 
+/* =============================================================================
+   Pilo Publica sobre el cartel: cifras clave (hasta 4), «Datos» y ejes.
+   ============================================================================= */
+
+/* Tesis larga (un lead de varias frases): menos colosal, misma voz. */
+.ors .opi-thesis--largo { max-width: 34ch; font-size: clamp(26px, 3.2vw, 44px); line-height: 1.08; letter-spacing: -0.02em; }
+
+/* Tres o cuatro cifras en una fila; una o dos, como siempre. */
+.opi-figs--3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
+.opi-figs--4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.ors .opi-figs--3 .opi-fig__big { font-size: clamp(56px, 7vw, 104px); }
+.ors .opi-figs--4 .opi-fig__big { font-size: clamp(48px, 5.6vw, 84px); }
+.ors .opi-fig__desc { max-width: 36ch; margin-top: 6px; color: #23302a; font-size: 15px; line-height: 1.5; }
+.opi-fig__meta { font-variant-numeric: tabular-nums; }
+.opi-mfig em { display: block; margin-top: 2px; color: var(--o-muted); font-size: 13px; font-style: normal; font-variant-numeric: tabular-nums; }
+
+/* Ejes: pliegos alternados. La foto del eje par entra a sangre sobre el pliego. */
+.opi .opi-eje { padding: clamp(48px, 6vw, 88px) 0; }
+.opi .opi-eje:first-child { padding-top: clamp(56px, 7vw, 104px); }
+.opi .opi-eje--sangre { padding-top: 0; }
+.opi-eje__bleed { margin-bottom: clamp(32px, 5vw, 64px) !important; }
+.ors .opi-eje .opi-sub { max-width: 24ch; font-size: clamp(28px, 3.4vw, 44px); line-height: 1; letter-spacing: -0.02em; border-top-width: 3px; margin-top: 0; }
+
+/* Apertura del eje: la escena, un poco más grande y sin justificar. */
+.ors .opi-p.opi-p--lede { color: var(--o-ink); font-size: clamp(19px, 1.7vw, 22px); font-weight: 500; line-height: 1.55; text-align: left; }
+
+/* Cita o destacado: un párrafo entre comillas, en la voz del titular. */
+.opi-quote { max-width: 30ch; margin: 1.3em 0 1.6em; padding: 0 0 0 clamp(16px, 2vw, 24px); border-left: 4px solid var(--ods); }
+.ors .opi-quote p { margin: 0; color: var(--o-ink); font-size: clamp(22px, 2.5vw, 32px); font-weight: 800; font-stretch: 75%; line-height: 1.1; letter-spacing: -0.015em; text-wrap: balance; }
+@media (min-width: 1000px) {
+  .opi-quote { margin-right: calc(var(--opi-side) + var(--opi-gap)); }
+}
+
+/* --- Datos: gráficos con la voz del cartel ------------------------------------------ */
+
+.opd-grid-all { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: clamp(36px, 5vw, 64px) var(--opi-gap); }
+.opd-grid-all--uno { grid-template-columns: minmax(0, 760px); }
+.opd { margin: 0; padding-top: 12px; border-top: 3px solid var(--ods); }
+.ors .opd-title { max-width: 32ch; margin: 0; color: var(--o-ink); font-size: clamp(22px, 2.2vw, 28px); font-weight: 800; font-stretch: 75%; line-height: 1.05; letter-spacing: -0.015em; }
+.ors .opd-note { margin-top: 4px; color: var(--o-muted); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-stretch: 75%; font-variant-numeric: tabular-nums; }
+.ors .opd-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin: 14px 0 6px; color: var(--ors-deep); font-size: clamp(56px, 7vw, 96px); font-weight: 800; font-stretch: 75%; line-height: 0.9; letter-spacing: -0.035em; font-variant-numeric: tabular-nums lining-nums; }
+.opd-big small { font-size: 0.5em; font-weight: 800; letter-spacing: 0; }
+.opd-big__x { color: var(--o-muted); font-size: 16px; font-weight: 700; letter-spacing: 0.04em; }
+.opd-svg { display: block; width: 100%; height: auto; margin-top: 10px; overflow: visible; }
+.opd-grid { stroke: var(--ors-rule); stroke-width: 1; }
+.opd-t-s { fill: var(--o-muted); font-family: inherit; font-size: 12px; font-variant-numeric: tabular-nums; }
+.opd-t-v { fill: var(--o-ink); font-family: inherit; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.opd-t-c { fill: var(--o-ink); font-family: inherit; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ors .opd-src { margin-top: 10px; color: var(--o-muted); font-size: 13.5px; line-height: 1.45; }
+
 @media (prefers-reduced-motion: reduce) {
   .opi-curtain { display: none; }
 }

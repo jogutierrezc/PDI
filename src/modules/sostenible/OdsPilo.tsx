@@ -7,6 +7,7 @@
    pieza como vista previa, con los datos del borrador y sin movimiento.
 
      tesis          una frase grande, condensada
+     datos          (Pilo Publica) gráficos en el lenguaje del cartel (OdsDatos)
      cifras         tipografía; en los ODS con cifras reales de ods-data.ts
                     (hoy 4 y 13) mandan esas; en los demás, el bloque «cifras»
      portada        la fotografía ancha (recorte 3:1 o 16:9), a sangre
@@ -27,7 +28,7 @@
    `clearProps: "all"` (borraría las variables de color en línea).
    ========================================================================== */
 
-import { Fragment, useRef } from "react";
+import { Fragment, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -44,6 +45,7 @@ import { ODS_CIFRAS_EN, tr } from "./i18n";
 import type { Lang } from "./i18n";
 import { MarcaEs } from "./LangSwitch";
 import { OdsRegistro } from "./OdsRegistro";
+import { OdsDatos } from "./OdsDatos";
 import { reduced } from "./widgets";
 import "./ods-report.css";
 import "./ods-pilo.css";
@@ -70,6 +72,7 @@ export function seccionesPilo(inf: InformePublico | null | undefined, soloRelato
   const s: [string, string][] = [];
   const figs = inf.bloques.some((b) => b.sec === "cifras" && b.figs.length) || deSeccion(inf, "tesis").length > 0;
   if (!soloRelato && figs) s.push(["cifras", tr(lang, "sec_cifras")]);
+  if (!soloRelato && inf.graficos?.some((g) => g.puntos.some((p) => p.v !== null))) s.push(["datos", tr(lang, "sec_datos")]);
   if (deSeccion(inf, "hicimos").length) s.push(["relato", tr(lang, "sec_relato")]);
   if (!soloRelato && deSeccion(inf, "proyectos").length) s.push(["proyectos", tr(lang, "sec_proyectos")]);
   if (!soloRelato && deSeccion(inf, "viene").length) s.push(["viene", tr(lang, "sec_viene")]);
@@ -94,6 +97,8 @@ export function cifrasDelInforme(o: Ods, inf: InformePublico, lang: Lang): { gra
     .sort(porPos)
     .flatMap((b) => b.figs)
     .filter((f) => f.v);
+  /* Pilo Publica: sus cifras clave (hasta 4) mandan siempre, también en los ODS con cifras reales. */
+  if (inf.origen === "pilo-publica") return { grandes: delBloque.slice(0, 4), margen: [] };
   if (!o.real) return { grandes: delBloque.slice(0, 2), margen: delBloque.slice(2) };
   const grandes = o.figures.map((f, i) => {
     const en = ODS_CIFRAS_EN[o.n - 1]?.[i];
@@ -118,6 +123,29 @@ function Texto({ b, lang }: { b: Pick<BloquePub, "text" | "text_en">; lang: Lang
       )}
     </span>
   );
+}
+
+/** Un párrafo es una cita si va entre comillas de principio a fin (solo en informes de Pilo Publica). */
+const esCita = (t: string): boolean => /^[«“"].{20,}[»”"]$/s.test(t.trim());
+
+/** Los párrafos de «Qué hicimos» de un informe de Pilo Publica, agrupados por eje: dónde empieza cada uno y cuántos son. */
+function agruparEjes(hicimos: BloquePub[]): { eje: string; desde: number; n: number }[] {
+  const g: { eje: string; desde: number; n: number }[] = [];
+  hicimos.forEach((b, i) => {
+    const eje = b.eje ?? b.id;
+    const u = g[g.length - 1];
+    if (u && u.eje === eje) u.n++;
+    else g.push({ eje, desde: i, n: 1 });
+  });
+  return g;
+}
+
+/** Texto, descripción y fuente de una cifra en el idioma pedido (en Pilo Publica, con respaldo al español y su marca de idioma). */
+function textoCifra(f: CifraT, lang: Lang, real: boolean, nuevo: boolean) {
+  const en = lang === "en";
+  const base = (nuevo ? "es" : real ? lang : "es") as Lang;
+  const conEn = (es: string | undefined, enTxt: string | undefined) => (en && enTxt?.trim() ? { t: enTxt, l: "en" as Lang } : { t: es ?? "", l: base });
+  return { label: conEn(f.label, f.label_en), desc: conEn(f.desc, f.desc_en), src: conEn(f.src, f.src_en) };
 }
 
 /* ---------- Piezas ------------------------------------------------------------- */
@@ -146,17 +174,23 @@ function Cifra({ v, lang }: { v: string; lang: Lang }) {
 }
 
 function Foto({ f, nota, slot, className, cortina, lang }: { f: FotoPub; nota?: NotaInforme; slot: RanuraFoto; className: string; cortina?: boolean; lang: Lang }) {
+  /* Si la imagen no carga (un enlace roto), la figura desaparece: nunca deja un hueco. */
+  const [fallo, setFallo] = useState(false);
   const src = f.url || nota?.image_url;
-  if (!src) return null;
+  if (!src || fallo) return null;
+  const en = lang === "en" && Boolean(f.caption_en?.trim());
+  const caption = en ? (f.caption_en as string) : f.caption;
+  const alt = (en && f.alt_en) || f.alt;
+  const ll = en ? "en" : "es";
   return (
     <figure className={className}>
       <div className="opi-frame">
-        <img src={src} alt={f.alt || f.caption || nota?.title || ""} lang="es" style={estiloRecorte(f.crop, slot)} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+        <img src={src} alt={alt || caption || nota?.title || ""} lang={ll} style={estiloRecorte(f.crop, slot)} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFallo(true)} />
         {cortina && <span className="opi-curtain" aria-hidden="true" />}
       </div>
-      {(f.caption || f.credit) && (
+      {(caption || f.credit) && (
         <figcaption>
-          <span lang="es">{f.caption}</span>
+          <span lang={ll}>{caption}</span>
           {f.credit && (
             <span className="opi-credit">
               {" "}
@@ -206,23 +240,39 @@ export function OdsPiloCuerpo({
   /* Al margen del relato: la foto 1 junto al segundo párrafo, la 2 junto al cuarto, y las cifras que sobran en los demás. */
   const margenDe = new Map<number, ReactNode[]>();
   const poner = (i: number, n: ReactNode) => margenDe.set(i, [...(margenDe.get(i) ?? []), n]);
-  const n1 = enRanura("n1");
-  const n2 = enRanura("n2");
+  const nuevo = informe.origen === "pilo-publica";
+  /* Pilo Publica ubica cada foto junto a su eje; el modelo viejo, en las ranuras n1 y n2. */
+  const n1 = nuevo ? undefined : enRanura("n1");
+  const n2 = nuevo ? undefined : enRanura("n2");
   if (n1) poner(Math.min(1, hicimos.length - 1), <Foto key="n1" f={n1} nota={nota.get(n1.news_id)} slot="n1" className="opi-shot opi-rise" lang={lang} />);
   if (n2) poner(Math.min(3, hicimos.length - 1), <Foto key="n2" f={n2} nota={nota.get(n2.news_id)} slot="n2" className="opi-shot opi-rise" lang={lang} />);
   const libres = hicimos.map((_, i) => i).filter((i) => !margenDe.has(i));
-  margen.forEach((f, k) => {
-    const i = libres[k % Math.max(1, libres.length)] ?? 0;
-    poner(
-      i,
-      <div key={`f${k}`} className="opi-mfig opi-rise">
+  const mfig = (f: CifraT, key: string) => {
+    const t = textoCifra(f, lang, o.real, nuevo);
+    return (
+      <div key={key} className="opi-mfig opi-rise">
         <b>
           <Cifra v={f.v} lang={lang} />
         </b>
-        <span lang="es">{f.label}</span>
-      </div>,
+        <span lang={t.label.l}>{t.label.t}</span>
+        {nuevo && (f.year || f.unit) && <em>{[f.year, f.unit].filter(Boolean).join(" · ")}</em>}
+      </div>
     );
+  };
+  margen.forEach((f, k) => {
+    const i = libres[k % Math.max(1, libres.length)] ?? 0;
+    poner(i, mfig(f, `f${k}`));
   });
+  /* Pilo Publica: por eje, la foto junto a su segundo párrafo (o a sangre en los ejes impares) y sus cifras al margen. */
+  const grupos = nuevo ? agruparEjes(hicimos) : [];
+  const detalleGrupos = grupos.map((g, k) => {
+    const foto = fotos.find((f) => f.eje === g.eje);
+    return { ...g, foto, sangre: Boolean(foto) && k % 2 === 1 };
+  });
+  if (nuevo) {
+    for (const g of detalleGrupos) if (g.foto && !g.sangre) poner(g.desde + Math.min(1, g.n - 1), <Foto key={`e${g.eje}`} f={g.foto} nota={nota.get(g.foto.news_id)} slot="n1" className="opi-shot opi-rise" lang={lang} />);
+    hicimos.forEach((b, i) => b.figs.forEach((f, k) => poner(i, mfig(f, `m${i}-${k}`))));
+  }
 
   useGSAP(
     () => {
@@ -245,6 +295,20 @@ export function OdsPiloCuerpo({
         start: "top 92%",
         once: true,
         onEnter: (b) => void gsap.from(b, { y: 18, opacity: 0, duration: 0.5, ease: "power3.out", stagger: 0.06, clearProps: "opacity,transform" }),
+      });
+      /* Datos: la línea se traza, las barras crecen, el anillo se llena y los puntos llegan (todo lo demás ya está puesto). */
+      q(".opd").forEach((fig) => {
+        const tl = gsap.timeline({ defaults: { ease: "power3.out" }, scrollTrigger: { trigger: fig, start: "top 85%", once: true } });
+        const ln = fig.querySelector(".opd-ln");
+        const br = fig.querySelectorAll(".opd-br");
+        const dn = fig.querySelector<SVGElement>(".opd-dn");
+        const dt = fig.querySelectorAll(".opd-dt");
+        const lv = fig.querySelectorAll(".opd-lv");
+        if (ln) tl.fromTo(ln, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1, ease: "power2.inOut", clearProps: "strokeDashoffset" }, 0);
+        if (br.length) tl.from(br, { scaleY: 0, transformOrigin: "50% 100%", duration: 0.7, stagger: 0.07, clearProps: "transform" }, 0);
+        if (dn) tl.fromTo(dn, { strokeDasharray: "0 100" }, { strokeDasharray: `${Number(dn.dataset.v) || 0} 100`, duration: 1.1, ease: "power2.inOut", clearProps: "strokeDasharray" }, 0);
+        if (dt.length) tl.from(dt, { scale: 0, transformOrigin: "50% 50%", duration: 0.35, stagger: 0.12, clearProps: "transform" }, 0.35);
+        if (lv.length) tl.from(lv, { opacity: 0, duration: 0.4, clearProps: "opacity" }, 0.7);
       });
       /* Las cifras cuentan. */
       q(".opi-cnt").forEach((c) => {
@@ -273,6 +337,59 @@ export function OdsPiloCuerpo({
 
   const portada = enRanura("portada");
 
+  const galeriaJsx = (
+    <div className="opi-gallery">
+      {galeria.map((f) => (
+        <Foto key={f.image_id ?? f.url ?? f.news_id} f={f} nota={nota.get(f.news_id)} slot="galeria" className="opi-gshot opi-rise" lang={lang} />
+      ))}
+    </div>
+  );
+
+  /** Un párrafo del relato con su subtítulo (si abre grupo), lo que va al margen y sus referencias. `abreEje`: primero de su eje (Pilo Publica). */
+  const unidad = (b: BloquePub, i: number, abreEje: boolean) => {
+    const nums = Array.from(new Set(b.sources.map((s) => refs.get(s.news_id) ?? 0)))
+      .filter(Boolean)
+      .sort((a, c) => a - c);
+    const h = b.heading?.trim();
+    const abre = nuevo ? Boolean(h) && abreEje : h && h !== hicimos[i - 1]?.heading?.trim();
+    const cita = nuevo && esCita(textoEnIdioma(b, lang).texto);
+    return (
+      <Fragment key={b.id}>
+        {abre && (
+          <h3 className="opi-sub opi-rise">
+            <Texto b={{ text: h as string, text_en: b.heading_en }} lang={lang} />
+          </h3>
+        )}
+        <div className="opi-unit">
+          {margenDe.has(i) && <aside className="opi-side">{margenDe.get(i)}</aside>}
+          {cita ? (
+            <blockquote className="opi-quote opi-rise">
+              <p>
+                <Texto b={b} lang={lang} />
+              </p>
+            </blockquote>
+          ) : (
+            <p className={`opi-p opi-rise ${nuevo && abreEje ? "opi-p--lede" : "opi-just"}`}>
+              <Texto b={b} lang={lang} />
+              {nums.length > 0 && (
+                <sup className="opi-refs">
+                  {nums.map((k, j) => (
+                    <span key={k}>
+                      {j > 0 && ","}
+                      <a href={`#osn-${idDe.get(k) ?? ""}`} aria-label={tr(lang, "fuente_n", { n: k })}>
+                        {k}
+                      </a>
+                    </span>
+                  ))}
+                </sup>
+              )}
+            </p>
+          )}
+        </div>
+      </Fragment>
+    );
+  };
+
   return (
     <div ref={scope} className="opi" lang={lang}>
       {!soloRelato && (tesis.length > 0 || grandes.length > 0) && (
@@ -282,27 +399,42 @@ export function OdsPiloCuerpo({
               {tr(lang, "tesis_cifras")}
             </h2>
             {tesis.map((b) => (
-              <p key={b.id} className="opi-thesis opi-rise">
+              <p key={b.id} className={`opi-thesis opi-rise${nuevo && textoEnIdioma(b, lang).texto.length > 170 ? " opi-thesis--largo" : ""}`}>
                 <Texto b={b} lang={lang} />
               </p>
             ))}
             {grandes.length > 0 && (
-              <div className="opi-figs">
-                {grandes.map((f, i) => (
-                  <div key={i} className="opi-fig opi-rise">
-                    <p className="opi-fig__big">
-                      <Cifra v={f.v} lang={lang} />
-                    </p>
-                    <p className="opi-fig__label" lang={o.real ? lang : "es"}>
-                      {f.label}
-                    </p>
-                    {f.src && (
-                      <p className="opi-fig__src">
-                        {tr(lang, "fuente")}: <span lang={o.real ? lang : "es"}>{f.src}</span>
+              <div className={`opi-figs opi-figs--${grandes.length}`}>
+                {grandes.map((f, i) => {
+                  const t = textoCifra(f, lang, o.real, nuevo);
+                  const meta = nuevo ? [f.unit, f.year].filter(Boolean).join(" · ") : "";
+                  return (
+                    <div key={i} className="opi-fig opi-rise">
+                      <p className="opi-fig__big">
+                        <Cifra v={f.v} lang={lang} />
                       </p>
-                    )}
-                  </div>
-                ))}
+                      <p className="opi-fig__label" lang={t.label.l}>
+                        {t.label.t}
+                      </p>
+                      {nuevo && t.desc.t && (
+                        <p className="opi-fig__desc" lang={t.desc.l}>
+                          {t.desc.t}
+                        </p>
+                      )}
+                      {(f.src || meta) && (
+                        <p className="opi-fig__src">
+                          {meta && <span className="opi-fig__meta">{meta}</span>}
+                          {f.src && (
+                            <>
+                              {meta ? " · " : ""}
+                              {tr(lang, "fuente")}: <span lang={t.src.l}>{t.src.t}</span>
+                            </>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {notaCifras.map((b) => (
@@ -314,59 +446,40 @@ export function OdsPiloCuerpo({
         </section>
       )}
 
+      {!soloRelato && informe.graficos && informe.graficos.length > 0 && <OdsDatos graficos={informe.graficos} lang={lang} titular={<Titular id="opi-datos-h" text={tr(lang, "datos_t")} />} />}
+
       {!soloRelato && portada && <Foto f={portada} nota={nota.get(portada.news_id)} slot="portada" className="opi-cover" cortina lang={lang} />}
 
-      {hicimos.length > 0 && (
+      {hicimos.length > 0 && !nuevo && (
         <section className="ors-sec opi-sec" id="ors-relato" aria-labelledby="opi-relato-h">
           <div className="odsx-wrap">
             <header className="opi-head">
               <Titular id="opi-relato-h" text={tr(lang, "hicimos_en", { e: edicion })} />
             </header>
-            <div className="opi-story">
-              {hicimos.map((b, i) => {
-                const nums = Array.from(new Set(b.sources.map((s) => refs.get(s.news_id) ?? 0)))
-                  .filter(Boolean)
-                  .sort((a, c) => a - c);
-                const h = b.heading?.trim();
-                const abre = h && h !== hicimos[i - 1]?.heading?.trim();
-                return (
-                  <Fragment key={b.id}>
-                    {abre && (
-                      <h3 className="opi-sub opi-rise">
-                        <Texto b={{ text: h, text_en: b.heading_en }} lang={lang} />
-                      </h3>
-                    )}
-                    <div className="opi-unit">
-                      {margenDe.has(i) && <aside className="opi-side">{margenDe.get(i)}</aside>}
-                      <p className="opi-p opi-just opi-rise">
-                        <Texto b={b} lang={lang} />
-                        {nums.length > 0 && (
-                          <sup className="opi-refs">
-                            {nums.map((k, j) => (
-                              <span key={k}>
-                                {j > 0 && ","}
-                                <a href={`#osn-${idDe.get(k) ?? ""}`} aria-label={tr(lang, "fuente_n", { n: k })}>
-                                  {k}
-                                </a>
-                              </span>
-                            ))}
-                          </sup>
-                        )}
-                      </p>
-                    </div>
-                  </Fragment>
-                );
-              })}
-            </div>
-            {galeria.length > 0 && (
-              <div className="opi-gallery">
-                {galeria.map((f) => (
-                  <Foto key={f.image_id ?? f.news_id} f={f} nota={nota.get(f.news_id)} slot="galeria" className="opi-gshot opi-rise" lang={lang} />
-                ))}
-              </div>
-            )}
+            <div className="opi-story">{hicimos.map((b, i) => unidad(b, i, false))}</div>
+            {galeria.length > 0 && galeriaJsx}
           </div>
         </section>
+      )}
+
+      {/* Pilo Publica: cada eje es un pliego; alternan papel y blanco, y la foto del eje par entra a sangre. */}
+      {hicimos.length > 0 && nuevo && (
+        <div id="ors-relato">
+          {detalleGrupos.map((g, k) => (
+            <section key={g.eje} className={`ors-sec opi-sec opi-eje${k % 2 ? " ors-sec--white" : ""}${g.sangre ? " opi-eje--sangre" : ""}`} aria-labelledby={k === 0 ? "opi-relato-h" : undefined} aria-label={k === 0 ? undefined : (hicimos[g.desde].heading ?? undefined) || undefined}>
+              {g.sangre && g.foto && <Foto f={g.foto} nota={nota.get(g.foto.news_id)} slot="portada" className="opi-cover opi-eje__bleed" lang={lang} />}
+              <div className="odsx-wrap">
+                {k === 0 && (
+                  <header className="opi-head">
+                    <Titular id="opi-relato-h" text={tr(lang, "hicimos_en", { e: edicion })} />
+                  </header>
+                )}
+                <div className="opi-story">{hicimos.slice(g.desde, g.desde + g.n).map((b, j) => unidad(b, g.desde + j, j === 0))}</div>
+                {k === detalleGrupos.length - 1 && galeria.length > 0 && galeriaJsx}
+              </div>
+            </section>
+          ))}
+        </div>
       )}
 
       {!soloRelato && proyectos.length > 0 && (

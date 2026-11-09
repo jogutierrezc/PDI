@@ -67,6 +67,8 @@ export interface CifraPub {
   unit: string;
   year: number | null;
   value: number | null;
+  /** Procedencia (descripcion, tabla, oficina…). La función pública aún no la entrega: si algún día llega, se usa. */
+  source?: Record<string, unknown>;
 }
 export interface CifraPP extends CifraPub {
   id: string;

@@ -20,6 +20,16 @@
    la intranet activará informe por informe. Con el interruptor apagado no
    aparecen ni en el menú ni en el scroll-spy.
 
+   FUENTE DEL CONTENIDO. El diseño es uno solo; lo que cambia es de dónde sale
+   el texto (useInformeDeOds, ods-informe.ts):
+     1. Si Pilo Publica tiene un informe PUBLICADO para este ODS y edición
+        (pp_informes), se convierte a la forma `InformePublico` y se pinta aquí:
+        tesis, cifras clave, sección «Datos» con sus gráficos, ejes como pliegos
+        alternados con su foto y cifras al margen, proyectos y «viene» si los hay.
+     2. Si no (ODS sin informe nuevo, edición 2025 importada, migración 0262 sin
+        aplicar), sale el modelo viejo (ods_reports) exactamente como antes.
+   El ODS 13 conserva su detalle y recibe solo el relato de cualquiera de los dos.
+
    Siempre en fondo claro (tokens `--o-*` de `.odsx`). Movimiento con GSAP: una
    sola coreografía de entrada (cortina del campo, máscara del número, la
    figura que sube, el titular por líneas) y revelados al hacer scroll. Todo el
@@ -39,8 +49,7 @@ import { EVIDENCE_LABEL, ODS13, ODS_EDITIONS, ODS_PUBLIC, ODS_ROUTES, STATUS_LAB
 import type { Bi, Ods, OdsEdition } from "./ods-data";
 import { OdsNews } from "./OdsNews";
 import { OdsPilo, recortesDe, seccionesPilo } from "./OdsPilo";
-import { usePublicInforme } from "../rankings/informes/datos";
-import { InformeEnRuta } from "../rankings/publica/InformeEnRuta";
+import { useInformeDeOds } from "./ods-informe";
 import { ODS_CIFRAS_EN, ODS_VIENE_EN, nombreOds, tesisOds, tr, useLang } from "./i18n";
 import { LangSwitch } from "./LangSwitch";
 import { Arrow, Counter, CutFilter, OdsReportIntro, OdsReportVideo, PlayMark, Words, fmtN, introSeen, parseFigure } from "./OdsReportParts";
@@ -78,8 +87,7 @@ export function OdsReport() {
   const edition = odsEdition(params.get("edicion"));
   return (
     <OdsShell title={`ODS ${o.n} · ${o.name}`}>
-      {/* Si Pilo Publica tiene un informe publicado de este ODS y edición, se muestra ése; si no, el informe de siempre. */}
-      <InformeEnRuta n={o.n} edition={edition} fallback={<ReportView key={`${o.n}-${edition}`} o={o} edition={edition} />} />
+      <ReportView key={`${o.n}-${edition}`} o={o} edition={edition} />
     </OdsShell>
   );
 }
@@ -94,9 +102,8 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
   const L: Lang = lang;
   const tx = (es: string, en: string) => (L === "es" ? es : en);
   const t = (b: Bi) => b[L];
-  /* El informe redactado con Pilo, si está publicado para esta edición (español e inglés). */
-  const piloQ = usePublicInforme(o.n, edition);
-  const pilo = piloQ.data ?? null;
+  /* El informe redactado con Pilo (español e inglés): el de Pilo Publica si está publicado; si no, el de siempre. Ver ods-informe.ts. */
+  const { informe: pilo } = useInformeDeOds(o.n, edition);
   const piloSecs = seccionesPilo(pilo, full, L);
 
   /* «check» es el HTML inicial: contenido completo, sin intro. En el navegador se decide antes de pintar. */

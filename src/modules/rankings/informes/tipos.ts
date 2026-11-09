@@ -54,6 +54,28 @@ export interface Cifra {
   v: string;
   label: string;
   src: string;
+  /** Pilo Publica: lo demás es opcional y el modelo viejo no lo trae. */
+  label_en?: string;
+  /** Qué es la cifra, en una frase. */
+  desc?: string;
+  desc_en?: string;
+  src_en?: string;
+  /** Unidad (si no es %) y año de la cifra. */
+  unit?: string;
+  year?: number | null;
+}
+
+/** Pilo Publica: un gráfico del informe (ya resuelto contra el libro de cifras). */
+export interface GraficoPub {
+  id: string;
+  tipo: "bar" | "line" | "donut";
+  titulo: string;
+  titulo_en: string;
+  puntos: { x: string; v: number | null; key: string }[];
+  unidad: string;
+  /** Procedencia de las cifras (español e inglés). */
+  fuente: string;
+  fuente_en: string;
 }
 
 export interface Bloque {
@@ -227,9 +249,22 @@ export interface InformeCompleto {
 /** Lo que lee el portal público: solo lo aprobado y publicado. */
 export interface InformePublico {
   informe: Pick<Informe, "id" | "ods" | "edition" | "updated_at">;
-  bloques: Pick<Bloque, "id" | "sec" | "pos" | "text" | "sources" | "figs" | "text_en" | "heading" | "heading_en">[];
+  bloques: (Pick<Bloque, "id" | "sec" | "pos" | "text" | "sources" | "figs" | "text_en" | "heading" | "heading_en"> & {
+    /** Pilo Publica: el eje al que pertenece el párrafo (un eje se parte en varios bloques). */
+    eje?: string;
+  })[];
   /** `url`: la imagen elegida (0146) o la portada de la nota. */
-  fotos: (Pick<Foto, "news_id" | "slot" | "caption" | "alt" | "credit" | "crop" | "image_id"> & { url?: string | null })[];
+  fotos: (Pick<Foto, "news_id" | "slot" | "caption" | "alt" | "credit" | "crop" | "image_id"> & {
+    url?: string | null;
+    /** Pilo Publica: pie y texto alternativo en inglés, y el eje al que acompaña. */
+    caption_en?: string;
+    alt_en?: string;
+    eje?: string;
+  })[];
+  /** Pilo Publica: el informe viene del módulo nuevo (no de ods_reports). Activa «Datos» y el ritmo por ejes. */
+  origen?: "pilo-publica";
+  /** Pilo Publica: gráficos del informe, en su orden. */
+  graficos?: GraficoPub[];
   /** 0146: el «Registro de actividades»: todas las notas del ODS, en orden cronológico. */
   registro?: RegistroActividad[];
 }

@@ -29,9 +29,9 @@ chequear() { f="$1"; shift; for s in "$@"; do grep -Eq "export (async )?(functio
 chequear pilo-rankingsod/anios.ts anioDeNoticias rangoFechasDeAnio
 chequear pilo-rankingsod/cifras.ts extraerCifras
 chequear pilo-rankingsod/fuentes.ts afinidadOds cifraAnual plano UMBRAL_FUENTE Criterio FilaCifras
-chequear pilo-rankingsod/logica.ts altDeFoto AVISO_IMAGENES enGrupos hablaDeMenores leerAjustes pieDeFoto RECORTE_POR_DEFECTO siguientePos fichaNotas instruccionesVoz ODS_NOMBRES Lectura Mensaje NotaInforme Persona Tono
+chequear pilo-rankingsod/logica.ts altDeFoto AVISO_IMAGENES enGrupos hablaDeMenores leerAjustes pieDeFoto RECORTE_POR_DEFECTO siguientePos fichaNotas instruccionesVoz ODS_NOMBRES Lectura Mensaje NotaInforme Persona Tono esAnuncio esCitaLiteral extraerJson frases nombresAjenos normalizar numerosDe numerosDeFechas numerosEnLetras resolverRef valorEnCifras
 chequear pilo-rankingsod/proveedor.ts elegirProveedor esperaTras429 leerAjustesIA
-chequear pilo-rankingsod/ficha.ts verificarTraduccion REGLAS_INGLES
+chequear pilo-rankingsod/ficha.ts verificarTraduccion REGLAS_INGLES numerosEn numerosEs
 chequear pilo-rankingsod/indicadores.ts INDICADORES_THE
 chequear noticias-pilo/logica.ts foldSystem roleRejected
 [ "$falta" = 0 ] || { echo "El pilo-rankingsod o noticias-pilo del servidor está desactualizado: súbelos antes. No se despliega."; exit 1; }

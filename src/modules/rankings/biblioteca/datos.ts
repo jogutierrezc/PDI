@@ -14,12 +14,14 @@ import { FaltaMigracion } from "../noticias";
 import { CLAVES as CLAVES_REPORTE, errorDe as errorReporte } from "../reporte/datos";
 import type { Clasificacion } from "./clasificar";
 import { YaGuardado } from "./errores";
+import { extraerFragmentos } from "./fragmentos";
+import type { FragmentoNuevo } from "./fragmentos";
 
 export const BUCKET_BIBLIOTECA = "ranking-biblioteca";
 const PAGINA = 1000;
 /** Columnas de la lista: sin el texto leído (hasta 20 000 caracteres por archivo). */
 const COLUMNAS_LISTA =
-  "id, ciclo, zip_nombre, ruta_zip, nombre, carpeta, ext, tamano, mime, sha256, storage_path, anio_detectado, estado_texto, nota_texto, ods_propuestos, propuestas, estado, indicador_aceptado, respuesta_aceptada, evidencia, subido_por, created_at, updated_at";
+  "id, ciclo, zip_nombre, ruta_zip, nombre, carpeta, ext, tamano, mime, sha256, storage_path, anio_detectado, estado_texto, nota_texto, fragmentos, ods_propuestos, propuestas, estado, indicador_aceptado, respuesta_aceptada, evidencia, subido_por, created_at, updated_at";
 
 export type ArchivoBiblioteca = Omit<RankingBibliotecaRow, "texto">;
 
@@ -28,7 +30,7 @@ interface ErrorBase {
   message?: string;
 }
 
-const MIGRACION = "Falta aplicar la migración 0152 (biblioteca de evidencias).";
+const MIGRACION = "Falta aplicar las migraciones 0152 y 0265 (biblioteca de evidencias y sus fragmentos).";
 
 export function errorDe(e: ErrorBase): Error {
   if (e.code === "42P01" || e.code === "PGRST205" || /ranking_biblioteca|biblioteca/i.test(e.message ?? "") && /does not exist|schema cache|column/i.test(e.message ?? "")) {
@@ -135,6 +137,8 @@ export interface ArchivoNuevo {
   texto: string;
   estadoTexto: RankingBibliotecaRow["estado_texto"];
   notaTexto: string | null;
+  /** El archivo por páginas, hojas y tablas, con su ubicación (0265). Puede ir vacío. */
+  fragmentos: FragmentoNuevo[];
   clasificacion: Clasificacion;
 }
 
@@ -165,11 +169,111 @@ export async function guardarArchivo(a: ArchivoNuevo): Promise<void> {
     ods_propuestos: c.ods,
     propuestas: c.propuestas,
     estado: c.estado === "sin_coincidencia" ? "sin_clasificar" : "propuesta",
-  });
+  }).select("id").single();
   if (r.error) {
     if (r.error.code === "23505") throw new YaGuardado(`«${a.ruta}» ya estaba en la biblioteca.`);
     throw errorDe(r.error);
   }
+  // Las ubicaciones son un extra: si no se pueden guardar (falta la 0265), el archivo queda guardado y se relee después.
+  if (a.fragmentos.length) {
+    try {
+      await guardarFragmentos((r.data as { id: string }).id, a.fragmentos);
+    } catch {
+      /* el archivo ya está; la Biblioteca ofrece «Releer con ubicaciones» */
+    }
+  }
+}
+
+/** Reemplaza los fragmentos de un archivo (con su ubicación) y deja anotado cuántos son. */
+export async function guardarFragmentos(id: string, fragmentos: FragmentoNuevo[]): Promise<void> {
+  const del = await supabase.from("ranking_biblioteca_fragmentos").delete().eq("biblioteca_id", id);
+  if (del.error) throw errorDe(del.error);
+  for (let i = 0; i < fragmentos.length; i += 20) {
+    const lote = fragmentos.slice(i, i + 20).map((f) => ({ biblioteca_id: id, orden: f.orden, tipo: f.tipo, ubicacion: f.ubicacion, hoja: f.hoja, texto: f.texto, tabla: f.tabla }));
+    const ins = await supabase.from("ranking_biblioteca_fragmentos").insert(lote);
+    if (ins.error) throw errorDe(ins.error);
+  }
+  const up = await supabase.from("ranking_biblioteca").update({ fragmentos: fragmentos.length }).eq("id", id);
+  if (up.error) throw errorDe(up.error);
+}
+
+export interface ResultadoRelectura {
+  id: string;
+  nombre: string;
+  fragmentos: number;
+  /** null = salió bien. */
+  problema: string | null;
+}
+
+/** Vuelve a leer un archivo ya guardado (lo baja del bucket) y le pone sus ubicaciones. El texto y la clasificación no se tocan. */
+export async function releerArchivo(a: ArchivoBiblioteca): Promise<ResultadoRelectura> {
+  const base = { id: a.id, nombre: a.nombre };
+  try {
+    const d = await supabase.storage.from(BUCKET_BIBLIOTECA).download(a.storage_path);
+    if (d.error) throw new Error(`no se pudo bajar del bucket: ${d.error.message}`);
+    const l = await extraerFragmentos(new Uint8Array(await d.data.arrayBuffer()), a.ext);
+    if (!l.fragmentos.length) return { ...base, fragmentos: 0, problema: l.nota ?? "No tiene texto para ubicar." };
+    await guardarFragmentos(a.id, l.fragmentos);
+    return { ...base, fragmentos: l.fragmentos.length, problema: null };
+  } catch (e) {
+    return { ...base, fragmentos: 0, problema: e instanceof Error ? e.message : "error" };
+  }
+}
+
+/** Vuelve a leer varios archivos, de a uno (cada PDF o Excel pesa en el navegador), avisando el avance. */
+export function useReleerArchivos() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ archivos, alAvanzar }: { archivos: ArchivoBiblioteca[]; alAvanzar?: (hechos: number, total: number, r: ResultadoRelectura) => void }) => {
+      const salida: ResultadoRelectura[] = [];
+      for (const a of archivos) {
+        const r = await releerArchivo(a);
+        salida.push(r);
+        alAvanzar?.(salida.length, archivos.length, r);
+      }
+      return salida;
+    },
+    onSuccess: () => void cliente.invalidateQueries({ queryKey: CLAVES.lista }),
+  });
+}
+
+/** Un fragmento de un archivo, para mostrar el extracto de donde sale una cifra. */
+export interface FragmentoGuardado {
+  orden: number;
+  tipo: FragmentoNuevo["tipo"];
+  ubicacion: string;
+  hoja: string | null;
+  texto: string;
+  tabla: FragmentoNuevo["tabla"];
+}
+
+export function useFragmento(bibliotecaId: string | null, orden: number | null) {
+  return useQuery({
+    queryKey: ["biblioteca", "fragmento", bibliotecaId, orden],
+    enabled: Boolean(bibliotecaId) && orden !== null,
+    retry: false,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<FragmentoGuardado | null> => {
+      const r = await supabase.from("ranking_biblioteca_fragmentos").select("orden, tipo, ubicacion, hoja, texto, tabla").eq("biblioteca_id", bibliotecaId ?? "").eq("orden", orden ?? -1).maybeSingle();
+      if (r.error) throw errorDe(r.error);
+      return (r.data as unknown as FragmentoGuardado | null) ?? null;
+    },
+  });
+}
+
+/** La ruta del archivo en el bucket y su nombre, para abrirlo en la página de la cifra. */
+export function useArchivoDe(bibliotecaId: string | null) {
+  return useQuery({
+    queryKey: ["biblioteca", "archivo", bibliotecaId],
+    enabled: Boolean(bibliotecaId),
+    retry: false,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const r = await supabase.from("ranking_biblioteca").select("nombre, storage_path, ext").eq("id", bibliotecaId ?? "").maybeSingle();
+      if (r.error) throw errorDe(r.error);
+      return (r.data as { nombre: string; storage_path: string; ext: string } | null) ?? null;
+    },
+  });
 }
 
 /** Cambia estado o propuestas de archivos (descartar, volver a proponer, reclasificar). */

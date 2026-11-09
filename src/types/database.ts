@@ -1984,6 +1984,8 @@ export interface RankingBibliotecaRow {
   texto: string;
   estado_texto: "ok" | "sin_texto" | "no_aplica" | "error";
   nota_texto: string | null;
+  /** Cuántos fragmentos con ubicación tiene (0265). 0 = leído con la versión vieja: hay que releerlo. */
+  fragmentos: number;
   ods_propuestos: number[];
   propuestas: RankingPropuestaBiblioteca[];
   estado: "sin_clasificar" | "propuesta" | "aceptada" | "descartada";

@@ -17,8 +17,9 @@ import { clasificarArchivo } from "./clasificar";
 import { ejecutarCola } from "./cola";
 import type { ArchivoNuevo } from "./datos";
 import { YaGuardado } from "./errores";
-import { extraerTexto } from "./extraer-texto";
 import type { TextoExtraido } from "./extraer-texto";
+import { leerArchivoCompleto } from "./fragmentos";
+import type { FragmentoNuevo } from "./fragmentos";
 import { ZipInvalido, extraerEntrada, sha256 } from "./zip-seguro";
 import type { ArchivoZip } from "./zip-seguro";
 
@@ -60,7 +61,6 @@ export function progresoInicial(archivos: ArchivoZip[]): ProgresoSubida {
 
 /** Sube los archivos admitidos del ZIP. Nunca lanza: cada archivo vuelve con su estado. */
 export async function subirZip(zip: Blob, archivos: ArchivoZip[], o: OpcionesSubida): Promise<ResultadoSubida[]> {
-  const leer = o.leerTexto ?? extraerTexto;
   const progreso = progresoInicial(archivos);
 
   const trabajo = async (a: ArchivoZip, signal?: AbortSignal): Promise<ResultadoSubida> => {
@@ -71,7 +71,15 @@ export async function subirZip(zip: Blob, archivos: ArchivoZip[], o: OpcionesSub
       return { ruta: a.ruta, estado: "repetido", mensaje: previo === a.ruta ? "Ya estaba en la biblioteca." : `Mismo contenido que «${previo}», ya guardado.` };
     }
     if (signal?.aborted) throw new DOMException("Cancelado", "AbortError");
-    const t = await leer(bytes, a.ext);
+    // Con `leerTexto` inyectado (pruebas) no hay fragmentos; si no, un solo paso da el texto y los fragmentos con su ubicación.
+    let t: TextoExtraido;
+    let fragmentos: FragmentoNuevo[] = [];
+    if (o.leerTexto) t = await o.leerTexto(bytes, a.ext);
+    else {
+      const r = await leerArchivoCompleto(bytes, a.ext);
+      t = r.texto;
+      fragmentos = r.lectura.fragmentos;
+    }
     const clasificacion = clasificarArchivo({ ruta: a.ruta, nombre: a.nombre, carpeta: a.carpeta, ext: a.ext, texto: t.texto });
     try {
       await o.guardar({
@@ -86,6 +94,7 @@ export async function subirZip(zip: Blob, archivos: ArchivoZip[], o: OpcionesSub
         texto: t.texto,
         estadoTexto: t.estado,
         notaTexto: t.nota,
+        fragmentos,
         clasificacion,
       });
     } catch (e) {

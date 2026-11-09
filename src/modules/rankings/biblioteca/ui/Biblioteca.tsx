@@ -26,6 +26,7 @@ import { ETIQUETA_BIBLIOTECA, FILTRO_INICIAL, aceptablesEnLote, carpetasDe, cont
 import type { EstadoBiblioteca, Filtro } from "../filtros";
 import { mb } from "../zip-seguro";
 import { CargaZip } from "./CargaZip";
+import { ReleerUbicaciones } from "./ReleerUbicaciones";
 import "../biblioteca.css";
 
 interface Props {

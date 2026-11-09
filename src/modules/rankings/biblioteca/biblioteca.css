@@ -378,3 +378,6 @@
 .rk-bib .rk-rep-filtros .rk-rep-select {
   max-width: 100%;
 }
+
+/* Releer con ubicaciones (0265) */
+.rk-bib-releer { display: grid; gap: 8px; justify-items: start; margin: 0 0 4px; }

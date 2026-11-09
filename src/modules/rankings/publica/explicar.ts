@@ -28,6 +28,13 @@ export interface FuenteCifra {
   descripcion_en: string;
   descrito: "pilo" | "persona" | "codigo" | "";
   formula: string;
+  /** Documentos de la Biblioteca: «bib:<id>», el nombre del archivo, su lugar (p. 12, Hoja X · celda C14) y la frase o fila de donde sale. */
+  ref: string;
+  archivo: string;
+  ubicacion: string;
+  celda: string;
+  contexto: string;
+  valor_literal: string;
 }
 
 const txt = (v: unknown): string => {
@@ -58,6 +65,12 @@ export function fuenteDe(c: Pick<CifraPP, "source">): FuenteCifra {
     descripcion_en: txt(s.descripcion_en),
     descrito: d === "pilo" || d === "persona" || d === "codigo" ? d : "",
     formula: txt(s.formula),
+    ref: txt(s.ref),
+    archivo: txt(s.archivo),
+    ubicacion: txt(s.ubicacion),
+    celda: txt(s.celda),
+    contexto: typeof s.contexto === "string" ? s.contexto.trim() : "",
+    valor_literal: txt(s.valor_literal),
   };
 }
 

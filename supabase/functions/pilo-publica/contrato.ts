@@ -148,6 +148,22 @@ export interface SourceCifra {
   /** Derivadas: cómo se calculó. */
   formula?: string;
 
+  /* Documentos de la biblioteca: el lugar exacto de donde se tomó la cifra. */
+  /** «p. 12», «Diapositiva 3», «Hoja «Ventas» · celda C14», «Sección «Resultados»». Es público. */
+  ubicacion?: string;
+  /** El nombre del archivo. */
+  archivo?: string;
+  /** La hoja del libro de Excel. */
+  hoja?: string;
+  /** La celda (C14) de una tabla. */
+  celda?: string;
+  /** El orden del fragmento en `ranking_biblioteca_fragmentos` (con `ref` «bib:<id>» se llega al extracto). */
+  fragmento?: number;
+  /** El número tal como está escrito en el archivo («1.250», «20,09 %»): lo que se resalta en el extracto. */
+  valor_literal?: string;
+  /** La frase o la fila completa de la que sale, para leerla sin abrir el archivo. */
+  contexto?: string;
+
   /* Campos internos de la función (la pantalla puede ignorarlos). */
   /** El `pp_fuentes.ref` del que sale («ds:<id>», «the:<id>», «od:<id>», el uuid de la nota…); «derivada» en las calculadas. */
   ref?: string;

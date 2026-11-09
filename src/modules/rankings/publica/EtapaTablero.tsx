@@ -6,6 +6,7 @@ import { motivoSinPilo } from "./contexto";
 import type { EtapaProps } from "./contexto";
 import { siguientePos, useBloques, useBorrarBloque, useCifras, useEditarCifra, useGuardarBloque } from "./datos";
 import { agruparPorSerie, componentesDe, etiquetaKind, explicacionDe, fuenteDe, sinExplicar, unidadNorm, unidadTexto } from "./explicar";
+import { ExtractoFuente } from "./ExtractoFuente";
 import { formato } from "./tipos";
 import type { CifraPP } from "./tipos";
 import { BotonPilo, Campo, ErrorAviso, Tarjeta, Vacio } from "./ui";
@@ -162,7 +163,12 @@ function FilaCifra({ c, libro, activa, onEstrella }: { c: CifraPP; libro: CifraP
           {editando ? "Cerrar edición" : "Editar nombre y explicación"}
         </button>
       </div>
-      {abierta && <Procedencia c={c} libro={libro} />}
+      {abierta && (
+        <>
+          <Procedencia c={c} libro={libro} />
+          <ExtractoFuente cifra={c} />
+        </>
+      )}
       {editando && <FormEditar c={c} onCerrar={() => setEditando(false)} />}
     </li>
   );

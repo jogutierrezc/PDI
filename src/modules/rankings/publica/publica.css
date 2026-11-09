@@ -2259,3 +2259,109 @@
 .pp-filas__r input { min-width: 0; }
 .pp-filas__enc { color: var(--ink-secondary); font-size: 0.8rem; font-weight: 600; }
 .pp-filas__enc > span:last-child { min-width: 4.5em; }
+/* ---------- El extracto de donde sale una cifra de un documento ---------- */
+
+.pp-extracto {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+}
+.pp-extracto__t {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-secondary);
+}
+.pp-extracto__datos {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px var(--space-4);
+  margin: 0;
+}
+.pp-extracto__datos dt {
+  font-weight: 700;
+  color: var(--ink-secondary);
+}
+.pp-extracto__datos dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.pp-extracto__cita {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--brand-blue) 5%, var(--surface));
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.pp-extracto__marca {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--brand-blue) 22%, transparent);
+  color: inherit;
+  font-weight: 700;
+}
+.pp-extracto__aviso {
+  margin: 0;
+  color: var(--ink-secondary);
+}
+.pp-extracto__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.pp-extracto__fragmento {
+  display: grid;
+  gap: var(--space-2);
+}
+.pp-extracto__texto {
+  max-height: 260px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  line-height: 1.55;
+}
+.pp-extracto__tabla {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+}
+.pp-extracto__tabla table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+}
+.pp-extracto__tabla td {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pp-extracto__tabla tr:first-child td {
+  font-weight: 700;
+  background: var(--surface-2);
+}
+.pp-extracto__tabla .is-fila td {
+  background: color-mix(in srgb, var(--brand-blue) 8%, transparent);
+}
+.pp-extracto__tabla .is-celda {
+  background: color-mix(in srgb, var(--brand-blue) 28%, transparent);
+  font-weight: 700;
+  outline: 2px solid var(--brand-blue);
+  outline-offset: -2px;
+}
+.pp-extracto__salto td {
+  text-align: center;
+  color: var(--ink-secondary);
+}

@@ -49,7 +49,9 @@ function procedencia(c: CifraPub | undefined): string {
   if (!s) return "";
   const of = texto(s.oficina);
   const tb = texto(s.tabla);
-  return [of, tb].filter(Boolean).join(" · ");
+  // Las cifras de un documento dicen además la página u hoja («p. 12», «Hoja «X» · celda C14»).
+  const lugar = texto(s.ubicacion);
+  return [of, tb, lugar].filter(Boolean).join(" · ");
 }
 
 /** Una cifra del libro como la «Cifra» del diseño. El valor va en formato español (así lo lee `parseFigure`). */

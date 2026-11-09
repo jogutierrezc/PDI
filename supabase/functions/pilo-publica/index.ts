@@ -77,7 +77,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { foldSystem, roleRejected } from "../noticias-pilo/logica.ts";
 import { anioDeNoticias, rangoFechasDeAnio } from "../pilo-rankingsod/anios.ts";
-import { extraerCifras } from "../pilo-rankingsod/cifras.ts";
+import { cifrasDeDocumento, type FragmentoSrv } from "./documentos.ts";
 import { afinidadOds, cifraAnual, plano, UMBRAL_FUENTE, type Criterio, type FilaCifras } from "../pilo-rankingsod/fuentes.ts";
 import { altDeFoto, AVISO_IMAGENES, enGrupos, hablaDeMenores, leerAjustes, pieDeFoto, RECORTE_POR_DEFECTO, siguientePos, type Lectura, type Mensaje, type NotaInforme } from "../pilo-rankingsod/logica.ts";
 import { elegirProveedor, esperaTras429, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts";
@@ -131,8 +131,6 @@ const FUENTE_BITACORA = "Pilo Publica";
 const PAGINA = 1000;
 /** Años hacia atrás que lee UDES en Cifras para las series. */
 const ANIOS_SERIE = 5;
-/** Cifras que se sacan, como máximo, del texto de un documento. */
-const CIFRAS_POR_DOCUMENTO = 30;
 
 const CICLO_RANKING: Partial<Record<Ranking, string>> = { impact: "the-impact", green: "ui-greenmetric" };
 
@@ -1004,32 +1002,44 @@ Deno.serve(async (request: Request) => {
       for (const f of de("documento")) {
         try {
           const id = f.ref.replace(/^bib:/, "");
-          const r = await admin.from("ranking_biblioteca").select("id, texto, anio_detectado").eq("id", id).maybeSingle();
+          const r = await admin.from("ranking_biblioteca").select("id, nombre, texto, anio_detectado, fragmentos").eq("id", id).maybeSingle();
           if (r.error) throw r.error;
-          const lista = extraerCifras(String(r.data?.texto ?? ""))
-            .filter((x) => x.num !== null && x.kind !== "otro")
-            .sort((a, b) => b.score - a.score)
-            .slice(0, CIFRAS_POR_DOCUMENTO);
           const anioDoc = r.data?.anio_detectado ?? null;
-          for (const x of lista) {
-            const k = `bib:${id}:${huella(`${x.value}|${x.quote}`)}`;
+          const archivo = String(r.data?.nombre ?? f.label);
+          // Con fragmentos (0265): cada cifra sabe su página, hoja y celda. Sin ellos (archivo leído con la versión vieja): el texto corrido, sin ubicación.
+          let fragmentos: FragmentoSrv[] = [];
+          if ((r.data?.fragmentos ?? 0) > 0) {
+            fragmentos = await todas<FragmentoSrv>((a, b) =>
+              admin.from("ranking_biblioteca_fragmentos").select("orden, tipo, ubicacion, hoja, texto, tabla").eq("biblioteca_id", id).order("orden").range(a, b),
+            );
+          }
+          const sinUbicacion = fragmentos.length === 0;
+          if (sinUbicacion) {
+            fragmentos = [{ orden: 0, tipo: "texto", ubicacion: "Texto del documento (sin ubicación)", hoja: null, texto: String(r.data?.texto ?? ""), tabla: null }];
+            avisos.push(`«${f.label.slice(0, 60)}»: se leyó con la versión anterior y sus cifras no dicen la página ni la hoja. Pulsa «Releer con ubicaciones» en la Biblioteca y rehaz el libro.`);
+          }
+          const doc = cifrasDeDocumento(fragmentos, anioDoc, archivo);
+          avisos.push(...doc.avisos);
+          for (const x of doc.cifras) {
+            const k = `bib:${id}:${huella(x.id)}`;
+            // La serie de una tabla lleva el documento: dos archivos con la misma hoja y rótulos no se mezclan.
+            const serie = x.source.serie ? `bib:${id.slice(0, 8)}:${x.source.serie}` : k;
             crudas.push({
               key: k,
-              serie: k,
-              label: x.label || x.value,
-              que: x.label || `Cifra del documento «${f.label.slice(0, 80)}»`,
-              unit: x.kind === "porcentaje" ? "%" : x.unit,
-              year: anioDoc,
-              value: x.num,
+              serie,
+              label: x.label,
+              que: x.que,
+              unit: x.unit,
+              year: x.year,
+              value: x.value,
               source: {
                 kind: "documento",
-                tabla: `Documento: ${f.label.slice(0, 160)}`,
-                tabla_db: "ranking_biblioteca",
+                tabla: `Documento: ${archivo.slice(0, 160)}`,
+                tabla_db: "ranking_biblioteca_fragmentos",
                 ref: f.ref,
-                fila: id,
-                ...(x.quote ? { cita: x.quote } : {}),
-                ...(anioDoc ? { periodo: `${anioDoc} (año detectado en el documento)` } : {}),
-                serie: k,
+                ...(x.source.fila === undefined ? { fila: id } : {}),
+                ...x.source,
+                serie,
               },
             });
           }

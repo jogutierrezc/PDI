@@ -4,7 +4,7 @@
    Un informe por ranking, unidad y edición, en seis etapas: Fuentes, Tablero,
    Gráficos, Narrativa, Diagramación y Publicar. Pilo (función pilo-publica)
    hace de periodista y estadístico; la persona revisa, edita, ordena y publica.
-   La selección vive en la dirección (?r=impact&u=4&ed=2027&paso=2).
+   La selección vive en la dirección (?r=impact&u=4&ed=2026&paso=2).
    ========================================================================== */
 
 import { useMemo } from "react";

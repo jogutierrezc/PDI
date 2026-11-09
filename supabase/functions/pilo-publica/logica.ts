@@ -378,8 +378,10 @@ const ORDEN_KIND: Record<KindFuente, number> = { noticia: 0, indicador: 1, libro
  * documento va solo).
  */
 export function trabajosEje(pendientes: FuentePendiente[], citadas: Set<string>, fallidas: Set<string>): { grupo: string[]; pista: string | null }[] {
+  // Los documentos de la biblioteca NO son base de redacción: un documento suelto (una metodología, una hoja de créditos)
+  // no cuenta lo que hizo la UDES y la IA terminaba inventando la cita. Siguen alimentando el libro de cifras.
   const libres = pendientes
-    .filter((p) => !citadas.has(p.ref) && !fallidas.has(p.ref))
+    .filter((p) => p.kind !== "documento" && !citadas.has(p.ref) && !fallidas.has(p.ref))
     .sort((a, b) => (a.pista ?? "~").localeCompare(b.pista ?? "~") || ORDEN_KIND[a.kind] - ORDEN_KIND[b.kind] || a.fecha.localeCompare(b.fecha) || a.ref.localeCompare(b.ref));
   const out: { grupo: string[]; pista: string | null }[] = [];
   let actual: { grupo: string[]; pista: string | null } | null = null;

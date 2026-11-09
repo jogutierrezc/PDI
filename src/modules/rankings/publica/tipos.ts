@@ -249,7 +249,8 @@ export const unidadDe = (ranking: string, key: string): UnidadPP | undefined => 
 
 export const ETAPAS = ["Fuentes", "Tablero", "Gráficos", "Narrativa", "Diagramación", "Publicar"] as const;
 export const EDICIONES = [2025, 2026, 2027, 2028];
-export const EDICION_BASE = 2027;
+/** La edición vigente: la que muestra /sostenible/impact/informes/ods/:n (esa ruta solo conoce 2025 y 2026). */
+export const EDICION_BASE = 2026;
 
 export const nombreUnidad = (r: RankingPP, u: UnidadPP, idioma: Idioma = "es") =>
   r === "impact" ? (idioma === "es" ? `ODS ${u.key}: ${u.name}` : `SDG ${u.key}: ${u.name_en}`) : idioma === "es" ? u.name : u.name_en;
@@ -324,6 +325,8 @@ export const elegir = (es: string, en: string, idioma: Idioma): { t: string; lan
 
 export function urlPublica(i: Pick<InformePP, "ranking" | "unit_key" | "edition">, lang?: Idioma): string {
   const base = typeof window === "undefined" ? "" : window.location.origin;
+  // THE Impact se ve en la ruta de siempre de cada ODS; los otros rankings, en /sostenible/informes/…
+  if (i.ranking === "impact") return `${base}/sostenible/impact/informes/ods/${encodeURIComponent(i.unit_key)}?edicion=${i.edition}${lang === "en" ? "&lang=en" : ""}`;
   return `${base}/sostenible/informes/${i.ranking}/${encodeURIComponent(i.unit_key)}?ed=${i.edition}${lang === "en" ? "&lang=en" : ""}`;
 }
 

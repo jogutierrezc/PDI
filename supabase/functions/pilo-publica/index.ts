@@ -483,6 +483,9 @@ Deno.serve(async (request: Request) => {
     } catch (e) {
       avisos.push(`Noticias: no se pudieron leer (${mensajeDe(e).slice(0, 120)}).`);
     }
+    if (!candidatas.some((c) => c.kind === "noticia")) {
+      avisos.push(`No hay noticias aprobadas ${informe.ranking === "impact" ? `del ODS ${unidad.key} ` : "de esta unidad "}publicadas en ${anioNoticias}. La edición ${edition} usa las noticias de ${anioNoticias} (las de un año van a la edición siguiente): si tus noticias son de otro año, cambia la edición del informe. La edición 2026 usa las de 2025.`);
+    }
 
     // 2. Indicadores diligenciados y aprobados.
     if (informe.ranking === "world") avisos.push("THE World no tiene reporte por oficinas en el sistema: no hay indicadores diligenciados que leer.");
@@ -589,7 +592,7 @@ Deno.serve(async (request: Request) => {
       for (const d of propios) {
         const publica = Boolean(d.evidencia && publicas.has(d.evidencia));
         if (!publica) privados++;
-        candidatas.push({ kind: "documento", ref: `bib:${d.id}`, label: d.nombre.slice(0, 300), include: publica, meta: { biblioteca_id: d.id, anio: d.anio_detectado, publica } });
+        candidatas.push({ kind: "documento", ref: `bib:${d.id}`, label: d.nombre.slice(0, 300), include: publica && !/methodolog|metodolog/i.test(d.nombre), meta: { biblioteca_id: d.id, anio: d.anio_detectado, publica, ...(/methodolog|metodolog/i.test(d.nombre) ? { nota: "Metodología del ranking: no es evidencia de lo que hace la UDES." } : {}) } });
       }
       if (privados) avisos.push(`${privados} documento(s) de la biblioteca no están ligados a una evidencia pública: quedan en la lista sin incluir.`);
     } catch (e) {

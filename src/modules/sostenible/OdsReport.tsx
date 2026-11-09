@@ -40,6 +40,7 @@ import type { Bi, Ods, OdsEdition } from "./ods-data";
 import { OdsNews } from "./OdsNews";
 import { OdsPilo, recortesDe, seccionesPilo } from "./OdsPilo";
 import { usePublicInforme } from "../rankings/informes/datos";
+import { InformeEnRuta } from "../rankings/publica/InformeEnRuta";
 import { ODS_CIFRAS_EN, ODS_VIENE_EN, nombreOds, tesisOds, tr, useLang } from "./i18n";
 import { LangSwitch } from "./LangSwitch";
 import { Arrow, Counter, CutFilter, OdsReportIntro, OdsReportVideo, PlayMark, Words, fmtN, introSeen, parseFigure } from "./OdsReportParts";
@@ -77,7 +78,8 @@ export function OdsReport() {
   const edition = odsEdition(params.get("edicion"));
   return (
     <OdsShell title={`ODS ${o.n} · ${o.name}`}>
-      <ReportView key={`${o.n}-${edition}`} o={o} edition={edition} />
+      {/* Si Pilo Publica tiene un informe publicado de este ODS y edición, se muestra ése; si no, el informe de siempre. */}
+      <InformeEnRuta n={o.n} edition={edition} fallback={<ReportView key={`${o.n}-${edition}`} o={o} edition={edition} />} />
     </OdsShell>
   );
 }

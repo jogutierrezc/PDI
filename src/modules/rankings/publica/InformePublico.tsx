@@ -7,7 +7,7 @@
    ========================================================================== */
 
 import { useEffect } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { useInformePublico } from "./datos";
 import { InformeVista } from "./InformeVista";
 import { nombreUnidad, rankingDe, unidadDe } from "./tipos";
@@ -19,6 +19,8 @@ export function InformePublico() {
   const [sp, setSp] = useSearchParams();
   const idioma: Idioma = sp.get("lang") === "en" ? "en" : "es";
   const ed = Number(sp.get("ed")) || null;
+  // THE Impact tiene su ruta de siempre por ODS: aquí solo se redirige a ella.
+  const aImpact = ranking === "impact" && /^(?:[1-9]|1[0-7])$/.test(unidad ?? "");
   const rk = rankingDe(ranking ?? "");
   const un = unidadDe(ranking ?? "", unidad ?? "");
   const q = useInformePublico(rk && un ? rk.id : undefined, un?.key, ed);
@@ -34,6 +36,8 @@ export function InformePublico() {
     else n.delete("lang");
     setSp(n, { replace: true });
   };
+
+  if (aImpact) return <Navigate to={`/sostenible/impact/informes/ods/${unidad}?edicion=${ed ?? 2026}${idioma === "en" ? "&lang=en" : ""}`} replace />;
 
   const encabezado = (
     <div className="pp-pub-top">

@@ -1,0 +1,108 @@
+/* =============================================================================
+   Portales públicos · lo que ve el público (y la administración sobre el sitio).
+
+   · La página de mantenimiento de un portal deshabilitado.
+   · La franja que avisa a la administración que ese portal está cerrado.
+   Usa los tokens del sitio, así que sigue el tema claro u oscuro del visitante.
+   ========================================================================== */
+
+.ppu-mant {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-6) 16px;
+  color: var(--ink);
+  background: var(--page);
+}
+
+.ppu-mant[data-compacto] { min-height: 100%; padding: var(--space-4); }
+
+.ppu-mant__caja {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  width: min(100%, 38rem);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.ppu-mant[data-compacto] .ppu-mant__caja { padding: var(--space-5) var(--space-4); gap: var(--space-2); box-shadow: none; }
+
+.ppu-mant__icono {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  color: var(--brand-blue);
+  background: var(--surface-3);
+  border-radius: 50%;
+}
+
+.ppu-mant[data-compacto] .ppu-mant__icono { width: 44px; height: 44px; }
+
+.ppu-mant h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.ppu-mant[data-compacto] h1 { font-size: var(--text-lg); }
+
+.ppu-mant__texto {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  text-wrap: pretty;
+  white-space: pre-line;
+}
+
+.ppu-mant__regreso {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.ppu-mant__regreso svg { color: var(--brand-blue); }
+
+.ppu-mant__enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* La franja de la administración: pegada al borde inferior de la ventana, sin tapar el contenido. */
+.ppu-franja {
+  position: sticky;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 16px;
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border-top: 2px solid var(--status-pending);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.ppu-franja svg { flex: none; color: var(--status-pending); }
+.ppu-franja span { flex: 1 1 18rem; }
+.ppu-franja a { color: var(--brand-blue); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.ppu-franja a:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; border-radius: 2px; }

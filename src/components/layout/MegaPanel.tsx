@@ -17,8 +17,9 @@
 
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { Link } from "react-router-dom";
 import { Icon } from "../ui/Icon";
+import { Destino } from "../../modules/admin/portales-publicos/EnlaceMenu";
+import { useMenuPublico } from "../../modules/admin/portales-publicos/estado";
 import { usePillars, useSummary } from "../../data/queries";
 import { formatValue, keyIndicators, useOpenDataCatalog } from "../../modules/datos-abiertos/data/open-data";
 import type { OpenDataCatalog, Report } from "../../modules/datos-abiertos/data/types";
@@ -48,6 +49,8 @@ interface Detail {
 
 export interface MenuItem {
   id: string;
+  /** La clave del vínculo para las sobreescrituras del menú público (0263). */
+  clave: string;
   to: string;
   name: string;
   hint: string;
@@ -74,14 +77,14 @@ const PILLAR_PICTOGRAM: Record<string, PictogramName> = {
   leaf: "leaf",
   community: "circles",
 };
-const PDI_PAGES: { to: string; name: string; hint: string; pictogram: PictogramName; progress?: boolean }[] = [
-  { to: "/pdi", name: "Inicio del PDI", hint: "El plan de un vistazo", pictogram: "home", progress: true },
-  { to: "/implementacion", name: "Implementación", hint: "Avance de pilares, áreas y proyectos", pictogram: "bars", progress: true },
-  { to: "/tablero", name: "Tablero PDI", hint: "Cumplimiento global y por pilar", pictogram: "grid", progress: true },
-  { to: "/facultades", name: "PDI por facultad", hint: "Propuestas y alineación con el plan", pictogram: "cap" },
-  { to: "/campus", name: "PDI por campus", hint: "Bucaramanga, Cúcuta y Valledupar", pictogram: "pin" },
-  { to: "/ods", name: "PDI y los ODS", hint: "Aporte a la Agenda 2030", pictogram: "globe" },
-  { to: "/desarrollo-tecnologico", name: "Desarrollo tecnológico", hint: "Aplicativos de la oficina", pictogram: "code" },
+const PDI_PAGES: { clave: string; to: string; name: string; hint: string; pictogram: PictogramName; progress?: boolean }[] = [
+  { clave: "menu.pdi.inicio", to: "/pdi", name: "Inicio del PDI", hint: "El plan de un vistazo", pictogram: "home", progress: true },
+  { clave: "menu.pdi.implementacion", to: "/implementacion", name: "Implementación", hint: "Avance de pilares, áreas y proyectos", pictogram: "bars", progress: true },
+  { clave: "menu.pdi.tablero", to: "/tablero", name: "Tablero PDI", hint: "Cumplimiento global y por pilar", pictogram: "grid", progress: true },
+  { clave: "menu.pdi.facultades", to: "/facultades", name: "PDI por facultad", hint: "Propuestas y alineación con el plan", pictogram: "cap" },
+  { clave: "menu.pdi.campus", to: "/campus", name: "PDI por campus", hint: "Bucaramanga, Cúcuta y Valledupar", pictogram: "pin" },
+  { clave: "menu.pdi.ods", to: "/ods", name: "PDI y los ODS", hint: "Aporte a la Agenda 2030", pictogram: "globe" },
+  { clave: "menu.pdi.desarrollo", to: "/desarrollo-tecnologico", name: "Desarrollo tecnológico", hint: "Aplicativos de la oficina", pictogram: "code" },
 ];
 
 /** La cifra que representa un informe: la titular, si no la primera clave, si no la primera con dato. */
@@ -96,8 +99,38 @@ function reportFigure(report: Report, catalog: OpenDataCatalog) {
   return undefined;
 }
 
-/** Los grupos de cada portal, con su detalle ya calculado. */
+/** La clave de «ver todo» de cada portal en las sobreescrituras del menú público. */
+const CLAVE_TODO: Record<PortalId, string> = { pdi: "menu.pdi.todo", cifras: "menu.cifras.todo", observatorio: "menu.obs.todo" };
+
+/** Los grupos de cada portal, con lo que la administración ocultó o cambió ya puesto (0263). */
 function useMenu(portal: PortalId): { groups: MenuGroup[]; loading: boolean } {
+  const base = useMenuBase(portal);
+  const { aplicar } = useMenuPublico();
+  return useMemo(
+    () => ({
+      loading: base.loading,
+      groups: base.groups
+        .map((g) => ({
+          ...g,
+          items: g.items.flatMap((item) => {
+            const v = aplicar(item.clave, { etiqueta: item.name, destino: item.to });
+            return v?.destino ? [{ ...item, name: v.etiqueta, to: v.destino, detail: { ...item.detail, title: v.etiqueta } }] : [];
+          }),
+        }))
+        .filter((g) => g.items.length > 0),
+    }),
+    [base, aplicar],
+  );
+}
+
+/** Los portales que el menú ofrece: los que no están ocultos ni deshabilitados. */
+function usePortales(): PortalId[] {
+  const { aplicar } = useMenuPublico();
+  return (Object.keys(PORTAL_INFO) as PortalId[]).filter((id) => aplicar(`menu.nav.${id}`, { etiqueta: PORTAL_INFO[id].label, portal: id }));
+}
+
+/** Los grupos de cada portal, con su detalle ya calculado. */
+function useMenuBase(portal: PortalId): { groups: MenuGroup[]; loading: boolean } {
   const pillars = usePillars();
   const summary = useSummary();
   const catalog = useOpenDataCatalog();
@@ -108,6 +141,7 @@ function useMenu(portal: PortalId): { groups: MenuGroup[]; loading: boolean } {
       const progress = summary.data?.progress;
       const pages: MenuItem[] = PDI_PAGES.map((p) => ({
         id: p.to,
+        clave: p.clave,
         to: p.to,
         name: p.name,
         hint: p.hint,
@@ -124,6 +158,7 @@ function useMenu(portal: PortalId): { groups: MenuGroup[]; loading: boolean } {
       }));
       const pillarItems: MenuItem[] = (pillars.data ?? []).map((pl) => ({
         id: pl.id,
+        clave: `menu.pdi.pilar.${pl.slug}`,
         to: `/implementacion/pilar/${pl.slug}`,
         name: pl.name,
         hint: pl.management_owner || `Pilar ${pl.numeral}`,
@@ -154,6 +189,7 @@ function useMenu(portal: PortalId): { groups: MenuGroup[]; loading: boolean } {
         const f = cat ? reportFigure(r, cat) : undefined;
         return {
           id: r.slug,
+          clave: `menu.cifras.${r.slug}`,
           to: `/datos-abiertos/${r.slug}`,
           name: r.name,
           hint: r.summary,
@@ -171,6 +207,7 @@ function useMenu(portal: PortalId): { groups: MenuGroup[]; loading: boolean } {
       const s = published ? summarize(published) : null;
       return {
         id: t.slug,
+        clave: `menu.obs.${t.slug}`,
         to: `/datos-abiertos/observatorio/${t.slug}`,
         name: t.name,
         hint: t.summary,
@@ -212,17 +249,20 @@ export default function MegaPanel({
 
 function DesktopPanel({ portal, setPortal, onNavigate }: { portal: PortalId; setPortal: (p: PortalId) => void; onNavigate: () => void }) {
   const { groups, loading } = useMenu(portal);
+  const { aplicar } = useMenuPublico();
+  const portales = usePortales();
   const [hovered, setHovered] = useState<string | null>(null);
   const items = groups.flatMap((g) => g.items);
   const active = items.find((i) => i.id === hovered) ?? items[0];
   const info = PORTAL_INFO[portal];
+  const todo = aplicar(CLAVE_TODO[portal], { etiqueta: info.all.label, destino: info.all.to });
   const [pictos, setPictos] = useState(() => readPictos());
 
   return (
     <div className="sh-panel__grid" data-pictos={pictos ? "on" : "off"} data-portal={portal}>
       <nav className="sh-rail" aria-label="Portales">
         <span className="sh-rail__label">Portales</span>
-        {(Object.keys(PORTAL_INFO) as PortalId[]).map((id) => (
+        {portales.map((id) => (
           <button
             key={id}
             type="button"
@@ -242,7 +282,7 @@ function DesktopPanel({ portal, setPortal, onNavigate }: { portal: PortalId; set
               <Pictogram name={PORTAL_INFO[id].pictogram} size={22} />
             </span>
             <span>
-              <b>{PORTAL_INFO[id].label}</b>
+              <b>{aplicar(`menu.nav.${id}`, { etiqueta: PORTAL_INFO[id].label, portal: id })?.etiqueta ?? PORTAL_INFO[id].label}</b>
               <small>{id === "pdi" ? "Pilares y páginas del plan" : id === "cifras" ? "Informes oficiales" : "Temas para explorar"}</small>
             </span>
           </button>
@@ -264,9 +304,11 @@ function DesktopPanel({ portal, setPortal, onNavigate }: { portal: PortalId; set
       <div className="sh-list">
         <div className="sh-list__head">
           <h2>{info.label}</h2>
-          <Link to={info.all.to} onClick={onNavigate}>
-            {info.all.label} <Icon name="arrow-right" size={15} />
-          </Link>
+          {todo?.destino && (
+            <Destino to={todo.destino} onClick={onNavigate}>
+              {todo.etiqueta} <Icon name="arrow-right" size={15} />
+            </Destino>
+          )}
         </div>
         {loading && !items.length ? (
           <p className="sh-list__loading">Cargando…</p>
@@ -277,7 +319,7 @@ function DesktopPanel({ portal, setPortal, onNavigate }: { portal: PortalId; set
               <ul>
                 {group.items.map((item) => (
                   <li key={item.id}>
-                    <Link
+                    <Destino
                       to={item.to}
                       className="sh-item"
                       data-active={item.id === active?.id || undefined}
@@ -294,7 +336,7 @@ function DesktopPanel({ portal, setPortal, onNavigate }: { portal: PortalId; set
                         <small>{item.hint}</small>
                       </span>
                       {item.code && <span className="sh-item__code">{item.code}</span>}
-                    </Link>
+                    </Destino>
                   </li>
                 ))}
               </ul>
@@ -319,7 +361,7 @@ function DesktopPanel({ portal, setPortal, onNavigate }: { portal: PortalId; set
 function DetailCard({ item, onNavigate }: { item: MenuItem; onNavigate: () => void }) {
   const d = item.detail;
   return (
-    <Link to={item.to} className="sh-card" style={{ "--tone": item.tone } as CSSProperties} onClick={onNavigate}>
+    <Destino to={item.to} className="sh-card" style={{ "--tone": item.tone } as CSSProperties} onClick={onNavigate}>
       <span className="sh-card__top">
         {item.code ? <span className="sh-card__code">{item.code}</span> : <span className="sh-card__picto"><Pictogram name={item.pictogram} size={18} /></span>}
         <span>{d.eyebrow}</span>
@@ -349,7 +391,7 @@ function DetailCard({ item, onNavigate }: { item: MenuItem; onNavigate: () => vo
       <span className="sh-card__cta">
         {d.cta} <Icon name="arrow-right" size={15} />
       </span>
-    </Link>
+    </Destino>
   );
 }
 
@@ -357,15 +399,17 @@ function DetailCard({ item, onNavigate }: { item: MenuItem; onNavigate: () => vo
 
 function MobileMenu({ onNavigate }: { onNavigate: () => void }) {
   const [openPortal, setOpenPortal] = useState<PortalId | null>(null);
+  const { aplicar } = useMenuPublico();
+  const portales = usePortales();
   return (
     <div className="sh-mobile__portals">
-      {(Object.keys(PORTAL_INFO) as PortalId[]).map((id) => (
+      {portales.map((id) => (
         <div key={id} className="sh-acc">
           <button type="button" className="sh-acc__head" aria-expanded={openPortal === id} onClick={() => setOpenPortal(openPortal === id ? null : id)}>
             <span className="sh-rail__icon" data-portal={id}>
               <Pictogram name={PORTAL_INFO[id].pictogram} size={20} />
             </span>
-            {PORTAL_INFO[id].label}
+            {aplicar(`menu.nav.${id}`, { etiqueta: PORTAL_INFO[id].label, portal: id })?.etiqueta ?? PORTAL_INFO[id].label}
             <Icon name="chevron-down" size={16} />
           </button>
           {openPortal === id && <MobileList portal={id} onNavigate={onNavigate} />}
@@ -377,13 +421,15 @@ function MobileMenu({ onNavigate }: { onNavigate: () => void }) {
 
 function MobileList({ portal, onNavigate }: { portal: PortalId; onNavigate: () => void }) {
   const { groups, loading } = useMenu(portal);
+  const { aplicar } = useMenuPublico();
   const info = PORTAL_INFO[portal];
+  const todo = aplicar(CLAVE_TODO[portal], { etiqueta: info.all.label, destino: info.all.to });
   return (
     <ul className="sh-acc__list">
       {loading && !groups.some((g) => g.items.length) && <li className="sh-list__loading">Cargando…</li>}
       {groups.flatMap((g) => g.items).map((item) => (
         <li key={item.id}>
-          <Link to={item.to} className="sh-acc__item" style={{ "--tone": item.tone } as CSSProperties} onClick={onNavigate}>
+          <Destino to={item.to} className="sh-acc__item" style={{ "--tone": item.tone } as CSSProperties} onClick={onNavigate}>
             <span className="sh-item__picto">
               <Pictogram name={item.pictogram} size={18} />
             </span>
@@ -391,14 +437,16 @@ function MobileList({ portal, onNavigate }: { portal: PortalId; onNavigate: () =
             {/* Siempre presente: así los códigos quedan en columna aunque falte la cifra. */}
             <small>{item.detail.figure?.value ?? ""}</small>
             {item.code && <span className="sh-item__code">{item.code}</span>}
-          </Link>
+          </Destino>
         </li>
       ))}
-      <li>
-        <Link to={info.all.to} className="sh-acc__all" onClick={onNavigate}>
-          {info.all.label}
-        </Link>
-      </li>
+      {todo?.destino && (
+        <li>
+          <Destino to={todo.destino} className="sh-acc__all" onClick={onNavigate}>
+            {todo.etiqueta}
+          </Destino>
+        </li>
+      )}
     </ul>
   );
 }

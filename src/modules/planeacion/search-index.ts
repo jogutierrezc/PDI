@@ -24,6 +24,7 @@ import { OBS_TOPICS } from "../datos-abiertos/observatorio/data";
 import { summarize, useObservatoryLive } from "../datos-abiertos/observatorio/live";
 import { bulletinFileUrl, usePublicBulletins } from "../boletin/data";
 import { useOfficePage } from "./page";
+import { useMenuPublico } from "../admin/portales-publicos/estado";
 import { documentHref, documentType, entriesOf, itemsUnder, useDocLibrary } from "../documentos/data";
 
 export type Portal = "cifras" | "observatorio" | "pdi" | "boletines" | "documentos" | "oficina";
@@ -52,6 +53,10 @@ export interface SearchEntry {
   /** La cifra simplificada. */
   figure?: { value: string; unit: string; when: string };
   keywords: string;
+  /** La clave del vínculo del menú público (0263): ocultarlo lo quita de aquí; cambiar etiqueta o destino cambia esta entrada. */
+  clave?: string;
+  /** Una entrada que cuelga de un vínculo (un indicador de un informe): solo desaparece con él. */
+  oculto?: string;
 }
 
 const MONEY = /dinero|peso|\$|cop\b|millones|presupuest/i;
@@ -85,21 +90,21 @@ export function latestFigure(indicator: Indicator, catalog: OpenDataCatalog) {
 }
 
 const PDI_PAGES: SearchEntry[] = [
-  { id: "p-pdi", portal: "pdi", title: "Portal PDI", hint: "Plan de Desarrollo Institucional 2024-2028", to: "/pdi", keywords: "plan desarrollo institucional portada" },
-  { id: "p-impl", portal: "pdi", title: "Implementación del PDI", hint: "Avance de los pilares", to: "/implementacion", keywords: "pilares avance proyectos areas lineas" },
-  { id: "p-board", portal: "pdi", title: "Tablero PDI", hint: "Cumplimiento global y por pilar", to: "/tablero", keywords: "dashboard indicadores seguimiento" },
-  { id: "p-ods", portal: "pdi", title: "PDI y los ODS", hint: "Aporte del plan a la Agenda 2030", to: "/ods", keywords: "ods objetivos desarrollo sostenible agenda 2030" },
-  { id: "p-fac", portal: "pdi", title: "PDI por facultad", hint: "Propuestas de cada facultad", to: "/facultades", keywords: "facultades decanatura" },
-  { id: "p-campus", portal: "pdi", title: "PDI por campus", hint: "El plan en cada sede", to: "/campus", keywords: "campus sede bucaramanga cucuta valledupar" },
-  { id: "p-dev", portal: "oficina", title: "Desarrollo tecnológico", hint: "Aplicativos construidos por Planeación", to: "/desarrollo-tecnologico", keywords: "software aplicativos proyectos web" },
+  { id: "p-pdi", portal: "pdi", title: "Portal PDI", hint: "Plan de Desarrollo Institucional 2024-2028", to: "/pdi", keywords: "plan desarrollo institucional portada", clave: "menu.pdi.inicio" },
+  { id: "p-impl", portal: "pdi", title: "Implementación del PDI", hint: "Avance de los pilares", to: "/implementacion", keywords: "pilares avance proyectos areas lineas", clave: "menu.pdi.implementacion" },
+  { id: "p-board", portal: "pdi", title: "Tablero PDI", hint: "Cumplimiento global y por pilar", to: "/tablero", keywords: "dashboard indicadores seguimiento", clave: "menu.pdi.tablero" },
+  { id: "p-ods", portal: "pdi", title: "PDI y los ODS", hint: "Aporte del plan a la Agenda 2030", to: "/ods", keywords: "ods objetivos desarrollo sostenible agenda 2030", clave: "menu.pdi.ods" },
+  { id: "p-fac", portal: "pdi", title: "PDI por facultad", hint: "Propuestas de cada facultad", to: "/facultades", keywords: "facultades decanatura", clave: "menu.pdi.facultades" },
+  { id: "p-campus", portal: "pdi", title: "PDI por campus", hint: "El plan en cada sede", to: "/campus", keywords: "campus sede bucaramanga cucuta valledupar", clave: "menu.pdi.campus" },
+  { id: "p-dev", portal: "oficina", title: "Desarrollo tecnológico", hint: "Aplicativos construidos por Planeación", to: "/desarrollo-tecnologico", keywords: "software aplicativos proyectos web", clave: "menu.pdi.desarrollo" },
 ];
 
 const OFFICE_PAGES: SearchEntry[] = [
-  { id: "o-team", portal: "oficina", title: "Nuestro equipo", hint: "Quiénes somos y cómo escribirnos", to: "/equipo", keywords: "equipo personas contacto oficina planeacion" },
-  { id: "o-cifras", portal: "cifras", title: "UDES en Cifras", hint: "Las cifras oficiales de la universidad", to: "/datos-abiertos", keywords: "datos abiertos estadisticas informes" },
-  { id: "o-obs", portal: "observatorio", title: "Observatorio de Analítica Académica", hint: "Catorce temas para explorar el dato", to: "/datos-abiertos/observatorio", keywords: "analitica datos temas" },
-  { id: "o-bol", portal: "boletines", title: "Boletines", hint: "El boletín estadístico en PDF", to: "/datos-abiertos/boletines", keywords: "boletin estadistico pdf descargar" },
-  { id: "o-docs", portal: "documentos", title: "Repositorio documental", hint: "Actas, normativa, informes y soportes históricos", to: "/documentos", keywords: "documentos repositorio archivo historico actas normativa" },
+  { id: "o-team", portal: "oficina", title: "Nuestro equipo", hint: "Quiénes somos y cómo escribirnos", to: "/equipo", keywords: "equipo personas contacto oficina planeacion", clave: "menu.nav.oficina" },
+  { id: "o-cifras", portal: "cifras", title: "UDES en Cifras", hint: "Las cifras oficiales de la universidad", to: "/datos-abiertos", keywords: "datos abiertos estadisticas informes", clave: "menu.cifras.todo" },
+  { id: "o-obs", portal: "observatorio", title: "Observatorio de Analítica Académica", hint: "Catorce temas para explorar el dato", to: "/datos-abiertos/observatorio", keywords: "analitica datos temas", clave: "menu.obs.todo" },
+  { id: "o-bol", portal: "boletines", title: "Boletines", hint: "El boletín estadístico en PDF", to: "/datos-abiertos/boletines", keywords: "boletin estadistico pdf descargar", clave: "menu.nav.boletines" },
+  { id: "o-docs", portal: "documentos", title: "Repositorio documental", hint: "Actas, normativa, informes y soportes históricos", to: "/documentos", keywords: "documentos repositorio archivo historico actas normativa", clave: "menu.nav.documentos" },
   { id: "o-login", portal: "oficina", title: "Acceso a la intranet", hint: "Para el equipo que carga y publica", to: "/acceso-intranet", keywords: "login intranet admin" },
 ];
 
@@ -113,6 +118,7 @@ export function useSiteIndex() {
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
   const { page } = useOfficePage();
   const library = useDocLibrary();
+  const { aplicar, cerrada, oculta } = useMenuPublico();
 
   const entries = useMemo(() => {
     const out: SearchEntry[] = [...OFFICE_PAGES, ...PDI_PAGES];
@@ -130,6 +136,7 @@ export function useSiteIndex() {
           code: report.code,
           tone,
           keywords: `informe ${report.slug}`,
+          clave: `menu.cifras.${report.slug}`,
         });
         for (const indicator of report.indicators) {
           if (MONEY.test(indicator.unit) || MONEY.test(indicator.label)) continue;
@@ -143,6 +150,7 @@ export function useSiteIndex() {
             tone,
             figure: latestFigure(indicator, cat),
             keywords: `${indicator.definition} ${indicator.unit}`,
+            oculto: `menu.cifras.${report.slug}`,
           });
         }
       }
@@ -167,6 +175,7 @@ export function useSiteIndex() {
             }
           : undefined,
         keywords: `${topic.summary} ${topic.source}`,
+        clave: `menu.obs.${topic.slug}`,
       });
       for (const dataset of published?.datasets.values() ?? []) {
         out.push({
@@ -178,6 +187,7 @@ export function useSiteIndex() {
           code: topic.code,
           tone: `var(--od-line-${topic.line})`,
           keywords: `${dataset.description} ${dataset.columns.map((c) => c.label).join(" ")}`,
+          oculto: `menu.obs.${topic.slug}`,
         });
       }
     }
@@ -194,6 +204,7 @@ export function useSiteIndex() {
         tone: `var(--pillar-${pillar.accent_slot})`,
         figure: { value: `${formatValue(pillar.progress.progress, "decimal")} %`, unit: "", when: "avance del pilar" },
         keywords: `${pillar.focus} ${pillar.description} pilar`,
+        clave: `menu.pdi.pilar.${pillar.slug}`,
       });
     }
     for (const project of projects.data ?? []) {
@@ -208,6 +219,7 @@ export function useSiteIndex() {
         tone: pillar ? `var(--pillar-${pillar.accent_slot})` : undefined,
         figure: { value: `${formatValue(project.progress, "decimal")} %`, unit: "", when: "avance del proyecto" },
         keywords: `${project.description} proyecto`,
+        oculto: pillar ? `menu.pdi.pilar.${pillar.slug}` : undefined,
       });
     }
 
@@ -285,8 +297,16 @@ export function useSiteIndex() {
         keywords: `${person.email} ${person.focus} equipo funcionario`,
       });
     }
-    return out;
-  }, [catalog.data, live.data, pillars.data, projects.data, documents.data, bulletins.data, page, library.data]);
+    // Lo que la administración ocultó o cambió en el menú (0263) y los portales deshabilitados: fuera del buscador.
+    return out.flatMap((entry) => {
+      if (entry.oculto && oculta(entry.oculto)) return [];
+      if (!entry.external && cerrada(entry.to)) return [];
+      if (!entry.clave) return [entry];
+      const v = aplicar(entry.clave, { etiqueta: entry.title, destino: entry.to });
+      if (!v?.destino) return [];
+      return [v.etiqueta === entry.title && v.destino === entry.to ? entry : { ...entry, title: v.etiqueta, to: v.destino, external: v.externo || entry.external }];
+    });
+  }, [catalog.data, live.data, pillars.data, projects.data, documents.data, bulletins.data, page, library.data, aplicar, cerrada, oculta]);
 
   const loading = catalog.isPending || pillars.isPending || projects.isPending;
   return { entries, loading };

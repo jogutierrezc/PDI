@@ -55,6 +55,7 @@ const SCREENS: { screen: AdminScreen; label: string; icon: IconName }[] = [
   { screen: "correos", label: "Correos", icon: "mail" },
   { screen: "rutas", label: "Rutas del bus", icon: "pin" },
   { screen: "cms", label: "CMS Portales", icon: "document" },
+  { screen: "portales_publicos", label: "Portales públicos", icon: "eye" },
   { screen: "rankings", label: "Rankings y noticias", icon: "chart" },
   { screen: "transfer", label: "Traslado de datos", icon: "upload" },
 ];

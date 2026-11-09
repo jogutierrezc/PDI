@@ -340,6 +340,7 @@ export const MODULES: ModuleDef[] = [
       { id: "institution", label: "Estructura institucional", note: "pide administrar" },
       { id: "users", label: "Usuarios y roles", note: "pide administrar" },
       { id: "transfer", label: "Traslado de datos", note: "pide administrar" },
+      { id: "portales_publicos", label: "Portales públicos", note: "pide administrar" },
     ],
     levels: {
       ver: { hint: "Consulta parámetros y desarrollo tecnológico.", needs: "consulta" },

@@ -15,6 +15,7 @@ import { TourProvider } from "./components/tour/TourProvider";
 import { TourFab } from "./components/tour/TourFab";
 import { PiloAi } from "./components/pilo/ai/PiloAi";
 import { AlertaEmergencia } from "./components/alertas/AlertaEmergencia";
+import { GuardiaPortales } from "./modules/admin/portales-publicos/GuardiaPortales";
 import { useAuth } from "./lib/auth";
 import type { AdminScreen, AppRole } from "./types/database";
 import type { ReactElement } from "react";
@@ -181,6 +182,7 @@ const PiloAiSettings = lazy(() =>
 const PiloEnsenanzaSettings = lazy(() =>
   import("./modules/admin/pilo-ensenanza/PiloEnsenanza").then((m) => ({ default: m.PiloEnsenanzaSettings })),
 );
+const PortalesPublicos = lazy(() => import("./modules/admin/portales-publicos/PortalesPublicos").then((m) => ({ default: m.PortalesPublicos })));
 const PiloWorkSettings = lazy(() => import("./modules/admin/pilo-work/PiloWorkSettings").then((m) => ({ default: m.PiloWorkSettings })));
 const PiloCapacitacionPage = lazy(() =>
   import("./modules/admin/pilo-capacitacion/PiloCapacitacion").then((m) => ({ default: m.PiloCapacitacionPage })),
@@ -310,6 +312,8 @@ export default function App() {
       {/* La capa de emergencias (0138): dormida hasta que Aluna declare una, y entonces cubre cualquier página. */}
       <AlertaEmergencia />
       <Suspense fallback={<RouteFallback />}>
+        {/* Portales deshabilitados desde la intranet (0263): mantenimiento para el público, franja de aviso para la administración. Falla abierta. */}
+        <GuardiaPortales>
         <Routes>
           {/* La portada es el portal de Planeación; el PDI vive en /pdi. */}
           <Route path="/" element={<PlaneacionHome />} />
@@ -752,6 +756,15 @@ export default function App() {
               </RequireRole>
             }
           />
+          {/* Portales públicos (0263): abrir o cerrar cada portal y cambiar el menú público. Solo administración. */}
+          <Route
+            path="/admin/portales-publicos"
+            element={
+              <RequireRole minimum="admin" screen="portales_publicos">
+                <PortalesPublicos />
+              </RequireRole>
+            }
+          />
           {/* La capa profunda de Pilo: la presentación, solo para la administración. */}
           <Route
             path="/admin/mr-pilo/presentacion"
@@ -845,6 +858,7 @@ export default function App() {
           <Route path="/sin-permiso" element={<Forbidden />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </GuardiaPortales>
       </Suspense>
       <TourFab />
       <PiloAi />

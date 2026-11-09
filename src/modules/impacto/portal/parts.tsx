@@ -22,18 +22,21 @@ import { speak, stopSpeaking, useVoice } from "../../../components/pilo/voice";
 import { PortalMissingError, usePortalData } from "./data";
 import type { PortalData } from "./data";
 import type { PiloNote } from "./analysis";
+import { Destino, EnlaceMenu } from "../../admin/portales-publicos/EnlaceMenu";
+import { useMenuPublico } from "../../admin/portales-publicos/estado";
 import "./portal.css";
 
 export const PORTAL_TOUR = "portal-impacto";
 
 const VIEWS = [
-  { to: "/impacto", label: "Institucional", match: (p: string) => p === "/impacto" },
-  { to: "/impacto/vicerrectoria/investigacion", label: "Vicerrectorías", match: (p: string) => p.startsWith("/impacto/vicerrectoria") },
-  { to: "/impacto/facultades", label: "Facultades", match: (p: string) => p.startsWith("/impacto/facultad") },
-  { to: "/impacto/programas", label: "Programas", match: (p: string) => p.startsWith("/impacto/programa") },
+  { clave: "impacto.vistas.institucional", to: "/impacto", label: "Institucional", match: (p: string) => p === "/impacto" },
+  { clave: "impacto.vistas.vicerrectorias", to: "/impacto/vicerrectoria/investigacion", label: "Vicerrectorías", match: (p: string) => p.startsWith("/impacto/vicerrectoria") },
+  { clave: "impacto.vistas.facultades", to: "/impacto/facultades", label: "Facultades", match: (p: string) => p.startsWith("/impacto/facultad") },
+  { clave: "impacto.vistas.programas", to: "/impacto/programas", label: "Programas", match: (p: string) => p.startsWith("/impacto/programa") },
 ];
 
 export function PortalLayout({ title, children }: { title: string; children: ReactNode }) {
+  const { aplicar } = useMenuPublico();
   const { start, isDone, active } = useTour();
   const pathname = useLocation().pathname.replace(/\/+$/, "") || "/";
   const started = useRef(false);
@@ -69,11 +72,14 @@ export function PortalLayout({ title, children }: { title: string; children: Rea
             </span>
           </Link>
           <nav aria-label="Vistas del portal" className="ipo-bar__nav" data-tour="ipo-views">
-            {VIEWS.map((v) => (
-              <Link key={v.to} to={v.to} aria-current={v.match(pathname) ? "page" : undefined}>
-                {v.label}
-              </Link>
-            ))}
+            {VIEWS.map((v) => {
+              const vinculo = aplicar(v.clave, { etiqueta: v.label, destino: v.to });
+              return vinculo?.destino ? (
+                <Destino key={v.to} to={vinculo.destino} aria-current={v.match(pathname) ? "page" : undefined}>
+                  {vinculo.etiqueta}
+                </Destino>
+              ) : null;
+            })}
           </nav>
           <button type="button" className="ipo-bar__tour" onClick={() => start(PORTAL_TOUR)} data-tour="ipo-tour">
             <PiloAvatar mood="feliz" size={32} />
@@ -91,7 +97,7 @@ export function PortalLayout({ title, children }: { title: string; children: Rea
           </div>
           <nav aria-label="Enlaces del pie">
             <Link to="/admin/impacto">Reportar en la intranet</Link>
-            <Link to="/datos-abiertos">UDES en Cifras</Link>
+            <EnlaceMenu clave="impacto.pie.cifras" etiqueta="UDES en Cifras" to="/datos-abiertos" />
           </nav>
         </div>
       </footer>

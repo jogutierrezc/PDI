@@ -17,13 +17,15 @@
    ========================================================================== */
 
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../ui/Icon";
 import { useTheme } from "../../lib/theme";
 import { INTRANET_HOME, useAuth } from "../../lib/auth";
 import { SessionMenu } from "./SessionMenu";
 import { UdesLogo } from "./UdesLogo";
 import { useIntranetLinks } from "./intranet-links";
+import { EnlaceMenu } from "../../modules/admin/portales-publicos/EnlaceMenu";
+import { useMenuPublico } from "../../modules/admin/portales-publicos/estado";
 import type { PortalId } from "./MegaPanel";
 import "./site-header.css";
 
@@ -52,6 +54,8 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
   const { resolved, toggle } = useTheme();
   const { profile } = useAuth();
   const intranet = useIntranetLinks();
+  // Lo que la administración ocultó o cambió del menú público (0263); sin respuesta del servidor, todo como en el código.
+  const { aplicar } = useMenuPublico();
   const location = useLocation();
   const navigate = useNavigate();
   const header = useRef<HTMLElement>(null);
@@ -194,11 +198,11 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
         </Link>
 
         <nav className="sh-nav" aria-label="Principal">
-          <NavLink to="/equipo" className="sh-nav__link">
-            La oficina
-          </NavLink>
+          <EnlaceMenu nav clave="menu.nav.oficina" etiqueta="La oficina" to="/equipo" className="sh-nav__link" />
           {PORTALS.map((p) => {
             const current = p.match(location.pathname);
+            const vinculo = aplicar(`menu.nav.${p.id}`, { etiqueta: p.label, portal: p.id });
+            if (!vinculo) return null;
             return (
               <button
                 key={p.id}
@@ -214,26 +218,16 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
                 onPointerLeave={() => finePointer && abandon(p.id)}
                 onClick={() => show(open === p.id ? null : p.id)}
               >
-                {p.label}
+                {vinculo.etiqueta}
                 <Icon name="chevron-down" size={14} />
               </button>
             );
           })}
-          <NavLink to="/sostenible" className="sh-nav__link">
-            UDES Sostenible
-          </NavLink>
-          <NavLink to="/datos-abiertos/boletines" className="sh-nav__link">
-            Boletines
-          </NavLink>
-          <NavLink to="/documentos" className="sh-nav__link">
-            Documentos
-          </NavLink>
+          <EnlaceMenu nav clave="menu.nav.sostenible" etiqueta="UDES Sostenible" to="/sostenible" className="sh-nav__link" />
+          <EnlaceMenu nav clave="menu.nav.boletines" etiqueta="Boletines" to="/datos-abiertos/boletines" className="sh-nav__link" />
+          <EnlaceMenu nav clave="menu.nav.documentos" etiqueta="Documentos" to="/documentos" className="sh-nav__link" />
           {/* La oferta de programas pide sesión: sin ella, la entrada no existe. */}
-          {profile && (
-            <NavLink to="/oferta" className="sh-nav__link">
-              Oferta
-            </NavLink>
-          )}
+          {profile && <EnlaceMenu nav clave="menu.nav.oferta" etiqueta="Oferta" to="/oferta" className="sh-nav__link" />}
         </nav>
 
         <div className="sh-tools">
@@ -283,26 +277,14 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
             {everOpened && <MegaPanel portal="cifras" setPortal={() => undefined} onNavigate={close} mode="mobile" />}
           </Suspense>
           <nav className="sh-mobile__links" aria-label="Más">
-            <Link to="/" onClick={close}>
-              Inicio · Planeación Institucional
-            </Link>
-            <Link to="/equipo" onClick={close}>
-              La oficina
-            </Link>
-            <Link to="/sostenible" onClick={close}>
-              UDES Sostenible
-            </Link>
-            <Link to="/datos-abiertos/boletines" onClick={close}>
-              Boletines
-            </Link>
-            <Link to="/documentos" onClick={close}>
-              Documentos
-            </Link>
+            <EnlaceMenu clave="menu.movil.inicio" etiqueta="Inicio · Planeación Institucional" to="/" onClick={close} />
+            <EnlaceMenu clave="menu.nav.oficina" etiqueta="La oficina" to="/equipo" onClick={close} />
+            <EnlaceMenu clave="menu.nav.sostenible" etiqueta="UDES Sostenible" to="/sostenible" onClick={close} />
+            <EnlaceMenu clave="menu.nav.boletines" etiqueta="Boletines" to="/datos-abiertos/boletines" onClick={close} />
+            <EnlaceMenu clave="menu.nav.documentos" etiqueta="Documentos" to="/documentos" onClick={close} />
             {profile ? (
               <>
-                <Link to="/oferta" onClick={close}>
-                  Oferta de programas
-                </Link>
+                <EnlaceMenu clave="menu.movil.oferta" etiqueta="Oferta de programas" to="/oferta" onClick={close} />
                 {intranet.links.some((l) => l.screen === "tableros") && (
                   <Link to="/admin/tableros" onClick={close}>
                     Mis Tableros

@@ -403,6 +403,7 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
           nav("correos", "Plantillas, conexión y bitácora de los correos"),
           nav("rutas", "Calles, flujo de estudiantes y paradas del bus UDES"),
           nav("cms", "Las páginas de la landing, de Planeación y de UDES Sostenible, con sus micrositios"),
+          nav("portales_publicos", "Abrir o cerrar cada portal público y cambiar por un tiempo los vínculos de su menú"),
           nav("development", "Los proyectos web de la oficina"),
         ],
       },

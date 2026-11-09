@@ -65,6 +65,7 @@ export type AdminSection =
   | "gestion_master"
   | "cumplimiento_tipologia"
   | "cms"
+  | "portales_publicos"
   | "obs_observatorios"
   | "obs_insertar";
 
@@ -322,6 +323,8 @@ export const navigation: NavGroup[] = [
       // Las páginas de la landing, de Planeación y de UDES Sostenible, con sus micrositios y su editor visual.
       { id: "cms", label: "CMS Portales", icon: "document", to: "/admin/cms", minimum: "planeacion" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
+      // Abrir o cerrar cada portal público (página de mantenimiento) y cambiar, por un tiempo, los vínculos del menú público. Solo administración.
+      { id: "portales_publicos", label: "Portales públicos", icon: "eye", to: "/admin/portales-publicos", minimum: "admin" },
       { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },
     ],
   },

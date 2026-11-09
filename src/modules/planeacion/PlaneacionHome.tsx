@@ -36,6 +36,8 @@ import { useOfficePage } from "./page";
 import type { OfficeAreaItem, TeamPerson } from "./page";
 import { PlanLayout } from "./PlanLayout";
 import { SiteSearch } from "./SiteSearch";
+import { Destino } from "../admin/portales-publicos/EnlaceMenu";
+import { useMenuPublico } from "../admin/portales-publicos/estado";
 import { TeamCarousel } from "./TeamCarousel";
 
 /* Video de fondo del hero (YouTube): mudo, en bucle, sin controles y detrás del contenido.
@@ -63,6 +65,8 @@ export function PlaneacionHome() {
   const searchInput = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const { page } = useOfficePage();
+  const { aplicar, cerrada } = useMenuPublico();
+  const oficina = aplicar("portada.oficina", { etiqueta: "Conocer la oficina", destino: "/equipo" });
 
   const focusSearch = () => {
     document.getElementById("buscar")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -116,12 +120,15 @@ export function PlaneacionHome() {
             <div className="pl-office__text">
               <h2 id="pl-oficina">{page.home.closingTitle}</h2>
               <p>{page.office.purpose}</p>
-              <Link className="pl-link" to="/equipo">
-                Conocer la oficina <Icon name="arrow-right" size={16} />
-              </Link>
+              {oficina?.destino && (
+                <Destino className="pl-link" to={oficina.destino}>
+                  {oficina.etiqueta} <Icon name="arrow-right" size={16} />
+                </Destino>
+              )}
             </div>
             <ul className="pl-office__links">
-              {page.links.map((item) => (
+              {/* Estos enlaces se escriben en «Página de la oficina»; aquí solo se quitan los que llevan a un portal deshabilitado. */}
+              {page.links.filter((item) => !cerrada(item.to)).map((item) => (
                 <li key={item.id}>
                   <Link to={item.to}>
                     <span>{item.label}</span>
@@ -143,6 +150,7 @@ export function PlaneacionHome() {
 const REPORT_TONES = ["PB", "PE", "VI", "EN", "EX", "IN"];
 
 export function CifrasTile() {
+  const { aplicar } = useMenuPublico();
   const catalog = useOpenDataCatalog();
   const video = useRef<HTMLVideoElement>(null);
   const tile = useRef<HTMLElement>(null);
@@ -187,6 +195,10 @@ export function CifrasTile() {
   const shown = reports.length ? reports.slice(0, 6) : REPORT_TONES.map((code, i) => ({ code, line: i + 1, slug: code, name: code }));
   const extra = Math.max(0, reports.length - shown.length);
 
+  // Los mosaicos se pueden ocultar o renombrar desde la intranet (0263); si el portal está cerrado, tampoco aparecen.
+  const vinculo = aplicar("portada.cifras", { etiqueta: "UDES en Cifras", destino: "/datos-abiertos" });
+  if (!vinculo?.destino) return null;
+
   return (
     <article className="pl-tile pl-tile--cifras" ref={tile}>
       {!reduced && (
@@ -209,9 +221,9 @@ export function CifrasTile() {
       </div>
       <div className="pl-tile__bottom">
         <h3>
-          <Link className="pl-stretch" to="/datos-abiertos">
-            UDES en Cifras
-          </Link>
+          <Destino className="pl-stretch" to={vinculo.destino}>
+            {vinculo.etiqueta}
+          </Destino>
         </h3>
         <p>
           {reports.length ? `${reports.length === 11 ? "Once" : reports.length} informes` : "Los informes"} con las cifras oficiales de la universidad, por año, periodo y campus. Con su fuente y su corte
@@ -249,13 +261,16 @@ export function PdiTile() {
   const summary = useSummary();
   const progress = summary.data?.progress ?? null;
   const list = pillars.data ?? [];
+  const { aplicar } = useMenuPublico();
+  const vinculo = aplicar("portada.pdi", { etiqueta: "Portal PDI", destino: "/pdi" });
+  if (!vinculo?.destino) return null;
   return (
     <article className="pl-tile pl-tile--pdi">
       <div className="pl-tile__row">
         <h3>
-          <Link className="pl-stretch" to="/pdi">
-            Portal PDI
-          </Link>
+          <Destino className="pl-stretch" to={vinculo.destino}>
+            {vinculo.etiqueta}
+          </Destino>
         </h3>
         <span className="pl-pill">2024–2028</span>
       </div>
@@ -297,12 +312,15 @@ export function BulletinsTile() {
   const catalog = useOpenDataCatalog();
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
   const latest = bulletins.data?.editions[0];
+  const { aplicar } = useMenuPublico();
+  const vinculo = aplicar("portada.boletines", { etiqueta: "Boletines", destino: "/datos-abiertos/boletines" });
+  if (!vinculo?.destino) return null;
   return (
     <article className="pl-tile pl-tile--bulletins">
       <h3>
-        <Link className="pl-stretch" to="/datos-abiertos/boletines">
-          Boletines
-        </Link>
+        <Destino className="pl-stretch" to={vinculo.destino}>
+          {vinculo.etiqueta}
+        </Destino>
       </h3>
       <p>{latest ? `Última edición: ${latest.title}.` : "El boletín estadístico en PDF: completo, ejecutivo y por informe."}</p>
       <span className="pl-covers" aria-hidden="true">
@@ -321,12 +339,15 @@ export function BulletinsTile() {
 }
 
 export function TeamTile({ areas, people }: { areas: OfficeAreaItem[]; people: TeamPerson[] }) {
+  const { aplicar } = useMenuPublico();
+  const vinculo = aplicar("portada.equipo", { etiqueta: "Nuestro equipo", destino: "/equipo" });
+  if (!vinculo?.destino) return null;
   return (
     <article className="pl-tile pl-tile--team">
       <h3>
-        <Link className="pl-stretch" to="/equipo">
-          Nuestro equipo
-        </Link>
+        <Destino className="pl-stretch" to={vinculo.destino}>
+          {vinculo.etiqueta}
+        </Destino>
       </h3>
       <p>Quiénes planean, miden y acompañan a cada oficina, y cómo escribirles.</p>
       {areas.length > 0 && (
@@ -346,12 +367,15 @@ export function TeamTile({ areas, people }: { areas: OfficeAreaItem[]; people: T
 export function ObservatoryTile() {
   const live = useObservatoryLive();
   const published = live.data?.size ?? 0;
+  const { aplicar } = useMenuPublico();
+  const vinculo = aplicar("portada.observatorio", { etiqueta: "Observatorio de Analítica", destino: "/datos-abiertos/observatorio" });
+  if (!vinculo?.destino) return null;
   return (
     <article className="pl-tile pl-tile--obs">
       <h3>
-        <Link className="pl-stretch" to="/datos-abiertos/observatorio">
-          Observatorio de Analítica
-        </Link>
+        <Destino className="pl-stretch" to={vinculo.destino}>
+          {vinculo.etiqueta}
+        </Destino>
       </h3>
       <p>
         Catorce temas para explorar el dato: de la oferta y la población a las alertas tempranas y los graduados.
@@ -389,6 +413,7 @@ export function Recent() {
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
   const live = useObservatoryLive();
   const period = useCurrentPeriod();
+  const { cerrada } = useMenuPublico();
 
   const items = useMemo(() => {
     const out: RecentItem[] = [];
@@ -405,8 +430,9 @@ export function Recent() {
     if (period.data?.cutoff_date) {
       out.push({ key: "pdi", date: period.data.cutoff_date, tag: "Plan de Desarrollo", tone: "pdi", title: `Seguimiento del PDI con corte al ${formatDate(period.data.cutoff_date)}`, to: "/tablero" });
     }
-    return out.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
-  }, [catalog.data, bulletins.data, live.data, period.data]);
+    // Lo que lleva a un portal deshabilitado no se anuncia.
+    return out.filter((i) => !cerrada(i.to)).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+  }, [catalog.data, bulletins.data, live.data, period.data, cerrada]);
 
   if (!items.length) return null;
   return (

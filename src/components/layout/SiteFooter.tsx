@@ -14,23 +14,27 @@ import { Link } from "react-router-dom";
 import { Icon } from "../ui/Icon";
 import { useOfficePage } from "../../modules/planeacion/page";
 import { UdesLogo } from "./UdesLogo";
+import { Destino } from "../../modules/admin/portales-publicos/EnlaceMenu";
+import { useMenuPublico } from "../../modules/admin/portales-publicos/estado";
 import "./site-footer.css";
 
-const PORTALS: [string, string][] = [
-  ["/pdi", "Plan de Desarrollo"],
-  ["/datos-abiertos", "UDES en Cifras"],
-  ["/datos-abiertos/observatorio", "Observatorio"],
-  ["/sostenible", "UDES Sostenible"],
-  ["/datos-abiertos/boletines", "Boletines"],
-  ["/rutas", "Rutas de transporte"],
+/* El tercer dato es la clave del vínculo en las sobreescrituras del menú público (0263); sin clave, no se puede ocultar:
+   el ingreso a la intranet siempre queda. */
+const PORTALS: [string, string, string][] = [
+  ["/pdi", "Plan de Desarrollo", "pie.pdi"],
+  ["/datos-abiertos", "UDES en Cifras", "pie.cifras"],
+  ["/datos-abiertos/observatorio", "Observatorio", "pie.observatorio"],
+  ["/sostenible", "UDES Sostenible", "pie.sostenible"],
+  ["/datos-abiertos/boletines", "Boletines", "pie.boletines"],
+  ["/rutas", "Rutas de transporte", "pie.rutas"],
 ];
 
-const OFFICE: [string, string][] = [
-  ["/equipo", "Nuestro equipo"],
-  ["/documentos", "Documentos"],
-  ["/pregunta", "Pregúntele a Pilo"],
-  ["/desarrollo-tecnologico", "Desarrollo tecnológico"],
-  ["/acceso-intranet", "Iniciar sesión"],
+const OFFICE: [string, string, string | null][] = [
+  ["/equipo", "Nuestro equipo", "pie.equipo"],
+  ["/documentos", "Documentos", "pie.documentos"],
+  ["/pregunta", "Pregúntele a Pilo", "pie.pilo"],
+  ["/desarrollo-tecnologico", "Desarrollo tecnológico", "pie.desarrollo"],
+  ["/acceso-intranet", "Iniciar sesión", null],
 ];
 
 const reduced = () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
@@ -67,6 +71,7 @@ function BackToTop() {
 }
 
 export function SiteFooter({ note }: { note?: ReactNode }) {
+  const { aplicar } = useMenuPublico();
   const { page } = useOfficePage();
   const office = page.office;
   const root = useRef<HTMLElement>(null);
@@ -126,20 +131,26 @@ export function SiteFooter({ note }: { note?: ReactNode }) {
 
           <nav className="sf-col sf-r" style={{ "--i": 1 } as React.CSSProperties} aria-label="Portales">
             <h2 className="sf-h">Portales</h2>
-            {PORTALS.map(([to, label]) => (
-              <Link key={to} className="sf-link" to={to}>
-                {label}
-              </Link>
-            ))}
+            {PORTALS.map(([to, label, clave]) => {
+              const v = aplicar(clave, { etiqueta: label, destino: to });
+              return v?.destino ? (
+                <Destino key={to} className="sf-link" to={v.destino}>
+                  {v.etiqueta}
+                </Destino>
+              ) : null;
+            })}
           </nav>
 
           <nav className="sf-col sf-r" style={{ "--i": 2 } as React.CSSProperties} aria-label="La oficina">
             <h2 className="sf-h">La oficina</h2>
-            {OFFICE.map(([to, label]) => (
-              <Link key={to} className="sf-link" to={to}>
-                {label}
-              </Link>
-            ))}
+            {OFFICE.map(([to, label, clave]) => {
+              const v = clave ? aplicar(clave, { etiqueta: label, destino: to }) : { etiqueta: label, destino: to };
+              return v?.destino ? (
+                <Destino key={to} className="sf-link" to={v.destino}>
+                  {v.etiqueta}
+                </Destino>
+              ) : null;
+            })}
           </nav>
         </div>
 

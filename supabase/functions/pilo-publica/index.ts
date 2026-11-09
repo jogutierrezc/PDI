@@ -957,11 +957,11 @@ Deno.serve(async (request: Request) => {
       let posK = siguientePos(SECCIONES.kpi, quedan);
       let posG = siguientePos(SECCIONES.grafico, quedan);
       const filas = [
-        ...t.kpis.map((k) => ({ informe_id: informeId, kind: "kpi", sec: SECCIONES.kpi, pos: posK++, origin: "pilo", enabled: true, spec: k, figs: [k.cifra] })),
+        ...t.kpis.map((k) => ({ informe_id: informeId, kind: "kpi", sec: SECCIONES.kpi, pos: posK++, origin: "pilo", enabled: true, spec: k, heading_es: "", heading_en: "", figs: [k.cifra] })),
         ...t.graficos.map((g) => ({ informe_id: informeId, kind: "grafico", sec: SECCIONES.grafico, pos: posG++, origin: "pilo", enabled: true, spec: g, heading_es: g.title_es, heading_en: g.title_en, figs: g.series.map((s) => s.cifra) })),
       ];
       if (filas.length) {
-        const w = await admin.from("pp_bloques").insert(filas);
+        const w = await admin.from("pp_bloques").insert(filas, { defaultToNull: false });
         if (w.error) throw w.error;
       }
       await bitacora({ kpis: t.kpis.length, graficos: t.graficos.length, descartados: t.descartados.length }, filas.length, t.descartados.length, null);

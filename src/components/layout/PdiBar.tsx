@@ -15,6 +15,7 @@ import { useLocation } from "react-router-dom";
 import { usePillars } from "../../data/queries";
 import { formatValue } from "../../modules/datos-abiertos/data/open-data";
 import { ContextBar } from "./ContextBar";
+import { useMenuPublico } from "../../modules/admin/portales-publicos/estado";
 
 type View = "implementacion" | "tablero" | "facultades" | "campus";
 
@@ -41,6 +42,7 @@ export function PdiBar() {
   const { pathname } = useLocation();
   const context = readContext(pathname);
   const pillars = usePillars();
+  const { aplicar } = useMenuPublico();
   if (!context) return null;
 
   const back =
@@ -51,11 +53,19 @@ export function PdiBar() {
         : { to: "/pdi", label: "Portal PDI" };
 
   // Implementación y Tablero conservan el pilar; las otras vistas no son por pilar.
-  const views = VIEWS.map((v) => ({
-    label: v.label,
-    to: context.pillar && (v.id === "implementacion" || v.id === "tablero") ? `/${v.id}/pilar/${context.pillar}` : v.to,
-    current: context.view === v.id,
-  }));
+  const views = VIEWS.flatMap((v) => {
+    // La administración puede ocultar o cambiar estas vistas (0263); una vista cambiada pierde el pilar, porque su destino ya no es el del plan.
+    const vinculo = aplicar(`pdi.barra.${v.id}`, { etiqueta: v.label, destino: v.to });
+    if (!vinculo?.destino) return [];
+    const propio = vinculo.destino === v.to;
+    return [
+      {
+        label: vinculo.etiqueta,
+        to: propio && context.pillar && (v.id === "implementacion" || v.id === "tablero") ? `/${v.id}/pilar/${context.pillar}` : vinculo.destino,
+        current: context.view === v.id,
+      },
+    ];
+  });
   const base = context.view === "tablero" ? "/tablero/pilar" : "/implementacion/pilar";
 
   return (

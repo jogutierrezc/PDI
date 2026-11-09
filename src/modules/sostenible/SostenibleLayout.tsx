@@ -8,7 +8,7 @@
 
 import { useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { PlanLayout } from "../planeacion/PlanLayout";
@@ -16,6 +16,7 @@ import { RANKINGS } from "./data";
 import { reduced } from "./widgets";
 import { useLang } from "./i18n";
 import { LangSwitch } from "./LangSwitch";
+import { EnlaceMenu } from "../admin/portales-publicos/EnlaceMenu";
 import "./sostenible.css";
 
 const INTRO_KEY = "udes-sostenible-intro";
@@ -36,20 +37,13 @@ export function SostenibleLayout({ title, children }: { title: string; children:
       <div className="sos" lang={lang}>
         <nav className="sos-sub" aria-label="UDES Sostenible">
           <div className="sos-wrap">
-            <NavLink to="/sostenible" end className="sos-sub__link" aria-current={pathname === "/sostenible" && !hash ? "page" : undefined}>
-              {t("nav_inicio")}
-            </NavLink>
+            {/* Cada vínculo lleva su clave para que la administración pueda ocultarlo o cambiarlo (0263). */}
+            <EnlaceMenu nav end clave="sostenible.inicio" etiqueta={t("nav_inicio")} to="/sostenible" className="sos-sub__link" aria-current={pathname === "/sostenible" && !hash ? "page" : undefined} />
             {RANKINGS.map((r) => (
-              <NavLink key={r.id} to={`/sostenible/${r.id}`} className="sos-sub__link">
-                {r.short}
-              </NavLink>
+              <EnlaceMenu nav key={r.id} clave={`sostenible.ranking.${r.id}`} etiqueta={r.short} to={`/sostenible/${r.id}`} className="sos-sub__link" />
             ))}
-            <Link to="/sostenible#indicadores" className="sos-sub__link">
-              {t("nav_indicadores")}
-            </Link>
-            <Link to="/sostenible#informes" className="sos-sub__link">
-              {t("nav_informes")}
-            </Link>
+            <EnlaceMenu clave="sostenible.indicadores" etiqueta={t("nav_indicadores")} to="/sostenible#indicadores" className="sos-sub__link" />
+            <EnlaceMenu clave="sostenible.informes" etiqueta={t("nav_informes")} to="/sostenible#informes" className="sos-sub__link" />
             {/* Español e inglés en todo el portal de los rankings: ?lang= y lo recordado. */}
             <LangSwitch lang={lang} onChange={setLang} className="sos-sub__lang" />
           </div>

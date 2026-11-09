@@ -73,6 +73,7 @@ export type AdminScreen =
   | "gestion_master"
   | "cumplimiento_tipologia"
   | "cms"
+  | "portales_publicos"
   // Paneles del Observatorio de Analítica (0231). «observatorio» sigue siendo la entrada general al módulo.
   | "obs_captura"
   | "obs_diseno"

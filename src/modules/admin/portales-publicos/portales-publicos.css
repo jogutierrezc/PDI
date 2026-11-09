@@ -1,0 +1,361 @@
+/* =============================================================================
+   Intranet · Portales públicos.
+
+   Sigue el lenguaje de la intranet: tokens de tokens.css, campos de admin.css
+   (.admin-field) y los botones de base.css. Aquí solo va lo propio: las
+   tarjetas de portal, el interruptor, la lista de vínculos con su editor, el
+   historial y el cuadro de confirmación. Solo tema claro de la intranet.
+   Prefijo ppa- (portales públicos · administración).
+   ========================================================================== */
+
+.ppa-pestana { display: grid; gap: var(--space-5); max-width: 62rem; }
+
+.ppa-intro,
+.ppa-chica {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  text-wrap: pretty;
+}
+
+.ppa-chica { color: var(--ink-muted); }
+.ppa-intro code, .ppa-chica code, .ppa-nota code { font-size: 0.92em; overflow-wrap: anywhere; }
+
+.ppa-resumen { margin: 0; font-size: var(--text-base); font-weight: 700; color: var(--ink); }
+
+.ppa-espera {
+  max-width: 72ch;
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink-muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+/* --- Avisos --------------------------------------------------------------- */
+
+.ppa-nota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 72ch;
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.ppa-nota > div { flex: 1 1 18rem; }
+.ppa-nota svg { flex: none; margin-top: 2px; }
+.ppa-nota[data-tono="aviso"] { background: var(--status-pending-soft); border-color: color-mix(in srgb, var(--status-pending) 34%, transparent); }
+.ppa-nota[data-tono="aviso"] svg { color: var(--status-pending); }
+.ppa-nota[data-tono="mal"] { background: var(--status-risk-soft); border-color: color-mix(in srgb, var(--status-risk) 30%, transparent); }
+.ppa-nota[data-tono="mal"] svg { color: var(--status-risk); }
+.ppa-nota[data-tono="ok"] svg { color: var(--status-done); }
+.ppa-nota[data-tono="info"] svg { color: var(--brand-blue); }
+
+/* --- Sellos y estados (glifo + palabra, nunca solo color) ------------------ */
+
+.ppa-sello,
+.ppa-estado-vinculo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ppa-sello[data-tono="ok"] { color: var(--status-done); background: var(--status-done-soft); }
+.ppa-sello[data-tono="mal"] { color: var(--status-risk); background: var(--status-risk-soft); }
+.ppa-estado-vinculo[data-estado="cambiado"] { color: var(--brand-blue-strong); background: var(--brand-blue-soft); }
+.ppa-estado-vinculo[data-estado="oculto"] { color: var(--status-risk); background: var(--status-risk-soft); }
+.ppa-estado-vinculo[data-estado="programado"],
+.ppa-estado-vinculo[data-estado="vencido"] { color: var(--ink); background: var(--status-pending-soft); }
+
+/* --- Tarjetas de portal ---------------------------------------------------- */
+
+.ppa-tarjetas { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+
+.ppa-tarjeta {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.ppa-tarjeta[data-cerrado] { border-color: color-mix(in srgb, var(--status-risk) 36%, transparent); }
+.ppa-tarjeta[data-enfocado] { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.ppa-tarjeta__cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ppa-tarjeta__cabeza h2 { margin: 0; font-size: var(--text-md); }
+.ppa-tarjeta__cabeza p { margin: 2px 0 0; color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+.ppa-rutas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.ppa-rutas code {
+  padding: 2px 8px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+/* El interruptor: un checkbox real (teclado, lectores) con pista dibujada. */
+.ppa-interruptor {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  width: fit-content;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.ppa-interruptor input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ppa-interruptor__pista {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  background: var(--ink-faint);
+  border-radius: var(--radius-pill);
+  transition: background-color var(--dur-base) ease;
+}
+
+.ppa-interruptor__pista::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.ppa-interruptor input:checked + .ppa-interruptor__pista { background: var(--status-done); }
+.ppa-interruptor input:checked + .ppa-interruptor__pista::after { transform: translateX(20px); }
+.ppa-interruptor input:focus-visible + .ppa-interruptor__pista { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.ppa-interruptor > span:last-child { display: grid; gap: 2px; }
+.ppa-interruptor strong { font-size: var(--text-base); }
+.ppa-interruptor small { color: var(--ink-muted); font-size: var(--text-sm); }
+
+.ppa-mant-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--space-4); }
+.ppa-mant-campos .admin-field--wide,
+.ppa-mant-campos .ppa-chica { grid-column: 1 / -1; }
+
+.ppa-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.ppa-acciones button[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+.ppa-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.ppa-estado[data-tono="ok"] { color: var(--status-done); }
+.ppa-estado[data-tono="mal"] { color: var(--status-risk); }
+
+.ppa-previa { display: grid; gap: var(--space-2); }
+.ppa-previa__rotulo { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* La página de mantenimiento se ve en su propio tema del sitio, dentro de un marco. */
+.ppa-previa__marco {
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: #f4f7fb;
+}
+
+.ppa-previa__marco .ppa-mant-prev,
+.ppa-previa__marco .ppu-mant { min-height: 0; padding: var(--space-6) var(--space-4); }
+
+/* --- Menú ----------------------------------------------------------------- */
+
+.ppa-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.ppa-filtros .admin-field { flex: 1 1 16rem; max-width: 26rem; }
+.ppa-filtros .ppa-intro { flex: 1 1 100%; }
+
+.ppa-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.ppa-check input { width: 18px; height: 18px; flex: none; accent-color: var(--brand-blue); }
+.ppa-check > span { display: grid; gap: 2px; }
+.ppa-check small { color: var(--ink-muted); }
+
+.ppa-grupo { display: grid; gap: var(--space-3); }
+.ppa-grupo > h2 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; padding-top: var(--space-3); font-size: var(--text-md); border-top: 1px solid var(--line); }
+.ppa-grupo ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.ppa-lugar { display: grid; gap: var(--space-2); }
+.ppa-lugar > h3 { margin: 0; color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; }
+
+.ppa-vinculo {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.ppa-vinculo[data-abierto] { border-color: var(--brand-blue); box-shadow: var(--shadow-sm); }
+
+.ppa-vinculo__fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.ppa-vinculo__texto { display: grid; gap: 2px; min-width: 0; }
+.ppa-vinculo__texto strong { font-size: var(--text-base); overflow-wrap: anywhere; }
+.ppa-vinculo__texto code { width: fit-content; max-width: 100%; color: var(--ink-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.ppa-vinculo__texto small { color: var(--ink-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.ppa-vinculo__cambio { color: var(--ink) !important; font-weight: 700; }
+
+.ppa-editor {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--line);
+}
+
+.ppa-editor__campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: var(--space-4); }
+.ppa-editor__campos .admin-field--wide { grid-column: 1 / -1; }
+
+.ppa-vista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.ppa-vista__rotulo { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.ppa-vista__valor { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.ppa-vista__valor code { overflow-wrap: anywhere; }
+.ppa-vista__pastilla { padding: 4px 12px; color: var(--brand-navy); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-pill); font-weight: 700; }
+
+.ppa-problemas {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
+  color: var(--ink);
+  background: var(--status-risk-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+/* --- Historial ------------------------------------------------------------ */
+
+.ppa-historial { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+
+.ppa-evento {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand-blue);
+  border-radius: var(--radius-md);
+}
+
+.ppa-evento[data-tono="ok"] { border-left-color: var(--status-done); }
+.ppa-evento[data-tono="mal"] { border-left-color: var(--status-risk); }
+
+.ppa-evento__cabeza { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); }
+.ppa-evento__cabeza span { flex: 1 1 14rem; color: var(--ink-secondary); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.ppa-evento__cabeza time { color: var(--ink-muted); font-size: var(--text-sm); }
+.ppa-evento__quien { margin: 0; color: var(--ink-secondary); font-size: var(--text-sm); }
+.ppa-evento__cambios { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.ppa-evento__cambios span { overflow-wrap: anywhere; }
+
+/* --- Confirmación ---------------------------------------------------------- */
+
+.ppa-dialogo {
+  width: min(32rem, calc(100vw - 32px));
+  padding: 0;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(10, 34, 73, 0.28);
+}
+
+.ppa-dialogo::backdrop { background: rgba(6, 30, 70, 0.45); }
+.ppa-dialogo__caja { display: grid; gap: var(--space-4); padding: var(--space-6); }
+.ppa-dialogo__caja h2 { margin: 0; font-size: var(--text-lg); }
+.ppa-dialogo__cuerpo { display: grid; gap: var(--space-3); color: var(--ink-secondary); font-size: var(--text-base); line-height: var(--leading-normal); }
+.ppa-dialogo__cuerpo p { margin: 0; }
+.ppa-dialogo__acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-3); }
+.ppa-efectos { display: grid; gap: var(--space-2); margin: 0; padding-left: var(--space-5); }
+
+@media (max-width: 640px) {
+  .ppa-tarjeta { padding: var(--space-4); }
+  .ppa-vinculo__fila { grid-template-columns: 1fr auto; }
+  .ppa-vinculo__fila .ppa-estado-vinculo { grid-column: 1; justify-self: start; }
+  .ppa-vinculo__fila button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ppa-vinculo:not([data-abierto]):hover { border-color: var(--line-strong); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ppa-interruptor__pista, .ppa-interruptor__pista::after { transition: none; }
+}

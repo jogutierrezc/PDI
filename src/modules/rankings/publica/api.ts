@@ -121,11 +121,13 @@ export interface ProgresoCorrida {
   hecho: number;
   total: number;
   fallos: number;
+  /** Los motivos de los fallos (sin repetir, los primeros), para que la persona sepa qué pasó. */
+  detalles: string[];
   mensaje: string | null;
   error: string | null;
   noDesplegada: boolean;
 }
-const VACIA: ProgresoCorrida = { corriendo: false, etiqueta: "", hecho: 0, total: 0, fallos: 0, mensaje: null, error: null, noDesplegada: false };
+const VACIA: ProgresoCorrida = { corriendo: false, etiqueta: "", hecho: 0, total: 0, fallos: 0, detalles: [], mensaje: null, error: null, noDesplegada: false };
 
 /** Corre una acción; si la respuesta trae `quedan > 0`, la repite hasta 0 o hasta que se pulse Detener. */
 export function useCorrida(informeId: string | undefined) {
@@ -142,6 +144,7 @@ export function useCorrida(informeId: string | undefined) {
       let hecho = 0;
       let total = 0;
       let fallos = 0;
+      const detalles: string[] = [];
       let sinAvance = 0;
       let ultima: T | null = null;
       setP({ ...VACIA, corriendo: true, etiqueta });
@@ -152,26 +155,32 @@ export function useCorrida(informeId: string | undefined) {
           const hizo = Number(r.escritos ?? r.traducidos ?? 0);
           const quedan = Number(r.quedan ?? 0);
           hecho += hizo;
-          if (Array.isArray(r.fallos)) fallos += r.fallos.length;
+          if (Array.isArray(r.fallos)) {
+            fallos += r.fallos.length;
+            for (const f of r.fallos as { motivo?: string; error?: string }[]) {
+              const m = String(f?.motivo ?? f?.error ?? "").trim().slice(0, 240);
+              if (m && !detalles.includes(m) && detalles.length < 6) detalles.push(m);
+            }
+          }
           else if (typeof r.fallos === "number") fallos += r.fallos;
           total = Math.max(total, hecho + quedan);
-          setP({ ...VACIA, corriendo: true, etiqueta, hecho, total, fallos });
+          setP({ ...VACIA, corriendo: true, etiqueta, hecho, total, fallos, detalles: [...detalles] });
           void qc.invalidateQueries({ queryKey: ["pp"] });
           if (quedan <= 0) break;
           sinAvance = hizo === 0 ? sinAvance + 1 : 0;
           if (sinAvance >= 2) {
-            setP({ ...VACIA, etiqueta, hecho, total, fallos, mensaje: `Pilo no pudo avanzar con los ${quedan} que quedan.` });
+            setP({ ...VACIA, etiqueta, hecho, total, fallos, detalles: [...detalles], mensaje: `Pilo no pudo avanzar con los ${quedan} que quedan.` });
             return ultima;
           }
           if (parar.current) {
-            setP({ ...VACIA, etiqueta, hecho, total, fallos, mensaje: `Detenido. Quedan ${quedan}; puedes continuar cuando quieras.` });
+            setP({ ...VACIA, etiqueta, hecho, total, fallos, detalles: [...detalles], mensaje: `Detenido. Quedan ${quedan}; puedes continuar cuando quieras.` });
             return ultima;
           }
         }
-        setP({ ...VACIA, etiqueta, hecho, total, fallos, mensaje: "Listo." });
+        setP({ ...VACIA, etiqueta, hecho, total, fallos, detalles: [...detalles], mensaje: "Listo." });
         return ultima;
       } catch (e) {
-        setP({ ...VACIA, etiqueta, hecho, total, fallos, error: e instanceof Error ? e.message : String(e), noDesplegada: e instanceof FuncionNoDesplegada });
+        setP({ ...VACIA, etiqueta, hecho, total, fallos, detalles: [...detalles], error: e instanceof Error ? e.message : String(e), noDesplegada: e instanceof FuncionNoDesplegada });
         return null;
       } finally {
         ocupado.current = false;

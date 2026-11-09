@@ -125,6 +125,13 @@ export function BarraPilo({ corrida }: { corrida: Corrida }) {
           </button>
         )}
       </div>
+      {!p.corriendo && p.detalles.length > 0 && (
+        <ul className="pp-barra__det">
+          {p.detalles.map((d) => (
+            <li key={d}>{d}</li>
+          ))}
+        </ul>
+      )}
       {p.corriendo && (
         <div className="pp-meter" aria-hidden="true">
           <i style={{ width: p.total > 0 ? `${pct}%` : "30%" }} className={p.total > 0 ? "" : "pp-meter--indef"} />

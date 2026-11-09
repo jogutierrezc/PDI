@@ -179,6 +179,7 @@ interface FilaBloque {
   text_en: string;
   sources: CitaBloque[] | null;
   figs: string[] | null;
+  warn?: string | null;
 }
 
 interface Candidata {
@@ -361,6 +362,8 @@ Deno.serve(async (request: Request) => {
       return fallo(e.message, e.code, e.status);
     }
     const m = mensajeDe(e);
+    // Al log del contenedor (docker logs): el mensaje, el código de la base y el tiempo, para diagnosticar sin adivinar.
+    console.error(`[pilo-publica] ${accion} falló tras ${Date.now() - inicio} ms:`, m, (e as { code?: string; details?: string; hint?: string })?.code ?? "", (e as { details?: string })?.details ?? "", (e as { hint?: string })?.hint ?? "");
     await bitacora(detalle, guardados, fallidos, m);
     return faltaMigracion(e as { code?: string; message?: string }) ? json(MIGRACION, 503) : fallo(m, "interno", 500);
   };
@@ -392,7 +395,7 @@ Deno.serve(async (request: Request) => {
 
   const cargarBloques = (kinds?: string[]) =>
     todas<FilaBloque>((a, b) => {
-      let q = admin.from("pp_bloques").select("id, kind, sec, pos, origin, enabled, spec, heading_es, heading_en, text_es, text_en, sources, figs").eq("informe_id", informeId);
+      let q = admin.from("pp_bloques").select("id, kind, sec, pos, origin, enabled, spec, heading_es, heading_en, text_es, text_en, sources, figs, warn").eq("informe_id", informeId);
       if (kinds) q = q.in("kind", kinds);
       return q.order("pos").range(a, b);
     });
@@ -964,7 +967,7 @@ Deno.serve(async (request: Request) => {
         const w = await admin.from("pp_bloques").insert(filas, { defaultToNull: false });
         if (w.error) throw w.error;
       }
-      await bitacora({ kpis: t.kpis.length, graficos: t.graficos.length, descartados: t.descartados.length }, filas.length, t.descartados.length, null);
+      await bitacora({ kpis: t.kpis.length, graficos: t.graficos.length, descartados: t.descartados.length, motivos: t.descartados.map((d) => d.motivo.slice(0, 220)).slice(0, 8) }, filas.length, t.descartados.length, null);
       return json({ ok: true, kpis: t.kpis.length, graficos: t.graficos.length, descartados: t.descartados });
     } catch (e) {
       return alto(e);
@@ -1000,7 +1003,8 @@ Deno.serve(async (request: Request) => {
 
       if (sec === "portada") {
         if ((informe.title_es.trim() || informe.lead_es.trim()) && !cuerpo.rehacer) return fallo("La portada ya tiene título o entrada: usa «rehacer» para que Pilo la escriba de nuevo.", "ya_hecho", 409);
-        const base = bloques.filter((b) => b.kind === "texto" && b.enabled && b.text_es.trim());
+        // Los ejes encendidos y los borradores sin verificar de Pilo (apagados, con aviso): la portada se apoya en lo escrito.
+        const base = bloques.filter((b) => b.kind === "texto" && b.text_es.trim() && (b.enabled || (b.origin === "pilo" && String(b.warn ?? "").startsWith("SIN VERIFICAR"))));
         if (!base.length) return fallo("Primero redacta los ejes: la portada se escribe a partir de ellos.", "sin_ejes", 409);
         const notas: NotaInforme[] = base.map((b) => ({ id: b.id, title: b.heading_es || "Bloque", body: b.text_es }));
         const usadas = new Set(bloques.flatMap((b) => [...(b.figs ?? []), String(b.spec?.cifra ?? "")]));
@@ -1013,7 +1017,7 @@ Deno.serve(async (request: Request) => {
         });
         if (!r.ok) {
           fallos.push({ refs: ["portada"], motivo: r.error });
-          await bitacora({ sec, escritos: 0, fallos: 1 }, 0, 1, r.error);
+          await bitacora({ sec, escritos: 0, fallos: 1, motivos: [r.error.slice(0, 220)] }, 0, 1, r.error);
           return json({ ok: true, escritos: 0, quedan: 0, fallos, sin_usar: sinUsar(0) });
         }
         let q = admin.from("pp_informes").update({ title_es: r.valor.title_es, title_en: r.valor.title_en, lead_es: r.valor.lead_es, lead_en: r.valor.lead_en, updated_by: actor }).eq("id", informeId).neq("state", "publicado");
@@ -1129,15 +1133,34 @@ Deno.serve(async (request: Request) => {
         if (!trabajo) break;
         const grupo = trabajo.grupo.map((r) => textoDe.get(r)!).filter(Boolean);
         const sub = libroDe(trabajo.grupo);
+        // El último texto con buena forma, aunque no pase la verificación: si no pasa, queda como borrador apagado y marcado.
+        const ultimo: { v: Eje | null } = { v: null };
         const r = await llamarVerificado<Eje>(mensajesEje(unidad, informe.ranking, voz, inds, grupo, sub, trabajo.pista), 1600, (crudo) => {
           const l = leerEje(crudo, grupo, inds);
           if (!l.ok) return l;
+          ultimo.v = l.valor;
           const v = verificarEje(l.valor, grupo, porKey, { exigir: trabajo!.grupo, fijos });
           if (!v.ok) return { ok: false, error: v.error ?? "No pasó la verificación." };
           return { ok: true, valor: { ...l.valor, warn: v.warn } };
         });
         if (!r.ok) {
           fallos.push({ refs: trabajo.grupo, motivo: r.error });
+          if (!bloqueId && ultimo.v) {
+            // Borrador: NO se publica solo. Queda apagado y con el aviso «SIN VERIFICAR» y el motivo, para que una persona lo revise, lo corrija y lo encienda.
+            const b = ultimo.v;
+            const aviso = `SIN VERIFICAR: ${r.error}`.slice(0, 500);
+            const spec = { indicator: b.indicator };
+            const w = await admin
+              .from("pp_bloques")
+              .insert({ informe_id: informeId, kind: "texto", sec: SECCIONES.texto, pos: trabajo.pos, origin: "pilo", enabled: false, spec, heading_es: b.heading_es, heading_en: b.heading_en, text_es: b.text_es, text_en: b.text_en, orig_es: b.text_es, orig_en: b.text_en, sources: b.sources, figs: b.figs, warn: aviso })
+              .select("id")
+              .single();
+            if (w.error) throw w.error;
+            ids.push(w.data.id);
+            bloques.push({ id: w.data.id, kind: "texto", sec: SECCIONES.texto, pos: trabajo.pos, origin: "pilo", enabled: false, spec, heading_es: b.heading_es, heading_en: b.heading_en, text_es: b.text_es, text_en: b.text_en, sources: b.sources, figs: b.figs });
+            escritos++;
+            continue;
+          }
           if (!bloqueId) {
             // No se descarta en silencio: la fuente queda marcada con el motivo, para una persona.
             for (const f of fuentes.filter((x) => trabajo!.grupo.includes(x.ref))) {
@@ -1173,7 +1196,7 @@ Deno.serve(async (request: Request) => {
         escritos++;
       }
       const quedan = trabajosEje(pendientes, citadas(), fallidas()).length;
-      await bitacora({ sec, escritos, fallos: fallos.length, quedan }, escritos, fallos.length, null);
+      await bitacora({ sec, escritos, fallos: fallos.length, quedan, motivos: fallos.map((f) => f.motivo.slice(0, 220)).slice(0, 6) }, escritos, fallos.length, null);
       return json({ ok: true, escritos, quedan, fallos, sin_usar: sinUsar(quedan), bloques: ids, ...(avisos.length ? { avisos } : {}) });
     } catch (e) {
       return alto(e, { sec, escritos }, escritos, fallos.length);

@@ -271,6 +271,16 @@ function EjeEditor({
         </ul>
       )}
 
+      {(b.warn ?? "").startsWith("SIN VERIFICAR") && (
+        <div className="pp-aviso-caja pp-aviso-caja--warn" role="status">
+          <strong>Borrador sin verificar</strong>
+          <p>Pilo escribió este texto, pero no pasó la verificación de citas y cifras. Corrígelo con las fuentes y, cuando esté bien, quita el aviso.</p>
+          <button type="button" className="pp-btn pp-btn--sm" onClick={() => guardar({ warn: null, enabled: true })}>
+            Ya lo revisé: quitar el aviso y mostrarlo
+          </button>
+        </div>
+      )}
+
       <div className="pp-dos">
         <Campo etiqueta="Título del eje (español)" valor={b.heading_es} lang="es" onGuardar={(v) => guardar({ heading_es: v })} />
         <Campo etiqueta="Título del eje (inglés)" valor={b.heading_en} lang="en" onGuardar={(v) => guardar({ heading_en: v })} />

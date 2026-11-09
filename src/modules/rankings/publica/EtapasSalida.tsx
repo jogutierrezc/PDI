@@ -228,6 +228,7 @@ export function EtapaPublicar(p: EtapaProps) {
     { ok: graficos.length > 0 && graficosMal.length === 0, t: graficos.length ? `${graficos.length} gráficos${graficosMal.length ? ` (${graficosMal.length} sin datos)` : ""}` : "Al menos un gráfico con datos", bloquea: true },
     { ok: ejes.length > 0, t: `${ejes.length} ejes narrativos visibles`, bloquea: true },
     { ok: sinCita.length === 0, t: sinCita.length ? `${sinCita.length} ejes sin cita o sin texto` : "Todos los ejes tienen cita", bloquea: true },
+    { ok: !ejes.some((b) => (b.warn ?? "").startsWith("SIN VERIFICAR")), t: ejes.some((b) => (b.warn ?? "").startsWith("SIN VERIFICAR")) ? "Hay ejes marcados «SIN VERIFICAR»: revisa las citas y las cifras y borra el aviso antes de publicar" : "Ningún eje está sin verificar", bloquea: true },
     { ok: cifrasMal.length === 0, t: cifrasMal.length ? `${cifrasMal.length} ejes citan cifras que no están en el libro` : "Las cifras del texto están en el libro", bloquea: true },
     { ok: alertas === 0, t: alertas ? `${alertas} ejes tienen números sin enlazar a cifras del libro: revísalos` : "Los números del texto están enlazados al libro", bloquea: false },
     { ok: sinIngles === 0, t: sinIngles ? `Falta inglés en ${sinIngles} partes: el informe en inglés mostrará el español en ellas` : "Todo está traducido al inglés", bloquea: false },

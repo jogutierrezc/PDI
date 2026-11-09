@@ -149,7 +149,8 @@ export function leerTablero(crudo: string, libro: Pick<CifraLibro, "key" | "labe
         motivo = `la cifra «${key}» está dos veces`;
         break;
       }
-      if (chart === "donut") {
+      // Donut y barras: «x» es el nombre corto del punto (una porción, o una medida comparada con otras de la misma unidad).
+      if (chart === "donut" || chart === "bar") {
         puntos.push({ x: limpio(p.x, 60) || c.label.slice(0, 60), cifra: key });
         continue;
       }

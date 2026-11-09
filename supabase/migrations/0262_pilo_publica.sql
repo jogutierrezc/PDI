@@ -198,15 +198,28 @@ grant select (id, ranking, unit_key, edition, state, settings, title_es, title_e
 grant select (id, informe_id, kind, sec, pos, origin, spec, heading_es, heading_en, text_es, text_en, figs, enabled, updated_at) on public.pp_bloques to anon;
 
 -- Las cifras que un informe publicado muestra, resueltas: una función en lugar de abrir el libro entero.
--- Devuelve solo las cifras citadas por bloques activos de un informe publicado.
+-- Devuelve solo las cifras citadas por bloques activos de un informe publicado, con un subconjunto SEGURO de su
+-- procedencia (explicación, tabla, oficina, periodo, desglose, indicador; nunca la cita, el enlace ni la fórmula).
+-- Esta es la versión final (la misma de 0264): se borra antes para poder aplicar 0262 y 0264 en cualquier orden y repetirlas.
+drop function if exists public.pp_cifras_publicas(uuid);
+
 create or replace function public.pp_cifras_publicas(p_informe uuid)
-returns table (key text, label text, label_en text, unit text, year int, value numeric)
+returns table (key text, label text, label_en text, unit text, year int, value numeric, source jsonb)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select c.key, c.label, c.label_en, c.unit, c.year, c.value
+  select c.key, c.label, c.label_en, c.unit, c.year, c.value,
+         jsonb_strip_nulls(jsonb_build_object(
+           'descripcion',    c.source -> 'descripcion',
+           'descripcion_en', c.source -> 'descripcion_en',
+           'tabla',          c.source -> 'tabla',
+           'oficina',        c.source -> 'oficina',
+           'periodo',        c.source -> 'periodo',
+           'desglose',       c.source -> 'desglose',
+           'indicador',      c.source -> 'indicador'
+         )) as source
     from public.pp_cifras c
     join public.pp_informes i on i.id = c.informe_id
    where c.informe_id = p_informe

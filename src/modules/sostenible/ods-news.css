@@ -17,6 +17,8 @@
 
 /* La pista: alineada con el contenido a la izquierda, sangra por la derecha. */
 .osn-track {
+  /* Contenedor de los textos ocultos (position:absolute): sin esto escapaban del recorte y la página ganaba ~9.000 px de ancho. */
+  position: relative;
   --osn-pad: max(16px, calc((100% - 1180px) / 2));
   display: flex;
   gap: clamp(16px, 2vw, 28px);

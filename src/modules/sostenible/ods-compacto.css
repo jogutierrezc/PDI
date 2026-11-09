@@ -1,0 +1,184 @@
+/* =============================================================================
+   Informe ODS · tipografía de informe (compacta).
+
+   Se carga AL FINAL, después de ods-report.css, ods-pilo.css y ods-news.css, y
+   sobrescribe solo tamaños, pesos, alineación y espacios. Los colores, la rejilla
+   y las animaciones siguen siendo los del cartel.
+
+   Las cuatro medidas pedidas son variables: se cambian aquí y en ningún otro sitio.
+     --odsc-titulo   11 pt  títulos (portada, secciones, ejes, notas)
+     --odsc-cuerpo   10 pt  cuerpo del texto
+     --odsc-fig       8 pt  títulos de figuras y rótulos de cifras
+     --odsc-sub       7 pt  subcontenido (descripciones, fuentes, notas, pies)
+   Son puntos tipográficos (1 pt = 1,333 px): 11 pt ≈ 14,7 px, 10 pt ≈ 13,3 px,
+   8 pt ≈ 10,7 px y 7 pt ≈ 9,3 px.
+
+   Texto justificado con guiones en títulos y cuerpo (la última línea queda a la
+   izquierda para que un título corto no se estire). Negrilla de 700 en lugar de 800.
+   ========================================================================== */
+
+.odsx .ors {
+  --odsc-titulo: 11pt;
+  --odsc-cuerpo: 10pt;
+  --odsc-fig: 8pt;
+  --odsc-sub: 7pt;
+  /* Cifras grandes: siguen siendo lo más visible, pero ya no ocupan media pantalla. */
+  --odsc-num: clamp(26px, 2.4vw, 32px);
+  --odsc-pad: clamp(24px, 3vw, 40px);
+}
+
+/* --- Justificado y guiones en todo el informe ---------------------------------- */
+.odsx .ors :is(h1, h2, h3, p, li, dd, figcaption, .opi-thesis, .opi-sub, .osn-x) {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 7 3 3;
+  text-wrap: pretty;
+}
+.odsx .ors :is(h1, h2, h3, .opi-thesis, .opi-sub, .opi-quote, .ors-lede, .opi-just, .osn-x, .opi-fig__desc, .opi-fig__label, .opi-proj li, .opi-mfig > span) {
+  text-align: justify;
+  text-align-last: left;
+}
+
+/* --- Portada: más baja, título y entradilla de informe ---------------------------- */
+.odsx .ors .ors-hero { min-height: clamp(300px, 44svh, 400px); }
+.odsx .ors .ors-hero__text { grid-column: 1 / 8; padding-top: 24px; }
+.odsx .ors .ors-h1 {
+  max-width: none;
+  margin: 0 0 8px !important;
+  font-size: var(--odsc-titulo) !important;
+  font-stretch: 100%;
+  font-weight: 700;
+  line-height: 1.35 !important;
+  letter-spacing: 0;
+}
+/* La máscara de la animación recortaba el pie de las letras: se le da aire. */
+.odsx .ors .ors-mask { padding-bottom: 0.3em; margin-bottom: -0.3em; }
+.odsx .ors .ors-lede {
+  max-width: 62ch;
+  font-size: var(--odsc-cuerpo);
+  font-weight: 500;
+  line-height: 1.55;
+}
+.odsx .ors .ors-meta { margin-top: 14px; padding-top: 8px; gap: 8px 22px; }
+.odsx .ors .ors-meta dt { font-size: var(--odsc-sub); }
+.odsx .ors .ors-meta dd { font-size: var(--odsc-fig); font-weight: 700; }
+.odsx .ors .ors-hero__back,
+.odsx .ors .ors-ed a { font-size: var(--odsc-fig); }
+
+/* --- Pliegos: menos aire, mejor uso del ancho ----------------------------------------- */
+.odsx .ors .ors-sec { padding: var(--odsc-pad) 0; font-size: var(--odsc-cuerpo); line-height: 1.55; }
+.odsx .ors .opi .opi-sec { padding: var(--odsc-pad) 0; }
+.odsx .ors .opi .opi-top { padding-bottom: 12px; }
+.odsx .ors .opi .opi-eje { padding: clamp(20px, 2.4vw, 32px) 0; }
+.odsx .ors .opi .opi-eje:first-child { padding-top: var(--odsc-pad); }
+.odsx .ors .ors-note { margin-top: 20px; padding-top: 8px; font-size: var(--odsc-cuerpo); }
+.odsx .ors .ors-head { margin-bottom: 18px; gap: 8px; }
+
+/* --- Títulos de sección ------------------------------------------------------------ */
+.odsx .ors .opi-head { margin-bottom: 14px; padding-top: 8px; border-top-width: 2px; }
+.odsx .ors :is(.opi-h2, .ors-h2, .opi-next .opi-h2, .osn h2) {
+  max-width: none;
+  margin: 0;
+  font-size: var(--odsc-titulo);
+  font-stretch: 100%;
+  font-weight: 700;
+  line-height: 1.35 !important;
+  letter-spacing: 0;
+}
+.odsx .ors .opi-eje .opi-sub,
+.odsx .ors .opi-sub {
+  max-width: none;
+  margin: 0 0 6px;
+  border-top-width: 2px;
+  font-size: var(--odsc-titulo);
+  font-stretch: 100%;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+/* --- Tesis y cifras ----------------------------------------------------------------- */
+.odsx .ors .opi-thesis {
+  max-width: none;
+  margin: 0 0 16px;
+  font-size: var(--odsc-titulo);
+  font-stretch: 100%;
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+.odsx .ors .opi-figs { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px 24px; }
+.odsx .ors .opi-fig { padding-top: 8px; border-top-width: 2px; }
+.odsx .ors :is(.opi-fig__big, .opd-big) { margin: 0 0 2px; font-size: var(--odsc-num) !important; line-height: 1; letter-spacing: -0.01em; }
+.odsx .ors .opi-cnt { font-size: inherit !important; font-stretch: 100%; font-weight: 700; }
+.odsx .ors .opi-fig__label { margin: 2px 0 4px; font-size: var(--odsc-fig); font-weight: 700; line-height: 1.35; }
+.odsx .ors :is(.opi-fig__desc, .opi-fig__src, .opi-fig__meta) { font-size: var(--odsc-sub); line-height: 1.45; }
+.odsx .ors :is(.opi-fig__desc, .opi-fig__label, .opi-fig__src) { max-width: none; }
+.odsx .ors .opi-fig__desc { margin: 0 0 4px; }
+.odsx .ors .opi-fig__src { margin: 0; }
+
+/* --- Relato (ejes): cuerpo de informe, citas y cifras al margen -------------------------- */
+.odsx .ors .opi { --opi-side: clamp(220px, 25vw, 300px); --opi-gap: clamp(20px, 3vw, 40px); }
+.odsx .ors .opi-story { max-width: none; font-size: var(--odsc-cuerpo); }
+.odsx .ors .opi-p { max-width: 92ch; margin: 0 0 0.9em; color: #23302a; font-size: var(--odsc-cuerpo); line-height: 1.55; }
+.odsx .ors :is(.opi-unit, .opi-just, .opi-story p) { font-size: var(--odsc-cuerpo); line-height: 1.55; }
+.odsx .ors .opi-quote {
+  max-width: none;
+  margin: 10px 0 12px;
+  padding-left: 12px;
+  border-left-width: 3px;
+  font-size: var(--odsc-titulo);
+  font-stretch: 100%;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.odsx .ors .opi-mfig { padding-top: 6px; border-top-width: 2px; }
+.odsx .ors .opi-mfig b { font-size: var(--odsc-num); font-stretch: 100%; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+.odsx .ors .opi-mfig > span { font-size: var(--odsc-fig); font-weight: 600; line-height: 1.35; }
+.odsx .ors .opi-mfig em { font-size: var(--odsc-sub); }
+.odsx .ors .opi-refs { font-size: 0.7em; }
+.odsx .ors .opi figcaption { margin-top: 4px; font-size: var(--odsc-sub); line-height: 1.4; }
+.odsx .ors .opi-proj li { padding: 8px 0 10px; font-size: var(--odsc-cuerpo); line-height: 1.5; }
+.odsx .ors .opi-proj b { font-size: var(--odsc-titulo); font-stretch: 100%; font-weight: 700; line-height: 1.3; }
+.odsx .ors .opi-reg__t { font-size: var(--odsc-cuerpo); }
+.odsx .ors .opi-reg__t th { font-size: var(--odsc-sub); }
+.odsx .ors .opi-reg__num b { font-size: var(--odsc-fig); }
+.odsx .ors .opi-reg__num span { font-size: var(--odsc-sub); }
+
+/* --- Datos: gráficos pequeños y con más columnas ------------------------------------------ */
+.odsx .ors .opd-grid-all { grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 22px 28px; }
+.odsx .ors .opd-grid-all--uno { grid-template-columns: minmax(0, 560px); }
+.odsx .ors .opd { padding-top: 8px; border-top-width: 2px; }
+.odsx .ors .opd-title { margin: 0 0 2px; font-size: var(--odsc-fig); font-stretch: 100%; font-weight: 700; line-height: 1.3; letter-spacing: 0; }
+.odsx .ors .opd-note,
+.odsx .ors .opd-big__x,
+.odsx .ors .opd-src { font-size: var(--odsc-sub); line-height: 1.4; }
+.odsx .ors .opd-big small { font-size: 0.55em; }
+.odsx .ors .opd-svg { margin-top: 4px; }
+/* El SVG se escala con su ancho (≈1,4× con dos gráficos por fila): estas son unidades del dibujo, para que se lea como 7 u 8 pt. */
+.odsx .ors .opd-t-s { font-size: 6.6px; }
+.odsx .ors .opd-t-v { font-size: 7.4px; }
+.odsx .ors .opd-t-c { font-size: 12px; }
+/* Títulos y rótulos de figuras: a la izquierda (justificar dos palabras las estira). */
+.odsx .ors .opd-title { text-align: left; }
+
+/* Grupos de gráficos con la misma fuente: una sola línea de fuente al pie del grupo. */
+.odsx .ors .opd-grupo + .opd-grupo { margin-top: 26px; }
+.odsx .ors .opd-src--grupo { margin: 10px 0 0; padding-top: 6px; border-top: 1px solid var(--ors-rule); text-align: left; }
+
+/* --- Noticias --------------------------------------------------------------------------------- */
+.odsx .ors .osn { padding: var(--odsc-pad) 0; }
+.odsx .ors .osn-card h3 { margin: 0 0 4px; font-size: var(--odsc-titulo); font-stretch: 100%; font-weight: 700; line-height: 1.3; letter-spacing: 0; }
+.odsx .ors .osn-x { font-size: var(--odsc-cuerpo); line-height: 1.5; -webkit-line-clamp: 4; line-clamp: 4; }
+.odsx .ors .osn-meta { margin: 8px 0 3px !important; font-size: var(--odsc-sub); }
+.odsx .ors .osn-more { font-size: var(--odsc-fig); }
+.odsx .ors .osn-count { font-size: var(--odsc-sub); }
+
+@media (max-width: 720px) {
+  /* En el teléfono el dibujo casi no se escala (≈0,8×): el texto del SVG sube para seguir legible. */
+  .odsx .ors .opd-t-s { font-size: 10px; }
+  .odsx .ors .opd-t-v { font-size: 11px; }
+  .odsx .ors .opd-t-c { font-size: 16px; }
+  .odsx .ors .ors-hero { min-height: 0; }
+  .odsx .ors .ors-hero__text { grid-column: 1 / -1; }
+}

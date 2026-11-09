@@ -301,11 +301,13 @@ export function OdsPiloCuerpo({
         const tl = gsap.timeline({ defaults: { ease: "power3.out" }, scrollTrigger: { trigger: fig, start: "top 85%", once: true } });
         const ln = fig.querySelector(".opd-ln");
         const br = fig.querySelectorAll(".opd-br");
+        const bh = fig.querySelectorAll(".opd-bh");
         const dn = fig.querySelector<SVGElement>(".opd-dn");
         const dt = fig.querySelectorAll(".opd-dt");
         const lv = fig.querySelectorAll(".opd-lv");
         if (ln) tl.fromTo(ln, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1, ease: "power2.inOut", clearProps: "strokeDashoffset" }, 0);
         if (br.length) tl.from(br, { scaleY: 0, transformOrigin: "50% 100%", duration: 0.7, stagger: 0.07, clearProps: "transform" }, 0);
+        if (bh.length) tl.from(bh, { scaleX: 0, transformOrigin: "0% 50%", duration: 0.7, stagger: 0.07, clearProps: "transform" }, 0);
         if (dn) tl.fromTo(dn, { strokeDasharray: "0 100" }, { strokeDasharray: `${Number(dn.dataset.v) || 0} 100`, duration: 1.1, ease: "power2.inOut", clearProps: "strokeDasharray" }, 0);
         if (dt.length) tl.from(dt, { scale: 0, transformOrigin: "50% 50%", duration: 0.35, stagger: 0.12, clearProps: "transform" }, 0.35);
         if (lv.length) tl.from(lv, { opacity: 0, duration: 0.4, clearProps: "opacity" }, 0.7);

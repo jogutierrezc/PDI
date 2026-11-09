@@ -57,6 +57,7 @@ import { OdsArtStrip, odsArtSize, odsOn, odsTone } from "./OdsArt";
 import type { Lang } from "./OdsReportParts";
 import { reduced } from "./widgets";
 import "./ods-report.css";
+import "./ods-compacto.css";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 

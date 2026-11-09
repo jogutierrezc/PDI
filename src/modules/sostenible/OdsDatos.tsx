@@ -24,19 +24,134 @@ const DER = 10;
 const ARR = 24;
 const ABA = 28;
 
-/** Un tope «redondo» para el eje. */
-function bonito(v: number): number {
-  if (!(v > 0)) return 1;
-  const p = Math.pow(10, Math.floor(Math.log10(v)));
-  const m = v / p;
-  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p;
+/** Las marcas del eje: pasos «redondos» (1, 2, 2,5, 5, 10 × 10ⁿ), nunca 3,3 ni 1.666,7. */
+function escala(minV: number, maxV: number): { min: number; max: number; marcas: number[] } {
+  const alto = maxV > minV ? maxV : minV + 1;
+  const crudo = (alto - Math.min(0, minV)) / 4;
+  const p = Math.pow(10, Math.floor(Math.log10(crudo)));
+  const m = crudo / p;
+  const paso = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  const min = minV < 0 ? Math.floor(minV / paso) * paso : 0;
+  const max = Math.ceil(alto / paso - 1e-9) * paso;
+  const marcas: number[] = [];
+  for (let v = min; v <= max + paso / 2; v += paso) marcas.push(Number(v.toFixed(6)));
+  return { min, max, marcas };
+}
+
+/** ¿Los puntos son periodos (años)? Si no, son categorías y una línea no tiene sentido. */
+const esTemporal = (g: GraficoPub) => g.puntos.length > 0 && g.puntos.every((p) => /^(19|20)\d{2}(?!\d)/.test(String(p.x).trim()));
+
+/** Comparación entre categorías (no entre años): se dibuja en barras horizontales, donde las etiquetas nunca se cruzan. */
+const esCategorias = (g: GraficoPub) => g.tipo !== "donut" && !esTemporal(g);
+const altoHorizontal = (n: number) => 16 + n * 30;
+
+/** Parte una etiqueta larga en hasta 2 renglones de `max` caracteres. */
+function partir(texto: string, max: number): string[] {
+  const t = String(texto).trim();
+  if (t.length <= max) return [t];
+  const pal = t.split(/\s+/);
+  let a = "";
+  let i = 0;
+  while (i < pal.length && (a + " " + pal[i]).trim().length <= max) a = (a + " " + pal[i++]).trim();
+  let b = pal.slice(i).join(" ");
+  if (!a) {
+    a = t.slice(0, max);
+    b = t.slice(max);
+  }
+  if (b.length > max) b = b.slice(0, Math.max(1, max - 1)).trimEnd() + "…";
+  return [a, b];
+}
+
+/** El nombre de una fuente en palabras de persona: nunca el nombre de una tabla de la base. */
+const TABLAS: [RegExp, string, string][] = [
+  [/^od_|^imp_/, "UDES en Cifras", "UDES in Figures"],
+  [/^ranking_(responses|indicators|evidence|assignments|cycles)/, "Reporte de las oficinas de la UDES", "UDES offices' report"],
+  [/^ranking_biblioteca/, "Biblioteca de evidencias de la UDES", "UDES evidence library"],
+  [/^ds_/, "Datos de Sostenibilidad de la UDES", "UDES Sustainability Data"],
+  [/^ugm_/, "UI GreenMetric (reporte de la UDES)", "UI GreenMetric (UDES report)"],
+  [/^news_/, "Noticias de la UDES", "UDES news"],
+  [/^wh_|^warehouse/, "Registros académicos de la UDES", "UDES academic records"],
+];
+function legible(texto: string, lang: Lang): string {
+  return String(texto)
+    .split(/\s*[;,]\s*/)
+    .map((t) => {
+      const k = t.trim();
+      if (!k) return "";
+      if (/^[a-z][a-z0-9_]*$/.test(k)) {
+        const hit = TABLAS.find(([re]) => re.test(k));
+        return hit ? (lang === "en" ? hit[2] : hit[1]) : k.replace(/_/g, " ");
+      }
+      return k;
+    })
+    .filter((t, i, a) => t && a.indexOf(t) === i)
+    .join("; ");
 }
 
 const dec = (v: number) => Math.min(2, (String(v).split(".")[1] ?? "").length);
 const num = (v: number, lang: Lang) => fmtN(v, lang, dec(v));
 
-function Trazo({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
+/** Barras horizontales: el nombre a la izquierda (hasta 2 renglones), la barra y su valor al final. */
+function Horizontal({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
   const puntos = g.puntos;
+  const n = puntos.length;
+  const validos = puntos.filter((p) => p.v !== null) as (typeof puntos[number] & { v: number })[];
+  const esc = escala(Math.min(0, ...validos.map((p) => p.v)), Math.max(...validos.map((p) => p.v)));
+  const etiqW = 150;
+  const x0 = etiqW + 10;
+  const x1 = W - 54;
+  const rango = esc.max - esc.min || 1;
+  const X = (v: number) => x0 + ((x1 - x0) * (v - esc.min)) / rango;
+  const alto = altoHorizontal(n);
+  const fila = (alto - 16) / n;
+  const mayor = validos.reduce((a, p) => (p.v > a ? p.v : a), -Infinity);
+  const sfx = pct ? " %" : "";
+  return (
+    <>
+      {esc.marcas.map((v, k) => (
+        <line key={k} x1={X(v)} x2={X(v)} y1={4} y2={alto - 12} className="opd-grid" />
+      ))}
+      {puntos.map((p, i) => {
+        const yc = 8 + fila * (i + 0.5);
+        const lineas = partir(String(p.x), 30);
+        const h = Math.min(14, fila * 0.55);
+        return (
+          <g key={p.key + p.x}>
+            <text x={etiqW} y={yc - ((lineas.length - 1) * 4) + 2.5} textAnchor="end" className="opd-t-s">
+              <title>{String(p.x)}</title>
+              {lineas.map((l, j) => (
+                <tspan key={j} x={etiqW} dy={j === 0 ? 0 : 8.5}>
+                  {l}
+                </tspan>
+              ))}
+            </text>
+            {p.v === null ? (
+              <text x={x0 + 4} y={yc + 2.5} className="opd-t-s">
+                {lang === "en" ? "n/a" : "s/d"}
+              </text>
+            ) : (
+              <>
+                <rect className="opd-bh" x={Math.min(X(p.v), X(Math.max(0, esc.min)))} y={yc - h / 2} width={Math.max(1, Math.abs(X(p.v) - X(Math.max(0, esc.min))))} height={h} style={{ fill: "var(--ors-deep)", opacity: p.v === mayor ? 1 : 0.42, transformBox: "fill-box", transformOrigin: "0% 50%" }} />
+                <text className="opd-lv opd-t-v" x={Math.max(X(p.v), X(Math.max(0, esc.min))) + 5} y={yc + 2.6}>
+                  {num(p.v, lang)}
+                  {sfx}
+                </text>
+              </>
+            )}
+          </g>
+        );
+      })}
+      <line x1={X(Math.max(0, esc.min))} x2={X(Math.max(0, esc.min))} y1={4} y2={alto - 12} stroke="currentColor" strokeWidth={1} style={{ stroke: "var(--ors-rule)" }} />
+    </>
+  );
+}
+
+function Trazo({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
+  if (esCategorias(g)) return <Horizontal g={g} lang={lang} pct={pct} />;
+  const puntos = g.puntos;
+  /* Una línea solo une periodos: con categorías se dibujan barras. */
+  const tipo = g.tipo === "line" && !esTemporal(g) ? "bar" : g.tipo;
+  const categorias = tipo === "bar" && !esTemporal(g);
   const validos = puntos.filter((p) => p.v !== null) as (typeof puntos[number] & { v: number })[];
   const sfx = pct ? " %" : "";
   const n = puntos.length;
@@ -45,7 +160,7 @@ function Trazo({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
   const paso = Math.ceil(n / 6);
   const rotula = (i: number) => (n - 1 - i) % paso === 0;
 
-  if (g.tipo === "donut") {
+  if (tipo === "donut") {
     const ult = validos[validos.length - 1];
     const v = Math.max(0, Math.min(100, ult.v));
     const cx = W / 2;
@@ -62,29 +177,39 @@ function Trazo({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
   }
 
   const pw = W - IZQ - DER;
-  const ph = H - ARR - ABA;
-  const mn = Math.min(0, ...validos.map((p) => p.v));
-  const mx = bonito(Math.max(...validos.map((p) => p.v)) * 1.05) || 1;
+  /* Etiquetas largas (categorías): hasta 2 renglones, a lo ancho de su hueco. */
+  const maxCar = Math.max(6, Math.floor(pw / n / 5.6));
+  const partes = puntos.map((p) => (categorias ? partir(String(p.x), maxCar) : [String(p.x)]));
+  const renglones = Math.max(1, ...partes.map((x) => x.length));
+  const aba = ABA + (renglones - 1) * 13;
+  const ph = H - ARR - aba;
+  const esc = escala(Math.min(0, ...validos.map((p) => p.v)), Math.max(...validos.map((p) => p.v)));
+  const mn = esc.min;
+  const mx = esc.max;
   const rango = mx - mn || 1;
   const X = (i: number) => IZQ + (pw * (i + 0.5)) / n;
   const Y = (v: number) => ARR + ph * (1 - (v - mn) / rango);
 
-  const rejilla = [0, 1, 2, 3].map((k) => {
-    const v = mn + (rango * k) / 3;
+  const rejilla = esc.marcas.map((v, k) => {
     const y = Y(v);
     return (
       <g key={k}>
         <line x1={IZQ} x2={W - DER} y1={y} y2={y} className="opd-grid" />
         <text x={IZQ - 8} y={y + 4} textAnchor="end" className="opd-t-s">
-          {fmtN(Number(v.toFixed(1)), lang, dec(Number(v.toFixed(1))))}
+          {fmtN(v, lang, dec(v))}
         </text>
       </g>
     );
   });
   const ejeX = puntos.map((p, i) =>
-    rotula(i) ? (
-      <text key={p.key + p.x} x={X(i)} y={H - 8} textAnchor="middle" className="opd-t-s">
-        {p.x}
+    rotula(i) || categorias ? (
+      <text key={p.key + p.x} x={X(i)} y={H - 8 - (renglones - 1) * 13} textAnchor="middle" className="opd-t-s">
+        <title>{String(p.x)}</title>
+        {partes[i].map((l, j) => (
+          <tspan key={j} x={X(i)} dy={j === 0 ? 0 : 13}>
+            {l}
+          </tspan>
+        ))}
       </text>
     ) : null,
   );
@@ -99,7 +224,7 @@ function Trazo({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
     );
   };
 
-  if (g.tipo === "bar") {
+  if (tipo === "bar") {
     const bw = Math.min(40, (pw / n) * 0.5);
     const cero = Y(Math.max(0, mn));
     return (
@@ -123,7 +248,7 @@ function Trazo({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
           ),
         )}
         {ejeX}
-        {n <= 6 ? puntos.map((_, i) => etiqueta(i)) : etiqueta(ultimoIdx)}
+        {n <= 6 || categorias ? puntos.map((_, i) => etiqueta(i)) : etiqueta(ultimoIdx)}
       </>
     );
   }
@@ -153,11 +278,12 @@ function Trazo({ g, lang, pct }: { g: GraficoPub; lang: Lang; pct: boolean }) {
   );
 }
 
-function Dato({ g, lang, uid }: { g: GraficoPub; lang: Lang; uid: string }) {
+function Dato({ g, lang, uid, fuenteAparte }: { g: GraficoPub; lang: Lang; uid: string; fuenteAparte?: boolean }) {
   const pct = g.unidad.trim() === "%";
   const titulo = lang === "en" && g.titulo_en.trim() ? g.titulo_en : g.titulo;
   const tl = lang === "en" && g.titulo_en.trim() ? "en" : "es";
-  const fuente = lang === "en" ? g.fuente_en : g.fuente;
+  const fuente = legible(lang === "en" ? g.fuente_en || g.fuente : g.fuente, lang);
+  const temporal = esTemporal(g) || g.tipo === "donut";
   const sfx = pct ? " %" : "";
   const sin = tr(lang, "datos_sin");
   const ult = [...g.puntos].reverse().find((p) => p.v !== null);
@@ -173,14 +299,16 @@ function Dato({ g, lang, uid }: { g: GraficoPub; lang: Lang; uid: string }) {
         {titulo || "—"}
       </h3>
       {nota && <p className="opd-note">{nota}</p>}
-      <p className="opd-big" aria-hidden="true">
-        <span className="opi-cnt" data-to={ult.v} data-dec={dec(ult.v)} data-lang={lang}>
-          {num(ult.v, lang)}
-        </span>
-        {pct && <small>%</small>}
-        <span className="opd-big__x">{ult.x}</span>
-      </p>
-      <svg className="opd-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={alt} focusable="false">
+      {temporal && (
+        <p className="opd-big" aria-hidden="true">
+          <span className="opi-cnt" data-to={ult.v} data-dec={dec(ult.v)} data-lang={lang}>
+            {num(ult.v, lang)}
+          </span>
+          {pct && <small>%</small>}
+          <span className="opd-big__x">{ult.x}</span>
+        </p>
+      )}
+      <svg className="opd-svg" viewBox={`0 0 ${W} ${esCategorias(g) ? altoHorizontal(g.puntos.length) : H}`} role="img" aria-label={alt} focusable="false">
         <Trazo g={g} lang={lang} pct={pct} />
       </svg>
       <table className="opi-vh">
@@ -203,9 +331,11 @@ function Dato({ g, lang, uid }: { g: GraficoPub; lang: Lang; uid: string }) {
           ))}
         </tbody>
       </table>
-      <figcaption className="opd-src">
-        {tr(lang, "fuente")}: <span lang={lang}>{fuente || tr(lang, "datos_fuente_def")}</span>
-      </figcaption>
+      {!fuenteAparte && (
+        <figcaption className="opd-src">
+          {tr(lang, "fuente")}: <span lang={lang}>{fuente || tr(lang, "datos_fuente_def")}</span>
+        </figcaption>
+      )}
     </figure>
   );
 }
@@ -214,17 +344,35 @@ function Dato({ g, lang, uid }: { g: GraficoPub; lang: Lang; uid: string }) {
 export function OdsDatos({ graficos, lang, titular }: { graficos: GraficoPub[]; lang: Lang; titular: ReactNode }) {
   const con = graficos.filter((g) => g.puntos.some((p) => p.v !== null));
   if (!con.length) return null;
+  /* Agrupados por fuente: los gráficos que comparten fuente van juntos y la fuente se dice una sola vez. */
+  const fuenteDe = (g: GraficoPub) => legible(lang === "en" ? g.fuente_en || g.fuente : g.fuente, lang) || tr(lang, "datos_fuente_def");
+  const grupos: { fuente: string; items: { g: GraficoPub; i: number }[] }[] = [];
+  con.forEach((g, i) => {
+    const f = fuenteDe(g);
+    const grupo = grupos.find((x) => x.fuente === f);
+    if (grupo) grupo.items.push({ g, i });
+    else grupos.push({ fuente: f, items: [{ g, i }] });
+  });
   return (
     <section className="ors-sec ors-sec--white opi-sec" id="ors-datos" aria-labelledby="opi-datos-h">
       <div className="odsx-wrap">
         <header className="opi-head">
           {titular}
         </header>
-        <div className={`opd-grid-all${con.length === 1 ? " opd-grid-all--uno" : ""}`}>
-          {con.map((g, i) => (
-            <Dato key={g.id} g={g} lang={lang} uid={`opd-${i}`} />
-          ))}
-        </div>
+        {grupos.map((grupo) => (
+          <div className="opd-grupo" key={grupo.fuente}>
+            <div className={`opd-grid-all${grupo.items.length === 1 ? " opd-grid-all--uno" : ""}`}>
+              {grupo.items.map(({ g, i }) => (
+                <Dato key={g.id} g={g} lang={lang} uid={`opd-${i}`} fuenteAparte={grupo.items.length > 1} />
+              ))}
+            </div>
+            {grupo.items.length > 1 && (
+              <p className="opd-src opd-src--grupo">
+                {tr(lang, "fuente")}: <span lang={lang}>{grupo.fuente}</span>
+              </p>
+            )}
+          </div>
+        ))}
       </div>
     </section>
   );

@@ -61,6 +61,8 @@ export const FUENTES_POR_EJE = 5;
 export const FUENTES_POR_EJE_NORMAL = 3;
 /** «profundizar»: tope de fuentes de un eje reescrito. */
 export const FUENTES_POR_EJE_MAX = 8;
+/** Tope de ejes de un informe: un informe de 40 secciones casi iguales no lo lee nadie. */
+export const MAX_EJES = 12;
 
 const limpio = (v: unknown, max: number) =>
   String(v ?? "")
@@ -595,12 +597,27 @@ const ORDEN_KIND: Record<KindFuente, number> = { noticia: 0, indicador: 1, libro
  * ni falló antes, juntas por indicador probable, de a FUENTES_POR_EJE (un
  * documento va solo).
  */
-export function trabajosEje(pendientes: FuentePendiente[], citadas: Set<string>, fallidas: Set<string>, porEje: number = FUENTES_POR_EJE): { grupo: string[]; pista: string | null }[] {
+/** Cómo se consolidan los ejes: uno por indicador, y un tope de ejes por informe. */
+export interface Consolidacion {
+  /** Indicadores que ya tienen un eje (un bloque de texto). */
+  pistasUsadas: Set<string>;
+  /** Cuántos ejes hay ya. */
+  ejesHechos: number;
+  maxEjes: number;
+}
+
+export function trabajosEje(
+  pendientes: FuentePendiente[],
+  citadas: Set<string>,
+  fallidas: Set<string>,
+  porEje: number = FUENTES_POR_EJE,
+  consolidacion?: Consolidacion,
+): { grupo: string[]; pista: string | null }[] {
   // Los documentos de la biblioteca NO son base de redacción: un documento suelto (una metodología, una hoja de créditos)
   // no cuenta lo que hizo la UDES y la IA terminaba inventando la cita. Siguen alimentando el libro de cifras.
   const libres = pendientes
     .filter((p) => p.kind !== "documento" && !citadas.has(p.ref) && !fallidas.has(p.ref))
-    .sort((a, b) => (a.pista ?? "~").localeCompare(b.pista ?? "~") || ORDEN_KIND[a.kind] - ORDEN_KIND[b.kind] || a.fecha.localeCompare(b.fecha) || a.ref.localeCompare(b.ref));
+    .sort((a, b) => (a.pista ?? "~").localeCompare(b.pista ?? "~") || ORDEN_KIND[a.kind] - ORDEN_KIND[b.kind] || b.fecha.localeCompare(a.fecha) || a.ref.localeCompare(b.ref));
   const out: { grupo: string[]; pista: string | null }[] = [];
   let actual: { grupo: string[]; pista: string | null } | null = null;
   for (const p of libres) {
@@ -617,7 +634,18 @@ export function trabajosEje(pendientes: FuentePendiente[], citadas: Set<string>,
     actual.grupo.push(p.ref);
   }
   if (actual && actual.grupo.length) out.push(actual);
-  return out;
+  if (!consolidacion) return out;
+  // Un eje por indicador (con las fuentes más recientes) y un tope de ejes: las demás fuentes quedan como «sin usar».
+  // Antes cada grupo de 3 notas era un eje y 138 notas daban ~46 secciones casi iguales.
+  const vistos = new Set(consolidacion.pistasUsadas);
+  const unicos: { grupo: string[]; pista: string | null }[] = [];
+  for (const g of out) {
+    const clave = g.pista ?? "~";
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    unicos.push(g);
+  }
+  return unicos.slice(0, Math.max(0, consolidacion.maxEjes - consolidacion.ejesHechos));
 }
 
 /**

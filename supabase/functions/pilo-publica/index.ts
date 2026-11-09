@@ -86,6 +86,7 @@ import { aNumeroLibre, anioDePeriodo, armarLibro, conservarDescripciones, cortar
 import {
   formaEje,
   FUENTES_POR_EJE_MAX,
+  MAX_EJES,
   fuentesParaProfundizar,
   leerDescripciones,
   leerEje,
@@ -1455,6 +1456,8 @@ Deno.serve(async (request: Request) => {
       // Profundidad: «profunda» por defecto (5 fuentes, 4–6 párrafos, UN eje por llamada); «normal» = 3 fuentes, 2–3 párrafos.
       const profundidad: Profundidad = cuerpo.profundidad === "normal" ? "normal" : "profunda";
       const porEje = formaEje(profundidad, 0).fuentes;
+      /** Un eje por indicador y un tope de ejes (MAX_EJES): lo demás queda en «sin usar», con la noticia a la vista en el carrusel. */
+      const consolidar = () => ({ pistasUsadas: new Set(textos().map((b) => String(b.spec?.indicator ?? "")).filter(Boolean)), ejesHechos: textos().length, maxEjes: MAX_EJES });
       const bloqueId = cuerpo.block_id ? String(cuerpo.block_id) : null;
       const profundizar = Boolean(bloqueId && cuerpo.profundizar);
       const cuantos = bloqueId || profundidad === "profunda" ? 1 : Math.max(1, Math.min(Math.max(2, destino.lote), Math.floor(Number(cuerpo.count) || 2)));
@@ -1482,7 +1485,7 @@ Deno.serve(async (request: Request) => {
           eraBorrador = !b.enabled && String(b.warn ?? "").startsWith("SIN VERIFICAR");
           trabajo = { grupo, pista, pos: b.pos };
         } else {
-          const t = trabajosEje(pendientes, citadas(), fallidas(), porEje)[0];
+          const t = trabajosEje(pendientes, citadas(), fallidas(), porEje, consolidar())[0];
           if (t) trabajo = { ...t, pos: siguientePos(SECCIONES.texto, bloques) };
         }
         if (!trabajo) break;
@@ -1563,7 +1566,7 @@ Deno.serve(async (request: Request) => {
         }
         escritos++;
       }
-      const quedan = trabajosEje(pendientes, citadas(), fallidas(), porEje).length;
+      const quedan = trabajosEje(pendientes, citadas(), fallidas(), porEje, consolidar()).length;
       await bitacora({ sec, profundidad, ...(profundizar ? { profundizar: true } : {}), escritos, fallos: fallos.length, quedan, motivos: fallos.map((f) => f.motivo.slice(0, 220)).slice(0, 6) }, escritos, fallos.length, null);
       return json({ ok: true, escritos, quedan, fallos, sin_usar: sinUsar(quedan), bloques: ids, ...(avisos.length ? { avisos } : {}) });
     } catch (e) {

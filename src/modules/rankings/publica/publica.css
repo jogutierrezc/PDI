@@ -2126,3 +2126,129 @@
 .pp-fila--img {
   flex-wrap: wrap;
 }
+
+/* Fuentes: un solo panel con filtros y una lista densa, en vez de una tarjeta por tipo. */
+.pp-fte {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.pp-fte__barra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.pp-fte__tipos,
+.pp-fte__herr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pp-fte__tipo {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+.pp-fte__tipo b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+}
+.pp-fte__tipo[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
+}
+.pp-fte__tipo[aria-pressed="true"] b {
+  color: inherit;
+}
+.pp-fte__buscar {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.pp-fte__estado {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  background: var(--surface);
+}
+.pp-fte__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+.pp-fte__fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px var(--space-4);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.pp-fte__fila:last-child {
+  border-bottom: 0;
+}
+.pp-fte__fila.is-off .pp-fte__t {
+  color: var(--ink-secondary);
+}
+.pp-fte__t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+.pp-fte__meta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+.pp-fte__vacio,
+.pp-fte__pie {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+}
+.pp-fte__pie {
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 640px) {
+  .pp-fte__fila {
+    flex-wrap: wrap;
+  }
+  .pp-fte__t {
+    flex-basis: calc(100% - 90px);
+    white-space: normal;
+  }
+  .pp-fte__meta {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}

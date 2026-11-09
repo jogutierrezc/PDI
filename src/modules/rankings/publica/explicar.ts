@@ -194,6 +194,24 @@ export function diagnosticar(tipo: TipoGrafico, cifras: CifraPP[]): Diagnostico 
     if (sinAnioN) errores.push("La línea necesita que cada cifra tenga año; hay cifras sin año.");
     const anios = cifras.map((c) => c.year).filter((y) => y !== null);
     if (new Set(anios).size !== anios.length) errores.push("Hay dos cifras del mismo año: la línea necesita un valor por año.");
+  } else if (tipo === "compare") {
+    if (cifras.length < 2) errores.push("«Antes y ahora» necesita al menos dos años de la misma medida.");
+    if (series.length > 1) errores.push("«Antes y ahora» es para una misma medida a través de los años. Estas cifras son de medidas distintas: usa barras o el mapa de calor.");
+    if (sinAnioN) errores.push("«Antes y ahora» necesita que cada cifra tenga año; hay cifras sin año.");
+    const anios = cifras.map((c) => c.year).filter((y) => y !== null);
+    if (new Set(anios).size !== anios.length) errores.push("Hay dos cifras del mismo año: hace falta un valor por año.");
+  } else if (tipo === "stack") {
+    if (cifras.length < 2) errores.push("La composición necesita al menos dos partes de un mismo total.");
+    if (new Set(cifras.map((c) => c.year)).size > 1) errores.push("Las partes de una composición deben ser del mismo año.");
+    if (cifras.some((c) => tieneValor(c) && Number(c.value) < 0)) errores.push("Una composición no admite valores negativos.");
+    if (cifras.length > 8) avisos.push("Más de 8 partes se leen mal: agrupa las menores en otra cifra.");
+    avisos.push("El % de cada parte se calcula sobre la suma de las cifras que elijas: elige todas las partes del total, no solo algunas.");
+  } else if (tipo === "heat") {
+    if (sinAnioN) errores.push("El mapa de calor necesita que cada cifra tenga año; hay cifras sin año.");
+    if (new Set(cifras.map((c) => c.year)).size < 2) errores.push("El mapa de calor necesita al menos dos años distintos.");
+    const celdas = cifras.map((c) => `${serieDe(c)}§${c.year}`);
+    if (new Set(celdas).size !== celdas.length) errores.push("Hay dos cifras de la misma medida y el mismo año: cada casilla lleva una sola.");
+    if (series.length > 12) avisos.push("Más de 12 filas se leen mal. Considera elegir menos medidas.");
   } else {
     if (cifras.length < 2) avisos.push("Una sola barra dice poco: suma otras cifras de la misma unidad.");
     if (series.length === 1 && sinAnioN) errores.push("Para barras de una misma medida, cada cifra necesita año.");
@@ -212,8 +230,8 @@ export function motivoIncompatible(tipo: TipoGrafico, elegidas: CifraPP[], c: Ci
   if (!elegidas.length) return tipo === "donut" && !esPct(c) ? "No es un porcentaje." : null;
   if (unidadNorm(elegidas[0].unit) !== unidadNorm(c.unit)) return `Otra unidad (${unidadTexto(c.unit)}; las elegidas son ${unidadTexto(elegidas[0].unit)}).`;
   if (tipo === "donut") return "El anillo muestra una sola cifra.";
-  if (tipo === "line") {
-    if (serieDe(c) !== serieDe(elegidas[0])) return "Es otra medida: la línea es de una sola medida a través de los años.";
+  if (tipo === "line" || tipo === "compare") {
+    if (serieDe(c) !== serieDe(elegidas[0])) return "Es otra medida: este gráfico es de una sola medida a través de los años.";
     if (c.year === null || elegidas.some((e) => e.year === c.year)) return "Ya hay una cifra de ese año (o no tiene año).";
   }
   return null;
@@ -266,7 +284,8 @@ export function tituloSugerido(tipo: TipoGrafico, cifras: CifraPP[]): { es: stri
 export function specDeCifras(tipo: TipoGrafico, cifras: CifraPP[], titulo?: { es: string; en: string }): SpecGrafico {
   const orden = [...cifras].sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
   const ordenadas = new Set(orden.map(serieDe)).size === 1 ? orden : cifras;
-  const x = etiquetasPuntos(ordenadas);
+  // El mapa de calor pone los años en las columnas: cada punto se rotula con su año y la fila sale de la medida.
+  const x = tipo === "heat" ? ordenadas.map((c) => String(c.year ?? "")) : etiquetasPuntos(ordenadas);
   const t = titulo ?? tituloSugerido(tipo, ordenadas);
   return { chart: tipo, series: ordenadas.map((c, i) => ({ x: x[i], cifra: c.key })), title_es: t.es, title_en: t.en };
 }

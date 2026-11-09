@@ -2252,3 +2252,10 @@
     white-space: normal;
   }
 }
+
+/* Gráfico con datos propios: filas de «nombre · valor · quitar». */
+.pp-filas { display: grid; gap: 6px; margin: 6px 0 10px; }
+.pp-filas__r { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pp-filas__r input { min-width: 0; }
+.pp-filas__enc { color: var(--ink-secondary); font-size: 0.8rem; font-weight: 600; }
+.pp-filas__enc > span:last-child { min-width: 4.5em; }

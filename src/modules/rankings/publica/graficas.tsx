@@ -8,6 +8,7 @@
    en reposo todo se ve completo.
    ========================================================================== */
 
+import { Visual, esVisual } from "../../sostenible/OdsVisuales";
 import { formato } from "./tipos";
 import type { Idioma, PuntoSerie, TipoGrafico } from "./tipos";
 
@@ -45,6 +46,9 @@ export function Grafica({ tipo, puntos, unidad, titulo, idioma, uid }: GraficaPr
   const sfx = pct ? " %" : "";
   const resumen = puntos.map((p) => `${p.x}: ${p.v === null ? (idioma === "en" ? "no data" : "sin dato") : formato(p.v, idioma) + sfx}`).join("; ");
   const alt = `${titulo}. ${resumen}`;
+
+  // Los visuales de UDES en Cifras (antes y ahora, composición, mapa de calor) son HTML y comparten el dibujo con el informe ODS.
+  if (esVisual(tipo)) return <Visual tipo={tipo} puntos={puntos} unidad={unidad} lang={idioma} fmt={(v) => formato(v, idioma)} />;
 
   const tabla = (
     <table className="pp-sr">

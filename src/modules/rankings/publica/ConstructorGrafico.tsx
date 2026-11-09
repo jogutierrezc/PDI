@@ -9,7 +9,7 @@ import { resolverSerie, varsAcento } from "./tipos";
 import type { CifraPP, CifraPub, SpecGrafico, TipoGrafico, UnidadPP } from "./tipos";
 import { ErrorAviso } from "./ui";
 
-export const NOMBRE_TIPO: Record<TipoGrafico, string> = { bar: "Barras", line: "Línea", donut: "Anillo" };
+export const NOMBRE_TIPO: Record<TipoGrafico, string> = { bar: "Barras", line: "Línea", donut: "Anillo", compare: "Antes y ahora", stack: "Composición", heat: "Mapa de calor" };
 
 const corto = (t: string, n = 150) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
@@ -77,7 +77,9 @@ export function ConstructorGrafico({
 
   const elegidas = claves.map((k) => porClave.get(k)).filter((c): c is CifraPP => Boolean(c));
   const tipoPorDefecto: TipoGrafico = modo === "pct" ? "donut" : modo === "comparar" ? "bar" : elegidas.length >= 3 ? "line" : "bar";
-  const tipo: TipoGrafico = modo === "pct" ? "donut" : modo === "comparar" ? "bar" : tipoElegido ?? tipoPorDefecto;
+  const tipo: TipoGrafico = modo === "pct" ? "donut" : tipoElegido ?? tipoPorDefecto;
+  /** Los tipos que ofrece cada modo: los básicos y los visuales de UDES en Cifras. */
+  const tiposDelModo: TipoGrafico[] = modo === "serie" ? ["line", "bar", "compare"] : modo === "comparar" ? ["bar", "stack", "heat"] : [];
 
   const cambiarModo = (m: Modo) => {
     setModo(m);
@@ -188,21 +190,27 @@ export function ConstructorGrafico({
                     </div>
                   </fieldset>
                 )}
-                {serie && (
-                  <div>
-                    <div className="pp-opt-t" id="pp-ctor-t">
-                      Tipo
-                    </div>
-                    <div className="pp-seg" role="group" aria-labelledby="pp-ctor-t">
-                      {(["line", "bar"] as TipoGrafico[]).map((t) => (
-                        <button key={t} type="button" aria-pressed={tipo === t} onClick={() => setTipoElegido(t)}>
-                          {NOMBRE_TIPO[t]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </>
+            )}
+
+            {(modo === "serie" ? Boolean(serie) : modo === "comparar" && Boolean(unidadSel)) && (
+              <div>
+                <div className="pp-opt-t" id="pp-ctor-t">
+                  Tipo
+                </div>
+                <div className="pp-seg" role="group" aria-labelledby="pp-ctor-t">
+                  {tiposDelModo.map((t) => (
+                    <button key={t} type="button" aria-pressed={tipo === t} onClick={() => setTipoElegido(t)}>
+                      {NOMBRE_TIPO[t]}
+                    </button>
+                  ))}
+                </div>
+                <p className="pp-nota">
+                  {tipo === "compare" && "Los años de una medida con su variación, como la evolución histórica de UDES en Cifras."}
+                  {tipo === "stack" && "Las partes de un mismo total del mismo año, en una barra al 100 %."}
+                  {tipo === "heat" && "Medidas en filas y años en columnas: elige varias medidas con sus años."}
+                </p>
+              </div>
             )}
 
             {modo === "comparar" && unidadSel && (
@@ -212,7 +220,7 @@ export function ConstructorGrafico({
                   .slice(0, 80)
                   .map((c) => {
                     const on = claves.includes(c.key);
-                    const motivo = on ? null : motivoIncompatible("bar", elegidas, c);
+                    const motivo = on ? null : motivoIncompatible(tipo, elegidas, c);
                     return (
                       <li key={c.key}>
                         <label className={`pp-opcion${motivo ? " pp-opcion--no" : ""}`}>

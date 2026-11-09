@@ -305,6 +305,18 @@ export function OdsPiloCuerpo({
         const dn = fig.querySelector<SVGElement>(".opd-dn");
         const dt = fig.querySelectorAll(".opd-dt");
         const lv = fig.querySelectorAll(".opd-lv");
+        /* Los visuales de UDES en Cifras: las barras se extienden desde la izquierda y las casillas del mapa se encienden en ola. */
+        const fl = fig.querySelectorAll(".ovz-fill");
+        const celdas = fig.querySelectorAll(".ovz-cell");
+        const tabla = fig.querySelector<HTMLElement>(".ovz-heat table");
+        const delta = fig.querySelector(".ovz-delta__n");
+        if (fl.length) tl.from(fl, { scaleX: 0, duration: 0.7, stagger: 0.08, clearProps: "transform" }, 0);
+        if (celdas.length) {
+          const filas = Number(tabla?.dataset.filas) || 1;
+          const cols = Number(tabla?.dataset.cols) || celdas.length;
+          tl.from(celdas, { opacity: 0, duration: 0.35, stagger: { each: 0.035, grid: [filas, cols], from: "start" }, clearProps: "opacity" }, 0);
+        }
+        if (delta) tl.from(delta, { y: 8, opacity: 0, duration: 0.45, clearProps: "opacity,transform" }, 0.5);
         if (ln) tl.fromTo(ln, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1, ease: "power2.inOut", clearProps: "strokeDashoffset" }, 0);
         if (br.length) tl.from(br, { scaleY: 0, transformOrigin: "50% 100%", duration: 0.7, stagger: 0.07, clearProps: "transform" }, 0);
         if (bh.length) tl.from(bh, { scaleX: 0, transformOrigin: "0% 50%", duration: 0.7, stagger: 0.07, clearProps: "transform" }, 0);

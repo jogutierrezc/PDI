@@ -13,7 +13,13 @@ export type RankingPP = "impact" | "world" | "green";
 export type Idioma = "es" | "en";
 export type EstadoInforme = "borrador" | "revision" | "publicado";
 export type Movimiento = "editorial" | "subtle" | "none";
-export type TipoGrafico = "bar" | "line" | "donut";
+/**
+ * bar · line · donut          los básicos.
+ * compare                     «antes y ahora»: los años de una medida con su variación (evolución histórica de UDES en Cifras).
+ * stack                       composición: las partes de un total en una barra al 100 % (desglose de UDES en Cifras).
+ * heat                        mapa de calor: medidas × años (el mapa de calor de UDES en Cifras).
+ */
+export type TipoGrafico = "bar" | "line" | "donut" | "compare" | "stack" | "heat";
 export type KindBloque = "kpi" | "grafico" | "texto" | "imagen";
 export type OrigenBloque = "pilo" | "persona" | "editado";
 export type KindFuente = "noticia" | "indicador" | "libro" | "documento" | "cifras";
@@ -290,7 +296,17 @@ export interface PuntoSerie {
   x: string;
   v: number | null;
   key: string;
+  /** La medida a la que pertenece (el nombre de la cifra sin su año): es la fila del mapa de calor. */
+  g?: string;
 }
+
+/** El nombre de una cifra sin el año que lleva al final o entre paréntesis. */
+const medidaDe = (t: string): string =>
+  t
+    .replace(/\s*[(\[]\s*(19|20)\d{2}\s*[)\]]\s*/g, " ")
+    .replace(/\s*[-–·,:]?\s*\b(19|20)\d{2}\b\s*$/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 export interface SerieResuelta {
   puntos: PuntoSerie[];
   faltan: string[];
@@ -306,7 +322,7 @@ export function resolverSerie(spec: SpecBloque, libro: Map<string, CifraPub>): S
     const v = c && c.value !== null && c.value !== undefined && Number.isFinite(Number(c.value)) ? Number(c.value) : null;
     if (c && !unidad) unidad = c.unit;
     if (v === null) faltan.push(s.cifra);
-    puntos.push({ x: s.x, v, key: s.cifra });
+    puntos.push({ x: s.x, v, key: s.cifra, g: c ? medidaDe(c.label) || c.key : s.cifra });
   }
   return { puntos, faltan, unidad };
 }

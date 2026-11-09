@@ -68,10 +68,10 @@ export interface Cifra {
 /** Pilo Publica: un gráfico del informe (ya resuelto contra el libro de cifras). */
 export interface GraficoPub {
   id: string;
-  tipo: "bar" | "line" | "donut";
+  tipo: "bar" | "line" | "donut" | "compare" | "stack" | "heat";
   titulo: string;
   titulo_en: string;
-  puntos: { x: string; v: number | null; key: string }[];
+  puntos: { x: string; v: number | null; key: string; g?: string }[];
   unidad: string;
   /** Procedencia de las cifras (español e inglés). */
   fuente: string;

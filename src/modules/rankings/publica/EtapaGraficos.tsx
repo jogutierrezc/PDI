@@ -5,12 +5,13 @@ import type { RespuestaAnalizar } from "./api";
 import type { EtapaProps } from "./contexto";
 import { siguientePos, useBloques, useBorrarBloque, useCifras, useGuardarBloque } from "./datos";
 import { ConstructorGrafico, NOMBRE_TIPO, Sugerencias, VistaPrevia } from "./ConstructorGrafico";
+import { GraficoPropio } from "./GraficoPropio";
 import { diagnosticar, explicacionDe, sugerirGraficos } from "./explicar";
 import type { Sugerencia } from "./explicar";
 import type { BloquePP, CifraPP, CifraPub, SpecBloque, SpecGrafico, TipoGrafico } from "./tipos";
 import { BotonPilo, Campo, ErrorAviso, Interruptor, Tarjeta, Vacio } from "./ui";
 
-const TIPOS: TipoGrafico[] = ["bar", "line", "donut"];
+const TIPOS: TipoGrafico[] = ["bar", "line", "donut", "compare", "stack", "heat"];
 
 export function EtapaGraficos(p: EtapaProps) {
   const bloques = useBloques(p.informe.id);
@@ -20,7 +21,7 @@ export function EtapaGraficos(p: EtapaProps) {
   const [sel, setSel] = useState<string | null>(null);
   const [rehacer, setRehacer] = useState(false);
   const [resumen, setResumen] = useState<string | null>(null);
-  const [panel, setPanel] = useState<"" | "crear" | "sugerencias">("");
+  const [panel, setPanel] = useState<"" | "crear" | "propio" | "sugerencias">("");
 
   const graficos = useMemo(() => (bloques.data ?? []).filter((b) => b.kind === "grafico"), [bloques.data]);
   const libroPP = useMemo(() => cifras.data ?? [], [cifras.data]);
@@ -68,8 +69,11 @@ export function EtapaGraficos(p: EtapaProps) {
         cuenta={sugerencias.length ? `${sugerencias.length} sugerencias` : undefined}
         acciones={
           <>
-            <button type="button" className="pp-btn pp-btn--sm" aria-expanded={panel === "crear"} onClick={() => setPanel(panel === "crear" ? "" : "crear")}>
-              {panel === "crear" ? "Cerrar" : "+ Crear paso a paso"}
+            <button type="button" className="pp-btn pp-btn--sm" aria-expanded={panel === "propio"} onClick={() => setPanel(panel === "propio" ? "" : "propio")}>
+              {panel === "propio" ? "Cerrar" : "+ Con datos propios"}
+            </button>
+            <button type="button" className="pp-btn pp-btn--sm" aria-expanded={panel === "crear"} onClick={() => setPanel(panel === "crear" ? "" : "crear")} disabled={libroPP.length === 0} title={libroPP.length === 0 ? "Usa las cifras del libro: primero arma el libro, o crea el gráfico con datos propios" : undefined}>
+              {panel === "crear" ? "Cerrar" : "+ Con cifras del libro"}
             </button>
             <button type="button" className="pp-btn pp-btn--sm" aria-expanded={panel === "sugerencias"} onClick={() => setPanel(panel === "sugerencias" ? "" : "sugerencias")} disabled={libroPP.length === 0}>
               {panel === "sugerencias" ? "Ocultar sugerencias" : "Ver sugerencias"}
@@ -79,11 +83,10 @@ export function EtapaGraficos(p: EtapaProps) {
       >
         {panel === "" && (
           <p className="pp-nota pp-pad">
-            {libroPP.length === 0
-              ? "Primero arma el libro de cifras en el tablero: los gráficos se dibujan con esas cifras."
-              : "Crea un gráfico eligiendo qué mostrar (solo se ofrecen combinaciones que sí se pueden dibujar) o mira las sugerencias que la pantalla arma sola con el libro."}
+            Un gráfico es independiente del tablero: crea uno con datos propios (escribes los datos y dices de dónde salen) o con cifras del libro (solo se ofrecen combinaciones que sí se pueden dibujar){libroPP.length ? ", o mira las sugerencias que la pantalla arma sola" : ""}. Si no hay datos, el informe se publica sin gráficos.
           </p>
         )}
+        {panel === "propio" && <GraficoPropio informeId={p.informe.id} unidad={p.unidad} onCrear={async (s) => void (await crear(s))} onCerrar={() => setPanel("")} />}
         {panel === "crear" && <ConstructorGrafico cifras={libroPP} libro={libro} unidad={p.unidad} onCrear={async (s) => void (await crear(s))} onCerrar={() => setPanel("")} />}
         {panel === "sugerencias" && <Sugerencias sugerencias={sugerencias} libro={libro} unidad={p.unidad} onAgregar={async (s: Sugerencia) => void (await crear(s.spec))} />}
       </Tarjeta>
@@ -91,7 +94,7 @@ export function EtapaGraficos(p: EtapaProps) {
       <Tarjeta titulo="Gráficos del informe" cuenta={`${graficos.filter((x) => x.enabled).length} visibles`}>
         {graficos.length === 0 ? (
           <Vacio titulo="Todavía no hay gráficos">
-            {libroPP.length === 0 ? "Primero arma el libro de cifras en el tablero." : "Pilo puede proponerlos, la pantalla te sugiere algunos, o puedes crear uno paso a paso."}
+            Pilo puede proponerlos con las cifras del libro, o puedes crear uno tú con datos propios. Sin datos, el informe sale sin esta sección.
           </Vacio>
         ) : (
           <div className="pp-ed">

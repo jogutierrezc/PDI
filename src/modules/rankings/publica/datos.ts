@@ -172,7 +172,49 @@ export function useEditarCifra() {
   });
 }
 
-const COLS_BLOQUE = "id, informe_id, kind, sec, pos, origin, enabled, spec, heading_es, heading_en, text_es, text_en, orig_es, orig_en, sources, figs, warn, updated_at";
+/** Una cifra que una persona escribe para un gráfico propio (sin pasar por las fuentes ni el tablero). */
+export interface CifraManual {
+  key: string;
+  label: string;
+  label_en: string;
+  unit: string;
+  year: number | null;
+  value: number;
+}
+
+/**
+ * Crea cifras manuales en el libro: llevan siempre la fuente que dijo la persona (en `source.oficina`, que es lo que
+ * el informe público imprime al pie) y la marca `manual`, para que «armar el libro» no las toque.
+ */
+export function useCrearCifras() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (o: { informe_id: string; fuente: string; cifras: CifraManual[] }) => {
+      const fuente = o.fuente.trim();
+      const filas = o.cifras.map((c) => ({
+        informe_id: o.informe_id,
+        ...c,
+        derived: false,
+        formula: "",
+        indicator: null,
+        source: {
+          oficina: fuente,
+          cita: fuente,
+          manual: true,
+          descrito: "persona",
+          descripcion: `Cifra escrita por una persona del equipo. Fuente: ${fuente}.`,
+          descripcion_en: `Figure entered by a team member. Source: ${fuente}.`,
+          ...(c.year !== null ? { periodo: String(c.year) } : {}),
+        },
+      }));
+      const { error } = await db.from("pp_cifras").insert(filas);
+      if (error) lanzar(error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pp", "cifras"] }),
+  });
+}
+
+const COLS_BLOQUE ="id, informe_id, kind, sec, pos, origin, enabled, spec, heading_es, heading_en, text_es, text_en, orig_es, orig_en, sources, figs, warn, updated_at";
 
 export function useBloques(id: string | undefined) {
   return useQuery({

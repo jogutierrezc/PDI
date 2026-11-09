@@ -1,0 +1,120 @@
+/* =============================================================================
+   Visuales de UDES en Cifras en el informe ODS: antes y ahora, composición y
+   mapa de calor (OdsVisuales.tsx).
+
+   Los tokens salen del cartel (--ors-*) y, fuera del informe (la vista previa de
+   Pilo Publica en la intranet), de los de la pantalla; así un solo archivo sirve
+   a los dos. Sin tarjetas, sin sombras, sin bordes laterales de color: reglas
+   finas, cifras tabulares y el color del ODS como único énfasis.
+   ========================================================================== */
+
+.ovz {
+  --ovz-c: var(--ors-deep, var(--pp-k, #0b5d46));
+  --ovz-bg: var(--ors-paper, var(--surface, #fff));
+  --ovz-ink: var(--o-ink, var(--ink, #14201a));
+  --ovz-mute: color-mix(in srgb, var(--ovz-ink) 62%, transparent);
+  --ovz-rule: var(--ors-rule, color-mix(in srgb, var(--ovz-ink) 20%, transparent));
+  --ovz-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  margin-top: 6px;
+  color: var(--ovz-ink);
+  font-size: var(--odsc-fig, 12px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+.ovz-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ovz-num { font-weight: 700; text-align: right; }
+.ovz-note { margin: 8px 0 0; color: var(--ovz-mute); font-size: var(--odsc-sub, 11px); }
+
+/* El mapa de calor ocupa todo el ancho de la fila de gráficos. */
+.opd--ancho { grid-column: 1 / -1; }
+
+/* --- Antes y ahora --------------------------------------------------------------- */
+.ovz-cmp__l { margin: 0; padding: 0; list-style: none; }
+.ovz-cmp__l li {
+  display: grid;
+  grid-template-columns: minmax(3.2em, auto) minmax(0, 1fr) minmax(5.5em, auto);
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--ovz-rule);
+}
+.ovz-x { min-width: 0; overflow-wrap: anywhere; }
+.ovz-track { display: block; height: 10px; background: color-mix(in srgb, var(--ovz-ink) 7%, transparent); }
+.ovz-fill {
+  display: block;
+  height: 100%;
+  background: var(--ovz-c);
+  opacity: 0.4;
+  transform-origin: 0 50%;
+}
+.ovz-cmp__l li.is-ultimo .ovz-fill { opacity: 1; }
+.ovz-delta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin: 10px 0 0;
+}
+.ovz-delta__n { font-size: var(--odsc-num, 26px); font-weight: 700; line-height: 1; letter-spacing: -0.01em; color: var(--ovz-c); }
+.ovz-delta small { color: var(--ovz-mute); font-size: var(--odsc-sub, 11px); }
+
+/* --- Composición ------------------------------------------------------------------------- */
+.ovz-bar {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  overflow: hidden;
+}
+.ovz-seg,
+.ovz-sw { background: color-mix(in srgb, var(--ovz-c) var(--t, 100%), var(--ovz-bg)); opacity: 1; }
+.ovz-leyenda { margin: 8px 0 0; padding: 0; list-style: none; }
+.ovz-leyenda li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--ovz-rule);
+}
+.ovz-sw { display: block; width: 10px; height: 10px; align-self: center; }
+.ovz-pc { min-width: 4.5em; color: var(--ovz-mute); text-align: right; }
+
+/* --- Mapa de calor ------------------------------------------------------------------------- */
+.ovz-scroll { overflow-x: auto; }
+.ovz-heat table { width: 100%; border-collapse: separate; border-spacing: 2px; }
+.ovz-heat th { padding: 3px 6px; font-weight: 600; text-align: left; }
+.ovz-heat thead th { color: var(--ovz-mute); font-size: var(--odsc-sub, 11px); text-align: center; }
+.ovz-heat tbody th { min-width: 9em; max-width: 16em; font-weight: 600; }
+.ovz-cell {
+  padding: 7px 6px;
+  text-align: center;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ovz-c) calc(8% + var(--i, 0) * 78%), var(--ovz-bg));
+  transition: background-color 0.2s var(--ovz-ease);
+}
+.ovz-cell.is-hi { color: var(--ors-on, #fff); }
+/* Vacío no es poco: trama, no el tono más claro. */
+.ovz-cell.ovz-nd {
+  color: var(--ovz-mute);
+  font-weight: 400;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--ovz-ink) 12%, transparent) 4px 5px);
+}
+@media (hover: hover) {
+  .ovz-heat tbody tr:hover .ovz-cell:not(.ovz-nd) { outline: 1px solid var(--ovz-c); outline-offset: -1px; }
+}
+
+@media (max-width: 520px) {
+  .ovz-cmp__l li { grid-template-columns: minmax(2.8em, auto) minmax(0, 1fr) auto; gap: 8px; }
+  .ovz-leyenda li { grid-template-columns: 10px minmax(0, 1fr) auto; }
+  .ovz-leyenda .ovz-pc { grid-column: 2 / -1; text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ovz-cell { transition: none; }
+}

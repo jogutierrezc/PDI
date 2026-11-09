@@ -16,6 +16,7 @@ import type { GraficoPub } from "../rankings/informes/tipos";
 import { fmtN } from "./OdsReportParts";
 import { tr } from "./i18n";
 import type { Lang } from "./i18n";
+import { Visual, esVisual } from "./OdsVisuales";
 
 const W = 420;
 const H = 240;
@@ -42,7 +43,7 @@ function escala(minV: number, maxV: number): { min: number; max: number; marcas:
 const esTemporal = (g: GraficoPub) => g.puntos.length > 0 && g.puntos.every((p) => /^(19|20)\d{2}(?!\d)/.test(String(p.x).trim()));
 
 /** Comparación entre categorías (no entre años): se dibuja en barras horizontales, donde las etiquetas nunca se cruzan. */
-const esCategorias = (g: GraficoPub) => g.tipo !== "donut" && !esTemporal(g);
+const esCategorias = (g: GraficoPub) => g.tipo !== "donut" && !esVisual(g.tipo) && !esTemporal(g);
 const altoHorizontal = (n: number) => 16 + n * 30;
 
 /** Parte una etiqueta larga en hasta 2 renglones de `max` caracteres. */
@@ -283,18 +284,19 @@ function Dato({ g, lang, uid, fuenteAparte }: { g: GraficoPub; lang: Lang; uid: 
   const titulo = lang === "en" && g.titulo_en.trim() ? g.titulo_en : g.titulo;
   const tl = lang === "en" && g.titulo_en.trim() ? "en" : "es";
   const fuente = legible(lang === "en" ? g.fuente_en || g.fuente : g.fuente, lang);
-  const temporal = esTemporal(g) || g.tipo === "donut";
+  const visual = esVisual(g.tipo);
+  const temporal = !visual && (esTemporal(g) || g.tipo === "donut");
   const sfx = pct ? " %" : "";
   const sin = tr(lang, "datos_sin");
   const ult = [...g.puntos].reverse().find((p) => p.v !== null);
   const resumen = g.puntos.map((p) => `${p.x}: ${p.v === null ? sin : num(p.v, lang) + sfx}`).join("; ");
-  const rango = g.puntos.length > 1 && g.tipo !== "donut" ? `${g.puntos[0].x} – ${g.puntos[g.puntos.length - 1].x}` : (g.puntos[g.puntos.length - 1]?.x ?? "");
+  const rango = visual && g.tipo !== "compare" ? "" : g.puntos.length > 1 && g.tipo !== "donut" ? `${g.puntos[0].x} – ${g.puntos[g.puntos.length - 1].x}` : (g.puntos[g.puntos.length - 1]?.x ?? "");
   const nota = [rango, !pct ? g.unidad : ""].filter(Boolean).join(" · ");
   const alt = `${titulo}. ${resumen}`;
   if (!ult || ult.v === null) return null;
 
   return (
-    <figure className="opd" aria-labelledby={`${uid}-t`}>
+    <figure className={`opd${g.tipo === "heat" ? " opd--ancho" : ""}`} aria-labelledby={`${uid}-t`}>
       <h3 id={`${uid}-t`} className="opd-title" lang={tl}>
         {titulo || "—"}
       </h3>
@@ -308,9 +310,14 @@ function Dato({ g, lang, uid, fuenteAparte }: { g: GraficoPub; lang: Lang; uid: 
           <span className="opd-big__x">{ult.x}</span>
         </p>
       )}
-      <svg className="opd-svg" viewBox={`0 0 ${W} ${esCategorias(g) ? altoHorizontal(g.puntos.length) : H}`} role="img" aria-label={alt} focusable="false">
-        <Trazo g={g} lang={lang} pct={pct} />
-      </svg>
+      {esVisual(g.tipo) ? (
+        <Visual tipo={g.tipo} puntos={g.puntos} unidad={g.unidad} lang={lang} fmt={(v) => num(v, lang)} />
+      ) : (
+        <svg className="opd-svg" viewBox={`0 0 ${W} ${esCategorias(g) ? altoHorizontal(g.puntos.length) : H}`} role="img" aria-label={alt} focusable="false">
+          <Trazo g={g} lang={lang} pct={pct} />
+        </svg>
+      )}
+      {g.tipo !== "heat" && (
       <table className="opi-vh">
         <caption>{titulo}</caption>
         <thead>
@@ -331,6 +338,7 @@ function Dato({ g, lang, uid, fuenteAparte }: { g: GraficoPub; lang: Lang; uid: 
           ))}
         </tbody>
       </table>
+      )}
       {!fuenteAparte && (
         <figcaption className="opd-src">
           {tr(lang, "fuente")}: <span lang={lang}>{fuente || tr(lang, "datos_fuente_def")}</span>

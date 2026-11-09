@@ -1051,7 +1051,8 @@ Deno.serve(async (request: Request) => {
       }
       // Las cifras que ya no salen de ninguna fuente incluida: se borran si ningún bloque las usa.
       const nuevas = new Set(filas.map((x) => x.key));
-      const viejas = previas.map((x) => x.key).filter((k) => !nuevas.has(k));
+      // Las cifras escritas a mano para un gráfico propio («manual:…») no salen de ninguna fuente: nunca se tocan.
+      const viejas = previas.map((x) => x.key).filter((k) => !nuevas.has(k) && !k.startsWith("manual:"));
       if (viejas.length) {
         const bloques = await cargarBloques(["kpi", "grafico", "texto"]);
         const enUso = new Set(bloques.flatMap((b) => [String(b.spec?.cifra ?? ""), ...((b.spec?.series as { cifra: string }[] | undefined) ?? []).map((s) => s.cifra), ...(b.figs ?? [])]));

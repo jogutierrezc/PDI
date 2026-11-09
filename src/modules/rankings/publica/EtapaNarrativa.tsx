@@ -5,9 +5,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PropuestaImagen, RespuestaImagenes, RespuestaRedactar, RespuestaTraducir } from "./api";
 import { motivoSinPilo } from "./contexto";
 import type { EtapaProps } from "./contexto";
-import { useActualizarInforme, useBloques, useBorrarBloque, useCifras, useFuentes, useGuardarBloque, useMedios } from "./datos";
+import { siguientePos, useActualizarInforme, useBloques, useBorrarBloque, useCifras, useFuentes, useGuardarBloque, useMedios } from "./datos";
+import { EditorParrafos } from "./EditorParrafos";
+import { ImagenesPorEnlace } from "./ImagenEnlace";
 import type { Medios } from "./datos";
-import { citasDe } from "./tipos";
+import { citasDe, esImagenEnlace } from "./tipos";
 import type { BloquePP } from "./tipos";
 import { BotonPilo, Campo, ErrorAviso, Interruptor, Tarjeta, Vacio } from "./ui";
 
@@ -37,11 +39,14 @@ export function EtapaNarrativa(p: EtapaProps) {
   const informeUp = useActualizarInforme();
   const [tab, setTab] = useState<string>("portada");
   const [resumen, setResumen] = useState<string | null>(null);
+  const [profundidad, setProfundidad] = useState<"normal" | "profunda">("profunda");
 
   const propuestas = useQuery<PropuestaImagen[]>({ queryKey: ["pp", "propuestas", p.informe.id], enabled: false, initialData: [], staleTime: Infinity, queryFn: () => [] });
 
   const ejes = useMemo(() => (bloques.data ?? []).filter((b) => b.kind === "texto" && b.sec !== "portada"), [bloques.data]);
-  const imagenes = useMemo(() => (bloques.data ?? []).filter((b) => b.kind === "imagen"), [bloques.data]);
+  // las de noticia (las que se eligen en cada eje) y las manuales por enlace (las que Pilo no toca)
+  const imagenes = useMemo(() => (bloques.data ?? []).filter((b) => b.kind === "imagen" && !esImagenEnlace(b)), [bloques.data]);
+  const manuales = useMemo(() => (bloques.data ?? []).filter(esImagenEnlace), [bloques.data]);
   const libro = useMemo(() => new Set((cifras.data ?? []).map((c) => c.key)), [cifras.data]);
 
   const idsNoticias = useMemo(() => {
@@ -61,7 +66,7 @@ export function EtapaNarrativa(p: EtapaProps) {
 
   const redactar = async (extra: Record<string, unknown>, etiqueta: string) => {
     setResumen(null);
-    const r = await p.corrida.correr<RespuestaRedactar>(etiqueta, "redactar", extra);
+    const r = await p.corrida.correr<RespuestaRedactar>(etiqueta, "redactar", { profundidad, ...extra });
     if (r) setResumen(`Pilo escribió ${r.escritos}.${r.sin_usar ? ` ${r.sin_usar} fuentes quedaron sin usar.` : ""}`);
   };
   const traducir = async () => {
@@ -78,7 +83,7 @@ export function EtapaNarrativa(p: EtapaProps) {
     }
   };
   const nuevoEje = async () => {
-    const id = await guardar.mutateAsync({ informe_id: p.informe.id, patch: { kind: "texto", sec: "ejes", pos: (bloques.data?.length ?? 0) + 1, heading_es: "Nuevo eje", text_es: "" } });
+    const id = await guardar.mutateAsync({ informe_id: p.informe.id, patch: { kind: "texto", sec: "ejes", pos: siguientePos(bloques.data), heading_es: "Nuevo eje", text_es: "" } });
     setTab(id);
   };
 
@@ -102,6 +107,19 @@ export function EtapaNarrativa(p: EtapaProps) {
         <BotonPilo pilo={p.pilo} corrida={p.corrida} onClick={() => void pedirImagenes()}>
           Pilo propone imágenes
         </BotonPilo>
+        <div className="pp-prof">
+          <span className="pp-opt-t" id="pp-prof-t">
+            Profundidad
+          </span>
+          <div className="pp-seg" role="group" aria-labelledby="pp-prof-t">
+            <button type="button" aria-pressed={profundidad === "normal"} onClick={() => setProfundidad("normal")} title="1 o 2 párrafos por eje">
+              Normal
+            </button>
+            <button type="button" aria-pressed={profundidad === "profunda"} onClick={() => setProfundidad("profunda")} title="3 a 6 párrafos por eje, con contexto, evidencia y alcance">
+              Profunda
+            </button>
+          </div>
+        </div>
         {motivoSinPilo(p.pilo, p.corrida) && !p.corrida.progreso.corriendo && <small className="pp-nota">{motivoSinPilo(p.pilo, p.corrida)}</small>}
       </div>
       {resumen && (
@@ -169,10 +187,11 @@ export function EtapaNarrativa(p: EtapaProps) {
                 if (actual) borrar.mutate(actual.id);
                 return;
               }
-              guardar.mutate({ informe_id: p.informe.id, id: actual?.id, patch: actual ? { spec: { ...actual.spec, ...spec, eje: eje.id } } : { kind: "imagen", sec: "ejes", pos: (bloques.data?.length ?? 0) + 1, spec: { ...spec, eje: eje.id } } });
+              guardar.mutate({ informe_id: p.informe.id, id: actual?.id, patch: actual ? { spec: { ...actual.spec, ...spec, eje: eje.id } } : { kind: "imagen", sec: "ejes", pos: siguientePos(bloques.data), spec: { ...spec, eje: eje.id } } });
             }}
             borrar={() => borrar.mutate(eje.id)}
             redactar={() => void redactar({ sec: "ejes", block_id: eje.id }, "Pilo redacta este eje")}
+            profundizar={() => void redactar({ sec: "ejes", block_id: eje.id, profundizar: true, profundidad: "profunda" }, "Pilo profundiza este eje")}
           />
         )}
         {ejes.length === 0 && tab === "portada" && (
@@ -181,6 +200,19 @@ export function EtapaNarrativa(p: EtapaProps) {
           </div>
         )}
       </Tarjeta>
+
+      <ImagenesPorEnlace
+        manuales={manuales}
+        ejes={ejes}
+        onCrear={async (spec) => {
+          await guardar.mutateAsync({ informe_id: p.informe.id, patch: { kind: "imagen", sec: "imagenes", pos: siguientePos(bloques.data), origin: "persona", enabled: true, spec } });
+        }}
+        onEditar={async (id, spec) => {
+          await guardar.mutateAsync({ informe_id: p.informe.id, id, patch: { spec } });
+        }}
+        onQuitar={(id) => borrar.mutate(id)}
+        onVisible={(id, v) => guardar.mutate({ informe_id: p.informe.id, id, patch: { enabled: v } })}
+      />
       {(guardar.error || borrar.error || informeUp.error) && <ErrorAviso error={guardar.error ?? borrar.error ?? informeUp.error} />}
       <div className="pp-acciones">
         <button type="button" className="button-secondary" onClick={() => p.ir(2)}>
@@ -207,6 +239,7 @@ function EjeEditor({
   elegirImagen,
   borrar,
   redactar,
+  profundizar,
 }: {
   b: BloquePP;
   libro: Set<string>;
@@ -220,6 +253,7 @@ function EjeEditor({
   elegirImagen: (spec: { news_id: string; image_id?: string } | null) => void;
   borrar: () => void;
   redactar: () => void;
+  profundizar: () => void;
 }) {
   const citas = citasDe(b);
   const problemas = problemasDe(b, libro);
@@ -259,6 +293,9 @@ function EjeEditor({
         <span className="pp-sp">
           <BotonPilo pilo={p.pilo} corrida={p.corrida} chico onClick={redactar}>
             Pilo redacta este eje
+          </BotonPilo>{" "}
+          <BotonPilo pilo={p.pilo} corrida={p.corrida} chico onClick={profundizar}>
+            Profundizar
           </BotonPilo>
         </span>
       </div>
@@ -285,10 +322,8 @@ function EjeEditor({
         <Campo etiqueta="Título del eje (español)" valor={b.heading_es} lang="es" onGuardar={(v) => guardar({ heading_es: v })} />
         <Campo etiqueta="Título del eje (inglés)" valor={b.heading_en} lang="en" onGuardar={(v) => guardar({ heading_en: v })} />
       </div>
-      <div className="pp-dos">
-        <Campo etiqueta="Texto en español" valor={b.text_es} lang="es" multilinea filas={9} ayuda="Separa los párrafos con una línea en blanco." onGuardar={(v) => guardar({ text_es: v })} />
-        <Campo etiqueta="Texto en inglés" valor={b.text_en} lang="en" multilinea filas={9} ayuda={b.text_es.trim() && !b.text_en.trim() ? "Falta la traducción: usa «Traducir lo que falte» o escríbela." : undefined} onGuardar={(v) => guardar({ text_en: v })} />
-      </div>
+      <EditorParrafos es={b.text_es} en={b.text_en} onGuardar={(v) => guardar(v)} />
+      <p className="pp-nota">Un texto en profundidad suele llevar de 3 a 6 párrafos por eje. «Profundizar» le pide a Pilo ampliar este eje con más contexto y evidencia, sin pisar lo que escribiste a mano.</p>
       {b.text_es.trim() && !b.text_en.trim() && <p className="pp-warn">Falta el inglés de este eje.</p>}
 
       <div>

@@ -22,10 +22,33 @@
      fuentes   { informe_id }                  → { ok, fuentes:{noticia,indicador,libro,documento,cifras}, nuevas, avisos }
                  junta lo que existe para (ranking, unit_key, edition); no pisa `include`.
      libro     { informe_id }                  → { ok, cifras, derivadas, avisos }       sin IA
-     analizar  { informe_id, rehacer? }        → { ok, kpis, graficos, descartados }     estadístico
-     redactar  { informe_id, sec?:'portada'|'ejes', block_id?, count?, reintentar? }
-                                               → { ok, escritos, quedan, fallos, sin_usar, bloques }   periodista
+                 cada cifra con un label legible («qué mide — desglose (año)») y su
+                 procedencia en pp_cifras.source (SourceCifra en contrato.ts: tabla,
+                 oficina, columna, desglose, periodo, indicador, definición, cita,
+                 serie…). Conserva lo descrito por una persona (siempre) y por Pilo
+                 (si la cifra no cambió).
+     describir { informe_id, rehacer? }        → { ok, descritas, fallos:[{key,motivo}], quedan }   estadístico
+                 explica las cifras sin descripción (o, con rehacer, también las de
+                 Pilo; NUNCA las de una persona) por lotes de ~12: label ES/EN (≤ 90)
+                 y descripción ES/EN (≤ 240: qué mide, a qué población, en qué
+                 periodo y cómo se obtuvo). El modelo solo ve la procedencia; el
+                 valor no se toca; un texto con números que no estén en la
+                 procedencia, el valor o el año se omite con su motivo (y la cifra
+                 queda marcada para no repetirla en bucle). El cliente repite hasta
+                 quedan = 0 (con rehacer, las descritas en los últimos 15 minutos no
+                 se repiten).
+     analizar  { informe_id, rehacer? }        → { ok, kpis, graficos, descartados, propuestos:[{block_id,chart,title_es,origen}] }
+                 el libro llega agrupado por serie con su label y descripción; pide
+                 3 a 6 gráficos y, si quedan menos de 3 válidos, el código completa con
+                 sugerencias deterministas (origen «codigo»). La IA nunca teclea números.
+     redactar  { informe_id, sec?:'portada'|'ejes', block_id?, profundizar?, count?, reintentar?, profundidad?:'normal'|'profunda' }
+                                               → { ok, escritos, quedan, fallos, sin_usar, bloques, avisos? }   periodista
+                 «profunda» (defecto): hasta 5 fuentes y 4–6 párrafos por eje, UN eje
+                 por llamada; «normal»: 3 fuentes y 2–3 párrafos. Con block_id +
+                 profundizar, reescribe en profundidad un eje de Pilo sumando fuentes
+                 del mismo indicador aún sin citar.
      imagenes  { informe_id }                  → { ok, propuestas, omitidas, aviso }     sin IA
+                 no toca imágenes de una persona (origin ≠ pilo) ni externas (spec.externa).
      traducir  { informe_id }                  → { ok, hechos, fallos, quedan }
 
    Reglas:
@@ -34,8 +57,10 @@
      · La IA nunca escribe un número del tablero: elige keys del libro. En el
        texto, cada número sale de una cifra del libro citada por su key (o es un
        año, una fecha de las citas, el número de fuentes, el ODS o un
-       indicador); cada frase tiene su cita literal; el inglés trae las mismas
-       cifras. Un reintento con el error; si no pasa, no se guarda.
+       indicador); cada párrafo tiene al menos una cita literal y se citan todas
+       las fuentes; el inglés trae las mismas cifras y los mismos párrafos. Un
+       reintento con el error (si queda tiempo); si no pasa, el eje queda como
+       borrador apagado «SIN VERIFICAR» con el motivo.
      · Pilo no reescribe bloques «persona» ni «editado» (409). Las fuentes que
        fallan quedan marcadas (pp_fuentes.meta.fallo) y se listan; ninguna
        noticia incluida se descarta en silencio (sin_usar).
@@ -56,10 +81,35 @@ import { extraerCifras } from "../pilo-rankingsod/cifras.ts";
 import { afinidadOds, cifraAnual, plano, UMBRAL_FUENTE, type Criterio, type FilaCifras } from "../pilo-rankingsod/fuentes.ts";
 import { altDeFoto, AVISO_IMAGENES, enGrupos, hablaDeMenores, leerAjustes, pieDeFoto, RECORTE_POR_DEFECTO, siguientePos, type Lectura, type Mensaje, type NotaInforme } from "../pilo-rankingsod/logica.ts";
 import { elegirProveedor, esperaTras429, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts";
-import { ACCIONES, ROL, SECCIONES, type Accion, type CitaBloque, type CodigoError, type Fallo, type KindFuente, type MetaNoticia, type PropuestaImagen, type Ranking, type SinUsar } from "./contrato.ts";
-import { aNumeroLibre, anioDePeriodo, armarLibro, formatoValor, resumir, type CifraCruda, type CifraLibro } from "./libro.ts";
-import { leerEje, leerPortada, leerTablero, leerTraduccionesPP, mensajesReintentoPP, trabajosEje, verificarEje, verificarPortada, type Eje, type FuentePendiente, type FuenteTexto, type ItemTraduccion, type Portada } from "./logica.ts";
-import { mensajesEje, mensajesPortada, mensajesTablero, mensajesTraducirPP } from "./roles.ts";
+import { ACCIONES, ROL, SECCIONES, type Accion, type CitaBloque, type CodigoError, type Fallo, type GraficoPropuesto, type KindFuente, type MetaNoticia, type Profundidad, type PropuestaImagen, type Ranking, type SinUsar, type SourceCifra, type SpecGrafico } from "./contrato.ts";
+import { aNumeroLibre, anioDePeriodo, armarLibro, conservarDescripciones, cortar, formatoValor, resumir, type CifraCruda, type CifraLibro } from "./libro.ts";
+import {
+  formaEje,
+  FUENTES_POR_EJE_MAX,
+  fuentesParaProfundizar,
+  leerDescripciones,
+  leerEje,
+  leerPortada,
+  leerTablero,
+  leerTraduccionesPP,
+  MIN_GRAFICOS,
+  MAX_GRAFICOS,
+  mensajesReintentoPP,
+  numerosPermitidos,
+  RECORDATORIO,
+  sugerirGraficos,
+  trabajosEje,
+  verificarEje,
+  verificarPortada,
+  type Descripcion,
+  type Eje,
+  type FuentePendiente,
+  type FuenteTexto,
+  type ItemDescribir,
+  type ItemTraduccion,
+  type Portada,
+} from "./logica.ts";
+import { mensajesDescribir, mensajesEje, mensajesPortada, mensajesTablero, mensajesTraducirPP } from "./roles.ts";
 import { coincidencias, indicadoresDe, indicadorProbable, tocaUnidad, unidadDe, type IndicadorRanking, type PreguntaGreen } from "./unidades.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
@@ -229,7 +279,7 @@ Deno.serve(async (request: Request) => {
   if (!url || !serviceKey) return fallo("La función no está configurada.", "interno", 500);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let cuerpo: { action?: string; informe_id?: string; rehacer?: boolean; sec?: string; block_id?: string; count?: number; reintentar?: boolean } = {};
+  let cuerpo: { action?: string; informe_id?: string; rehacer?: boolean; sec?: string; block_id?: string; count?: number; reintentar?: boolean; profundidad?: string; profundizar?: boolean } = {};
   try {
     cuerpo = JSON.parse((await request.text()) || "{}");
   } catch {
@@ -329,13 +379,20 @@ Deno.serve(async (request: Request) => {
     }
   };
 
-  /** Una llamada, su lectura y, si no pasa, un reintento con el error. */
-  const llamarVerificado = async <T>(mensajes: Mensaje[], maxTokens: number, leer: (crudo: string) => Lectura<T>): Promise<Lectura<T>> => {
+  /**
+   * Una llamada, su lectura y, si no pasa, un reintento con el error. El
+   * reintento solo se hace si cabe en el presupuesto suponiendo que tarda lo
+   * mismo que la primera (con textos largos, una llamada puede pasar de 30 s y
+   * el servidor corta la petición).
+   */
+  const llamarVerificado = async <T>(mensajes: Mensaje[], maxTokens: number, leer: (crudo: string) => Lectura<T>, recordatorio?: string): Promise<Lectura<T>> => {
+    const t0 = Date.now();
     const crudo = await llamar(mensajes, maxTokens);
+    const duracion = Date.now() - t0;
     const primera = leer(crudo);
     if (primera.ok) return primera;
-    if (!hayTiempo()) return { ok: false, error: `${primera.error} No hubo tiempo de reintentar.` };
-    const segunda = leer(await llamar(mensajesReintentoPP(mensajes, crudo, primera.error), maxTokens));
+    if (!hayTiempo() || Date.now() - inicio + duracion > PRESUPUESTO_MS) return { ok: false, error: `${primera.error} No hubo tiempo de reintentar.` };
+    const segunda = leer(await llamar(mensajesReintentoPP(mensajes, crudo, primera.error, recordatorio), maxTokens));
     return segunda.ok ? segunda : { ok: false, error: segunda.error };
   };
 
@@ -438,6 +495,17 @@ Deno.serve(async (request: Request) => {
       resp.push(...((r.data ?? []) as Resp[]));
     }
     return { resp, porQ };
+  };
+
+  /** El nombre legible de las unidades u oficinas (units.name) por id; lo que no se lee queda fuera. */
+  const nombresDeUnidades = async (ids: string[]): Promise<Map<string, string>> => {
+    const out = new Map<string, string>();
+    for (const trozo of enTrozos([...new Set(ids.filter(Boolean))])) {
+      const r = await admin.from("units").select("id, name").in("id", trozo);
+      if (r.error) return out;
+      for (const u of (r.data ?? []) as { id: string; name: string }[]) out.set(u.id, u.name);
+    }
+    return out;
   };
 
   /* ===================================================================================
@@ -649,14 +717,32 @@ Deno.serve(async (request: Request) => {
           );
           for (const f of filas) {
             const n = porId.get(f.news_id);
+            const campus = String(n?.meta?.campus ?? "").trim();
+            const oficina = String(n?.meta?.office ?? "").trim();
+            const fecha = fechaDe(n?.meta);
+            const indicador = String(n?.meta?.indicator ?? "").split("/")[0];
             crudas.push({
               key: `nf:${f.id}`,
               serie: `nf:${f.id}`,
               label: f.label || f.value,
+              que: f.label || `Cifra de la noticia «${(n?.label ?? "").slice(0, 80)}»`,
+              ...(campus ? { desglose: `Sede ${campus}` } : {}),
               unit: f.kind === "porcentaje" ? "%" : f.unit,
-              year: anioDe(fechaDe(n?.meta)),
+              year: anioDe(fecha),
               value: f.num === null ? null : Number(f.num),
-              source: { tabla: "news_figures", ref: f.news_id, kind: "noticia", fila: f.id, cita: f.quote, url: String(n?.meta?.url ?? "") || undefined },
+              source: {
+                kind: "noticia",
+                tabla: `Noticia: ${(n?.label ?? "").slice(0, 160)}`,
+                tabla_db: "news_figures",
+                ref: f.news_id,
+                fila: f.id,
+                ...(oficina ? { oficina } : {}),
+                ...(fecha ? { periodo: fecha.slice(0, 10) } : {}),
+                ...(indicador ? { indicador_id: indicador } : {}),
+                ...(f.quote ? { cita: f.quote } : {}),
+                ...(n?.meta?.url ? { url: String(n.meta.url) } : {}),
+                serie: `nf:${f.id}`,
+              },
               indicator: (n?.meta?.indicator as string | null) ?? null,
             });
           }
@@ -673,18 +759,38 @@ Deno.serve(async (request: Request) => {
         try {
           const ids = ind.map((f) => f.ref.replace(/^the:/, ""));
           const { resp, texto } = await leerTHE(c, ids);
+          // La oficina que respondió (units.name): es el desglose de la cifra.
+          const oficinas = await nombresDeUnidades(resp.map((r) => r.unidad));
           for (const r of resp)
             for (const [campo, valor] of Object.entries(r.valores ?? {})) {
-              const nombre = texto.get(campo)?.texto_es || `${r.indicador} · ${campo}`;
+              const delCampo = texto.get(campo);
+              const delIndicador = texto.get(r.indicador);
+              const nombre = delCampo?.texto_es || delIndicador?.texto_es || `Indicador ${r.indicador}`;
+              const oficina = oficinas.get(r.unidad) ?? "";
               crudas.push({
                 key: `the:${r.id}:${campo}`,
                 serie: `the:${r.id}:${campo}`,
                 label: nombre.slice(0, 200),
-                label_en: (texto.get(campo)?.texto_en ?? "").slice(0, 200),
+                que: nombre,
+                ...(delCampo?.texto_en || delIndicador?.texto_en ? { que_en: delCampo?.texto_en || delIndicador?.texto_en } : {}),
+                ...(oficina ? { desglose: oficina } : {}),
                 unit: /%|porcentaje/i.test(nombre) ? "%" : "",
                 year: anioDatos,
                 value: typeof valor === "number" ? valor : null,
-                source: { tabla: "ranking_responses", ref: `the:${r.id}`, kind: "indicador", fila: r.id, columna: `valores.${campo}` },
+                source: {
+                  kind: "indicador",
+                  tabla: `Reporte por oficinas de THE Impact (ODS ${unidad.key})`,
+                  tabla_db: "ranking_responses",
+                  ref: `the:${r.id}`,
+                  fila: r.id,
+                  ...(oficina ? { oficina } : {}),
+                  columna: delCampo?.texto_es ? cortar(delCampo.texto_es, 160) : campo,
+                  periodo: `${anioDatos} (año de datos del ciclo)`,
+                  indicador_id: r.indicador,
+                  ...(delIndicador?.texto_es ? { indicador: cortar(delIndicador.texto_es, 200) } : {}),
+                  ...(delIndicador?.texto_es || delCampo?.texto_es ? { definicion: cortar(delCampo?.texto_es || delIndicador?.texto_es || "", 400) } : {}),
+                  serie: `the:${r.id}:${campo}`,
+                },
                 indicator: r.indicador.split("/")[0],
               });
             }
@@ -701,16 +807,33 @@ Deno.serve(async (request: Request) => {
             for (const campo of p?.esquema?.campos ?? []) {
               if (campo.tipo !== "numero") continue;
               const valor = r.valores?.[campo.k];
+              // «y1», «y2», «y3»: los tres años de la pregunta, sin año fijo.
+              const sinAnio = /^y\d$/.test(campo.k);
+              const pregunta = p?.nombre_es || `Pregunta ${r.q} de UI GreenMetric`;
+              const que = campo.es && !sinAnio ? campo.es : pregunta;
+              const queEn = campo.en && !sinAnio ? campo.en : p?.nombre_en || "";
               crudas.push({
                 key: `ugm:${r.id}:${campo.k}`,
                 serie: `ugm:${r.q}:${campo.k}`,
-                label: (campo.es || p?.nombre_es || campo.k).slice(0, 200),
-                label_en: (campo.en || p?.nombre_en || "").slice(0, 200),
+                label: que.slice(0, 200),
+                que,
+                ...(queEn ? { que_en: queEn } : {}),
+                ...(sinAnio ? { desglose: campo.es ? `${campo.es}` : `año ${campo.k.slice(1)} de los tres que pide la pregunta` } : {}),
                 unit: campo.unidad ?? p?.unidad ?? "",
-                // «y1», «y2», «y3»: los tres años de la pregunta, sin año fijo.
-                year: /^y\d$/.test(campo.k) ? null : anioDatos,
+                year: sinAnio ? null : anioDatos,
                 value: typeof valor === "number" ? valor : aNumeroLibre(valor),
-                source: { tabla: "ugm_respuestas", ref: `ugm:${r.id}`, kind: "indicador", fila: r.id, columna: `valores.${campo.k}` },
+                source: {
+                  kind: "indicador",
+                  tabla: `Respuestas de UI GreenMetric · categoría ${unidad.key}`,
+                  tabla_db: "ugm_respuestas",
+                  ref: `ugm:${r.id}`,
+                  fila: r.id,
+                  columna: campo.es || campo.k,
+                  periodo: sinAnio ? `${campo.es || campo.k} (de los años que pide la pregunta)` : `${anioDatos} (año de datos del ciclo)`,
+                  indicador_id: r.q,
+                  indicador: cortar(pregunta, 200),
+                  serie: `ugm:${r.q}:${campo.k}`,
+                },
                 indicator: r.q,
               });
             }
@@ -731,19 +854,27 @@ Deno.serve(async (request: Request) => {
             continue;
           }
           const mapa = (r.data.mapa ?? {}) as Record<string, string>;
-          const ii = await admin.from("ds_indicadores").select("id, nombre, unidad, resumen").eq("id", r.data.indicador_id).maybeSingle();
+          const ii = await admin.from("ds_indicadores").select("id, nombre, descripcion, unidad, resumen").eq("id", r.data.indicador_id).maybeSingle();
           if (ii.error) throw ii.error;
           if (!mapa.valor) {
             avisos.push(`«${f.label.slice(0, 60)}»: el mapa no dice qué columna da el valor.`);
             continue;
           }
           const libroId = String(r.data.libro_id);
-          const col = await admin.from("ds_columnas").select("clave, etiqueta, tipo").eq("libro_id", libroId).eq("clave", mapa.valor).maybeSingle();
+          const [col, lib] = await Promise.all([
+            admin.from("ds_columnas").select("clave, etiqueta, tipo").eq("libro_id", libroId).eq("clave", mapa.valor).maybeSingle(),
+            admin.from("ds_libros").select("nombre, oficina_id").eq("id", libroId).maybeSingle(),
+          ]);
           const filas = await todas<{ id: string; datos: Record<string, unknown> }>((a, b) => admin.from("ds_filas").select("id, datos").eq("libro_id", libroId).order("orden").range(a, b));
           const regla = (["suma", "promedio", "ultimo"].includes(String(ii.data?.resumen)) ? ii.data?.resumen : "promedio") as "suma" | "promedio" | "ultimo";
           const unit = col.data?.tipo === "porcentaje" ? "%" : String(ii.data?.unidad ?? "");
           const nombre = String(ii.data?.nombre ?? f.label);
-          const grupos = new Map<string, { year: number | null; sede: string; valores: number[]; filas: string[] }>();
+          // Lo que mide: el indicador y, si dice algo más, la columna («Brigadas de salud · Número de asistentes»).
+          const etiquetaCol = String(col.data?.etiqueta ?? "").trim();
+          const que = etiquetaCol && !nombre.toLowerCase().includes(etiquetaCol.toLowerCase()) ? `${nombre} · ${etiquetaCol}` : nombre;
+          const tabla = String(lib.data?.nombre ?? "").trim() || f.label;
+          const oficina = lib.data?.oficina_id ? (await nombresDeUnidades([String(lib.data.oficina_id)])).get(String(lib.data.oficina_id)) ?? "" : "";
+          const grupos = new Map<string, { year: number | null; sede: string; valores: number[]; filas: string[]; periodos: Set<string> }>();
           let sinValor = 0;
           for (const fila of filas) {
             const valor = aNumeroLibre(fila.datos?.[mapa.valor]);
@@ -754,9 +885,11 @@ Deno.serve(async (request: Request) => {
             const year = mapa.periodo ? anioDePeriodo(fila.datos?.[mapa.periodo]) : null;
             const sede = mapa.campus ? String(fila.datos?.[mapa.campus] ?? "").trim() : "";
             const k = `${year ?? ""}|${sede}`;
-            const g = grupos.get(k) ?? { year, sede, valores: [], filas: [] };
+            const g = grupos.get(k) ?? { year, sede, valores: [], filas: [], periodos: new Set<string>() };
             g.valores.push(valor);
             g.filas.push(fila.id);
+            const periodo = mapa.periodo ? String(fila.datos?.[mapa.periodo] ?? "").trim() : "";
+            if (periodo) g.periodos.add(periodo.slice(0, 20));
             grupos.set(k, g);
           }
           if (sinValor) avisos.push(`«${nombre.slice(0, 60)}»: ${sinValor} fila(s) sin valor numérico no entran al libro.`);
@@ -765,14 +898,33 @@ Deno.serve(async (request: Request) => {
           for (const g of grupos.values()) {
             const varias = (sedesPorAnio.get(String(g.year ?? ""))?.size ?? 0) > 1 && g.sede;
             const value = resumir(g.valores, regla);
+            const serie = `ds:${respId}${varias ? `:${slug(g.sede)}` : ""}`;
+            const periodos = [...g.periodos].sort();
+            const nota = g.valores.length > 1 ? `${regla === "suma" ? "suma" : regla === "ultimo" ? "último valor" : "promedio"} de ${g.valores.length} filas` : undefined;
             crudas.push({
               key: `ds:${respId}:${g.year ?? "sin-anio"}${varias ? `:${slug(g.sede)}` : ""}`,
-              serie: `ds:${respId}${varias ? `:${slug(g.sede)}` : ""}`,
+              serie,
               label: varias ? `${nombre} — ${g.sede}` : nombre,
+              que,
+              ...(varias ? { desglose: g.sede } : {}),
               unit,
               year: g.year,
               value,
-              source: { tabla: "ds_filas", ref: f.ref, kind: "libro", fila: g.filas, columna: mapa.valor, nota: g.valores.length > 1 ? `${regla} de ${g.valores.length} filas` : undefined },
+              source: {
+                kind: "libro",
+                tabla,
+                tabla_db: "ds_filas",
+                ref: f.ref,
+                ...(g.filas.length === 1 ? { fila: g.filas[0] } : { fila: `${g.filas.length} filas`, filas: g.filas }),
+                ...(oficina ? { oficina } : {}),
+                columna: etiquetaCol || mapa.valor,
+                ...(periodos.length ? { periodo: cortar(periodos.join(", "), 120) } : g.year !== null ? { periodo: String(g.year) } : {}),
+                indicador_id: String(r.data.indicador_id),
+                indicador: nombre,
+                ...(ii.data?.descripcion ? { definicion: cortar(String(ii.data.descripcion), 400) } : {}),
+                ...(nota ? { nota } : {}),
+                serie,
+              },
               sumable: regla === "suma",
               ...(varias ? { grupo: `ds:${respId}`, parte: g.sede } : {}),
             });
@@ -786,14 +938,22 @@ Deno.serve(async (request: Request) => {
       const od = de("cifras");
       if (od.length) {
         try {
-          type Ind = { id: string; key: string; label: string; unit: string; format: FilaCifras["format"]; annual_rule: FilaCifras["annual_rule"]; aggregation: string };
+          type Ind = { id: string; key: string; label: string; unit: string; format: FilaCifras["format"]; annual_rule: FilaCifras["annual_rule"]; aggregation: string; definition: string | null; office_id: string | null; od_reports: { name: string } | null };
           const ids = od.map((f) => f.ref.replace(/^od:/, ""));
           const inds: Ind[] = [];
           for (const trozo of enTrozos(ids)) {
-            const r = await admin.from("od_indicators").select("id, key, label, unit, format, annual_rule, aggregation").in("id", trozo);
+            const r = await admin.from("od_indicators").select("id, key, label, unit, format, annual_rule, aggregation, definition, office_id, od_reports(name)").in("id", trozo);
             if (r.error) throw r.error;
-            inds.push(...((r.data ?? []) as Ind[]));
+            inds.push(...((r.data ?? []) as unknown as Ind[]));
           }
+          // La oficina responsable (od_offices.name); si no se puede leer, la cifra sigue sin ella.
+          const oficinasOd = new Map<string, string>();
+          const idsOficina = [...new Set(inds.map((i) => i.office_id).filter((x): x is string => Boolean(x)))];
+          if (idsOficina.length) {
+            const r = await admin.from("od_offices").select("id, name").in("id", idsOficina);
+            for (const o of (r.data ?? []) as { id: string; name: string }[]) oficinasOd.set(o.id, o.name);
+          }
+          const reglaTexto: Record<string, string> = { suma: "suma de los periodos del año", promedio: "promedio de los periodos del año", ultimo: "valor del último periodo del año" };
           const anios = Array.from({ length: ANIOS_SERIE }, (_, i) => anioDatos - ANIOS_SERIE + 1 + i);
           for (const trozo of enTrozos(inds.map((i) => i.id))) {
             const vals = await todas<{ id: string; indicator_id: string; year: number; term: "A" | "B" | "anual"; value: number | null }>((a, b) =>
@@ -804,14 +964,31 @@ Deno.serve(async (request: Request) => {
                 const del = vals.filter((v) => v.indicator_id === i.id && v.year === y);
                 if (!del.length) continue;
                 const n = cifraAnual(del.map((v) => ({ term: v.term, value: v.value === null ? null : Number(v.value) })), i.annual_rule);
+                const oficina = i.office_id ? oficinasOd.get(i.office_id) ?? "" : "";
+                const terminos = [...new Set(del.map((v) => (v.term === "anual" ? "anual" : `${y}-${v.term}`)))].join(", ");
                 crudas.push({
                   key: `od:${i.id}:${y}`,
                   serie: `od:${i.key}`,
                   label: i.label,
+                  que: i.label,
+                  desglose: "Toda la UDES",
                   unit: i.format === "porcentaje" ? "%" : i.unit,
                   year: y,
                   value: n,
-                  source: { tabla: "od_values", ref: `od:${i.id}`, kind: "cifras", fila: del.map((v) => v.id), nota: `regla anual: ${i.annual_rule}` },
+                  source: {
+                    kind: "cifras",
+                    tabla: `UDES en Cifras${i.od_reports?.name ? ` · ${i.od_reports.name}` : ""}`,
+                    tabla_db: "od_values",
+                    ref: `od:${i.id}`,
+                    ...(del.length === 1 ? { fila: del[0].id } : { fila: `${del.length} valores`, filas: del.map((v) => v.id) }),
+                    ...(oficina ? { oficina } : {}),
+                    periodo: terminos ? `${y} (${terminos})` : String(y),
+                    indicador_id: i.key,
+                    indicador: i.label,
+                    ...(i.definition ? { definicion: cortar(i.definition, 400) } : {}),
+                    nota: `regla anual: ${reglaTexto[String(i.annual_rule)] ?? i.annual_rule}`,
+                    serie: `od:${i.key}`,
+                  },
                   sumable: i.aggregation === "suma" && i.format !== "porcentaje",
                 });
               }
@@ -831,9 +1008,28 @@ Deno.serve(async (request: Request) => {
             .filter((x) => x.num !== null && x.kind !== "otro")
             .sort((a, b) => b.score - a.score)
             .slice(0, CIFRAS_POR_DOCUMENTO);
+          const anioDoc = r.data?.anio_detectado ?? null;
           for (const x of lista) {
             const k = `bib:${id}:${huella(`${x.value}|${x.quote}`)}`;
-            crudas.push({ key: k, serie: k, label: x.label || x.value, unit: x.kind === "porcentaje" ? "%" : x.unit, year: r.data?.anio_detectado ?? null, value: x.num, source: { tabla: "ranking_biblioteca", ref: f.ref, kind: "documento", fila: id, cita: x.quote } });
+            crudas.push({
+              key: k,
+              serie: k,
+              label: x.label || x.value,
+              que: x.label || `Cifra del documento «${f.label.slice(0, 80)}»`,
+              unit: x.kind === "porcentaje" ? "%" : x.unit,
+              year: anioDoc,
+              value: x.num,
+              source: {
+                kind: "documento",
+                tabla: `Documento: ${f.label.slice(0, 160)}`,
+                tabla_db: "ranking_biblioteca",
+                ref: f.ref,
+                fila: id,
+                ...(x.quote ? { cita: x.quote } : {}),
+                ...(anioDoc ? { periodo: `${anioDoc} (año detectado en el documento)` } : {}),
+                serie: k,
+              },
+            });
           }
         } catch (e) {
           avisos.push(`«${f.label.slice(0, 60)}»: no se pudo leer el documento (${mensajeDe(e).slice(0, 120)}).`);
@@ -842,14 +1038,18 @@ Deno.serve(async (request: Request) => {
 
       const libro = armarLibro(crudas, { anioMin: edition - 12, anioMax: edition });
       avisos.push(...libro.avisos);
-      const filas = [...libro.cifras, ...libro.derivadas].map((x) => ({ informe_id: informeId, ...x, label: x.label.slice(0, 300), label_en: x.label_en.slice(0, 300) }));
+      // Lo que ya explicó una persona (siempre) o Pilo (si la cifra no cambió) no se pierde al rehacer el libro.
+      const previas = await todas<{ key: string; label: string; label_en: string; value: number; year: number | null; source: SourceCifra | null }>((a, b) =>
+        admin.from("pp_cifras").select("key, label, label_en, value, year, source").eq("informe_id", informeId).order("key").range(a, b),
+      );
+      const filas = conservarDescripciones([...libro.cifras, ...libro.derivadas], previas).map((x) => ({ informe_id: informeId, ...x, label: x.label.slice(0, 300), label_en: x.label_en.slice(0, 300) }));
       for (const lote of enGrupos(filas, 400)) {
         const w = await admin.from("pp_cifras").upsert(lote, { onConflict: "informe_id,key" });
         if (w.error) throw w.error;
       }
       // Las cifras que ya no salen de ninguna fuente incluida: se borran si ningún bloque las usa.
       const nuevas = new Set(filas.map((x) => x.key));
-      const viejas = (await todas<{ key: string }>((a, b) => admin.from("pp_cifras").select("key").eq("informe_id", informeId).order("key").range(a, b))).map((x) => x.key).filter((k) => !nuevas.has(k));
+      const viejas = previas.map((x) => x.key).filter((k) => !nuevas.has(k));
       if (viejas.length) {
         const bloques = await cargarBloques(["kpi", "grafico", "texto"]);
         const enUso = new Set(bloques.flatMap((b) => [String(b.spec?.cifra ?? ""), ...((b.spec?.series as { cifra: string }[] | undefined) ?? []).map((s) => s.cifra), ...(b.figs ?? [])]));
@@ -881,7 +1081,9 @@ Deno.serve(async (request: Request) => {
           const id = s.news_id || (s.kind === "noticia" ? s.ref : "");
           if (id && !ejeDe.has(id)) ejeDe.set(id, b.id);
         }
-      const yaTienen = new Set(bloques.filter((b) => b.kind === "imagen").map((b) => String(b.spec?.news_id ?? "")));
+      // Solo se AGREGAN bloques: nunca se borra ni se cambia una imagen existente (y menos una de una persona,
+      // origin ≠ pilo, o una externa con spec.url y spec.externa). Una nota que ya tiene imagen no se repite.
+      const yaTienen = new Set(bloques.filter((b) => b.kind === "imagen").map((b) => String(b.spec?.news_id ?? "")).filter(Boolean));
       const pendientes = [...ejeDe.keys()].filter((id) => !yaTienen.has(id));
       const omitidas: { news_id: string; motivo: string }[] = [];
       let pos = siguientePos(SECCIONES.imagen, bloques);
@@ -935,6 +1137,124 @@ Deno.serve(async (request: Request) => {
   if (motivo) return fallo(motivo, "sin_ia", 503, { proveedor: destino.proveedor, modelo: destino.model });
 
   /* ===================================================================================
+     describir: el estadístico explica qué es cada cifra (solo con su procedencia)
+     =================================================================================== */
+  if (accion === "describir") {
+    let descritas = 0;
+    const fallos: { key: string; motivo: string }[] = [];
+    try {
+      const libro = await cargarLibro();
+      if (!libro.length) return fallo("El libro de cifras está vacío: primero arma el libro.", "sin_libro", 409);
+      const ahora = Date.now();
+      /** Con «rehacer», las descritas por Pilo hace menos de 15 minutos no se repiten (el cliente puede repetir hasta quedan = 0). */
+      const reciente = (s: SourceCifra | null | undefined) => {
+        const t = Date.parse(String(s?.descrito_at ?? ""));
+        return Number.isFinite(t) && ahora - t < 15 * 60_000;
+      };
+      const falloReciente = (s: SourceCifra | null | undefined) => {
+        const t = Date.parse(String(s?.describir_fallo?.at ?? ""));
+        return Number.isFinite(t) && (!cuerpo.rehacer || ahora - t < 15 * 60_000);
+      };
+      const falta = (c: CifraLibro) => {
+        const s = c.source ?? ({} as SourceCifra);
+        if (s.descrito === "persona") return false;
+        if (falloReciente(s)) return false;
+        const incompleta = !s.descripcion || !s.descripcion_en || !c.label_en;
+        if (s.descrito === "codigo") return incompleta;
+        return incompleta || Boolean(cuerpo.rehacer && !reciente(s));
+      };
+      const porKey = new Map(libro.map((c) => [c.key, c]));
+      const pendientes = () => libro.filter(falta);
+
+      /** Lo único que el modelo ve de una cifra: su procedencia, su valor y su año. */
+      const contextoDe = (c: CifraLibro): string => {
+        const s = c.source ?? ({} as SourceCifra);
+        const bases = (s.bases ?? []).map((k) => porKey.get(k)?.label).filter(Boolean) as string[];
+        return [
+          `Nombre actual: ${c.label}`,
+          `Valor: ${formatoValor(Number(c.value), c.unit)}${c.unit && !["%", "pp"].includes(c.unit) ? ` ${c.unit}` : ""} · unidad: ${c.unit || "sin unidad"} · año: ${c.year ?? "sin año"}`,
+          s.tabla ? `Tabla o informe: ${s.tabla}` : "",
+          s.oficina ? `Oficina: ${s.oficina}` : "",
+          s.columna ? `Columna o campo: ${s.columna}` : "",
+          s.indicador || s.indicador_id ? `Indicador: ${[s.indicador_id, s.indicador].filter(Boolean).join(" — ")}` : "",
+          s.definicion ? `Definición del indicador: ${cortar(s.definicion, 400)}` : "",
+          s.desglose ? `Desglose: ${s.desglose}` : "",
+          s.periodo ? `Periodo: ${s.periodo}` : "",
+          s.nota ? `Cómo se obtuvo: ${s.nota}` : "",
+          c.derived ? `Calculada por el sistema: ${c.formula || s.formula || ""}` : "",
+          bases.length ? `Calculada a partir de: ${bases.slice(0, 4).join("; ")}` : "",
+          s.cita ? `Cita de la fuente: «${cortar(s.cita, 300)}»` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+      };
+
+      const guardar = async (c: CifraLibro, d: Descripcion) => {
+        const s = c.source ?? ({} as SourceCifra);
+        const { describir_fallo: _f, ...resto } = s;
+        // Las derivadas conservan lo que escribió el código en español; Pilo completa lo que falta.
+        const deCodigo = s.descrito === "codigo";
+        const cambios = deCodigo
+          ? {
+              label_en: c.label_en || d.label_en,
+              source: { ...resto, descripcion: s.descripcion || d.descripcion_es, descripcion_en: s.descripcion_en || d.descripcion_en, descrito: "codigo" as const, descrito_at: new Date().toISOString() },
+            }
+          : {
+              label: d.label_es.slice(0, 300),
+              label_en: d.label_en.slice(0, 300),
+              source: { ...resto, descripcion: d.descripcion_es, descripcion_en: d.descripcion_en, descrito: "pilo" as const, descrito_at: new Date().toISOString() },
+            };
+        // Nunca sobre lo que describió una persona mientras Pilo trabajaba.
+        const w = await admin.from("pp_cifras").update(cambios).eq("informe_id", informeId).eq("key", c.key).or("source->>descrito.is.null,source->>descrito.neq.persona").select("key");
+        if (w.error) throw w.error;
+        if (w.data?.length) {
+          Object.assign(c, cambios);
+          descritas++;
+        } else {
+          fallos.push({ key: c.key, motivo: "Una persona la describió mientras Pilo trabajaba: no se tocó." });
+          c.source = { ...s, descrito: "persona" };
+        }
+      };
+
+      const marcarFallo = async (c: CifraLibro, m: string) => {
+        fallos.push({ key: c.key, motivo: m });
+        const source = { ...(c.source ?? {}), describir_fallo: { motivo: m.slice(0, 300), at: new Date().toISOString() } } as SourceCifra;
+        const w = await admin.from("pp_cifras").update({ source }).eq("informe_id", informeId).eq("key", c.key).or("source->>descrito.is.null,source->>descrito.neq.persona");
+        if (w.error) throw w.error;
+        c.source = source;
+      };
+
+      for (let vuelta = 0; ; vuelta++) {
+        if (vuelta > 0 && !hayTiempo()) break;
+        const lote = pendientes().slice(0, 12);
+        if (!lote.length) break;
+        const items: ItemDescribir[] = lote.map((c) => {
+          const contexto = contextoDe(c);
+          return { key: c.key, contexto, permitidos: numerosPermitidos(contexto, c) };
+        });
+        const r = await llamarVerificado(mensajesDescribir(unidad, informe.ranking, items), 3000, (crudo) => leerDescripciones(crudo, items), RECORDATORIO.describir);
+        if (!r.ok) {
+          // Sin tiempo para el reintento: no se marca nada, la próxima llamada lo intenta de nuevo.
+          if (/No hubo tiempo de reintentar/.test(r.error)) {
+            fallos.push(...lote.map((c) => ({ key: c.key, motivo: `${r.error} Sigue en la fila.` })));
+            break;
+          }
+          // El lote no se pudo leer ni tras el reintento: cada cifra queda marcada con el motivo (no se repite en bucle; «rehacer» la vuelve a intentar).
+          for (const c of lote) await marcarFallo(c, r.error);
+          continue;
+        }
+        for (const d of r.valor.buenas) await guardar(porKey.get(d.key)!, d);
+        for (const m of r.valor.malas) await marcarFallo(porKey.get(m.key)!, m.motivo);
+      }
+      const quedan = pendientes().length;
+      await bitacora({ descritas, fallos: fallos.length, quedan, motivos: fallos.map((f) => `${f.key}: ${f.motivo}`.slice(0, 220)).slice(0, 8) }, descritas, fallos.length, null);
+      return json({ ok: true, descritas, fallos, quedan });
+    } catch (e) {
+      return alto(e, { descritas, fallos: fallos.length }, descritas, fallos.length);
+    }
+  }
+
+  /* ===================================================================================
      analizar: el estadístico con IA
      =================================================================================== */
   if (accion === "analizar") {
@@ -949,12 +1269,17 @@ Deno.serve(async (request: Request) => {
       const inds = await indicadores(c);
       // Primero las que responden a un indicador y las más recientes.
       const orden = [...libro].sort((a, b) => Number(Boolean(b.indicator)) - Number(Boolean(a.indicator)) || (b.year ?? 0) - (a.year ?? 0) || a.key.localeCompare(b.key));
-      const r = await llamarVerificado(mensajesTablero(unidad, informe.ranking, inds, orden), 1800, (crudo) => leerTablero(crudo, libro, usadas));
+      const r = await llamarVerificado(mensajesTablero(unidad, informe.ranking, inds, orden), 2400, (crudo) => leerTablero(crudo, libro, usadas));
       if (!r.ok) {
         await bitacora({ error: r.error }, 0, 1, r.error);
         return fallo(`Pilo no logró un tablero legible: ${r.error}`, "verificacion", 422);
       }
       const t = r.valor;
+      // Menos de 3 gráficos válidos: el código completa con sugerencias deterministas (origen «codigo»), sin repetir
+      // los de una persona ni los que ya propuso Pilo.
+      const deOtros = bloques.filter((b) => b.origin !== "pilo" && b.kind === "grafico").map((b) => b.spec as unknown as SpecGrafico).filter((s) => Array.isArray(s?.series));
+      const sugeridos = t.graficos.length < MIN_GRAFICOS ? sugerirGraficos(libro, [...deOtros, ...t.graficos], Math.min(MAX_GRAFICOS - t.graficos.length, MIN_GRAFICOS - t.graficos.length)) : [];
+      t.graficos.push(...sugeridos);
       if (cuerpo.rehacer && dePilo.length) {
         const d = await admin.from("pp_bloques").delete().eq("informe_id", informeId).eq("origin", "pilo").in("kind", ["kpi", "grafico"]);
         if (d.error) throw d.error;
@@ -966,12 +1291,20 @@ Deno.serve(async (request: Request) => {
         ...t.kpis.map((k) => ({ informe_id: informeId, kind: "kpi", sec: SECCIONES.kpi, pos: posK++, origin: "pilo", enabled: true, spec: k, heading_es: "", heading_en: "", figs: [k.cifra] })),
         ...t.graficos.map((g) => ({ informe_id: informeId, kind: "grafico", sec: SECCIONES.grafico, pos: posG++, origin: "pilo", enabled: true, spec: g, heading_es: g.title_es, heading_en: g.title_en, figs: g.series.map((s) => s.cifra) })),
       ];
+      const propuestos: GraficoPropuesto[] = [];
       if (filas.length) {
-        const w = await admin.from("pp_bloques").insert(filas, { defaultToNull: false });
+        const w = await admin.from("pp_bloques").insert(filas, { defaultToNull: false }).select("id, kind, spec");
         if (w.error) throw w.error;
+        for (const b of (w.data ?? []) as { id: string; kind: string; spec: SpecGrafico }[])
+          if (b.kind === "grafico") propuestos.push({ block_id: b.id, chart: b.spec.chart, title_es: b.spec.title_es, origen: b.spec.origen === "codigo" ? "codigo" : "pilo" });
       }
-      await bitacora({ kpis: t.kpis.length, graficos: t.graficos.length, descartados: t.descartados.length, motivos: t.descartados.map((d) => d.motivo.slice(0, 220)).slice(0, 8) }, filas.length, t.descartados.length, null);
-      return json({ ok: true, kpis: t.kpis.length, graficos: t.graficos.length, descartados: t.descartados });
+      await bitacora(
+        { kpis: t.kpis.length, graficos: t.graficos.length, sugeridos: sugeridos.length, descartados: t.descartados.length, motivos: t.descartados.map((d) => d.motivo.slice(0, 220)).slice(0, 8) },
+        filas.length,
+        t.descartados.length,
+        null,
+      );
+      return json({ ok: true, kpis: t.kpis.length, graficos: t.graficos.length, descartados: t.descartados, propuestos });
     } catch (e) {
       return alto(e);
     }
@@ -1111,41 +1444,67 @@ Deno.serve(async (request: Request) => {
       /** El libro del grupo: las cifras de sus fuentes y las derivadas de ellas. */
       const libroDe = (grupo: string[]) => {
         const g = new Set(grupo);
-        const propias = libro.filter((x) => !x.derived && g.has(x.source?.ref));
+        const propias = libro.filter((x) => !x.derived && g.has(String(x.source?.ref ?? "")));
         const llaves = new Set(propias.map((x) => x.key));
-        const derivadas = libro.filter((x) => x.derived && (Array.isArray(x.source?.fila) ? x.source.fila : [x.source?.fila]).some((k) => llaves.has(String(k))));
+        // Las bases de una derivada: `source.bases` (o `source.fila` en libros armados antes).
+        const basesDe = (x: CifraLibro): unknown[] => (Array.isArray(x.source?.bases) ? x.source.bases : Array.isArray((x.source as { fila?: unknown })?.fila) ? ((x.source as { fila?: unknown[] }).fila ?? []) : [x.source?.fila]);
+        const derivadas = libro.filter((x) => x.derived && basesDe(x).some((k) => llaves.has(String(k))));
         return [...propias, ...derivadas];
       };
 
+      // Profundidad: «profunda» por defecto (5 fuentes, 4–6 párrafos, UN eje por llamada); «normal» = 3 fuentes, 2–3 párrafos.
+      const profundidad: Profundidad = cuerpo.profundidad === "normal" ? "normal" : "profunda";
+      const porEje = formaEje(profundidad, 0).fuentes;
       const bloqueId = cuerpo.block_id ? String(cuerpo.block_id) : null;
-      const cuantos = bloqueId ? 1 : Math.max(1, Math.min(Math.max(2, destino.lote), Math.floor(Number(cuerpo.count) || 2)));
+      const profundizar = Boolean(bloqueId && cuerpo.profundizar);
+      const cuantos = bloqueId || profundidad === "profunda" ? 1 : Math.max(1, Math.min(Math.max(2, destino.lote), Math.floor(Number(cuerpo.count) || 2)));
       for (let vuelta = 0; vuelta < cuantos; vuelta++) {
         if (vuelta > 0 && !hayTiempo()) break;
         let trabajo: { grupo: string[]; pista: string | null; pos: number } | null = null;
+        let anterior: { heading_es: string; text_es: string } | null = null;
+        let eraBorrador = false;
         if (bloqueId) {
           const b = bloques.find((x) => x.id === bloqueId && x.kind === "texto");
           if (!b) return fallo("No existe ese bloque de texto en el informe.", "informe", 404);
           if (b.origin !== "pilo") return fallo("Una persona escribió o editó este bloque: Pilo no lo reescribe.", "de_persona", 409);
           const propias = [...new Set((b.sources ?? []).map((s) => s.ref))].filter((r) => textoDe.has(r));
           if (!propias.length) return fallo("Las fuentes de este bloque ya no están incluidas o no se pueden leer.", "sin_fuentes", 409);
-          trabajo = { grupo: propias, pista: String(b.spec?.indicator ?? "") || null, pos: b.pos };
+          const pista = String(b.spec?.indicator ?? "") || null;
+          let grupo = propias;
+          if (profundizar) {
+            // Más fuentes del MISMO indicador que ningún eje cita aún: al menos 2 nuevas si las hay, sin pasar del tope.
+            const cupo = Math.min(FUENTES_POR_EJE_MAX - propias.length, Math.max(2, porEje - propias.length));
+            const nuevas = fuentesParaProfundizar(pendientes, citadas(), fallidas(), pista, cupo);
+            grupo = [...propias, ...nuevas];
+            if (!nuevas.length) avisos.push(`No quedan fuentes del indicador ${pista ?? "(sin indicador)"} sin citar: el eje se reescribió en profundidad con sus mismas fuentes.`);
+            anterior = { heading_es: b.heading_es, text_es: b.text_es };
+          }
+          eraBorrador = !b.enabled && String(b.warn ?? "").startsWith("SIN VERIFICAR");
+          trabajo = { grupo, pista, pos: b.pos };
         } else {
-          const t = trabajosEje(pendientes, citadas(), fallidas())[0];
+          const t = trabajosEje(pendientes, citadas(), fallidas(), porEje)[0];
           if (t) trabajo = { ...t, pos: siguientePos(SECCIONES.texto, bloques) };
         }
         if (!trabajo) break;
         const grupo = trabajo.grupo.map((r) => textoDe.get(r)!).filter(Boolean);
         const sub = libroDe(trabajo.grupo);
+        // Profundizar siempre escribe en profundidad, aunque se pida «normal».
+        const forma = formaEje(profundizar ? "profunda" : profundidad, grupo.length);
         // El último texto con buena forma, aunque no pase la verificación: si no pasa, queda como borrador apagado y marcado.
         const ultimo: { v: Eje | null } = { v: null };
-        const r = await llamarVerificado<Eje>(mensajesEje(unidad, informe.ranking, voz, inds, grupo, sub, trabajo.pista), 1600, (crudo) => {
-          const l = leerEje(crudo, grupo, inds);
-          if (!l.ok) return l;
-          ultimo.v = l.valor;
-          const v = verificarEje(l.valor, grupo, porKey, { exigir: trabajo!.grupo, fijos });
-          if (!v.ok) return { ok: false, error: v.error ?? "No pasó la verificación." };
-          return { ok: true, valor: { ...l.valor, warn: v.warn } };
-        });
+        const r = await llamarVerificado<Eje>(
+          mensajesEje(unidad, informe.ranking, voz, inds, grupo, sub, trabajo.pista, forma, anterior),
+          forma.maxTokens,
+          (crudo) => {
+            const l = leerEje(crudo, grupo, inds, forma);
+            if (!l.ok) return l;
+            ultimo.v = l.valor;
+            const v = verificarEje(l.valor, grupo, porKey, { exigir: trabajo!.grupo, fijos });
+            if (!v.ok) return { ok: false, error: v.error ?? "No pasó la verificación." };
+            return { ok: true, valor: { ...l.valor, warn: v.warn } };
+          },
+          RECORDATORIO.eje,
+        );
         if (!r.ok) {
           fallos.push({ refs: trabajo.grupo, motivo: r.error });
           if (!bloqueId && ultimo.v) {
@@ -1160,7 +1519,7 @@ Deno.serve(async (request: Request) => {
               .single();
             if (w.error) throw w.error;
             ids.push(w.data.id);
-            bloques.push({ id: w.data.id, kind: "texto", sec: SECCIONES.texto, pos: trabajo.pos, origin: "pilo", enabled: false, spec, heading_es: b.heading_es, heading_en: b.heading_en, text_es: b.text_es, text_en: b.text_en, sources: b.sources, figs: b.figs });
+            bloques.push({ id: w.data.id, kind: "texto", sec: SECCIONES.texto, pos: trabajo.pos, origin: "pilo", enabled: false, spec, heading_es: b.heading_es, heading_en: b.heading_en, text_es: b.text_es, text_en: b.text_en, sources: b.sources, figs: b.figs, warn: aviso });
             escritos++;
             continue;
           }
@@ -1177,14 +1536,20 @@ Deno.serve(async (request: Request) => {
         const e = r.valor;
         const datos = { spec: { indicator: e.indicator }, heading_es: e.heading_es, heading_en: e.heading_en, text_es: e.text_es, text_en: e.text_en, orig_es: e.text_es, orig_en: e.text_en, sources: e.sources, figs: e.figs, warn: e.warn };
         if (bloqueId) {
-          const w = await admin.from("pp_bloques").update(datos).eq("id", bloqueId).eq("origin", "pilo").select("id");
+          // Un borrador «SIN VERIFICAR» que ahora pasa la verificación se enciende como cualquier eje verificado de Pilo.
+          const w = await admin
+            .from("pp_bloques")
+            .update({ ...datos, ...(eraBorrador ? { enabled: true } : {}) })
+            .eq("id", bloqueId)
+            .eq("origin", "pilo")
+            .select("id");
           if (w.error) throw w.error;
           if (!w.data?.length) {
             await bitacora({ sec, escritos }, escritos, 1, "Una persona cambió el bloque mientras Pilo escribía.");
             return fallo("Una persona cambió el bloque mientras Pilo escribía: no se reescribió.", "de_persona", 409);
           }
           const b = bloques.find((x) => x.id === bloqueId)!;
-          Object.assign(b, { sources: e.sources, figs: e.figs, text_es: e.text_es });
+          Object.assign(b, { sources: e.sources, figs: e.figs, text_es: e.text_es, warn: e.warn, ...(eraBorrador ? { enabled: true } : {}) });
           ids.push(bloqueId);
         } else {
           const w = await admin
@@ -1198,8 +1563,8 @@ Deno.serve(async (request: Request) => {
         }
         escritos++;
       }
-      const quedan = trabajosEje(pendientes, citadas(), fallidas()).length;
-      await bitacora({ sec, escritos, fallos: fallos.length, quedan, motivos: fallos.map((f) => f.motivo.slice(0, 220)).slice(0, 6) }, escritos, fallos.length, null);
+      const quedan = trabajosEje(pendientes, citadas(), fallidas(), porEje).length;
+      await bitacora({ sec, profundidad, ...(profundizar ? { profundizar: true } : {}), escritos, fallos: fallos.length, quedan, motivos: fallos.map((f) => f.motivo.slice(0, 220)).slice(0, 6) }, escritos, fallos.length, null);
       return json({ ok: true, escritos, quedan, fallos, sin_usar: sinUsar(quedan), bloques: ids, ...(avisos.length ? { avisos } : {}) });
     } catch (e) {
       return alto(e, { sec, escritos }, escritos, fallos.length);
@@ -1231,13 +1596,32 @@ Deno.serve(async (request: Request) => {
           par(String(s.title_es ?? ""), String(s.title_en ?? ""), { tabla: "grafico", id: b.id, campo: "title_es" }, { tabla: "grafico", id: b.id, campo: "title_en" });
         }
       }
+      // Lotes por tamaño: hasta 6 textos y ~4.500 caracteres (un eje largo puede ir solo), para no pasarse de tiempo ni de tokens.
+      const lotesDe = (lista: typeof trabajos) => {
+        const out: (typeof trabajos)[] = [];
+        let actual: typeof trabajos = [];
+        let chars = 0;
+        for (const t of lista) {
+          if (actual.length && (actual.length >= 6 || chars + t.texto.length > 4500)) {
+            out.push(actual);
+            actual = [];
+            chars = 0;
+          }
+          actual.push(t);
+          chars += t.texto.length;
+        }
+        if (actual.length) out.push(actual);
+        return out;
+      };
       let intentados = 0;
       for (const hacia of ["en", "es"] as const) {
-        for (const lote of enGrupos(trabajos.filter((t) => t.hacia === hacia), 6)) {
+        for (const lote of lotesDe(trabajos.filter((t) => t.hacia === hacia))) {
           if (!hayTiempo()) break;
           intentados += lote.length;
           const items: ItemTraduccion[] = lote.map((t, i) => ({ ref: `T${i + 1}`, texto: t.texto }));
-          const r = await llamarVerificado(mensajesTraducirPP(items, hacia), 2600, (c) => leerTraduccionesPP(c, items, hacia));
+          const chars = lote.reduce((s, t) => s + t.texto.length, 0);
+          const tokens = Math.min(3800, Math.max(1200, Math.ceil(chars / 2.5) + 400));
+          const r = await llamarVerificado(mensajesTraducirPP(items, hacia), tokens, (c) => leerTraduccionesPP(c, items, hacia));
           if (!r.ok) {
             fallos.push(...lote.map((t) => ({ ref: `${t.destino.tabla}:${t.destino.id}:${t.destino.campo}`, error: r.error })));
             continue;

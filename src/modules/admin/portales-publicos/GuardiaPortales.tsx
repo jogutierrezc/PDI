@@ -15,12 +15,13 @@
    un administrador.
    ========================================================================== */
 
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
 import { Icon } from "../../../components/ui/Icon";
-import { UdesLogo } from "../../../components/layout/UdesLogo";
+// La escena lleva GSAP y el minijuego: se pide solo cuando de verdad hay que mostrarla.
+const EscenaError = lazy(() => import("../../errores/EscenaError").then((m) => ({ default: m.EscenaError })));
 import { esMarcoInsertado, portalDeRuta, useEstadoPublico } from "./estado";
 import type { PortalEstado } from "./estado";
 import "./publico.css";
@@ -117,11 +118,30 @@ export function Mantenimiento({
     };
   }, [vistaPrevia]);
 
+  // La versión completa es la escena de Pilo en mantenimiento (módulo errores); los marcos incrustados siguen con el aviso corto de abajo.
+  if (!compacto) {
+    const vuelve = cuando && new Date(cuando).getTime() > Date.now() ? new Date(cuando) : null;
+    const escena = (
+      <EscenaError
+        codigo="503"
+        vistaPrevia={vistaPrevia}
+        titulo={`${titulo} está en mantenimiento`}
+        mensaje={texto}
+        regreso={vuelve}
+        acciones={[
+          ...(enlazarPortada ? [{ texto: "Ir a la portada de Planeación", a: "/", tipo: "pri" as const }] : []),
+          { texto: "Acceso de la intranet", a: "/acceso-intranet", tipo: "sec" as const },
+        ]}
+      />
+    );
+    const carga = <div className="route-fallback" role="status" aria-live="polite"><span className="route-fallback__spinner" aria-hidden="true" /><span className="sr-only">Cargando…</span></div>;
+    return vistaPrevia ? <Suspense fallback={carga}>{escena}</Suspense> : <main className="err-fondo" id="contenido"><Suspense fallback={carga}>{escena}</Suspense></main>;
+  }
+
   const Raiz = vistaPrevia ? "div" : "main";
   return (
     <Raiz className="ppu-mant" data-compacto={compacto || undefined} {...(vistaPrevia ? {} : { id: "contenido" })}>
       <div className="ppu-mant__caja">
-        {!compacto && <UdesLogo height={40} />}
         <span className="ppu-mant__icono" aria-hidden="true">
           <Icon name="settings" size={compacto ? 22 : 30} />
         </span>

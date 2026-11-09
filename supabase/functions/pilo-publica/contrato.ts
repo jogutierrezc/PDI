@@ -49,7 +49,11 @@ export interface SpecGrafico {
   series: PuntoSerie[];
   /** La unidad común de la serie (la pone el código, no la IA). */
   unit?: string;
+  /** Quién propuso el gráfico: el estadístico con IA o la sugerencia determinista del código. */
+  origen?: OrigenGrafico;
 }
+
+export type OrigenGrafico = "pilo" | "codigo";
 
 export interface SpecImagen {
   news_id: string;
@@ -62,6 +66,8 @@ export interface SpecImagen {
   alt?: string;
   url?: string;
   credit?: string;
+  /** Imagen manual de una persona (spec.url https): la acción `imagenes` no la toca. */
+  externa?: boolean;
 }
 
 export interface SpecTexto {
@@ -81,6 +87,8 @@ export interface CitaBloque {
   url?: string;
   /** La nota, si la fuente es una noticia (para las imágenes y los enlaces). */
   news_id?: string;
+  /** El párrafo del texto (1, 2, …) que se apoya en esta cita. */
+  p?: number;
 }
 
 /** pp_fuentes.meta de una noticia (lo que la pantalla lee). */
@@ -102,42 +110,92 @@ export interface MetaNoticia {
   fallo?: { motivo: string; at: string };
 }
 
-/* ---------- El rastro de una cifra (pp_cifras.source) ------------------------------ */
+/* ---------- La procedencia de una cifra (pp_cifras.source) -------------------------- */
 
-export interface RastroCifra {
-  /** La tabla de origen («news_figures», «ds_filas», «ranking_responses», «ugm_respuestas», «od_values», «ranking_biblioteca»). */
-  tabla: string;
-  /** El `pp_fuentes.ref` del que sale. */
-  ref: string;
+/**
+ * De dónde sale una cifra y qué mide. Contrato con la pantalla: todo es
+ * opcional salvo `kind` y `tabla`. Lo escribe `libro` en TODAS las vías
+ * (Datos de Sostenibilidad, THE Impact, UI GreenMetric, UDES en Cifras,
+ * documentos, noticias y derivadas); `describir` agrega la descripción.
+ */
+export interface SourceCifra {
   kind: KindFuente;
-  /** Fila(s) de origen. */
-  fila?: string | string[];
+  /** Nombre LEGIBLE de la tabla, libro o informe («Brigadas de salud 2024», «UDES en Cifras · Bienestar»). */
+  tabla: string;
+  /** La oficina o unidad que reporta. */
+  oficina?: string;
+  /** La columna o el campo («Número de asistentes»). */
   columna?: string;
-  /** El trozo literal que la contiene, si lo hay. */
+  /** La parte a la que se refiere («Sede Bucaramanga», «Oficina de Bienestar», «Toda la UDES»). */
+  desglose?: string;
+  /** El periodo («2024», «2024-1, 2024-2», «2025-03-12»). */
+  periodo?: string;
+  indicador_id?: string;
+  /** Nombre del indicador. */
+  indicador?: string;
+  definicion?: string;
+  /** El trozo literal que la contiene, si sale de un texto. */
   cita?: string;
   url?: string;
-  /** Cómo se obtuvo, si se juntaron varias filas. */
+  fila?: string | number;
+  /** Clave estable de la MISMA medida a través de años o periodos: lo que permite armar series sin adivinar. */
+  serie?: string;
+  /** Qué mide, a qué población, en qué periodo y cómo se obtuvo (ES). */
+  descripcion?: string;
+  descripcion_en?: string;
+  /** Quién escribió la descripción: Pilo (`describir`), una persona (no se pisa) o el código (derivadas). */
+  descrito?: "pilo" | "persona" | "codigo";
+  /** Derivadas: cómo se calculó. */
+  formula?: string;
+
+  /* Campos internos de la función (la pantalla puede ignorarlos). */
+  /** El `pp_fuentes.ref` del que sale («ds:<id>», «the:<id>», «od:<id>», el uuid de la nota…); «derivada» en las calculadas. */
+  ref?: string;
+  /** La tabla técnica de la base («ds_filas», «ranking_responses», «od_values»…). */
+  tabla_db?: string;
+  /** Todas las filas de origen, si se juntaron varias. */
+  filas?: string[];
+  /** Derivadas: las keys del libro de las que sale. */
+  bases?: string[];
+  /** Cómo se juntaron varias filas («suma de 12 filas»). */
   nota?: string;
+  /** `describir`: cuándo se describió (ISO) y, si falló, el motivo. */
+  descrito_at?: string;
+  describir_fallo?: { motivo: string; at: string };
 }
+
+/** Nombre anterior del tipo (compatibilidad). */
+export type RastroCifra = SourceCifra;
 
 /* ---------- Cuerpos y respuestas ---------------------------------------------------- */
 
-export type Accion = "estado" | "fuentes" | "libro" | "analizar" | "redactar" | "imagenes" | "traducir";
-export const ACCIONES: Accion[] = ["estado", "fuentes", "libro", "analizar", "redactar", "imagenes", "traducir"];
+export type Accion = "estado" | "fuentes" | "libro" | "describir" | "analizar" | "redactar" | "imagenes" | "traducir";
+export const ACCIONES: Accion[] = ["estado", "fuentes", "libro", "describir", "analizar", "redactar", "imagenes", "traducir"];
+
+/** redactar «ejes»: «normal» = hasta 3 fuentes y 2–3 párrafos; «profunda» (defecto) = hasta 5 fuentes y 4–6 párrafos. */
+export type Profundidad = "normal" | "profunda";
 
 export interface Pedido {
   action: Accion;
   informe_id?: string;
-  /** analizar: reemplaza los kpi/gráficos de Pilo. redactar «portada»: escribe aunque ya haya título o entrada. */
+  /**
+   * analizar: reemplaza los kpi/gráficos de Pilo. redactar «portada»: escribe aunque ya haya título o entrada.
+   * describir: vuelve a describir también las ya descritas por Pilo (nunca las de una persona); se puede
+   * repetir con rehacer hasta quedan = 0 (las descritas en los últimos 15 minutos no se repiten).
+   */
   rehacer?: boolean;
   /** redactar: la sección. */
   sec?: "portada" | "ejes";
   /** redactar «ejes»: reescribe ese bloque (solo si es de Pilo). */
   block_id?: string;
-  /** redactar «ejes»: cuántos párrafos en esta llamada. */
+  /** redactar «ejes» con block_id: reescribe el eje en profundidad sumando fuentes del mismo indicador aún sin citar. */
+  profundizar?: boolean;
+  /** redactar «ejes»: cuántos ejes en esta llamada (con «profunda», siempre 1). */
   count?: number;
   /** redactar «ejes»: vuelve a intentar las fuentes que fallaron antes. */
   reintentar?: boolean;
+  /** redactar «ejes»: por defecto «profunda». */
+  profundidad?: Profundidad;
 }
 
 export type CodigoError =
@@ -196,11 +254,31 @@ export interface Descartado {
   motivo: string;
 }
 
+export interface RespuestaDescribir {
+  ok: true;
+  /** Cifras descritas en esta llamada. */
+  descritas: number;
+  /** Las que no pasaron la verificación (se omiten; el resto se guarda). */
+  fallos: { key: string; motivo: string }[];
+  /** Cifras que faltan por describir; el cliente repite hasta 0. */
+  quedan: number;
+}
+
+export interface GraficoPropuesto {
+  block_id?: string;
+  chart: Grafico;
+  title_es: string;
+  /** «pilo»: lo propuso el estadístico con IA; «codigo»: sugerencia determinista para completar 3. */
+  origen: OrigenGrafico;
+}
+
 export interface RespuestaAnalizar {
   ok: true;
   kpis: number;
   graficos: number;
   descartados: Descartado[];
+  /** Cada gráfico creado, con quién lo propuso. */
+  propuestos: GraficoPropuesto[];
 }
 
 export interface Fallo {
@@ -223,6 +301,8 @@ export interface RespuestaRedactar {
   /** Noticias incluidas que no quedaron citadas en ningún texto, con el motivo. */
   sin_usar: SinUsar[];
   bloques?: string[];
+  /** Avisos de la llamada (fuentes que no se pudieron leer, «profundizar» sin fuentes nuevas…). */
+  avisos?: string[];
 }
 
 export interface PropuestaImagen {

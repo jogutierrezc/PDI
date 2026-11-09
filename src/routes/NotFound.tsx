@@ -4,26 +4,13 @@ import { Icon } from "../components/ui/Icon";
 import { usePillars } from "../data/queries";
 import { accentFor } from "../data/pdi";
 import { roleLabels, useAuth } from "../lib/auth";
+import { EscenaError } from "../modules/errores/EscenaError";
 
 export function NotFound() {
   return (
     <PublicLayout className="notfound-page">
-      <section className="u-container notfound">
-        <span className="eyebrow">Error 404</span>
-        <h1>Esta página no existe</h1>
-        <p className="lede">
-          El enlace puede estar desactualizado o la sección se movió. Desde aquí puedes volver al plan.
-        </p>
-
-        <div className="notfound__actions">
-          <Link className="button-primary" to="/">
-            Volver al inicio <span data-arrow aria-hidden="true">→</span>
-          </Link>
-          <Link className="button-secondary" to="/tablero">
-            Ir al tablero PDI
-          </Link>
-        </div>
-
+      <section className="u-container notfound-escena">
+        <EscenaError codigo="404" />
         <PillarShortcuts />
       </section>
     </PublicLayout>
@@ -40,23 +27,20 @@ export function Forbidden() {
 
   return (
     <PublicLayout className="notfound-page">
-      <section className="u-container notfound">
-        <span className="eyebrow">Acceso restringido</span>
-        <h1>No tienes permiso para esta sección</h1>
-        <p className="lede">
-          {profile
-            ? `Tu rol de acceso no incluye esta pantalla (capacidad: ${roleLabels[profile.role]}). Si necesitas entrar, pide a un administrador que la añada a tu rol.`
-            : "Inicia sesión con una cuenta autorizada para continuar."}
-        </p>
-
-        <div className="notfound__actions">
-          <Link className="button-primary" to={home}>
-            Ir a lo que sí puedo ver <span data-arrow aria-hidden="true">→</span>
-          </Link>
-          <Link className="button-secondary" to="/">
-            Volver al portal público
-          </Link>
-        </div>
+      <section className="u-container notfound-escena">
+        <EscenaError
+          codigo="403"
+          titulo="No tienes permiso para esta sección"
+          mensaje={
+            profile
+              ? `Tu rol de acceso no incluye esta pantalla (capacidad: ${roleLabels[profile.role]}). Si necesitas entrar, pide a un administrador que la añada a tu rol.`
+              : "Inicia sesión con una cuenta autorizada para continuar."
+          }
+          acciones={[
+            { texto: "Ir a lo que sí puedo ver", a: home, tipo: "pri" },
+            { texto: "Volver al portal público", a: "/", tipo: "sec" },
+          ]}
+        />
       </section>
     </PublicLayout>
   );

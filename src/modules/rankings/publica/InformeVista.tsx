@@ -7,11 +7,11 @@
    el libro; una cifra que falta se avisa en la intranet y se omite en público.
    ========================================================================== */
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useAnimarInforme, reducido } from "./animar";
 import { Grafica } from "./graficas";
-import { CATALOGO, ajustesDe, elegir, formato, nombreUnidad, ordenDe, parrafos, rankingDe, resolverSerie, varsAcento } from "./tipos";
+import { CATALOGO, ajustesDe, elegir, errorEnlaceHttps, formato, nombreUnidad, ordenDe, parrafos, rankingDe, resolverSerie, varsAcento } from "./tipos";
 import type { BloquePP, CifraPub, Idioma, InformePP, SeccionVista, UnidadPP } from "./tipos";
 import type { Medios } from "./datos";
 import { SDG } from "../../sostenible/data";
@@ -71,19 +71,99 @@ export interface VistaProps {
 const dec = (v: number) => Math.min(2, (String(v).split(".")[1] ?? "").length);
 const porPos = (a: BloquePP, b: BloquePP) => a.pos - b.pos;
 
-function Fig({ src, alt, caption, credit }: { src: string; alt: string; caption: string; credit?: string | null }) {
+interface ImagenResuelta {
+  src: string;
+  alt: string;
+  caption: string;
+  credit?: string | null;
+  creditUrl?: string | null;
+}
+
+/** La imagen con su pie. Si no carga, no deja un hueco: avisa al padre y no se dibuja. */
+function Fig({ src, alt, caption, credit, creditUrl, onFallo }: ImagenResuelta & { onFallo: () => void }) {
+  const enlace = creditUrl && !errorEnlaceHttps(creditUrl) ? creditUrl : null;
   return (
     <figure className="pp-fig">
       <div className="pp-clip">
-        <img src={src} alt={alt} loading="lazy" decoding="async" />
+        <img src={src} alt={alt} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onFallo} />
       </div>
       {(caption || credit) && (
         <figcaption>
           {caption}
-          {credit ? ` · ${credit}` : ""}
+          {credit ? (
+            <>
+              {caption ? " · " : ""}
+              {enlace ? (
+                <a href={enlace} target="_blank" rel="noopener noreferrer">
+                  {credit}
+                </a>
+              ) : (
+                credit
+              )}
+            </>
+          ) : null}
         </figcaption>
       )}
     </figure>
+  );
+}
+
+/** Un párrafo es una cita si va entre comillas de principio a fin. */
+const esCita = (t: string): boolean => /^[«“"].{20,}[»”"]$/s.test(t.trim());
+
+/** Un eje: título, párrafos con ritmo, cifras destacadas y su imagen (que se oculta si falla). */
+function Eje({ e, i, idioma, im, cifras, etiqueta }: { e: BloquePP; i: number; idioma: Idioma; im: ImagenResuelta | null; cifras: Map<string, CifraPub>; etiqueta: string }) {
+  const [fallo, setFallo] = useState(false);
+  const h = elegir(e.heading_es, e.heading_en, idioma);
+  const t = elegir(e.text_es, e.text_en, idioma);
+  const ps = parrafos(t.t);
+  const mostrar = im && !fallo ? im : null;
+  const destacadas = (e.figs ?? [])
+    .map((k) => cifras.get(k))
+    .filter((c): c is CifraPub => Boolean(c) && c!.value !== null)
+    .slice(0, 2);
+  // las cifras destacadas van tras el segundo párrafo (o el primero, si el texto es corto)
+  const despuesDe = ps.length > 2 ? 1 : 0;
+  const tarjeta = destacadas.length ? (
+    <aside className="pp-stat" key="stat" aria-label={idioma === "en" ? "Key figures of this axis" : "Cifras de este eje"}>
+      {destacadas.map((c) => {
+        const et = elegir(c.label, c.label_en, idioma);
+        const pct = c.unit.trim() === "%";
+        return (
+          <div key={c.key}>
+            <b>
+              {formato(c.value as number, idioma, dec(c.value as number))}
+              {pct ? " %" : ""}
+            </b>
+            <span lang={et.lang}>{et.t}</span>
+            <em>{[c.year, !pct ? c.unit : ""].filter(Boolean).join(" · ")}</em>
+          </div>
+        );
+      })}
+    </aside>
+  ) : null;
+  return (
+    <article className={`pp-axis${i % 2 ? " pp-axis--rev" : ""}${mostrar ? "" : " pp-axis--solo"}`}>
+      <div>
+        <span className="pp-tag">
+          {etiqueta} {i + 1}
+        </span>
+        {h.t && <h3 lang={h.lang}>{h.t}</h3>}
+        <div className="pp-body" lang={t.lang}>
+          {ps.flatMap((x, k) => {
+            const nodo = esCita(x) ? (
+              <blockquote key={k}>
+                <p>{x}</p>
+              </blockquote>
+            ) : (
+              <p key={k}>{x}</p>
+            );
+            return k === despuesDe && tarjeta ? [nodo, tarjeta] : [nodo];
+          })}
+        </div>
+      </div>
+      {mostrar && <Fig {...mostrar} onFallo={() => setFallo(true)} />}
+    </article>
   );
 }
 
@@ -112,8 +192,10 @@ export function InformeVista({ informe, unidad, bloques, cifras, medios, idioma,
   // imagen de cada eje: la que lo nombra (spec.eje) o, si no, por orden
   const imagenDeEje = useMemo(() => {
     const m = new Map<string, BloquePP>();
-    const sueltas = imagenes.filter((i) => !i.spec.eje || !ejes.some((e) => e.id === i.spec.eje));
-    for (const i of imagenes) if (i.spec.eje && ejes.some((e) => e.id === i.spec.eje) && !m.has(i.spec.eje)) m.set(i.spec.eje, i);
+    // las manuales (por enlace) van primero: son decisión de una persona
+    const ordenadas = [...imagenes].sort((a, b) => Number(Boolean(b.spec.url)) - Number(Boolean(a.spec.url)));
+    const sueltas = ordenadas.filter((i) => !i.spec.eje || !ejes.some((e) => e.id === i.spec.eje));
+    for (const i of ordenadas) if (i.spec.eje && ejes.some((e) => e.id === i.spec.eje) && !m.has(i.spec.eje)) m.set(i.spec.eje, i);
     for (const e of ejes) if (!m.has(e.id)) {
       const s = sueltas.shift();
       if (s) m.set(e.id, s);
@@ -122,8 +204,14 @@ export function InformeVista({ informe, unidad, bloques, cifras, medios, idioma,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depende de los bloques activos
   }, [activos]);
 
-  const resolverImagen = (b: BloquePP | undefined) => {
+  const resolverImagen = (b: BloquePP | undefined): ImagenResuelta | null => {
     if (!b) return null;
+    if (b.spec.url) {
+      if (errorEnlaceHttps(b.spec.url)) return null; // nunca se dibuja algo que no sea https
+      const cap = elegir(b.spec.caption_es ?? "", b.spec.caption_en ?? "", idioma).t;
+      const alt = elegir(b.spec.alt_es ?? "", b.spec.alt_en ?? "", idioma).t || cap;
+      return { src: b.spec.url, alt, caption: cap, credit: b.spec.credit || null, creditUrl: b.spec.credit_url || null };
+    }
     const img = (b.spec.image_id && medios.imagenes.get(b.spec.image_id)) || (b.spec.news_id ? medios.deNoticia.get(b.spec.news_id)?.[0] : undefined);
     const n = b.spec.news_id ? medios.noticias.get(b.spec.news_id) : undefined;
     const src = img?.url ?? n?.image_url ?? null;
@@ -291,27 +379,9 @@ export function InformeVista({ informe, unidad, bloques, cifras, medios, idioma,
       <div className="pp-rp">
         <h2 id="pp-h-ejes">{impact ? L.ejesImpact : L.ejes}</h2>
         <span className="pp-ul" />
-        {ejes.map((e, i) => {
-          const h = elegir(e.heading_es, e.heading_en, idioma);
-          const t = elegir(e.text_es, e.text_en, idioma);
-          const im = resolverImagen(imagenDeEje.get(e.id));
-          return (
-            <article className={`pp-axis${i % 2 ? " pp-axis--rev" : ""}${im ? "" : " pp-axis--solo"}`} key={e.id}>
-              <div>
-                <span className="pp-tag">
-                  {L.eje} {i + 1}
-                </span>
-                {h.t && <h3 lang={h.lang}>{h.t}</h3>}
-                <div className="pp-body" lang={t.lang}>
-                  {parrafos(t.t).map((p, k) => (
-                    <p key={k}>{p}</p>
-                  ))}
-                </div>
-              </div>
-              {im && <Fig {...im} />}
-            </article>
-          );
-        })}
+        {ejes.map((e, i) => (
+          <Eje key={e.id} e={e} i={i} idioma={idioma} im={resolverImagen(imagenDeEje.get(e.id))} cifras={cifras} etiqueta={L.eje} />
+        ))}
       </div>
     </section>
   ) : null;

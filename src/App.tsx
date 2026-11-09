@@ -16,6 +16,7 @@ import { TourFab } from "./components/tour/TourFab";
 import { PiloAi } from "./components/pilo/ai/PiloAi";
 import { AlertaEmergencia } from "./components/alertas/AlertaEmergencia";
 import { GuardiaPortales } from "./modules/admin/portales-publicos/GuardiaPortales";
+import { LimitePorRuta } from "./modules/errores/LimiteDeErrores";
 import { useAuth } from "./lib/auth";
 import type { AdminScreen, AppRole } from "./types/database";
 import type { ReactElement } from "react";
@@ -39,6 +40,7 @@ const PiloPolicy = lazy(() => import("./modules/pilo-app/terms/PolicyPage").then
 const Dashboard = lazy(() => import("./routes/Dashboard").then((m) => ({ default: m.Dashboard })));
 const NotFound = lazy(() => import("./routes/NotFound").then((m) => ({ default: m.NotFound })));
 const Forbidden = lazy(() => import("./routes/NotFound").then((m) => ({ default: m.Forbidden })));
+const PaginaError = lazy(() => import("./modules/errores/PaginaError").then((m) => ({ default: m.PaginaError })));
 const ImplementationPortal = lazy(() =>
   import("./modules/implementation/ImplementationPortal").then((m) => ({ default: m.ImplementationPortal })),
 );
@@ -314,6 +316,7 @@ export default function App() {
       <Suspense fallback={<RouteFallback />}>
         {/* Portales deshabilitados desde la intranet (0263): mantenimiento para el público, franja de aviso para la administración. Falla abierta. */}
         <GuardiaPortales>
+        <LimitePorRuta>
         <Routes>
           {/* La portada es el portal de Planeación; el PDI vive en /pdi. */}
           <Route path="/" element={<PlaneacionHome />} />
@@ -856,8 +859,11 @@ export default function App() {
 
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/sin-permiso" element={<Forbidden />} />
+          {/* Cualquier código de error con su escena de Pilo: 401, 402, 408, 429, 500, 502, 503… Sirve también de destino para el servidor. */}
+          <Route path="/error/:codigo" element={<PaginaError />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </LimitePorRuta>
         </GuardiaPortales>
       </Suspense>
       <TourFab />

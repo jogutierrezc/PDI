@@ -47,7 +47,8 @@ export interface RespuestaAnalizar {
   ok: boolean;
   kpis: number;
   graficos: number;
-  descartados: number;
+  /** Lo que se descartó, con su motivo (el servidor manda la lista; versiones viejas mandaban solo el número). */
+  descartados: { motivo: string }[] | number;
 }
 export interface RespuestaRedactar {
   ok: boolean;
@@ -77,7 +78,19 @@ export interface RespuestaTraducir {
   traducidos?: number;
 }
 
-export type Accion = "estado" | "fuentes" | "libro" | "analizar" | "redactar" | "imagenes" | "traducir";
+export interface RespuestaDescribir {
+  ok: boolean;
+  descritas: number;
+  fallos?: { key?: string; motivo?: string }[];
+  quedan: number;
+}
+export class AccionNoDisponible extends ErrorPublica {
+  constructor(accion: string) {
+    super(`La función pilo-publica desplegada todavía no conoce la acción «${accion}». Pídele a quien despliega que publique la versión nueva de la función; mientras tanto puedes escribir las explicaciones a mano.`, "accion_desconocida");
+  }
+}
+
+export type Accion = "estado" | "fuentes" | "libro" | "analizar" | "redactar" | "imagenes" | "traducir" | "describir";
 
 export async function llamar<T>(accion: Accion, informe_id: string, extra: Record<string, unknown> = {}): Promise<T> {
   const r = await supabase.functions.invoke("pilo-publica", { body: { action: accion, informe_id, ...extra } });
@@ -94,11 +107,13 @@ export async function llamar<T>(accion: Accion, informe_id: string, extra: Recor
     } catch {
       /* se queda el mensaje general */
     }
+    if (/acci[oó]n desconocida|unknown action|unknown_action|accion_desconocida/i.test(`${mensaje} ${code}`)) throw new AccionNoDisponible(accion);
     if (code === "migracion") throw new FaltaMigracion(mensaje || "Falta aplicar la migración 0262 (Pilo Publica).");
     if (!ctx || (status === 404 && (code === "" || /NOT_FOUND/i.test(code) || /not found/i.test(mensaje)))) throw new FuncionNoDesplegada();
     throw new ErrorPublica(mensaje, code);
   }
   const d = r.data as T & { ok?: boolean; error?: string; code?: string };
+  if (d && d.ok === false && d.error && /acci[oó]n desconocida|unknown action/i.test(`${d.error} ${d.code ?? ""}`)) throw new AccionNoDisponible(accion);
   if (d && d.ok === false && d.error) throw new ErrorPublica(d.error, d.code ?? "");
   return d as T;
 }
@@ -150,9 +165,9 @@ export function useCorrida(informeId: string | undefined) {
       setP({ ...VACIA, corriendo: true, etiqueta });
       try {
         for (let vuelta = 0; vuelta < 200; vuelta++) {
-          const r = await llamar<T & { escritos?: number; traducidos?: number; quedan?: number; fallos?: unknown }>(accion, informeId, extra);
+          const r = await llamar<T & { escritos?: number; traducidos?: number; descritas?: number; quedan?: number; fallos?: unknown }>(accion, informeId, extra);
           ultima = r;
-          const hizo = Number(r.escritos ?? r.traducidos ?? 0);
+          const hizo = Number(r.escritos ?? r.traducidos ?? r.descritas ?? 0);
           const quedan = Number(r.quedan ?? 0);
           hecho += hizo;
           if (Array.isArray(r.fallos)) {

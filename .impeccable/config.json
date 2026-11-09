@@ -47,6 +47,18 @@
         ],
         "createdAt": "2026-10-28T15:39:46.189Z",
         "reason": "Plantilla de correo de THE Impact: la caja de observaciones replica el HTML de ejemplo que aportó el usuario (border-left 4px). Es correo en tablas inline, no interfaz del portal; el usuario no confirmó el borde por separado."
+      },
+      {
+        "rule": "design-system-font",
+        "value": "pixelify sans",
+        "createdAt": "2026-11-09T15:59:20.787Z",
+        "reason": "user confirmed: pixel-art fonts approved for the error-page scene, matching the reference image the user supplied"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "silkscreen",
+        "createdAt": "2026-11-09T15:59:21.309Z",
+        "reason": "user confirmed: pixel-art fonts approved for the error-page scene, matching the reference image the user supplied"
       }
     ]
   }

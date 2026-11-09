@@ -1,20 +1,16 @@
 /* Etapa 3 de Pilo Publica: gráficos dinámicos. Cada gráfico cita cifras del libro; nunca lleva números propios. */
 
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RespuestaAnalizar } from "./api";
 import type { EtapaProps } from "./contexto";
-import { useBloques, useBorrarBloque, useCifras, useGuardarBloque } from "./datos";
-import { Grafica } from "./graficas";
-import { resolverSerie, varsAcento } from "./tipos";
-import type { BloquePP, CifraPub, SpecBloque, TipoGrafico } from "./tipos";
+import { siguientePos, useBloques, useBorrarBloque, useCifras, useGuardarBloque } from "./datos";
+import { ConstructorGrafico, NOMBRE_TIPO, Sugerencias, VistaPrevia } from "./ConstructorGrafico";
+import { diagnosticar, explicacionDe, sugerirGraficos } from "./explicar";
+import type { Sugerencia } from "./explicar";
+import type { BloquePP, CifraPP, CifraPub, SpecBloque, SpecGrafico, TipoGrafico } from "./tipos";
 import { BotonPilo, Campo, ErrorAviso, Interruptor, Tarjeta, Vacio } from "./ui";
 
-const TIPOS: { id: TipoGrafico; nombre: string }[] = [
-  { id: "bar", nombre: "Barras" },
-  { id: "line", nombre: "Línea" },
-  { id: "donut", nombre: "Anillo" },
-];
+const TIPOS: TipoGrafico[] = ["bar", "line", "donut"];
 
 export function EtapaGraficos(p: EtapaProps) {
   const bloques = useBloques(p.informe.id);
@@ -24,9 +20,12 @@ export function EtapaGraficos(p: EtapaProps) {
   const [sel, setSel] = useState<string | null>(null);
   const [rehacer, setRehacer] = useState(false);
   const [resumen, setResumen] = useState<string | null>(null);
+  const [panel, setPanel] = useState<"" | "crear" | "sugerencias">("");
 
   const graficos = useMemo(() => (bloques.data ?? []).filter((b) => b.kind === "grafico"), [bloques.data]);
-  const libro = useMemo(() => new Map<string, CifraPub>((cifras.data ?? []).map((c) => [c.key, c])), [cifras.data]);
+  const libroPP = useMemo(() => cifras.data ?? [], [cifras.data]);
+  const libro = useMemo(() => new Map<string, CifraPub>(libroPP.map((c) => [c.key, c])), [libroPP]);
+  const sugerencias = useMemo(() => sugerirGraficos(libroPP, graficos.map((g) => g.spec)), [libroPP, graficos]);
 
   useEffect(() => {
     if (graficos.length && !graficos.some((g) => g.id === sel)) setSel(graficos[0].id);
@@ -36,15 +35,14 @@ export function EtapaGraficos(p: EtapaProps) {
   const analizar = async () => {
     setResumen(null);
     const r = await p.corrida.correr<RespuestaAnalizar>("Pilo propone el tablero y los gráficos", "analizar", rehacer ? { rehacer: true } : {});
-    if (r) setResumen(`Pilo propuso ${r.kpis} cifras clave y ${r.graficos} gráficos.${r.descartados ? ` Descartó ${r.descartados} por no tener cifras verificables.` : ""}`);
+    if (r) setResumen(`Pilo propuso ${r.kpis} cifras clave y ${r.graficos} gráficos.${(Array.isArray(r.descartados) ? r.descartados.length : r.descartados) ? ` Descartó ${Array.isArray(r.descartados) ? r.descartados.length : r.descartados} (${Array.isArray(r.descartados) ? r.descartados.slice(0, 2).map((d) => d.motivo).join(" ") : "sin cifras verificables"}).` : ""}`);
   };
 
-  const nuevo = async () => {
-    const id = await guardar.mutateAsync({
-      informe_id: p.informe.id,
-      patch: { kind: "grafico", sec: "graficos", pos: (bloques.data?.length ?? 0) + 1, spec: { chart: "bar", series: [], title_es: "Nuevo gráfico", title_en: "New chart" } },
-    });
+  /** Inserta un gráfico nuevo (origen persona). Lanza el error para que quien llama lo muestre sin perder lo elegido. */
+  const crear = async (spec: SpecGrafico): Promise<string> => {
+    const id = await guardar.mutateAsync({ informe_id: p.informe.id, patch: { kind: "grafico", sec: "graficos", pos: siguientePos(bloques.data), enabled: true, spec } });
     setSel(id);
+    return id;
   };
 
   if (bloques.isPending || cifras.isPending) return <p role="status">Cargando los gráficos…</p>;
@@ -63,18 +61,36 @@ export function EtapaGraficos(p: EtapaProps) {
         </label>
         {resumen && <small className="pp-nota" role="status">{resumen}</small>}
       </div>
+
       <Tarjeta
-        titulo="Gráficos del informe"
-        cuenta={`${graficos.filter((x) => x.enabled).length} visibles`}
+        titulo="Armar un gráfico"
+        cuenta={sugerencias.length ? `${sugerencias.length} sugerencias` : undefined}
         acciones={
-          <button type="button" className="pp-btn pp-btn--sm" onClick={() => void nuevo()} disabled={guardar.isPending}>
-            + Nuevo gráfico
-          </button>
+          <>
+            <button type="button" className="pp-btn pp-btn--sm" aria-expanded={panel === "crear"} onClick={() => setPanel(panel === "crear" ? "" : "crear")}>
+              {panel === "crear" ? "Cerrar" : "+ Crear paso a paso"}
+            </button>
+            <button type="button" className="pp-btn pp-btn--sm" aria-expanded={panel === "sugerencias"} onClick={() => setPanel(panel === "sugerencias" ? "" : "sugerencias")} disabled={libroPP.length === 0}>
+              {panel === "sugerencias" ? "Ocultar sugerencias" : "Ver sugerencias"}
+            </button>
+          </>
         }
       >
+        {panel === "" && (
+          <p className="pp-nota pp-pad">
+            {libroPP.length === 0
+              ? "Primero arma el libro de cifras en el tablero: los gráficos se dibujan con esas cifras."
+              : "Crea un gráfico eligiendo qué mostrar (solo se ofrecen combinaciones que sí se pueden dibujar) o mira las sugerencias que la pantalla arma sola con el libro."}
+          </p>
+        )}
+        {panel === "crear" && <ConstructorGrafico cifras={libroPP} libro={libro} unidad={p.unidad} onCrear={async (s) => void (await crear(s))} onCerrar={() => setPanel("")} />}
+        {panel === "sugerencias" && <Sugerencias sugerencias={sugerencias} libro={libro} unidad={p.unidad} onAgregar={async (s: Sugerencia) => void (await crear(s.spec))} />}
+      </Tarjeta>
+
+      <Tarjeta titulo="Gráficos del informe" cuenta={`${graficos.filter((x) => x.enabled).length} visibles`}>
         {graficos.length === 0 ? (
           <Vacio titulo="Todavía no hay gráficos">
-            {libro.size === 0 ? "Primero arma el libro de cifras en el tablero: los gráficos se dibujan con esas cifras." : "Pilo puede proponerlos con las cifras del libro, o puedes crear uno a mano."}
+            {libroPP.length === 0 ? "Primero arma el libro de cifras en el tablero." : "Pilo puede proponerlos, la pantalla te sugiere algunos, o puedes crear uno paso a paso."}
           </Vacio>
         ) : (
           <div className="pp-ed">
@@ -98,12 +114,12 @@ export function EtapaGraficos(p: EtapaProps) {
               ))}
             </div>
             <div className="pp-ed__r" role="tabpanel" id="pp-gp" aria-labelledby={g ? `pp-gt-${g.id}` : undefined}>
-              {g && <Editor key={g.id} g={g} libro={libro} cifras={cifras.data ?? []} p={p} guardar={(patch) => guardar.mutate({ informe_id: p.informe.id, id: g.id, patch })} borrar={() => borrar.mutate(g.id)} />}
+              {g && <Editor key={g.id} g={g} libro={libro} cifras={libroPP} p={p} guardar={(patch) => guardar.mutateAsync({ informe_id: p.informe.id, id: g.id, patch }).then(() => undefined)} borrar={() => borrar.mutate(g.id)} />}
             </div>
           </div>
         )}
       </Tarjeta>
-      {(guardar.error || borrar.error) && <ErrorAviso error={guardar.error ?? borrar.error} />}
+      {borrar.error && <ErrorAviso error={borrar.error} />}
       <div className="pp-acciones">
         <button type="button" className="button-secondary" onClick={() => p.ir(1)}>
           ← Tablero
@@ -116,15 +132,63 @@ export function EtapaGraficos(p: EtapaProps) {
   );
 }
 
-function Editor({ g, libro, cifras, p, guardar, borrar }: { g: BloquePP; libro: Map<string, CifraPub>; cifras: CifraPub[]; p: EtapaProps; guardar: (patch: Partial<BloquePP>) => void; borrar: () => void }) {
-  const spec = g.spec;
+type Estado = { k: "ok" | "guardando" | "mal"; msg?: string };
+
+function Editor({ g, libro, cifras, p, guardar, borrar }: { g: BloquePP; libro: Map<string, CifraPub>; cifras: CifraPP[]; p: EtapaProps; guardar: (patch: Partial<BloquePP>) => Promise<void>; borrar: () => void }) {
+  // Copia local: lo que la persona hace nunca se pierde por un guardado que falle o llegue tarde.
+  const [spec, setSpecLocal] = useState<SpecBloque>(g.spec);
+  const [visible, setVisible] = useState(g.enabled);
+  const [estado, setEstado] = useState<Estado>({ k: "ok" });
+  const [confirma, setConfirma] = useState(false);
+  const specRef = useRef<SpecBloque>(g.spec);
+  const pendientes = useRef(0);
+  const cola = useRef<Promise<void>>(Promise.resolve());
+
+  // Si el bloque cambia desde fuera (Pilo, otra pestaña) y no hay guardados en curso, se toma lo nuevo.
+  useEffect(() => {
+    if (pendientes.current === 0 && estado.k !== "mal") {
+      specRef.current = g.spec;
+      setSpecLocal(g.spec);
+      setVisible(g.enabled);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando llega una versión nueva del bloque
+  }, [g.updated_at]);
+
+  const persistir = (patch: Partial<BloquePP>) => {
+    pendientes.current += 1;
+    setEstado({ k: "guardando" });
+    cola.current = cola.current
+      .then(() => guardar(patch))
+      .then(() => {
+        pendientes.current -= 1;
+        if (pendientes.current === 0) setEstado({ k: "ok" });
+      })
+      .catch((e: unknown) => {
+        pendientes.current -= 1;
+        setEstado({ k: "mal", msg: e instanceof Error ? e.message : String(e) });
+      });
+  };
+  const setSpec = (n: Partial<SpecBloque>) => {
+    const next = { ...specRef.current, ...n };
+    specRef.current = next;
+    setSpecLocal(next);
+    persistir({ spec: next });
+  };
+
   const tipo = spec.chart ?? "bar";
   const series = spec.series ?? [];
-  const s = resolverSerie(spec, libro);
-  const setSpec = (n: Partial<SpecBloque>) => guardar({ spec: { ...spec, ...n } });
+  const porClave = new Map(cifras.map((c) => [c.key, c]));
+  const actuales = series.map((x) => porClave.get(x.cifra)).filter((c): c is CifraPP => Boolean(c));
+  const faltan = series.filter((x) => !porClave.has(x.cifra));
+  const dx = series.length ? diagnosticar(tipo, actuales) : { ok: false, errores: [], avisos: [] as string[] };
   const setSerie = (i: number, n: Partial<{ x: string; cifra: string }>) => setSpec({ series: series.map((x, k) => (k === i ? { ...x, ...n } : x)) });
-  const esPct = s.unidad.trim() === "%";
-  const [confirma, setConfirma] = useState(false);
+  const ordenadas = useMemo(() => [...cifras].sort((a, b) => a.label.localeCompare(b.label, "es") || (a.year ?? 0) - (b.year ?? 0)), [cifras]);
+
+  const motivoTipo = (t: TipoGrafico): string | null => {
+    if (t === tipo || !actuales.length) return null;
+    const d = diagnosticar(t, actuales);
+    return d.ok ? null : d.errores[0];
+  };
 
   return (
     <>
@@ -134,51 +198,78 @@ function Editor({ g, libro, cifras, p, guardar, borrar }: { g: BloquePP; libro: 
             Tipo de gráfico
           </div>
           <div className="pp-seg" role="group" aria-labelledby={`pp-tipo-${g.id}`}>
-            {TIPOS.map((t) => (
-              <button key={t.id} type="button" aria-pressed={tipo === t.id} disabled={t.id === "donut" && series.length > 0 && !esPct} title={t.id === "donut" && !esPct ? "El anillo es solo para porcentajes" : undefined} onClick={() => setSpec({ chart: t.id })}>
-                {t.nombre}
-              </button>
-            ))}
+            {TIPOS.map((t) => {
+              const m = motivoTipo(t);
+              return (
+                <button key={t} type="button" aria-pressed={tipo === t} disabled={Boolean(m)} title={m ?? undefined} onClick={() => setSpec({ chart: t })}>
+                  {NOMBRE_TIPO[t]}
+                </button>
+              );
+            })}
           </div>
         </div>
         <label className="pp-check pp-check--abajo">
-          <Interruptor marcado={g.enabled} etiqueta="Mostrar este gráfico en el informe" onCambio={(v) => guardar({ enabled: v })} /> Mostrar en el informe
+          <Interruptor
+            marcado={visible}
+            etiqueta="Mostrar este gráfico en el informe"
+            onCambio={(v) => {
+              setVisible(v);
+              persistir({ enabled: v });
+            }}
+          />{" "}
+          Mostrar en el informe
         </label>
+        <span className={`pp-guardado pp-guardado--${estado.k}`} role="status" aria-live="polite">
+          {estado.k === "guardando" ? "Guardando…" : estado.k === "ok" ? "Guardado" : "No se guardó"}
+        </span>
       </div>
+      {estado.k === "mal" && (
+        <div className="pp-aviso-caja pp-aviso-caja--mal" role="alert">
+          <strong>No se pudo guardar el cambio</strong>
+          <p>{estado.msg} Lo que ves en pantalla sigue ahí; no se perdió.</p>
+          <button type="button" className="pp-btn pp-btn--sm" onClick={() => persistir({ spec: specRef.current, enabled: visible })}>
+            Reintentar guardar
+          </button>
+        </div>
+      )}
       <div className="pp-dos">
-        <Campo etiqueta="Título en español" valor={spec.title_es ?? ""} onGuardar={(v) => setSpec({ title_es: v })} lang="es" />
+        <Campo etiqueta="Título en español" valor={spec.title_es ?? ""} onGuardar={(v) => setSpec({ title_es: v })} lang="es" ayuda="Sin cifras en el título, solo años." />
         <Campo etiqueta="Título en inglés" valor={spec.title_en ?? ""} onGuardar={(v) => setSpec({ title_en: v })} lang="en" />
       </div>
 
       <fieldset className="pp-series">
         <legend>Cifras del gráfico</legend>
-        {series.length === 0 && <p className="pp-nota">Agrega al menos una cifra del libro.</p>}
-        {series.map((x, i) => (
-          <div className="pp-serie" key={i}>
-            <Campo etiqueta="Etiqueta (por ejemplo, el año)" valor={x.x} onGuardar={(v) => setSerie(i, { x: v })} />
-            <div className="pp-fld">
-              <label htmlFor={`pp-c-${g.id}-${i}`}>Cifra del libro</label>
-              <select id={`pp-c-${g.id}-${i}`} value={x.cifra} onChange={(e) => setSerie(i, { cifra: e.target.value })}>
-                {!libro.has(x.cifra) && <option value={x.cifra}>{x.cifra ? `Falta: ${x.cifra}` : "Elegir…"}</option>}
-                {cifras.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                    {c.year ? ` (${c.year})` : ""}
-                  </option>
-                ))}
-              </select>
+        {series.length === 0 && <p className="pp-nota">Este gráfico no tiene cifras. Agrega al menos una del libro (o elimínalo y créalo paso a paso).</p>}
+        {series.map((x, i) => {
+          const c = porClave.get(x.cifra);
+          return (
+            <div className="pp-serie" key={i}>
+              <Campo etiqueta="Etiqueta (por ejemplo, el año)" valor={x.x} onGuardar={(v) => setSerie(i, { x: v })} />
+              <div className="pp-fld">
+                <label htmlFor={`pp-c-${g.id}-${i}`}>Cifra del libro</label>
+                <select id={`pp-c-${g.id}-${i}`} value={x.cifra} onChange={(e) => setSerie(i, { cifra: e.target.value })}>
+                  {!c && <option value={x.cifra}>{x.cifra ? `Falta: ${x.cifra}` : "Elegir…"}</option>}
+                  {ordenadas.map((k) => (
+                    <option key={k.key} value={k.key}>
+                      {k.label}
+                      {k.year ? ` (${k.year})` : " (sin año)"} · {k.unit.trim() || "sin unidad"}
+                    </option>
+                  ))}
+                </select>
+                {c && <small>{explicacionDe(c).texto ? `${explicacionDe(c).texto.slice(0, 140)}${explicacionDe(c).texto.length > 140 ? "…" : ""}` : "Esta cifra aún no tiene explicación."}</small>}
+              </div>
+              <button type="button" className="pp-btn pp-btn--sm" onClick={() => setSpec({ series: series.filter((_, k) => k !== i) })} aria-label={`Quitar la cifra ${i + 1}`}>
+                Quitar
+              </button>
             </div>
-            <button type="button" className="pp-btn pp-btn--sm" onClick={() => setSpec({ series: series.filter((_, k) => k !== i) })} aria-label={`Quitar la cifra ${i + 1}`}>
-              Quitar
-            </button>
-          </div>
-        ))}
+          );
+        })}
         <button
           type="button"
           className="pp-btn pp-btn--sm"
           disabled={cifras.length === 0}
           onClick={() => {
-            const c = cifras.find((k) => !series.some((x) => x.cifra === k.key)) ?? cifras[0];
+            const c = cifras.find((k) => k.value !== null && !series.some((x) => x.cifra === k.key)) ?? cifras[0];
             setSpec({ series: [...series, { x: c?.year ? String(c.year) : "", cifra: c?.key ?? "" }] });
           }}
         >
@@ -186,17 +277,28 @@ function Editor({ g, libro, cifras, p, guardar, borrar }: { g: BloquePP; libro: 
         </button>
       </fieldset>
 
-      {s.faltan.length > 0 && (
+      {faltan.length > 0 && (
         <p className="pp-aviso" role="status">
-          Faltan cifras en el libro o no tienen valor: <code>{s.faltan.join(", ")}</code>. El gráfico no las dibuja.
+          Faltan cifras en el libro: <code>{faltan.map((x) => x.cifra).join(", ")}</code>. El gráfico no las dibuja; cámbialas o quítalas.
         </p>
       )}
+      {series.length > 0 && dx.errores.length > 0 && (
+        <ul className="pp-warn-lista" role="status">
+          {dx.errores.map((m) => (
+            <li key={m}>{m}</li>
+          ))}
+        </ul>
+      )}
+      {dx.avisos.length > 0 && (
+        <ul className="pp-warn-lista" role="status">
+          {dx.avisos.map((m) => (
+            <li key={m}>{m}</li>
+          ))}
+        </ul>
+      )}
 
-      <div className="pp-cc pp-cc--prev" style={varsAcento(p.unidad) as CSSProperties}>
-        <h3>{spec.title_es || "Sin título"}</h3>
-        {s.puntos.some((x) => x.v !== null) ? <Grafica tipo={tipo} puntos={s.puntos} unidad={s.unidad} titulo={spec.title_es ?? ""} idioma="es" uid={`prev-${g.id}`} /> : <p className="pp-nota">La vista previa aparece cuando haya al menos una cifra con valor.</p>}
-        <div className="pp-src">Vista previa en vivo, con los mismos componentes del informe.</div>
-      </div>
+      <VistaPrevia spec={spec} libro={libro} unidad={p.unidad} uid={`prev-${g.id}`} />
+      <div className="pp-src">Vista previa en vivo, con los mismos componentes del informe.</div>
 
       <div className="pp-acciones">
         {confirma ? (

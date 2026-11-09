@@ -10,6 +10,10 @@
        legible: variación entre años (en % o, si la serie ya es un %, en
        puntos porcentuales), promedio y total acumulado de los años, total de
        las partes de un mismo año y la participación % de cada parte.
+   Cada cifra sale con un nombre legible («qué mide — desglose (año)») y su
+   procedencia en `source` (SourceCifra: tabla, oficina, columna, desglose,
+   periodo, indicador, definición, cita, serie…); las derivadas traen además
+   su fórmula, sus bases y una descripción escrita por el código.
    La IA nunca escribe un número: elige keys de este libro.
 
    Las keys son estables (se reconstruyen igual en cada corrida) para que el
@@ -17,19 +21,25 @@
    misma cifra.
    ========================================================================== */
 
-import type { KindFuente, RastroCifra } from "./contrato.ts";
+import type { SourceCifra } from "./contrato.ts";
 
 /** Una cifra tal como la lee una fuente, antes de validarla. */
 export interface CifraCruda {
   key: string;
-  /** La serie a la que pertenece (misma medida en distintos años): la key sin el año. */
+  /** La serie a la que pertenece (misma medida en distintos años): la key sin el año. Va también en `source.serie`. */
   serie: string;
+  /** Respaldo del nombre si no hay `que`. */
   label: string;
   label_en?: string;
+  /** Qué mide, sin desglose ni año («Personas atendidas en brigadas de salud»). El label sale de aquí. */
+  que?: string;
+  que_en?: string;
+  /** La parte («Sede Bucaramanga»): va en el label y en `source.desglose`. */
+  desglose?: string;
   unit: string;
   year: number | null;
   value: number | null;
-  source: RastroCifra;
+  source: SourceCifra;
   indicator?: string | null;
   /** ¿Tiene sentido sumarla entre años o entre partes? (personas atendidas sí; una tasa no). */
   sumable?: boolean;
@@ -49,9 +59,37 @@ export interface CifraLibro {
   value: number;
   derived: boolean;
   formula: string;
-  source: RastroCifra;
+  source: SourceCifra;
   indicator: string | null;
 }
+
+/* ---------- Etiquetas legibles ------------------------------------------------------- */
+
+const espacios = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
+
+/** Corta un texto en el último espacio antes de `max` (sin dejar media palabra). */
+export function cortar(s: string, max: number): string {
+  const t = espacios(s);
+  if (t.length <= max) return t;
+  const c = t.slice(0, max - 1);
+  const i = c.lastIndexOf(" ");
+  return `${(i > max * 0.6 ? c.slice(0, i) : c).replace(/[\s,;:.—–-]+$/, "")}…`;
+}
+
+/** «<qué mide> — <desglose> (<año>)», sin claves técnicas. */
+export function etiquetaCifra(que: string, desglose?: string | null, year?: number | null): string {
+  const q = cortar(que, 150);
+  const d = espacios(desglose);
+  return `${q}${d && !q.toLowerCase().includes(d.toLowerCase()) ? ` — ${cortar(d, 60)}` : ""}${year ? ` (${year})` : ""}`;
+}
+
+/** El nombre de la serie: sin el año final. */
+const nombreSerie = (c: CifraCruda, en = false): string => {
+  const que = en ? c.que_en ?? "" : c.que ?? "";
+  if (que) return etiquetaCifra(que, c.desglose, null);
+  const l = en ? c.label_en ?? "" : c.label;
+  return l.replace(/\s*\((19|20)\d{2}\)\s*$/, "");
+};
 
 export interface OpcionesLibro {
   /** Primer y último año aceptables (incluidos). */
@@ -103,7 +141,9 @@ export function validarCrudas(crudas: CifraCruda[], op: OpcionesLibro): { buenas
   const porKey = new Map<string, CifraCruda>();
   const porSerieAnio = new Map<string, CifraCruda>();
   for (const c0 of crudas) {
-    const c = { ...c0, unit: normalizarUnidad(c0.unit), label: String(c0.label ?? "").replace(/\s+/g, " ").trim().slice(0, 200) };
+    const label = c0.que ? etiquetaCifra(c0.que, c0.desglose, c0.year) : espacios(c0.label);
+    const label_en = c0.que_en ? etiquetaCifra(c0.que_en, c0.desglose, c0.year) : espacios(c0.label_en);
+    const c = { ...c0, unit: normalizarUnidad(c0.unit), label: cortar(label, 200), label_en: cortar(label_en, 200) };
     const v = numero(c.value);
     const nombre = `«${c.label.slice(0, 60)}»${c.year ? ` ${c.year}` : ""}`;
     if (!c.key || !c.label) {
@@ -142,7 +182,30 @@ export function validarCrudas(crudas: CifraCruda[], op: OpcionesLibro): { buenas
 
 /* ---------- Derivadas -------------------------------------------------------------------- */
 
-const rastroDerivado = (kind: KindFuente, bases: string[], formula: string): RastroCifra => ({ tabla: "pp_cifras", ref: "derivada", kind, fila: bases, nota: formula });
+/** La procedencia de una derivada: calculada en código, con su fórmula, sus bases y una descripción del código. */
+const rastroDerivado = (
+  de: CifraCruda,
+  bases: string[],
+  formula: string,
+  serie: string,
+  descripcion: string,
+  extra: Partial<SourceCifra> = {},
+): SourceCifra => ({
+  kind: de.source.kind,
+  tabla: "Libro de cifras del informe (calculada)",
+  tabla_db: "pp_cifras",
+  ref: "derivada",
+  ...(de.source.oficina ? { oficina: de.source.oficina } : {}),
+  ...(de.source.indicador_id ? { indicador_id: de.source.indicador_id } : {}),
+  ...(de.source.indicador ? { indicador: de.source.indicador } : {}),
+  bases,
+  formula,
+  nota: formula,
+  serie,
+  descripcion: cortar(descripcion, 240),
+  descrito: "codigo",
+  ...extra,
+});
 
 const base = (c: CifraCruda): CifraLibro => ({
   key: c.key,
@@ -153,7 +216,12 @@ const base = (c: CifraCruda): CifraLibro => ({
   value: c.value as number,
   derived: false,
   formula: "",
-  source: c.source,
+  source: {
+    ...c.source,
+    serie: c.source.serie || c.serie,
+    ...(c.desglose && !c.source.desglose ? { desglose: c.desglose } : {}),
+    ...(c.year !== null && !c.source.periodo ? { periodo: String(c.year) } : {}),
+  },
   indicator: c.indicator ?? null,
 });
 
@@ -168,19 +236,21 @@ function derivadasDeSerie(serie: string, lista: CifraCruda[], avisos: string[]):
     avisos.push(`La serie «${conAnio[0].label.slice(0, 60)}» mezcla unidades (${[...unidades].join(", ")}): no se calcularon variaciones.`);
     return [];
   }
-  const unit = conAnio[0].unit;
-  const etiqueta = conAnio[0].label;
-  const etiquetaEn = conAnio[0].label_en ?? "";
-  const kind = conAnio[0].source.kind;
-  const indicator = conAnio[0].indicator ?? null;
+  const primera = conAnio[0];
+  const unit = primera.unit;
+  const etiqueta = nombreSerie(primera);
+  const etiquetaEn = nombreSerie(primera, true);
+  const indicator = primera.indicator ?? null;
+  const desglose = primera.desglose ? { desglose: primera.desglose } : {};
   const out: CifraLibro[] = [];
   const variacion = (a: CifraCruda, b: CifraCruda) => {
     const ya = a.year as number;
     const yb = b.year as number;
+    const key = `der:var:${serie}:${ya}-${yb}`;
     if (unit === "%") {
       const formula = `${formatoValor(v(b), "%")} (${yb}) − ${formatoValor(v(a), "%")} (${ya})`;
       out.push({
-        key: `der:var:${serie}:${ya}-${yb}`,
+        key,
         label: `Cambio de ${etiqueta} entre ${ya} y ${yb} (puntos porcentuales)`,
         label_en: etiquetaEn ? `Change in ${etiquetaEn}, ${ya}–${yb} (percentage points)` : "",
         unit: "pp",
@@ -188,7 +258,11 @@ function derivadasDeSerie(serie: string, lista: CifraCruda[], avisos: string[]):
         value: redondear(v(b) - v(a), 2),
         derived: true,
         formula,
-        source: rastroDerivado(kind, [a.key, b.key], formula),
+        source: rastroDerivado(primera, [a.key, b.key], formula, key, `Diferencia, en puntos porcentuales, entre el valor de ${yb} y el de ${ya} de «${etiqueta}». La calcula el sistema con esas dos cifras del libro.`, {
+          ...desglose,
+          periodo: `${ya}–${yb}`,
+          ...(etiquetaEn ? { descripcion_en: cortar(`Difference, in percentage points, between the ${yb} and ${ya} values of “${etiquetaEn}”. Computed by the system from those two figures.`, 240) } : {}),
+        }),
         indicator,
       });
       return;
@@ -196,7 +270,7 @@ function derivadasDeSerie(serie: string, lista: CifraCruda[], avisos: string[]):
     if (v(a) === 0) return;
     const formula = `(${formatoValor(v(b), unit)} − ${formatoValor(v(a), unit)}) / ${formatoValor(Math.abs(v(a)), unit)} × 100 (${yb} frente a ${ya})`;
     out.push({
-      key: `der:var:${serie}:${ya}-${yb}`,
+      key,
       label: `Variación de ${etiqueta} entre ${ya} y ${yb}`,
       label_en: etiquetaEn ? `Change in ${etiquetaEn}, ${ya}–${yb}` : "",
       unit: "%",
@@ -204,7 +278,11 @@ function derivadasDeSerie(serie: string, lista: CifraCruda[], avisos: string[]):
       value: redondear(((v(b) - v(a)) / Math.abs(v(a))) * 100, 1),
       derived: true,
       formula,
-      source: rastroDerivado(kind, [a.key, b.key], formula),
+      source: rastroDerivado(primera, [a.key, b.key], formula, key, `Variación porcentual de «${etiqueta}» de ${ya} a ${yb}: la diferencia entre los dos años dividida por el valor de ${ya}. La calcula el sistema con esas dos cifras del libro.`, {
+        ...desglose,
+        periodo: `${ya}–${yb}`,
+        ...(etiquetaEn ? { descripcion_en: cortar(`Percentage change in “${etiquetaEn}” from ${ya} to ${yb}: the difference between both years divided by the ${ya} value. Computed by the system.`, 240) } : {}),
+      }),
       indicator,
     });
   };
@@ -212,12 +290,13 @@ function derivadasDeSerie(serie: string, lista: CifraCruda[], avisos: string[]):
   variacion(conAnio[conAnio.length - 2], ultimo);
   if (conAnio.length >= 3) variacion(conAnio[0], ultimo);
 
-  const y0 = conAnio[0].year as number;
+  const y0 = primera.year as number;
   const y1 = ultimo.year as number;
   const suma = conAnio.reduce((s, c) => s + v(c), 0);
   const formulaProm = `(${conAnio.map((c) => `${formatoValor(v(c), unit)} [${c.year}]`).join(" + ")}) / ${conAnio.length}`;
+  const keyProm = `der:prom:${serie}:${y0}-${y1}`;
   out.push({
-    key: `der:prom:${serie}:${y0}-${y1}`,
+    key: keyProm,
     label: `Promedio anual de ${etiqueta}, ${y0}–${y1}`,
     label_en: etiquetaEn ? `Annual average of ${etiquetaEn}, ${y0}–${y1}` : "",
     unit,
@@ -225,13 +304,18 @@ function derivadasDeSerie(serie: string, lista: CifraCruda[], avisos: string[]):
     value: redondear(suma / conAnio.length, 2),
     derived: true,
     formula: formulaProm,
-    source: rastroDerivado(kind, conAnio.map((c) => c.key), formulaProm),
+    source: rastroDerivado(primera, conAnio.map((c) => c.key), formulaProm, keyProm, `Promedio de los valores anuales de «${etiqueta}» entre ${y0} y ${y1}. Lo calcula el sistema con las cifras de esos años.`, {
+      ...desglose,
+      periodo: `${y0}–${y1}`,
+      ...(etiquetaEn ? { descripcion_en: cortar(`Average of the yearly values of “${etiquetaEn}” between ${y0} and ${y1}. Computed by the system.`, 240) } : {}),
+    }),
     indicator,
   });
   if (conAnio.every((c) => c.sumable) && unit !== "%") {
     const formulaTot = conAnio.map((c) => `${formatoValor(v(c), unit)} [${c.year}]`).join(" + ");
+    const keyAcum = `der:acum:${serie}:${y0}-${y1}`;
     out.push({
-      key: `der:acum:${serie}:${y0}-${y1}`,
+      key: keyAcum,
       label: `Total acumulado de ${etiqueta}, ${y0}–${y1}`,
       label_en: etiquetaEn ? `Cumulative total of ${etiquetaEn}, ${y0}–${y1}` : "",
       unit,
@@ -239,7 +323,11 @@ function derivadasDeSerie(serie: string, lista: CifraCruda[], avisos: string[]):
       value: redondear(suma, 2),
       derived: true,
       formula: formulaTot,
-      source: rastroDerivado(kind, conAnio.map((c) => c.key), formulaTot),
+      source: rastroDerivado(primera, conAnio.map((c) => c.key), formulaTot, keyAcum, `Suma de los valores anuales de «${etiqueta}» entre ${y0} y ${y1}. La calcula el sistema con las cifras de esos años.`, {
+        ...desglose,
+        periodo: `${y0}–${y1}`,
+        ...(etiquetaEn ? { descripcion_en: cortar(`Sum of the yearly values of “${etiquetaEn}” between ${y0} and ${y1}. Computed by the system.`, 240) } : {}),
+      }),
       indicator,
     });
   }
@@ -254,41 +342,55 @@ function derivadasDeGrupo(grupo: string, partes: CifraCruda[], avisos: string[])
     if (unidades.size > 1) avisos.push(`Las partes de «${partes[0].label.slice(0, 60)}» tienen unidades distintas: no se sumaron.`);
     return [];
   }
-  const unit = partes[0].unit;
-  const year = partes[0].year;
+  const primera = partes[0];
+  const unit = primera.unit;
+  const year = primera.year;
   const total = partes.reduce((s, c) => s + v(c), 0);
   if (total <= 0) return [];
-  const kind = partes[0].source.kind;
-  const indicator = partes[0].indicator ?? null;
-  const nombre = partes[0].label.replace(/\s*[—–-]\s*[^—–-]+$/, "");
-  const formulaTot = partes.map((c) => `${formatoValor(v(c), unit)} [${c.parte ?? c.label}]`).join(" + ");
+  const indicator = primera.indicator ?? null;
+  // El nombre del todo: «qué mide» sin la parte (o el label sin su desglose y su año, en filas viejas).
+  const nombre = primera.que ? cortar(primera.que, 150) : primera.label.replace(/\s*\((19|20)\d{2}\)\s*$/, "").replace(/\s*[—–]\s*[^—–]+$/, "");
+  const nombreEn = primera.que_en ? cortar(primera.que_en, 150) : (primera.label_en ?? "").replace(/\s*\((19|20)\d{2}\)\s*$/, "").replace(/\s*[—–]\s*[^—–]+$/, "");
+  const parteDe = (c: CifraCruda) => c.parte ?? c.desglose ?? c.label;
+  const formulaTot = partes.map((c) => `${formatoValor(v(c), unit)} [${parteDe(c)}]`).join(" + ");
   const totKey = `der:tot:${grupo}${year !== null ? `:${year}` : ""}`;
+  const anio = year !== null ? ` (${year})` : "";
+  const nombresPartes = partes.map(parteDe).join(", ");
   const out: CifraLibro[] = [
     {
       key: totKey,
-      label: `${nombre}: total${year !== null ? ` ${year}` : ""}`,
-      label_en: partes[0].label_en ? `${partes[0].label_en.replace(/\s*[—–-]\s*[^—–-]+$/, "")}: total${year !== null ? ` ${year}` : ""}` : "",
+      label: `${nombre} — total de las partes${anio}`,
+      label_en: nombreEn ? `${nombreEn} — total${anio}` : "",
       unit,
       year,
       value: redondear(total, 2),
       derived: true,
       formula: formulaTot,
-      source: rastroDerivado(kind, partes.map((c) => c.key), formulaTot),
+      source: rastroDerivado(primera, partes.map((c) => c.key), formulaTot, `der:tot:${grupo}`, `Suma de «${nombre}» en sus partes (${cortar(nombresPartes, 120)})${year !== null ? ` en ${year}` : ""}. La calcula el sistema con las cifras de cada parte.`, {
+        desglose: "Total de las partes",
+        ...(year !== null ? { periodo: String(year) } : {}),
+        ...(nombreEn ? { descripcion_en: cortar(`Sum of “${nombreEn}” across its parts (${nombresPartes})${year !== null ? ` in ${year}` : ""}. Computed by the system.`, 240) } : {}),
+      }),
       indicator,
     },
   ];
   for (const c of partes) {
     const formula = `${formatoValor(v(c), unit)} / ${formatoValor(total, unit)} × 100`;
+    const parte = parteDe(c);
     out.push({
       key: `der:part:${c.key}`,
-      label: `Participación de ${c.parte ?? c.label} en ${nombre}${year !== null ? ` ${year}` : ""}`,
-      label_en: c.label_en ? `Share of ${c.parte ?? c.label_en}${year !== null ? `, ${year}` : ""}` : "",
+      label: `Participación de ${parte} en ${nombre}${anio}`,
+      label_en: nombreEn ? `Share of ${parte} in ${nombreEn}${anio}` : "",
       unit: "%",
       year,
       value: redondear((v(c) / total) * 100, 1),
       derived: true,
       formula,
-      source: rastroDerivado(kind, [c.key, totKey], formula),
+      source: rastroDerivado(c, [c.key, totKey], formula, `der:part:${c.serie}`, `Porcentaje que representa ${parte} dentro del total de «${nombre}»${year !== null ? ` en ${year}` : ""}. Lo calcula el sistema: el valor de la parte dividido por la suma de las partes.`, {
+        desglose: parte,
+        ...(year !== null ? { periodo: String(year) } : {}),
+        ...(nombreEn ? { descripcion_en: cortar(`Share of ${parte} in the total of “${nombreEn}”${year !== null ? ` in ${year}` : ""}: the part divided by the sum of all parts. Computed by the system.`, 240) } : {}),
+      }),
       indicator,
     });
   }
@@ -346,13 +448,99 @@ export function resumir(valores: number[], regla: "suma" | "promedio" | "ultimo"
 
 /* ---------- El libro para la IA ---------------------------------------------------------- */
 
-/** Una cifra como dato para el modelo: key, nombre, unidad, año y valor ya escrito. */
-export function lineaLibro(c: Pick<CifraLibro, "key" | "label" | "unit" | "year" | "value" | "derived" | "formula">): string {
-  return `· ${c.key} | ${c.label.replace(/\|/g, "/")} | ${c.unit || "—"} | ${c.year ?? "—"} | ${formatoValor(Number(c.value), c.unit)}${c.derived ? ` | derivada: ${c.formula.replace(/\|/g, "/")}` : ""}`;
+type CifraDato = Pick<CifraLibro, "key" | "label" | "unit" | "year" | "value" | "derived" | "formula"> & { source?: SourceCifra | null };
+
+const sinBarras = (s: string) => s.replace(/\|/g, "/").replace(/\s+/g, " ").trim();
+
+/** La serie de una cifra: `source.serie` o, en filas viejas, la key sin el año final. */
+export function serieDeCifra(c: { key: string; source?: SourceCifra | null }): string {
+  const s = String(c.source?.serie ?? "").trim();
+  if (s) return s;
+  const m = /^(.*?)[:_|-]((?:19|20)\d{2})$/.exec(c.key);
+  return m ? m[1] : c.key;
+}
+
+/** Una cifra como dato para el modelo: key, nombre, unidad, año, valor ya escrito y, si la hay, qué mide. */
+export function lineaLibro(c: CifraDato): string {
+  const que = String(c.source?.descripcion ?? "").trim();
+  return `· ${c.key} | ${sinBarras(c.label)} | ${c.unit || "—"} | ${c.year ?? "—"} | ${formatoValor(Number(c.value), c.unit)}${c.derived ? ` | derivada: ${sinBarras(c.formula)}` : ""}${que ? ` | qué mide: ${sinBarras(cortar(que, 200))}` : ""}`;
 }
 
 /** El libro como bloque de datos, acotado para no pasarse del contexto del modelo. */
-export function libroComoDato(cifras: Parameters<typeof lineaLibro>[0][], max = 160): string {
+export function libroComoDato(cifras: CifraDato[], max = 160): string {
   const lista = cifras.slice(0, max).map(lineaLibro).join("\n");
-  return `<<<LIBRO\nkey | qué mide | unidad | año | valor\n${lista.replace(/<<<LIBRO|LIBRO>>>/g, "")}\nLIBRO>>>${cifras.length > max ? `\n(Se muestran ${max} de ${cifras.length} cifras.)` : ""}`;
+  return `<<<LIBRO\nkey | qué mide | unidad | año | valor | (derivada) | (descripción)\n${lista.replace(/<<<LIBRO|LIBRO>>>/g, "")}\nLIBRO>>>${cifras.length > max ? `\n(Se muestran ${max} de ${cifras.length} cifras.)` : ""}`;
+}
+
+/**
+ * El libro agrupado por SERIE (la misma medida en varios años) para el
+ * estadístico: así arma líneas con una sola serie y barras comparando series
+ * de la misma unidad, sin adivinar qué cifra va con cuál.
+ */
+export function libroPorSeries(cifras: CifraDato[], maxCifras = 170): string {
+  const grupos = new Map<string, CifraDato[]>();
+  for (const c of cifras.slice(0, maxCifras)) {
+    const s = serieDeCifra(c);
+    grupos.set(s, [...(grupos.get(s) ?? []), c]);
+  }
+  const partes: string[] = [];
+  let n = 0;
+  for (const [s, lista] of grupos) {
+    n++;
+    const orden = [...lista].sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
+    const c0 = orden[orden.length - 1];
+    const nombre = sinBarras(c0.label.replace(/\s*\((19|20)\d{2}\)\s*$/, ""));
+    const que = String(c0.source?.descripcion ?? "").trim();
+    const anios = [...new Set(orden.map((c) => c.year).filter((y): y is number => y !== null))];
+    partes.push(
+      [
+        `[S${n}] serie «${sinBarras(s).slice(0, 90)}» · ${nombre} · unidad: ${c0.unit || "sin unidad"}${c0.derived ? " · calculada" : ""}${anios.length >= 2 ? ` · ${anios.length} años` : ""}`,
+        que ? `   qué mide: ${sinBarras(cortar(que, 220))}` : "",
+        ...orden.map((c) => `   · ${c.key} | ${c.year ?? "—"} | ${formatoValor(Number(c.value), c.unit)}${c.derived ? ` | ${sinBarras(c.formula).slice(0, 140)}` : ""}`),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+  return `<<<LIBRO\nCada serie es la MISMA medida en distintos años (key | año | valor).\n${partes.join("\n").replace(/<<<LIBRO|LIBRO>>>/g, "")}\nLIBRO>>>${cifras.length > maxCifras ? `\n(Se muestran ${maxCifras} de ${cifras.length} cifras.)` : ""}`;
+}
+
+/* ---------- Conservar las descripciones al rehacer el libro ------------------------------ */
+
+type FilaPrevia = Pick<CifraLibro, "key" | "label" | "label_en" | "value" | "year"> & { source: SourceCifra | null };
+
+/**
+ * Al volver a armar el libro, lo que explicó una persona se conserva siempre;
+ * lo que explicó Pilo, solo si la cifra no cambió de valor ni de año (si cambió,
+ * se vuelve a describir). Las derivadas traen su descripción del código.
+ */
+export function conservarDescripciones<T extends Pick<CifraLibro, "key" | "label" | "label_en" | "value" | "year" | "source">>(nuevas: T[], previas: FilaPrevia[]): T[] {
+  const porKey = new Map(previas.map((p) => [p.key, p]));
+  return nuevas.map((n) => {
+    const p = porKey.get(n.key);
+    const d = p?.source?.descrito;
+    // Derivadas: el código reescribe el español; el inglés que completó Pilo se conserva si la cifra no cambió.
+    if (p && d === "codigo" && Number(p.value) === Number(n.value)) {
+      return {
+        ...n,
+        label_en: n.label_en || p.label_en,
+        source: { ...n.source, ...(!n.source?.descripcion_en && p.source?.descripcion_en ? { descripcion_en: p.source.descripcion_en } : {}) },
+      };
+    }
+    if (!p || (d !== "persona" && d !== "pilo")) return n;
+    if (d === "pilo" && (Number(p.value) !== Number(n.value) || (p.year ?? null) !== (n.year ?? null))) return n;
+    const s = p.source ?? ({} as SourceCifra);
+    return {
+      ...n,
+      label: p.label || n.label,
+      label_en: p.label_en || n.label_en,
+      source: {
+        ...n.source,
+        ...(s.descripcion ? { descripcion: s.descripcion } : {}),
+        ...(s.descripcion_en ? { descripcion_en: s.descripcion_en } : {}),
+        descrito: d,
+        ...(s.descrito_at ? { descrito_at: s.descrito_at } : {}),
+      },
+    };
+  });
 }

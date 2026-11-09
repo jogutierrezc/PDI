@@ -20,13 +20,37 @@ const db = supabase as unknown as { from: (t: string) => any; rpc: (f: string, a
 interface ErrBD {
   code?: string;
   message?: string;
+  details?: string;
+  hint?: string;
 }
 const noExiste = (e: ErrBD | null) =>
   Boolean(e && (e.code === "42P01" || e.code === "PGRST205" || e.code === "PGRST202" || /does not exist|schema cache/i.test(e.message ?? "")));
 const MIGRACION = "Falta aplicar la migración 0262 (Pilo Publica).";
+/** El error de la base dicho en español claro: qué pasó y qué hacer. */
+export function mensajeBD(e: ErrBD): string {
+  const crudo = [e.message, e.details, e.hint].filter(Boolean).join(" · ");
+  switch (e.code) {
+    case "42501":
+      return "No tienes permiso para guardar aquí (hace falta el rol de Planeación o administración). Lo que escribiste sigue en pantalla.";
+    case "23503":
+      return `La base no encontró un dato al que este bloque se refiere (por ejemplo, tu perfil o el informe). Detalle: ${crudo}`;
+    case "23514":
+      return `La base rechazó el bloque porque no cumple una regla (tipo, origen o estado). Detalle: ${crudo}`;
+    case "23505":
+      return "Ya existe un registro igual. Recarga la pantalla y vuelve a intentarlo.";
+    case "PGRST301":
+    case "PGRST303":
+      return "Tu sesión venció. Vuelve a entrar y repite el guardado.";
+    default:
+      return /jwt|token/i.test(crudo) ? "Tu sesión venció. Vuelve a entrar y repite el guardado." : crudo || "Error de la base de datos.";
+  }
+}
 const lanzar = (e: ErrBD): never => {
-  throw noExiste(e) ? new FaltaMigracion(MIGRACION) : new Error(e.message ?? "Error de la base de datos.");
+  throw noExiste(e) ? new FaltaMigracion(MIGRACION) : new Error(mensajeBD(e));
 };
+
+/** La siguiente posición libre entre los bloques de un informe. */
+export const siguientePos = (bloques: { pos: number }[] | undefined): number => (bloques ?? []).reduce((m, b) => Math.max(m, b.pos || 0), 0) + 1;
 
 async function quienSoy(): Promise<string | null> {
   try {
@@ -130,6 +154,21 @@ export function useCifras(id: string | undefined) {
       if (error) lanzar(error);
       return ((data ?? []) as CifraPP[]).map((c) => ({ ...c, value: c.value === null ? null : Number(c.value) }));
     },
+  });
+}
+
+/** Edita una cifra a mano: conserva el resto de `source` y marca que la descripción es de una persona (Pilo no la pisa). */
+export function useEditarCifra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (o: { cifra: CifraPP; label: string; label_en: string; descripcion: string; descripcion_en: string }) => {
+      const base = o.cifra.source && typeof o.cifra.source === "object" ? o.cifra.source : {};
+      const source = { ...base, descripcion: o.descripcion.trim(), descripcion_en: o.descripcion_en.trim(), descrito: o.descripcion.trim() || o.descripcion_en.trim() ? "persona" : (base as Record<string, unknown>).descrito };
+      const label = o.label.trim() || o.cifra.label;
+      const { error } = await db.from("pp_cifras").update({ label, label_en: o.label_en.trim(), source }).eq("id", o.cifra.id);
+      if (error) lanzar(error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pp", "cifras"] }),
   });
 }
 

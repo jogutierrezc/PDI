@@ -88,6 +88,15 @@ export interface SpecBloque extends SpecGrafico {
   news_id?: string;
   image_id?: string;
   caption?: string;
+  /** Imagen por enlace (manual): https, con pie, crédito y texto alternativo. */
+  url?: string;
+  externa?: boolean;
+  caption_es?: string;
+  caption_en?: string;
+  credit?: string;
+  credit_url?: string;
+  alt_es?: string;
+  alt_en?: string;
   /** Convención de esta pantalla: el bloque de texto (eje) al que acompaña una imagen. */
   eje?: string;
   indicator?: string;
@@ -335,3 +344,25 @@ export const ordenDe = (a: AjustesPP): SeccionVista[] => {
   const base = (a.order ?? []).filter((s) => ORDEN_BASE.includes(s));
   return [...base, ...ORDEN_BASE.filter((s) => !base.includes(s))];
 };
+
+/** Una imagen manual (por enlace) lleva `spec.url`. */
+export const esImagenEnlace = (b: Pick<BloquePP, "kind" | "spec">): boolean => b.kind === "imagen" && typeof b.spec.url === "string" && b.spec.url.length > 0;
+
+/** Solo https con servidor y sin usuario/clave; devuelve el mensaje de error o null si el enlace sirve. */
+export function errorEnlaceHttps(valor: string, nombre = "El enlace"): string | null {
+  const v = valor.trim();
+  if (!v) return `${nombre} está vacío.`;
+  if (v.length > 2000) return `${nombre} es demasiado largo.`;
+  if (/^\s*(javascript|data|vbscript|file|blob):/i.test(v)) return `${nombre} no es válido: solo se aceptan direcciones https://.`;
+  if (/^http:\/\//i.test(v)) return `${nombre} usa http://. Usa una dirección https:// (segura).`;
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    return `${nombre} no parece una dirección web. Debe empezar por https://`;
+  }
+  if (u.protocol !== "https:") return `${nombre} debe empezar por https://`;
+  if (!u.hostname || !u.hostname.includes(".")) return `${nombre} no tiene un servidor válido.`;
+  if (u.username || u.password) return `${nombre} no debe llevar usuario ni clave.`;
+  return null;
+}

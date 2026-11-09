@@ -72,12 +72,12 @@ export function Vacio({ titulo, children }: { titulo: string; children?: ReactNo
   );
 }
 
-export function ErrorAviso({ error, onReintentar }: { error: unknown; onReintentar?: () => void }) {
+export function ErrorAviso({ error, onReintentar, titulo }: { error: unknown; onReintentar?: () => void; titulo?: string }) {
   const falta = error instanceof FaltaMigracion;
   const msg = error instanceof Error ? error.message : String(error);
   return (
     <div className={`pp-aviso-caja ${falta ? "pp-aviso-caja--info" : "pp-aviso-caja--mal"}`} role="alert">
-      <strong>{falta ? "Falta preparar la base de datos" : "No se pudo cargar"}</strong>
+      <strong>{falta ? "Falta preparar la base de datos" : (titulo ?? "No se pudo cargar")}</strong>
       <p>{falta ? `${msg} Pídele a quien administra la base que la aplique y vuelve a abrir esta pantalla.` : msg}</p>
       {onReintentar && !falta && (
         <button type="button" className="pp-btn pp-btn--sm" onClick={onReintentar}>

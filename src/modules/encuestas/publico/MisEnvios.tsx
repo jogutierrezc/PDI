@@ -79,6 +79,8 @@ function Fila({ envio, abierto, onAlternar, onQuitar, quitando, onCopiar, mostra
   useLayoutEffect(() => {
     const el = cuerpo.current;
     if (!el) return;
+    // Cerrado, el detalle no recibe foco ni lectores.
+    (el as HTMLDivElement & { inert: boolean }).inert = !abierto;
     if (primera.current) {
       primera.current = false;
       return;
@@ -111,7 +113,7 @@ function Fila({ envio, abierto, onAlternar, onQuitar, quitando, onCopiar, mostra
         </span>
         <Traza etapa={envio.etapa} />
       </button>
-      <div className="ep-mis-cuerpo" id={idCuerpo} ref={cuerpo} role="region" aria-label={`Detalle de ${envio.titulo}`} style={{ height: 0 }} inert={!abierto}>
+      <div className="ep-mis-cuerpo" id={idCuerpo} ref={cuerpo} role="region" aria-label={`Detalle de ${envio.titulo}`} style={{ height: 0 }}>
         <div>
           {envio.items.map((it, i) => (
             <div key={i} className="ep-mis-item">

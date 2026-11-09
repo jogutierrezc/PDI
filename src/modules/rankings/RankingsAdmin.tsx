@@ -36,8 +36,10 @@ import "./rankings.css";
 const UiGreen = lazy(() => import("./uigreen/ui/UiGreen").then((m) => ({ default: m.UiGreen })));
 // THE Impact (intranet): misma estructura que UI GreenMetric, sobre el reporte por oficinas (0149) y los ciclos (0237 a 0241).
 const ThImpact = lazy(() => import("./thimpact/ui/ThImpact").then((m) => ({ default: m.ThImpact })));
+// Pilo Publica: informes de cada ranking armados por Pilo; trae GSAP y las gráficas, por eso va aparte.
+const PiloPublica = lazy(() => import("./publica/PiloPublica").then((m) => ({ default: m.PiloPublica })));
 
-type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion";
+type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion" | "publica";
 const BASE = "/admin/rankings";
 const KICKER = "Tablero de rankings";
 
@@ -63,7 +65,7 @@ export function RankingsAdmin() {
   const seccion: Seccion | null =
     param === undefined
       ? "tablero"
-      : param === "noticias" || param === "informes" || param === "posicion"
+      : param === "noticias" || param === "informes" || param === "posicion" || param === "publica"
         ? param
         : rankingById(param)
           ? (param as RankingId)
@@ -91,6 +93,9 @@ export function RankingsAdmin() {
       <AdminRailTab current={seccion === "posicion"} to={`${BASE}/posicion`}>
         Posicionamiento THE
       </AdminRailTab>
+      <AdminRailTab current={seccion === "publica"} to={`${BASE}/publica`}>
+        Pilo Publica
+      </AdminRailTab>
     </AdminRail>
   );
 
@@ -107,6 +112,14 @@ export function RankingsAdmin() {
     titulo = "Informes ODS con Pilo";
     descripcion = "Pilo redacta cada ODS con las noticias aprobadas; tú revisas, eliges la evidencia de THE y publicas";
     cuerpo = <InformesOds />;
+  } else if (seccion === "publica") {
+    titulo = "Pilo Publica";
+    descripcion = "Un informe por ranking y unidad: Pilo lee las fuentes, arma las cifras y escribe; tú revisas, ordenas y publicas";
+    cuerpo = (
+      <Suspense fallback={<p role="status">Cargando Pilo Publica…</p>}>
+        <PiloPublica />
+      </Suspense>
+    );
   } else if (seccion === "posicion") {
     titulo = "Posicionamiento en THE Impact";
     descripcion = "Dónde está la UDES en THE Impact 2026 frente a Colombia y qué tan probable es moverse en 2027, con supuestos a la vista";

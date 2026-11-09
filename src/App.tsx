@@ -88,6 +88,7 @@ const SostenibleRanking = lazy(() => import("./modules/sostenible/SostenibleRank
 const RankingsAdmin = lazy(() => import("./modules/rankings/RankingsAdmin").then((m) => ({ default: m.RankingsAdmin })));
 const ReporteOficina = lazy(() => import("./modules/rankings/reporte/ui/ReporteOficina").then((m) => ({ default: m.ReporteOficina })));
 const UiGreenMios = lazy(() => import("./modules/rankings/uigreen/ui/UiGreen").then((m) => ({ default: m.UiGreenMios })));
+const InformePublico = lazy(() => import("./modules/rankings/publica/InformePublico").then((m) => ({ default: m.InformePublico })));
 const OdsPortal = lazy(() => import("./modules/sostenible/OdsPortal").then((m) => ({ default: m.OdsPortal })));
 const OdsReport = lazy(() => import("./modules/sostenible/OdsReport").then((m) => ({ default: m.OdsReport })));
 const OdsRector = lazy(() => import("./modules/sostenible/OdsRector").then((m) => ({ default: m.OdsRector })));
@@ -362,6 +363,8 @@ export default function App() {
           <Route path="/sostenible/impact/boletin" element={<OdsBulletin />} />
           {/* La página de evidencia que abre el evaluador de THE: sin marco, sin menú y sin enlaces. */}
           <Route path="/sostenible/impact/evidencia/:n/:indicador" element={<OdsEvidence />} />
+          {/* Informes de rankings armados con Pilo Publica (0262): público, sin sesión, solo lo publicado. */}
+          <Route path="/sostenible/informes/:ranking/:unidad" element={<InformePublico />} />
           {/* Un tablero personalizado de Datos de Sostenibilidad (0204); antes de :ranking para no chocar. */}
           <Route path="/sostenible/tablero/:slug" element={<SostenibleTablero />} />
           {/* La hoja de evidencia de UI GreenMetric: sin menú; antes de :ranking/:categoria. */}

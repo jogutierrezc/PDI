@@ -96,7 +96,7 @@ export function useOdsBulletinAdmin() {
   /** Sube el PDF y lo deja publicado; crea la plantilla del boletín ODS si aún no existe. */
   const publish = async ({ file, label, cutLabel, note }: PublishInput) => {
     if (!periodId || !period.data) throw new Error("No hay un periodo vigente.");
-    const template =
+    let template =
       row ??
       (await save.mutateAsync({
         period_id: periodId,
@@ -106,7 +106,19 @@ export function useOdsBulletinAdmin() {
         settings: {},
         status: "publicado",
       }));
+    // La plantilla puede haberse creado como borrador al guardar la portada: para que el público vea la edición, se publica.
+    if (template.status !== "publicado") template = await save.mutateAsync({ id: template.id, period_id: periodId, status: "publicado" });
     return create.mutateAsync({ bulletin: template, file, label, cutLabel, periodLabel: period.data.label, note });
+  };
+
+  /**
+   * Guarda el diseño de la portada en los ajustes de la plantilla (sin migración). Si la plantilla aún no existe, la
+   * crea como borrador: no aparece en el portal hasta que se publique una edición.
+   */
+  const saveSettings = async (patch: Record<string, unknown>) => {
+    if (!periodId) throw new Error("No hay un periodo vigente.");
+    if (row) return save.mutateAsync({ id: row.id, period_id: periodId, settings: { ...row.settings, ...patch } });
+    return save.mutateAsync({ period_id: periodId, report_id: null, slug: ODS_BULLETIN_SLUG, title: ODS_BULLETIN_TITLE, settings: patch, status: "borrador" });
   };
 
   return {
@@ -117,6 +129,7 @@ export function useOdsBulletinAdmin() {
     isLoading: period.isLoading || bundle.isLoading,
     error: period.error ?? bundle.error ?? null,
     publish,
+    saveSettings,
     publishing: save.isPending || create.isPending,
     setStatus: setStatus.mutateAsync,
     settingStatus: setStatus.isPending,

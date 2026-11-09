@@ -39,7 +39,10 @@ const ThImpact = lazy(() => import("./thimpact/ui/ThImpact").then((m) => ({ defa
 // Pilo Publica: informes de cada ranking armados por Pilo; trae GSAP y las gráficas, por eso va aparte.
 const PiloPublica = lazy(() => import("./publica/PiloPublica").then((m) => ({ default: m.PiloPublica })));
 
-type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion" | "publica";
+// Boletín PDF de los informes ODS: se arma y se publica solo desde aquí (antes estaba en la página pública).
+const BoletinAdmin = lazy(() => import("./boletin/BoletinAdmin").then((m) => ({ default: m.BoletinAdmin })));
+
+type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion" | "publica" | "boletin";
 const BASE = "/admin/rankings";
 const KICKER = "Tablero de rankings";
 
@@ -65,7 +68,7 @@ export function RankingsAdmin() {
   const seccion: Seccion | null =
     param === undefined
       ? "tablero"
-      : param === "noticias" || param === "informes" || param === "posicion" || param === "publica"
+      : param === "noticias" || param === "informes" || param === "posicion" || param === "publica" || param === "boletin"
         ? param
         : rankingById(param)
           ? (param as RankingId)
@@ -96,6 +99,9 @@ export function RankingsAdmin() {
       <AdminRailTab current={seccion === "publica"} to={`${BASE}/publica`}>
         Pilo Publica
       </AdminRailTab>
+      <AdminRailTab current={seccion === "boletin"} to={`${BASE}/boletin`}>
+        Boletín PDF
+      </AdminRailTab>
     </AdminRail>
   );
 
@@ -118,6 +124,14 @@ export function RankingsAdmin() {
     cuerpo = (
       <Suspense fallback={<p role="status">Cargando Pilo Publica…</p>}>
         <PiloPublica />
+      </Suspense>
+    );
+  } else if (seccion === "boletin") {
+    titulo = "Boletín PDF de los informes ODS";
+    descripcion = "Arma el boletín con los informes publicados, descárgalo en PDF y publícalo en Boletines; el público solo ve la edición publicada";
+    cuerpo = (
+      <Suspense fallback={<p role="status">Cargando el boletín…</p>}>
+        <BoletinAdmin />
       </Suspense>
     );
   } else if (seccion === "posicion") {

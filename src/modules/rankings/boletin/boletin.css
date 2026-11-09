@@ -1,0 +1,166 @@
+/* =============================================================================
+   Boletín PDF de los informes ODS · diseño del documento y del entorno admin.
+
+   Tipografía de informe (la misma del informe ODS en pantalla): títulos 11 pt,
+   cuerpo 10 pt, títulos de figura 8 pt, subcontenido 7 pt; texto justificado
+   con guiones. El color de cada ODS es el único énfasis: reglas finas, cifras
+   tabulares, sin tarjetas ni sombras. En papel manda @page A4; los bloques que
+   no deben partirse (cifras, imágenes, gráficos, un eje corto) lo piden con
+   break-inside.
+   ========================================================================== */
+
+.bpf-doc {
+  --bpf-ink: #14201a;
+  --bpf-mute: #55625b;
+  --bpf-rule: #cfd6d1;
+  --bpf-titulo: 11pt;
+  --bpf-cuerpo: 10pt;
+  --bpf-fig: 8pt;
+  --bpf-sub: 7pt;
+  --odsc-fig: var(--bpf-fig);
+  --odsc-sub: var(--bpf-sub);
+  --odsc-num: 18pt;
+  --pp-k: var(--c, var(--ba, #2b5c30));
+  --ink: var(--bpf-ink);
+  --ink-secondary: var(--bpf-mute);
+  --track: #e6ebe8;
+  --gridline: #dfe5e1;
+  --surface: #fff;
+  color: var(--bpf-ink);
+  background: #fff;
+  font-family: var(--bf, "Open Sans", sans-serif);
+  font-size: var(--bpf-cuerpo);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.bpf-doc :is(h1, h2, h3, h4, p, ul, ol, blockquote, figure) { margin: 0; }
+.bpf-doc :is(p, li, figcaption, blockquote) { hyphens: auto; -webkit-hyphens: auto; text-wrap: pretty; }
+
+/* --- Portada: la hoja de Informes Institucionales (PaginaPortada), a tamaño de papel --------------------- */
+.bpf-cover { break-after: page; }
+.bpf-cover .vi-pg { margin: 0 auto; }
+
+/* --- Presentación rectoral e índice --------------------------------------------------------- */
+.bpf-pres, .bpf-indice { padding: 6mm 0; break-after: page; }
+.bpf-pres small { color: var(--ba); font-size: var(--bpf-sub); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.bpf-pres h2, .bpf-indice h2, .bpf-contra h2 { margin: 2mm 0 6mm; font-size: 16pt; font-weight: 700; line-height: 1.2; }
+.bpf-p { margin: 0 0 2.4mm; font-size: var(--bpf-cuerpo); text-align: justify; text-align-last: left; orphans: 3; widows: 3; }
+.bpf-cita { margin: 5mm 0 !important; padding-top: 3mm; border-top: 2px solid var(--ba); font-size: var(--bpf-titulo); font-weight: 600; line-height: 1.45; text-align: justify; text-align-last: left; }
+.bpf-firma { margin-top: 8mm !important; font-size: var(--bpf-fig); color: var(--bpf-mute); }
+.bpf-firma b { color: var(--bpf-ink); }
+.bpf-indice ol { padding: 0; list-style: none; }
+.bpf-indice li { display: grid; grid-template-columns: 9mm 1fr; gap: 4mm; align-items: center; padding: 2mm 0; border-bottom: 1px solid var(--bpf-rule); font-size: var(--bpf-cuerpo); }
+.bpf-indice u { display: grid; place-items: center; width: 9mm; height: 9mm; background: var(--c); color: #fff; font-weight: 700; text-decoration: none; }
+
+/* --- Un ODS ----------------------------------------------------------------------------------- */
+.bpf-ods { padding: 2mm 0 4mm; break-before: page; }
+.bpf-ods__hd { display: flex; align-items: center; gap: 5mm; padding-bottom: 3mm; border-bottom: 2px solid var(--c); }
+.bpf-ods__n { display: grid; place-items: center; flex: none; width: 14mm; height: 14mm; background: var(--c); color: #fff; font-size: 18pt; font-weight: 700; }
+.bpf-ods__hd small { color: var(--c); font-size: var(--bpf-sub); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.bpf-ods__hd h2 { font-size: var(--bpf-titulo); font-weight: 700; line-height: 1.3; }
+.bpf-titulo { margin: 4mm 0 2mm; font-size: 14pt; font-weight: 700; line-height: 1.25; break-after: avoid; }
+.bpf-tesis { margin: 0 0 3mm; font-size: var(--bpf-titulo); font-weight: 600; line-height: 1.5; text-align: justify; text-align-last: left; }
+.bpf-h4 { margin: 5mm 0 2mm; padding-top: 2mm; border-top: 1px solid var(--c); color: var(--bpf-ink); font-size: var(--bpf-titulo); font-weight: 700; line-height: 1.3; text-align: left; break-after: avoid; }
+
+/* Cifras destacadas */
+.bpf-cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm 4mm; margin: 2mm 0 3mm; }
+.bpf-cifra { display: flex; flex-direction: column; gap: 0.6mm; padding-top: 2mm; border-top: 2px solid var(--c); break-inside: avoid; }
+.bpf-cifra__v { color: var(--c); font-size: var(--odsc-num); font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+.bpf-cifra__v small { font-size: 0.45em; font-weight: 600; letter-spacing: 0; }
+.bpf-cifra__l { font-size: var(--bpf-fig); font-weight: 700; line-height: 1.3; }
+.bpf-cifra__d, .bpf-cifra__s { color: var(--bpf-mute); font-size: var(--bpf-sub); line-height: 1.35; }
+.bpf-cifra__s { font-style: italic; }
+
+/* Narrativa: dos columnas justificadas */
+.bpf-eje { margin-top: 1mm; }
+.bpf-eje__cols { column-count: 2; column-gap: 7mm; column-rule: 1px solid var(--bpf-rule); }
+.bpf-eje__cols .bpf-p { break-inside: avoid-column; }
+.bpf-eje .bpf-cifras { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 3mm; }
+
+/* Imágenes */
+.bpf-foto { margin: 3mm 0; break-inside: avoid; }
+.bpf-foto img { display: block; width: 100%; max-height: 62mm; object-fit: cover; background: var(--track); }
+.bpf-foto--principal img { max-height: 78mm; }
+.bpf-foto figcaption { margin-top: 1.2mm; color: var(--bpf-mute); font-size: var(--bpf-sub); line-height: 1.35; text-align: left; }
+
+/* Gráficos: dos por fila; el texto del SVG se fija en unidades del dibujo para que se lea como 7 pt */
+.bpf-graficos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm 7mm; }
+.bpf-gr { break-inside: avoid; padding-top: 2mm; border-top: 1px solid var(--bpf-rule); }
+.bpf-gr:has(.ovz-heat) { grid-column: 1 / -1; }
+.bpf-gr__t { margin-bottom: 1mm; font-size: var(--bpf-fig); font-weight: 700; line-height: 1.3; text-align: left; }
+.bpf-gr__s { margin-top: 1mm; color: var(--bpf-mute); font-size: var(--bpf-sub); text-align: left; }
+.bpf-gr .pp-svg { display: block; width: 100%; height: auto; max-height: 62mm; }
+.bpf-gr .pp-svg text { font-size: 15px !important; }
+.bpf-gr .pp-svg text[font-size="34"], .bpf-gr .pp-svg text[font-weight="800"] { font-size: 30px !important; }
+.bpf-gr .pp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.bpf-lista { padding: 0; list-style: none; }
+.bpf-lista li { padding: 1.6mm 0 2mm; border-bottom: 1px solid var(--bpf-rule); font-size: var(--bpf-cuerpo); text-align: justify; text-align-last: left; break-inside: avoid; }
+
+.bpf-contra { display: grid; align-content: center; min-height: 240mm; padding: 10mm 0; break-before: page; text-align: left; }
+.bpf-contra p { color: var(--bpf-mute); font-size: var(--bpf-cuerpo); }
+
+/* =============================================================================
+   Entorno admin: panel de opciones y vista previa del papel.
+   ========================================================================== */
+
+.bpf-admin { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: clamp(16px, 2vw, 28px); align-items: start; }
+.bpf-panel { position: sticky; top: calc(var(--header-h, 72px) + 8px); display: grid; gap: 18px; max-height: calc(100svh - var(--header-h, 72px) - 24px); overflow: auto; padding-right: 6px; }
+.bpf-panel section { display: grid; gap: 8px; }
+.bpf-panel h3 { margin: 0; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-secondary); }
+.bpf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bpf-ch {
+  display: grid; place-items: center; min-width: 38px; height: 38px; padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); background: transparent; color: var(--ink);
+  font: inherit; font-weight: 700; cursor: pointer;
+  transition: background-color 0.18s cubic-bezier(0.23, 1, 0.32, 1), color 0.18s cubic-bezier(0.23, 1, 0.32, 1), transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.bpf-ch[aria-pressed="true"] { background: var(--c); color: #fff; border-color: var(--c); }
+.bpf-ch:disabled { opacity: 0.38; cursor: not-allowed; text-decoration: line-through; }
+.bpf-ch:not(:disabled):active { transform: scale(0.96); }
+.bpf-check { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; }
+.bpf-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.bpf-sw { display: flex; gap: 8px; }
+.bpf-sw button { width: 28px; height: 28px; border: 2px solid transparent; background: var(--c); cursor: pointer; }
+.bpf-sw button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.bpf-texto { width: 100%; min-height: 120px; font: inherit; }
+.bpf-nota { margin: 0; color: var(--ink-secondary); font-size: 0.82rem; line-height: 1.4; }
+.bpf-aviso { margin: 0; padding: 8px 0; border-top: 1px solid var(--gridline); color: var(--ink-secondary); font-size: 0.86rem; }
+
+.bpf-visor { min-width: 0; }
+.bpf-visor__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 10px; }
+.bpf-papel {
+  width: min(100%, 210mm); margin: 0 auto; padding: 14mm 13mm 16mm;
+  background: #fff; border: 1px solid var(--gridline); color: #14201a;
+}
+.bpf-papel .bpf-portada, .bpf-papel .bpf-pres, .bpf-papel .bpf-indice, .bpf-papel .bpf-ods, .bpf-papel .bpf-contra { border-bottom: 1px dashed var(--gridline); margin-bottom: 8mm; }
+.bpf-publicar { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--gridline); }
+
+/* La copia que se imprime vive fuera de la aplicación; solo se ve al imprimir. */
+.bpf-print-root { display: none; }
+
+@media (max-width: 1023px) {
+  .bpf-admin { grid-template-columns: minmax(0, 1fr); }
+  .bpf-panel { position: static; max-height: none; overflow: visible; }
+  .bpf-papel { padding: 10mm 6mm; }
+  .bpf-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bpf-eje__cols { column-count: 1; }
+  .bpf-graficos { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* La portada ocupa la hoja completa, sin márgenes: página con nombre. */
+@page bpfportada { size: A4; margin: 0; }
+
+@media print {
+  @page { size: A4; margin: 14mm 13mm 16mm; }
+  body.bpf-imprimiendo { background: #fff !important; }
+  body.bpf-imprimiendo > *:not(.bpf-print-root) { display: none !important; }
+  body.bpf-imprimiendo .bpf-print-root { display: block !important; }
+  .bpf-print-root .bpf-doc { width: auto; }
+  .bpf-print-root .bpf-cover { page: bpfportada; }
+  .bpf-print-root { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bpf-ch { transition: none; }
+}

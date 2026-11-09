@@ -169,6 +169,9 @@ const DocumentPortal = lazy(() =>
 const CollectionPage = lazy(() =>
   import("./modules/documentos/CollectionPage").then((m) => ({ default: m.CollectionPage })),
 );
+const DocViewerPage = lazy(() =>
+  import("./modules/documentos/visor/DocViewerPage").then((m) => ({ default: m.DocViewerPage })),
+);
 const DocumentsAdmin = lazy(() =>
   import("./modules/admin/documentos/DocumentsAdmin").then((m) => ({ default: m.DocumentsAdmin })),
 );
@@ -389,6 +392,8 @@ export default function App() {
           <Route path="/datos-abiertos/:slug" element={<OpenDataReport />} />
           {/* El repositorio documental e histórico de la oficina. */}
           <Route path="/documentos" element={<DocumentPortal />} />
+          {/* Un documento a pantalla completa, con «Volver». Va antes que :slug para que «ver» no se tome por una colección. */}
+          <Route path="/documentos/ver/:id" element={<DocViewerPage />} />
           <Route path="/documentos/:slug/:section?" element={<CollectionPage />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 

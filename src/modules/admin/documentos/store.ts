@@ -122,9 +122,9 @@ export function useRemoveCollection() {
       const nodes = (children ?? []) as { id: string; cover: string | null }[];
       const ids = [collection.id, ...nodes.map((node) => node.id)];
 
-      const { data } = await supabase.from("doc_items").select("path").in("collection_id", ids);
-      const paths = ((data ?? []) as { path: string | null }[])
-        .map((row) => row.path)
+      const { data } = await supabase.from("doc_items").select("path,source_path,thumb_path").in("collection_id", ids);
+      const paths = ((data ?? []) as { path: string | null; source_path: string | null; thumb_path: string | null }[])
+        .flatMap((row) => [row.path, row.source_path, row.thumb_path])
         .filter((path): path is string => Boolean(path));
       for (const node of nodes) if (node.cover) paths.push(node.cover);
       if (collection.cover) paths.push(collection.cover);
@@ -156,7 +156,7 @@ export function useRemoveItem() {
     mutationFn: async (item: DocItem) => {
       const { error } = await supabase.from("doc_items").delete().eq("id", item.id);
       if (error) throw describeDatabaseError(error);
-      await removeDocFiles(item.path ? [item.path] : []);
+      await removeDocFiles([item.path, item.sourcePath, item.thumbPath]);
     },
     onSuccess: refresh,
   });
@@ -173,7 +173,13 @@ const COVER_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 const DOC_EXTENSIONS = [
   ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
   ".csv", ".txt", ".zip", ".jpg", ".jpeg", ".png", ".webp",
+  // Resultados de Quarto y R Markdown (ya renderizados), HTML y Markdown.
+  ".html", ".htm", ".md",
 ];
+
+/** Código fuente que acompaña a un .html de Quarto o R: se muestra como texto, no se ejecuta. */
+const SOURCE_EXTENSIONS = [".qmd", ".rmd", ".r"];
+export const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 
 export const formatBytes = (bytes: number) =>
   bytes >= 1024 * 1024
@@ -236,6 +242,30 @@ export async function uploadDocFile(collectionId: string, file: File): Promise<U
     fileType: extension.replace(".", "").toUpperCase(),
     sizeBytes: file.size,
   };
+}
+
+/** El código fuente (.qmd, .Rmd, .R) de un documento de Quarto o R. */
+export async function uploadSourceFile(collectionId: string, file: File): Promise<{ path: string; name: string }> {
+  const extension = extensionOf(file.name);
+  if (!SOURCE_EXTENSIONS.includes(extension)) {
+    throw new FriendlyError(`«${file.name}» no es código fuente de Quarto ni de R. Sube un archivo ${SOURCE_EXTENSIONS.join(", ")}.`);
+  }
+  if (file.size > MAX_SOURCE_BYTES) {
+    throw new FriendlyError(`«${file.name}» pesa ${formatBytes(file.size)} y el máximo del código fuente son ${formatBytes(MAX_SOURCE_BYTES)}.`);
+  }
+  const path = `${collectionId}/fuente-${Date.now()}-${safeName(file.name)}`;
+  const { error } = await supabase.storage.from(DOC_BUCKET).upload(path, file, { contentType: "text/plain", upsert: false });
+  if (error) throw uploadError(error.message);
+  return { path, name: file.name };
+}
+
+/** La miniatura de un documento (ya reducida por miniatura.ts). */
+export async function uploadThumb(collectionId: string, blob: Blob): Promise<string> {
+  const extension = blob.type === "image/png" ? "png" : blob.type === "image/jpeg" ? "jpg" : "webp";
+  const path = `miniaturas/${collectionId}/${Date.now()}.${extension}`;
+  const { error } = await supabase.storage.from(DOC_BUCKET).upload(path, blob, { contentType: blob.type || "image/webp", upsert: false });
+  if (error) throw uploadError(error.message);
+  return path;
 }
 
 /** La tapa de una colección. */

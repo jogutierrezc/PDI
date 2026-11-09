@@ -1,34 +1,31 @@
 /* =============================================================================
-   Portal Documentos · el tomo abierto.
+   Portal Documentos · una colección.
 
-   A la izquierda la tapa grande, sus secciones y los años que guarda; a la
-   derecha el índice, numerado y agrupado por año. Cada entrada dice antes de
-   pulsarla de qué tipo es, cuánto pesa y —si es un enlace— a qué sitio lleva:
-   nadie debería descubrir que un documento son cuarenta megas, ni que sale del
-   portal, después de haber pulsado.
+   Cabecera baja; a la izquierda, una columna pegajosa con las secciones, los
+   tipos y los años; a la derecha, el índice agrupado por año. Cada fila trae
+   miniatura, resumen de dos líneas (con «Leer más» para el resto), y las
+   acciones que le tocan a su tipo: «Ver» abre la página a pantalla completa
+   del documento; los enlaces salen al sitio de destino.
 
-   Las secciones son las divisorias del tomo. Con «Todas» se recorren una tras
-   otra, cada una con su pestaña; eligiendo una, el índice se queda en ella. Los
-   documentos que no están en ninguna sección van primero y sin pestaña: son
-   del tomo, no de una divisoria.
+   Tipo y año viven en la URL (?tipo=pdf&anio=2025) y la sección en la ruta:
+   al volver del documento, la vista queda como estaba.
 
-   Las ediciones anteriores no se ocultan ni compiten: viven plegadas bajo la
-   vigente, y se despliegan donde están. En un repositorio histórico la versión
-   vieja es dato, no ruido, pero la que hay que descargar hoy es una sola.
+   Las ediciones anteriores siguen plegadas bajo la vigente.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import gsap from "gsap";
 import { Icon } from "../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
 import { formatBytes } from "../../data/storage";
 import { NotFound } from "../../routes/NotFound";
 import { PlanLayout } from "../planeacion/PlanLayout";
+import { contarPorTipo, iniciadoConTeclado, pasa, useEntrada, useFiltros } from "./DocumentPortal";
+import { DocThumb } from "./DocThumb";
+import { TipoDoc } from "./TipoDoc";
 import {
-  coversYear,
-  documentFileUrl,
   documentHref,
-  documentType,
   entriesOf,
   itemsUnder,
   sortEntries,
@@ -37,6 +34,7 @@ import {
   yearsOf,
 } from "./data";
 import type { DocCollection, DocEntry, DocItem } from "./data";
+import { FORMAT_LABEL, FORMAT_ORDER, formatOf, hasMore, hostOf, isPreviewableFormat, shortDescription, viewerPath } from "./tipos";
 import "./documentos.css";
 
 interface YearGroup {
@@ -64,8 +62,10 @@ function groupByYear(entries: DocEntry[]): YearGroup[] {
 
 export function CollectionPage() {
   const { slug, section: sectionSlug } = useParams();
+  const { search } = useLocation();
   const library = useDocLibrary();
-  const [year, setYear] = useState<number | null>(null);
+  const { tipo, anio, setTipo, setAnio, limpiar } = useFiltros();
+  const raiz = useRef<HTMLDivElement>(null);
 
   const data = library.data;
   const collection = data?.collections.find((c) => c.slug === slug);
@@ -80,22 +80,23 @@ export function CollectionPage() {
     () => (collection && data ? itemsUnder(collection, data) : []),
     [collection, data],
   );
-  /** Lo que de verdad se está mirando: el tomo entero, o solo una divisoria.
-   *  Las cifras y los años de la columna se cuentan de aquí, porque decir
-   *  «6 documentos, 2018-2025» dentro de una sección de dos es mentir. */
+  /** Lo que de verdad se está mirando: el tomo entero o una sola sección. */
   const scope = useMemo(
     () => (section && data ? (data.byCollection.get(section.id) ?? []) : everything),
     [section, data, everything],
   );
   const years = useMemo(() => yearsOf(scope), [scope]);
+  const scopeEntries = useMemo(() => entriesOf(scope), [scope]);
+  const typeCounts = useMemo(() => contarPorTipo(scopeEntries), [scopeEntries]);
+  const types = FORMAT_ORDER.filter((f) => (typeCounts.get(f) ?? 0) > 0);
 
   const parts = useMemo(() => {
     if (!collection || !data) return [];
-    const inYear = (items: DocItem[]) =>
-      year === null ? items : items.filter((item) => coversYear(item, year));
-    const indexOf = (items: DocItem[]) => groupByYear(sortEntries(entriesOf(inYear(items))));
+    // Se filtra sobre las entradas vigentes, no sobre los documentos: una
+    // edición nueva de otro tipo no debe resucitar a la vieja.
+    const indexOf = (items: DocItem[]) =>
+      groupByYear(sortEntries(entriesOf(items).filter((e) => pasa(e.item, tipo, anio))));
 
-    // Con una sección elegida, el índice es solo suyo.
     if (section) {
       const groups = indexOf(data.byCollection.get(section.id) ?? []);
       return groups.length ? [{ section, groups }] : [];
@@ -109,7 +110,14 @@ export function CollectionPage() {
       if (groups.length) out.push({ section: item, groups });
     }
     return out;
-  }, [collection, data, sections, section, year]);
+  }, [collection, data, sections, section, tipo, anio]);
+
+  const shown = parts.reduce(
+    (sum, part) => sum + part.groups.reduce((n, group) => n + group.entries.length, 0),
+    0,
+  );
+
+  useEntrada(raiz, ".dc-row", `${collection?.id}|${section?.id}|${tipo}|${anio}`, Boolean(collection));
 
   if (library.isPending) {
     return (
@@ -136,63 +144,52 @@ export function CollectionPage() {
   // exista.
   if (!collection || (sectionSlug && !section)) return <NotFound />;
 
-  const cover = documentFileUrl(collection.cover);
   const range = yearRange(scope);
-  const total = entriesOf(scope).length;
-  /** El total del tomo, para la fila «Todas» de la lista de secciones. */
+  const total = scopeEntries.length;
   const collectionTotal = entriesOf(everything).length;
-  const shown = parts.reduce(
-    (sum, part) => sum + part.groups.reduce((n, group) => n + group.entries.length, 0),
-    0,
-  );
   const heading = section ? section.title : collection.title;
   const lede = section ? section.subtitle : collection.subtitle;
+  const base = `/documentos/${collection.slug}`;
+  const filtrando = tipo !== null || anio !== null;
 
   return (
     <PlanLayout
       title={`${section ? `${section.title} · ${collection.title}` : collection.title} · Repositorio documental`}
     >
       <section className="pl-hero pl-hero--compact dc-hero" aria-labelledby="dc-coleccion">
-        <div className="pl-container pl-hero__inner">
-          <Link className="pl-back" to={section ? `/documentos/${collection.slug}` : "/documentos"}>
-            <Icon name="arrow-left" size={16} />
-            {section ? collection.title : "Repositorio documental"}
-          </Link>
-          <h1 id="dc-coleccion">{heading}</h1>
-          {lede && <p className="pl-hero__lede">{lede}</p>}
+        <div className="pl-container dc-hero__inner">
+          <div className="dc-hero__text">
+            <Link className="pl-back" to={section ? `${base}${search}` : `/documentos${search}`}>
+              <Icon name="arrow-left" size={16} />
+              {section ? collection.title : "Repositorio documental"}
+            </Link>
+            <h1 id="dc-coleccion">{heading}</h1>
+            {lede && <p className="pl-hero__lede">{lede}</p>}
+          </div>
+          <dl className="dc-facts">
+            <div>
+              <dt>Documentos</dt>
+              <dd>{total}</dd>
+            </div>
+            {range && (
+              <div>
+                <dt>Cubre años</dt>
+                <dd>{range}</dd>
+              </div>
+            )}
+          </dl>
         </div>
       </section>
 
-      <section className="pl-section dc-open">
+      <section className="pl-section dc-open" ref={raiz}>
         <div className="pl-container dc-open__grid">
-          <aside className="dc-open__plate" aria-label="La colección">
-            <span className="dc-open__cover">
-              {cover ? (
-                <img src={cover} alt={collection.coverAlt} decoding="async" />
-              ) : (
-                <span aria-hidden="true">{collection.title.trim().charAt(0).toUpperCase()}</span>
-              )}
-            </span>
-
-            <dl className="dc-open__facts">
-              <div>
-                <dt>Documentos</dt>
-                <dd>{total}</dd>
-              </div>
-              {range && (
-                <div>
-                  <dt>Cubre</dt>
-                  <dd>{range}</dd>
-                </div>
-              )}
-            </dl>
-
+          <aside className="dc-rail" aria-label="Filtros de la colección">
             {sections.length > 0 && (
-              <nav className="dc-parts" aria-label="Secciones de la colección">
+              <nav className="dc-rail__block" aria-label="Secciones de la colección">
                 <h2>Secciones</h2>
                 <ul>
                   <li>
-                    <Link to={`/documentos/${collection.slug}`} aria-current={section ? undefined : "page"}>
+                    <Link to={`${base}${search}`} aria-current={section ? undefined : "page"}>
                       <span>Todas</span>
                       <b>{collectionTotal}</b>
                     </Link>
@@ -200,7 +197,7 @@ export function CollectionPage() {
                   {sections.map((item) => (
                     <li key={item.id}>
                       <Link
-                        to={`/documentos/${collection.slug}/${item.slug}`}
+                        to={`${base}/${item.slug}${search}`}
                         aria-current={section?.id === item.id ? "page" : undefined}
                       >
                         <span>{item.title}</span>
@@ -212,19 +209,36 @@ export function CollectionPage() {
               </nav>
             )}
 
+            {types.length > 1 && (
+              <div className="dc-rail__block" role="group" aria-label="Filtrar por tipo de documento">
+                <h2>Tipo de documento</h2>
+                <ul>
+                  {types.map((f) => (
+                    <li key={f}>
+                      <button type="button" aria-pressed={tipo === f} onClick={() => setTipo(tipo === f ? null : f)}>
+                        <span>{FORMAT_LABEL[f]}</span>
+                        <b>{typeCounts.get(f)}</b>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {years.length > 1 && (
-              <div className="dc-open__years">
-                <h2>Años</h2>
-                <div className="dc-years" role="group" aria-label="Filtrar por año">
-                  <button type="button" aria-pressed={year === null} onClick={() => setYear(null)}>
+              <div className="dc-rail__block" role="group" aria-label="Filtrar por año">
+                <h2>Año</h2>
+                <div className="dc-chips">
+                  <button type="button" className="dc-chip" aria-pressed={anio === null} onClick={() => setAnio(null)}>
                     Todos
                   </button>
                   {years.map((value) => (
                     <button
                       key={value}
                       type="button"
-                      aria-pressed={year === value}
-                      onClick={() => setYear(year === value ? null : value)}
+                      className="dc-chip"
+                      aria-pressed={anio === value}
+                      onClick={() => setAnio(anio === value ? null : value)}
                     >
                       {value}
                     </button>
@@ -240,51 +254,40 @@ export function CollectionPage() {
                 <strong>
                   {everything.length === 0
                     ? "Esta colección todavía no tiene documentos publicados."
-                    : year !== null
-                      ? `Aquí no hay documentos de ${year}.`
+                    : filtrando
+                      ? "No hay documentos con estos filtros."
                       : "Esta sección todavía no tiene documentos publicados."}
                 </strong>
-                {everything.length > 0 && year !== null && (
-                  <button type="button" className="pl-link" onClick={() => setYear(null)}>
+                {everything.length > 0 && filtrando && (
+                  <button type="button" className="pl-link dc-linkbtn" onClick={limpiar}>
                     Ver los {total} documentos
                   </button>
                 )}
               </p>
             ) : (
-              (() => {
-                // La numeración corre a lo largo de todo el índice, secciones
-                // incluidas: es un índice, no una lista por tramo.
-                let number = 0;
-                return parts.map((part) => (
-                  <section className="dc-part" key={part.section?.id ?? "sueltos"}>
-                    {part.section && !section && (
-                      <h2 className="dc-part__tab">
-                        <Link to={`/documentos/${collection.slug}/${part.section.slug}`}>
-                          {part.section.title}
-                        </Link>
-                      </h2>
-                    )}
-                    {part.groups.map((group) => (
-                      <div className="dc-group" key={group.year ?? "sin-ano"}>
-                        <h3 className="dc-group__year">{group.year ?? "Sin año declarado"}</h3>
-                        <ol className="dc-entries">
-                          {group.entries.map((entry) => {
-                            number += 1;
-                            return (
-                              <Entry
-                                key={entry.item.id}
-                                entry={entry}
-                                number={number}
-                                groupYear={group.year}
-                              />
-                            );
-                          })}
-                        </ol>
-                      </div>
-                    ))}
-                  </section>
-                ));
-              })()
+              parts.map((part) => (
+                <section className="dc-part" key={part.section?.id ?? "sueltos"}>
+                  {part.section && !section && (
+                    <h2 className="dc-part__tab">
+                      <Link to={`${base}/${part.section.slug}${search}`}>{part.section.title}</Link>
+                    </h2>
+                  )}
+                  {part.groups.map((group) => (
+                    <div className="dc-group" key={group.year ?? "sin-ano"}>
+                      <h3 className="dc-group__year">{group.year ?? "Sin año declarado"}</h3>
+                      <ol className="dc-rows">
+                        {group.entries.map((entry) => (
+                          <Row
+                            key={entry.item.id}
+                            entry={entry}
+                            sectionName={part.section?.title ?? ""}
+                          />
+                        ))}
+                      </ol>
+                    </div>
+                  ))}
+                </section>
+              ))
             )}
           </div>
         </div>
@@ -293,45 +296,102 @@ export function CollectionPage() {
   );
 }
 
-/* --- Una entrada del índice -------------------------------------------------------------- */
+/* --- Una fila del índice ------------------------------------------------------------------ */
 
-function Entry({
-  entry,
-  number,
-  groupYear,
-}: {
-  entry: DocEntry;
-  number: number;
-  groupYear: number | null;
-}) {
+function Row({ entry, sectionName }: { entry: DocEntry; sectionName: string }) {
   const { item, older } = entry;
+  const format = formatOf(item);
   const href = documentHref(item);
+  const preview = isPreviewableFormat(format);
+  const host = item.kind === "enlace" ? hostOf(item.url) : "";
+  const more = hasMore(item);
+
+  const [open, setOpen] = useState(false);
+  const desc = useRef<HTMLDivElement>(null);
+  /** Alto antes del cambio; nulo si no hay que animar (teclado o movimiento reducido). */
+  const antes = useRef<number | null>(null);
+
+  const alternar = (event: React.MouseEvent) => {
+    const quiere =
+      event.detail > 0 &&
+      !iniciadoConTeclado() &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    antes.current = quiere && desc.current ? desc.current.offsetHeight : null;
+    setOpen((v) => !v);
+  };
+
+  useLayoutEffect(() => {
+    const el = desc.current;
+    const from = antes.current;
+    antes.current = null;
+    if (!el || from === null) return;
+    const to = el.offsetHeight;
+    if (from === to) return;
+    const tween = gsap.fromTo(
+      el,
+      { height: from, overflow: "hidden" },
+      { height: to, duration: 0.24, ease: "power2.out", clearProps: "height,overflow" },
+    );
+    return () => {
+      tween.kill();
+      gsap.set(el, { clearProps: "height,overflow" });
+    };
+  }, [open]);
+
+  const title = item.title;
 
   return (
-    <li className="dc-entry">
-      <span className="dc-entry__number" aria-hidden="true">
-        {String(number).padStart(2, "0")}
-      </span>
+    <li className="dc-row">
+      <div className="dc-row__thumb">
+        <DocThumb item={item} size="md" />
+      </div>
 
-      <div className="dc-entry__body">
+      <div className="dc-row__body">
         <h4>
-          {href ? (
-            // Todo abre en una pestaña nueva, también el archivo: vive en otro
-            // dominio y el atributo `download` no manda ahí, así que prometer
-            // una descarga sería mentir.
-            <a href={href} className="pl-stretch" target="_blank" rel="noopener noreferrer">
-              {item.title}
+          {preview ? (
+            <Link to={viewerPath(item.id)}>{title}</Link>
+          ) : href ? (
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {title}
+              <span className="sr-only">, se abre en una pestaña nueva</span>
             </a>
           ) : (
-            item.title
+            title
           )}
-          {item.version && <span className="dc-entry__version">{item.version}</span>}
         </h4>
 
-        {item.description && <p>{item.description}</p>}
+        <div className="dc-row__desc" ref={desc} data-open={open || undefined}>
+          <p id={`desc-${item.id}`}>{open ? item.description.trim() : shortDescription(item)}</p>
+        </div>
+        {more && (
+          <button
+            type="button"
+            className="dc-more"
+            aria-expanded={open}
+            aria-controls={`desc-${item.id}`}
+            onClick={alternar}
+          >
+            {open ? "Leer menos" : "Leer más"}
+          </button>
+        )}
 
-        <p className="dc-entry__meta">
-          <Meta item={item} groupYear={groupYear} />
+        <p className="dc-row__meta">
+          <TipoDoc format={format} />
+          {item.version && <span>{item.version}</span>}
+          {item.kind === "archivo" && item.sizeBytes ? <span>{formatBytes(item.sizeBytes)}</span> : null}
+          {host && (
+            <span>
+              <Icon name="external" size={12} />
+              {host}
+            </span>
+          )}
+          {sectionName && <span>{sectionName}</span>}
+          {item.visibility === "intranet" && (
+            <span className="dc-chip-intranet">
+              <Icon name="lock" size={12} />
+              Solo intranet
+            </span>
+          )}
         </p>
 
         {older.length > 0 && (
@@ -349,68 +409,65 @@ function Entry({
         )}
       </div>
 
-      <span className="dc-entry__go" aria-hidden="true">
-        <Icon name={item.kind === "enlace" ? "external" : "download"} size={18} />
-      </span>
+      <div className="dc-row__acts">
+        {preview ? (
+          <>
+            <Link className="dc-btn dc-btn--pri" to={viewerPath(item.id)}>
+              <Icon name="eye" size={16} />
+              Ver
+            </Link>
+            {item.kind === "archivo" && href && (
+              <a
+                className="dc-btn"
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Descargar ${title}`}
+              >
+                <Icon name="download" size={16} />
+                Descargar
+              </a>
+            )}
+          </>
+        ) : href ? (
+          format === "file" ? (
+            <a className="dc-btn dc-btn--pri" href={href} target="_blank" rel="noopener noreferrer" aria-label={`Descargar ${title}`}>
+              <Icon name="download" size={16} />
+              Descargar
+            </a>
+          ) : (
+            <a className="dc-btn dc-btn--pri" href={href} target="_blank" rel="noopener noreferrer">
+              <Icon name="external" size={16} />
+              {format === "repo" ? "Abrir en el repositorio" : "Abrir enlace"}
+              <span className="sr-only">, se abre en una pestaña nueva</span>
+            </a>
+          )
+        ) : null}
+        {!preview && host && <small className="dc-row__dest">{host}</small>}
+      </div>
     </li>
-  );
-}
-
-/** El sitio al que lleva un enlace, para poder decidir antes de pulsarlo. */
-function hostOf(url: string | null): string {
-  if (!url) return "";
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
-
-/** El año solo se repite cuando dice algo que la pestaña del grupo no dice:
- *  un rango, o una edición retirada que cuelga de otro año. */
-function Meta({ item, groupYear }: { item: DocItem; groupYear?: number | null }) {
-  const bits: string[] = [documentType(item)];
-  if (item.kind === "enlace") {
-    const host = hostOf(item.url);
-    if (host) bits.push(host);
-  } else if (item.sizeBytes) {
-    bits.push(formatBytes(item.sizeBytes));
-  }
-  const range = item.yearTo !== null && item.yearTo !== item.year;
-  if (item.year !== null && (range || groupYear === undefined || groupYear !== item.year)) {
-    bits.push(range ? `${item.year}-${item.yearTo}` : `${item.year}`);
-  }
-  return (
-    <>
-      {bits.join(" · ")}
-      <span className="sr-only">
-        {item.kind === "enlace"
-          ? ", enlace externo, se abre en una pestaña nueva"
-          : ", se abre en una pestaña nueva"}
-      </span>
-    </>
   );
 }
 
 /** Una edición retirada: se puede consultar, pero se dibuja como lo que es. */
 function OlderVersion({ item }: { item: DocItem }) {
-  const href = documentHref(item);
+  const format = formatOf(item);
+  const label = `${item.version || "Edición anterior"}${item.year !== null ? ` · ${item.year}` : ""}`;
+  const meta = [FORMAT_LABEL[format], item.kind === "archivo" && item.sizeBytes ? formatBytes(item.sizeBytes) : ""]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <li>
-      {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer">
-          {item.version || "Edición anterior"}
-          {item.year !== null && ` · ${item.year}`}
+      {isPreviewableFormat(format) ? (
+        <Link to={viewerPath(item.id)}>{label}</Link>
+      ) : documentHref(item) ? (
+        <a href={documentHref(item) ?? undefined} target="_blank" rel="noopener noreferrer">
+          {label}
         </a>
       ) : (
-        <span>
-          {item.version || "Edición anterior"}
-          {item.year !== null && ` · ${item.year}`}
-        </span>
+        <span>{label}</span>
       )}
-      <small>
-        <Meta item={item} />
-      </small>
+      <small>{meta}</small>
     </li>
   );
 }

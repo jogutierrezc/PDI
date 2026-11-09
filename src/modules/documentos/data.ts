@@ -30,6 +30,10 @@ export const docPublicKey = ["documentos", "publicado"] as const;
 
 export type DocStatus = "borrador" | "publicado";
 export type DocKind = "archivo" | "enlace";
+/** Quién ve el documento en el portal. OJO: no protege el archivo (el bucket es público). */
+export type DocVisibility = "publico" | "intranet";
+/** De dónde viene un .html: común, Quarto o R Markdown. */
+export type DocFlavor = "" | "quarto" | "rmarkdown";
 
 export interface DocCollection {
   id: string;
@@ -50,6 +54,8 @@ export interface DocItem {
   collectionId: string;
   title: string;
   description: string;
+  /** Resumen corto (2 líneas) para el índice; vacío = se usa la descripción recortada. */
+  summary: string;
   kind: DocKind;
   url: string | null;
   path: string | null;
@@ -62,6 +68,13 @@ export interface DocItem {
   version: string;
   supersedes: string | null;
   status: DocStatus;
+  visibility: DocVisibility;
+  flavor: DocFlavor;
+  /** Código fuente (.qmd, .Rmd, .R) en el bucket, para mostrarlo junto al resultado. */
+  sourcePath: string | null;
+  sourceName: string;
+  /** Miniatura (imagen) en el bucket. */
+  thumbPath: string | null;
   position: number;
   updatedAt: string;
 }
@@ -92,6 +105,7 @@ export interface ItemRow {
   collection_id: string;
   title: string;
   description: string;
+  summary?: string | null;
   kind: DocKind;
   url: string | null;
   path: string | null;
@@ -104,6 +118,11 @@ export interface ItemRow {
   version: string;
   supersedes: string | null;
   status: DocStatus;
+  visibility?: DocVisibility | null;
+  flavor?: DocFlavor | null;
+  source_path?: string | null;
+  source_name?: string | null;
+  thumb_path?: string | null;
   position: number;
   updated_at: string;
 }
@@ -138,6 +157,7 @@ export const itemFrom = (r: ItemRow): DocItem => ({
   collectionId: r.collection_id,
   title: r.title,
   description: r.description ?? "",
+  summary: r.summary ?? "",
   kind: r.kind,
   url: r.url,
   path: r.path,
@@ -150,6 +170,11 @@ export const itemFrom = (r: ItemRow): DocItem => ({
   version: r.version ?? "",
   supersedes: r.supersedes,
   status: r.status,
+  visibility: r.visibility === "intranet" ? "intranet" : "publico",
+  flavor: r.flavor === "quarto" || r.flavor === "rmarkdown" ? r.flavor : "",
+  sourcePath: r.source_path ?? null,
+  sourceName: r.source_name ?? "",
+  thumbPath: r.thumb_path ?? null,
   position: r.position,
   updatedAt: r.updated_at,
 });
@@ -159,6 +184,7 @@ export const itemTo = (i: Omit<DocItem, "updatedAt">) => ({
   collection_id: i.collectionId,
   title: i.title,
   description: i.description,
+  summary: i.summary,
   kind: i.kind,
   // La restricción de la base exige que solo venga la fuente que toca.
   url: i.kind === "enlace" ? i.url : null,
@@ -172,6 +198,11 @@ export const itemTo = (i: Omit<DocItem, "updatedAt">) => ({
   version: i.version,
   supersedes: i.supersedes,
   status: i.status,
+  visibility: i.visibility,
+  flavor: i.flavor,
+  source_path: i.sourcePath,
+  source_name: i.sourceName,
+  thumb_path: i.thumbPath,
   position: i.position,
 });
 

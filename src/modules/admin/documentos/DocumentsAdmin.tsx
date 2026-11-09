@@ -18,16 +18,18 @@
    La colección vive en la ruta: /admin/documentos/actas-consejo
    ========================================================================== */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import gsap from "gsap";
 import { useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { useAuth } from "../../../lib/auth";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
-import { ConfirmButton, Panel, slugify } from "../udes-en-cifras/ui";
+import { ConfirmButton, slugify } from "../udes-en-cifras/ui";
 import { documentFileUrl, entriesOf, itemsUnder, yearRange } from "../../documentos/data";
 import type { DocCollection, DocItem } from "../../documentos/data";
 import { ItemRows } from "./ItemRows";
+import { fromKeyboard, reducedMotion } from "./motion";
 import {
   MAX_COVER_BYTES,
   formatBytes,
@@ -79,6 +81,9 @@ export function DocumentsAdmin() {
   const parent = current?.parentId ? (collections.find((c) => c.id === current.parentId) ?? null) : null;
   /** De qué colección colgaría una sección nueva: de la elegida, o de su madre. */
   const sectionHome = current ? (current.parentId ? parent : current) : null;
+  const byCollection = state?.byCollection;
+  /** Estable: el asistente lo usa para decidir qué puede reemplazar un documento. */
+  const itemsOf = useCallback((collectionId: string) => byCollection?.get(collectionId) ?? [], [byCollection]);
 
   useEffect(() => {
     if (!notice) return;
@@ -195,6 +200,11 @@ export function DocumentsAdmin() {
                   existing={nodes}
                   sections={current.parentId ? [] : (sections.get(current.id) ?? [])}
                   items={items}
+                  allItems={
+                    current.parentId
+                      ? items
+                      : itemsUnder(current as DocCollection, { sections, byCollection: state?.byCollection ?? new Map() })
+                  }
                   canEdit={canEdit}
                   notify={setNotice}
                   fail={setError}
@@ -221,6 +231,9 @@ export function DocumentsAdmin() {
                 {!draft && (
                   <ItemRows
                     collection={current as DocCollection}
+                    root={(parent ?? current) as DocCollection}
+                    sections={sections.get((parent ?? current).id) ?? []}
+                    itemsOf={itemsOf}
                     items={items}
                     canEdit={canEdit}
                     notify={setNotice}
@@ -354,8 +367,14 @@ function CollectionRail({
   );
 }
 
-/* --- Los datos de la colección --------------------------------------------------------- */
+/* --- La cabecera de la colección ------------------------------------------------------------ */
 
+/**
+ * La colección en una franja: tapa pequeña, nombre, dirección y cuentas. Sus
+ * datos se editan en un formulario que se pliega y se despliega, porque lo que
+ * se viene a hacer aquí casi siempre son los documentos, y el formulario
+ * entero empujaba la lista cuatrocientos píxeles hacia abajo.
+ */
 function CollectionForm({
   collection,
   isNew,
@@ -364,6 +383,7 @@ function CollectionForm({
   existing,
   sections,
   items,
+  allItems,
   canEdit,
   notify,
   fail,
@@ -380,6 +400,8 @@ function CollectionForm({
   /** Las secciones propias, cuando esto es una colección de primer nivel. */
   sections: DocCollection[];
   items: DocItem[];
+  /** Los documentos del nodo y, en una colección, los de sus secciones. */
+  allItems: DocItem[];
   canEdit: boolean;
   notify: (message: string) => void;
   fail: (message: string) => void;
@@ -388,13 +410,17 @@ function CollectionForm({
 }) {
   const [form, setForm] = useState(collection);
   const [uploading, setUploading] = useState(false);
+  const [open, setOpen] = useState(isNew);
   const picker = useRef<HTMLInputElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const save = useSaveCollection();
+  const bodyId = useId();
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
   const cover = documentFileUrl(form.cover);
+  const savedCover = documentFileUrl(collection.cover);
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(collection), [form, collection]);
   // La dirección es única dentro de su madre: dos colecciones distintas pueden
   // tener cada una su sección «Acuerdos».
@@ -409,6 +435,40 @@ function CollectionForm({
       : slugTaken
         ? "Ya hay otra colección con esa dirección."
         : "";
+
+  const range = yearRange(allItems);
+  const kind = isSection ? "sección" : "colección";
+
+  /** Pliega o despliega el formulario: altura y opacidad en <= 260 ms; sin animar con el teclado. */
+  function panel(next: boolean, animate: boolean) {
+    const node = body.current;
+    if (!node) return;
+    gsap.killTweensOf(node);
+    const still = !animate || reducedMotion();
+    if (next) {
+      node.hidden = false;
+      setOpen(true);
+      if (!still) {
+        gsap.fromTo(node, { height: 0, opacity: 0 }, { height: "auto", opacity: 1, duration: 0.24, ease: "power3.out", clearProps: "height,opacity" });
+      }
+      return;
+    }
+    setOpen(false);
+    if (still) {
+      node.hidden = true;
+      return;
+    }
+    gsap.to(node, {
+      height: 0,
+      opacity: 0,
+      duration: 0.18,
+      ease: "power3.out",
+      onComplete: () => {
+        node.hidden = true;
+        gsap.set(node, { clearProps: "height,opacity" });
+      },
+    });
+  }
 
   async function pickCover(file: File | undefined) {
     if (!file) return;
@@ -434,6 +494,7 @@ function CollectionForm({
     save.mutate(form, {
       onSuccess: () => {
         notify(isNew ? `Se creó «${form.title}».` : `Se guardó «${form.title}».`);
+        if (!isNew) panel(false, true);
         onSaved(form);
       },
       onError: (saveError) =>
@@ -441,186 +502,254 @@ function CollectionForm({
     });
   }
 
+  const shownTitle = isNew ? form.title || (isSection ? "Sección nueva" : "Colección nueva") : collection.title;
+
   return (
-    <Panel
-      title={isSection ? (isNew ? "La sección nueva" : "La sección") : isNew ? "La colección nueva" : "La colección"}
-      description={
-        isSection
-          ? "Una divisoria dentro de la colección. Su tapa no sale en la estantería: allí manda la del tomo."
-          : "La tapa, el nombre y el subtítulo son lo que se lee en la estantería del portal. El lomo —los años y el conteo— se calcula de sus documentos y de los de sus secciones."
-      }
-      actions={
-        canEdit && (
-          <>
-            {!isNew && (
-              <ConfirmButton
-                label="Eliminar"
-                confirmLabel={
-                  sections.length
-                    ? `Se borran la colección, sus ${sections.length === 1 ? "1 sección" : `${sections.length} secciones`}, los documentos de todas y sus archivos.`
-                    : `Se borra ${isSection ? "la sección" : "la colección"}, sus ${items.length} documentos y sus archivos.`
-                }
-                onConfirm={onRemove}
-              />
-            )}
-            <button
-              type="button"
-              className="button-primary"
-              disabled={save.isPending || (!dirty && !isNew)}
-              onClick={submit}
-            >
-              {save.isPending ? "Guardando…" : isNew ? (isSection ? "Crear la sección" : "Crear la colección") : "Guardar"}
-            </button>
-          </>
-        )
-      }
-    >
-      <div className="doc-collection">
-        <div className="doc-collection__cover">
-          <span className="doc-collection__preview">
-            {cover ? (
-              <img src={cover} alt={form.coverAlt || `Tapa de ${form.title}`} />
-            ) : (
-              <span aria-hidden="true">{form.title.trim().charAt(0).toUpperCase() || "?"}</span>
-            )}
-          </span>
-          {canEdit && (
-            <>
-              <input
-                ref={picker}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                className="sr-only"
-                onChange={(event) => void pickCover(event.target.files?.[0])}
-              />
-              <button
-                type="button"
-                className="button-secondary"
-                disabled={uploading}
-                onClick={() => picker.current?.click()}
-              >
-                {uploading ? "Subiendo…" : cover ? "Cambiar la tapa" : "Subir una tapa"}
-              </button>
-              <small className="doc-hint">
-                Se recorta a lo ancho (4:3). Hasta {formatBytes(MAX_COVER_BYTES)}.
-                {isSection ? " En una sección es opcional: no se ve en el portal." : ""}
-              </small>
-            </>
+    <section className="oda-panel da-chead" aria-label={isSection ? "La sección" : "La colección"}>
+      <div className="da-chead__bar">
+        <span className="da-chead__cover">
+          {savedCover && !isNew ? (
+            <img src={savedCover} alt="" />
+          ) : (
+            <span aria-hidden="true">{shownTitle.trim().charAt(0).toUpperCase() || "?"}</span>
           )}
-        </div>
+        </span>
 
-        <div className="oda-form-grid doc-collection__fields">
-          <label className="admin-field">
-            <span>Nombre</span>
-            <input
-              type="text"
-              value={form.title}
-              disabled={!canEdit}
-              placeholder="Actas de Consejo Superior"
-              onChange={(event) => {
-                const title = event.target.value;
-                setForm((current) => ({
-                  ...current,
-                  title,
-                  // La dirección se propone desde el nombre solo mientras nadie
-                  // la haya tocado: cambiarla después rompería los enlaces que
-                  // ya circulan.
-                  slug: isNew || !current.slug ? slugify(title) : current.slug,
-                }));
-              }}
-            />
-          </label>
-
-          <label className="admin-field">
-            <span>Dirección pública</span>
-            <input
-              type="text"
-              value={form.slug}
-              disabled={!canEdit}
-              placeholder="actas-consejo"
-              onChange={(event) => set("slug", slugify(event.target.value))}
-            />
-            <small className="doc-hint">
-              /documentos/{parent ? `${parent.slug}/` : ""}
-              <b>{form.slug || "…"}</b>
-              {slugTaken && <span className="doc-warn"> · ya está en uso</span>}
-            </small>
-          </label>
-
-          <label className="admin-field admin-field--wide">
-            <span>Subtítulo</span>
-            <input
-              type="text"
-              value={form.subtitle}
-              disabled={!canEdit}
-              placeholder="Acuerdos y decisiones del máximo órgano de gobierno"
-              onChange={(event) => set("subtitle", event.target.value)}
-            />
-          </label>
-
-          <label className="admin-field admin-field--wide">
-            <span>Texto alternativo de la tapa</span>
-            <input
-              type="text"
-              value={form.coverAlt}
-              disabled={!canEdit}
-              placeholder="Qué se ve en la fotografía"
-              onChange={(event) => set("coverAlt", event.target.value)}
-            />
-            {!form.coverAlt && form.cover && (
-              <small className="doc-warn">
-                <Icon name="alert" size={13} /> Sin esto, quien use lector de pantalla no sabrá qué hay en la tapa.
-              </small>
-            )}
-          </label>
-
-          {isSection && (
-            <label className="admin-field">
-              <span>Sección de</span>
-              <select
-                value={form.parentId ?? ""}
-                disabled={!canEdit}
-                onChange={(event) => set("parentId", event.target.value || null)}
-              >
-                {roots.map((root) => (
-                  <option key={root.id} value={root.id}>
-                    {root.title}
-                  </option>
-                ))}
-              </select>
-              <small className="doc-hint">
-                Cambiarla la muda de tomo, con sus documentos.
-                {parent ? ` Ahora cuelga de «${parent.title}».` : ""}
-              </small>
-            </label>
-          )}
-
-          <label className="admin-field">
-            <span>Estado</span>
-            <select
-              value={form.status}
-              disabled={!canEdit}
-              onChange={(event) => set("status", event.target.value as DocCollection["status"])}
-            >
-              <option value="borrador">Borrador · solo la intranet</option>
-              <option value="publicado">{isSection ? "Publicada · visible en su colección" : "Publicada · visible en el portal"}</option>
-            </select>
-            <small className="doc-hint">
-              {isSection
-                ? "Una sección en borrador esconde sus documentos, y una colección en borrador esconde sus secciones."
-                : "Una colección en borrador esconde también sus secciones y sus documentos, aunque estén publicados."}
-            </small>
-          </label>
-
-          {!isSection && sections.length > 0 && (
-            <p className="admin-field admin-field--wide doc-hint">
-              Esta colección tiene {sections.length === 1 ? "1 sección" : `${sections.length} secciones`}: en el
-              portal, sus documentos se listan bajo la divisoria de cada una, y los que cargues aquí van
-              primero, sin sección.
+        <div className="da-chead__id">
+          <h2>{shownTitle}</h2>
+          <p className="da-chead__path">
+            /documentos/{parent ? `${parent.slug}/` : ""}
+            <b>{(isNew ? form.slug : collection.slug) || "…"}</b>
+          </p>
+          {!isNew && (
+            <p className="da-chead__stats">
+              <span className="oda-badge" data-tone={collection.status === "publicado" ? "ok" : undefined}>
+                <Icon name={collection.status === "publicado" ? "check" : "eye-off"} size={12} />
+                {collection.status === "publicado" ? "Publicada" : "Borrador"}
+              </span>
+              <span>
+                <b>{allItems.length}</b> {allItems.length === 1 ? "documento" : "documentos"}
+              </span>
+              {!isSection && (
+                <span>
+                  <b>{sections.length}</b> {sections.length === 1 ? "sección" : "secciones"}
+                </span>
+              )}
+              {range && (
+                <span>
+                  Cubre <b>{range}</b>
+                </span>
+              )}
             </p>
           )}
         </div>
+
+        {!isNew && (
+          <button
+            type="button"
+            className="button-secondary da-chead__toggle"
+            aria-expanded={open}
+            aria-controls={bodyId}
+            onClick={(event) => panel(!open, !fromKeyboard(event))}
+          >
+            <Icon name={open ? "chevron-down" : "pen"} size={15} className={open ? "da-flip" : undefined} />
+            {open ? "Cerrar ajustes" : canEdit ? `Editar ${kind}` : `Ver ${kind}`}
+          </button>
+        )}
       </div>
-    </Panel>
+
+      <div id={bodyId} ref={body} className="da-chead__edit" hidden={!isNew}>
+        <div className="da-chead__inner">
+          <p className="doc-hint da-chead__lede">
+            {isSection
+              ? "Una divisoria dentro de la colección. Su tapa no sale en la estantería: allí manda la del tomo."
+              : "La tapa, el nombre y el subtítulo son lo que se lee en la estantería del portal. El lomo —los años y el conteo— se calcula de sus documentos y de los de sus secciones."}
+          </p>
+
+          <div className="doc-collection">
+            <div className="doc-collection__cover">
+              <span className="doc-collection__preview">
+                {cover ? (
+                  <img src={cover} alt={form.coverAlt || `Tapa de ${form.title}`} />
+                ) : (
+                  <span aria-hidden="true">{form.title.trim().charAt(0).toUpperCase() || "?"}</span>
+                )}
+              </span>
+              {canEdit && (
+                <>
+                  <input
+                    ref={picker}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/avif"
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-label="Elegir la tapa de la colección"
+                    onChange={(event) => void pickCover(event.target.files?.[0])}
+                  />
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    disabled={uploading}
+                    onClick={() => picker.current?.click()}
+                  >
+                    {uploading ? "Subiendo…" : cover ? "Cambiar la tapa" : "Subir una tapa"}
+                  </button>
+                  <small className="doc-hint">
+                    Se recorta a lo ancho (4:3). Hasta {formatBytes(MAX_COVER_BYTES)}.
+                    {isSection ? " En una sección es opcional: no se ve en el portal." : ""}
+                  </small>
+                </>
+              )}
+            </div>
+
+            <div className="oda-form-grid doc-collection__fields">
+              <label className="admin-field">
+                <span>Nombre</span>
+                <input
+                  type="text"
+                  value={form.title}
+                  disabled={!canEdit}
+                  placeholder="Actas de Consejo Superior"
+                  onChange={(event) => {
+                    const title = event.target.value;
+                    setForm((current) => ({
+                      ...current,
+                      title,
+                      // La dirección se propone desde el nombre solo mientras nadie
+                      // la haya tocado: cambiarla después rompería los enlaces que
+                      // ya circulan.
+                      slug: isNew || !current.slug ? slugify(title) : current.slug,
+                    }));
+                  }}
+                />
+              </label>
+
+              <label className="admin-field">
+                <span>Dirección pública</span>
+                <input
+                  type="text"
+                  value={form.slug}
+                  disabled={!canEdit}
+                  placeholder="actas-consejo"
+                  onChange={(event) => set("slug", slugify(event.target.value))}
+                />
+                <small className="doc-hint">
+                  /documentos/{parent ? `${parent.slug}/` : ""}
+                  <b>{form.slug || "…"}</b>
+                  {slugTaken && <span className="doc-warn"> · ya está en uso</span>}
+                </small>
+              </label>
+
+              <label className="admin-field admin-field--wide">
+                <span>Subtítulo</span>
+                <input
+                  type="text"
+                  value={form.subtitle}
+                  disabled={!canEdit}
+                  placeholder="Acuerdos y decisiones del máximo órgano de gobierno"
+                  onChange={(event) => set("subtitle", event.target.value)}
+                />
+              </label>
+
+              <label className="admin-field admin-field--wide">
+                <span>Texto alternativo de la tapa</span>
+                <input
+                  type="text"
+                  value={form.coverAlt}
+                  disabled={!canEdit}
+                  placeholder="Qué se ve en la fotografía"
+                  onChange={(event) => set("coverAlt", event.target.value)}
+                />
+                {!form.coverAlt && form.cover && (
+                  <small className="doc-warn">
+                    <Icon name="alert" size={13} /> Sin esto, quien use lector de pantalla no sabrá qué hay en la tapa.
+                  </small>
+                )}
+              </label>
+
+              {isSection && (
+                <label className="admin-field">
+                  <span>Sección de</span>
+                  <select
+                    value={form.parentId ?? ""}
+                    disabled={!canEdit}
+                    onChange={(event) => set("parentId", event.target.value || null)}
+                  >
+                    {roots.map((root) => (
+                      <option key={root.id} value={root.id}>
+                        {root.title}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="doc-hint">
+                    Cambiarla la muda de tomo, con sus documentos.
+                    {parent ? ` Ahora cuelga de «${parent.title}».` : ""}
+                  </small>
+                </label>
+              )}
+
+              <label className="admin-field">
+                <span>Estado</span>
+                <select
+                  value={form.status}
+                  disabled={!canEdit}
+                  onChange={(event) => set("status", event.target.value as DocCollection["status"])}
+                >
+                  <option value="borrador">Borrador · solo la intranet</option>
+                  <option value="publicado">{isSection ? "Publicada · visible en su colección" : "Publicada · visible en el portal"}</option>
+                </select>
+                <small className="doc-hint">
+                  {isSection
+                    ? "Una sección en borrador esconde sus documentos, y una colección en borrador esconde sus secciones."
+                    : "Una colección en borrador esconde también sus secciones y sus documentos, aunque estén publicados."}
+                </small>
+              </label>
+
+              {!isSection && sections.length > 0 && (
+                <p className="admin-field admin-field--wide doc-hint">
+                  Esta colección tiene {sections.length === 1 ? "1 sección" : `${sections.length} secciones`}: en el
+                  portal, sus documentos se listan bajo la divisoria de cada una, y los que cargues aquí van
+                  primero, sin sección.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {canEdit && (
+            <div className="da-chead__foot">
+              {problem && dirty && (
+                <span className="admin-field-error">
+                  <Icon name="alert" size={14} /> {problem}
+                </span>
+              )}
+              {!isNew && (
+                <ConfirmButton
+                  label="Eliminar"
+                  confirmLabel={
+                    sections.length
+                      ? `Se borran la colección, sus ${sections.length === 1 ? "1 sección" : `${sections.length} secciones`}, los documentos de todas y sus archivos.`
+                      : `Se borra ${isSection ? "la sección" : "la colección"}, sus ${items.length} documentos y sus archivos.`
+                  }
+                  onConfirm={onRemove}
+                />
+              )}
+              {isNew && (
+                <button type="button" className="button-secondary" onClick={onRemove}>
+                  Descartar
+                </button>
+              )}
+              <button
+                type="button"
+                className="button-primary"
+                disabled={save.isPending || (!dirty && !isNew)}
+                onClick={submit}
+              >
+                {save.isPending ? "Guardando…" : isNew ? (isSection ? "Crear la sección" : "Crear la colección") : "Guardar"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

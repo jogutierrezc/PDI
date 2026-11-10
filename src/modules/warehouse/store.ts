@@ -17,7 +17,6 @@ import { supabase, readFunctionError } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { FILAS_POR_LOTE, derivarColumnas, enLotes, enParalelo, huellaContenido, leerSegun, periodoDelArchivo, recortarPorPolitica, ultimoPeriodoDe, type Fila, type Hoja } from "./motor";
 import { lectorDe, reportePorId } from "./reportes";
-import type { ResumenGrupoNotas } from "./estudio";
 import type { DatosParaPilo } from "./paraPilo";
 
 export const whKeys = {
@@ -26,8 +25,6 @@ export const whKeys = {
   cargas: ["warehouse", "cargas"] as const,
   periodos: ["warehouse", "periodos"] as const,
   politicas: ["warehouse", "politicas"] as const,
-  rendimiento: (periodo: string, sede: string) => ["warehouse", "rendimiento", periodo, sede] as const,
-  todas: (carga: string) => ["warehouse", "todas", carga] as const,
 };
 
 /** PostgREST corta cada respuesta en 1000 filas: lo largo se pide por páginas. */
@@ -200,50 +197,122 @@ export function usePoliticas() {
   });
 }
 
-/** Rendimiento de un periodo y sede, con todos sus cortes. */
-export function useRendimiento(periodo: string, sede: string) {
-  return useQuery({
-    queryKey: whKeys.rendimiento(periodo, sede),
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const filas = await todas<Record<string, unknown>>((a, b) =>
-        supabase.from("v_wh_rendimiento").select("*").eq("periodo", periodo).eq("sede", sede).order("codigo").order("letra").range(a, b),
-      );
-      return filas.map(
-        (r): GrupoRendimiento => ({
-          periodo: String(r.periodo),
-          sede: String(r.sede),
-          corte: String(r.corte),
-          codigo: String(r.codigo ?? ""),
-          letra: String(r.letra ?? ""),
-          nombre: String(r.nombre ?? ""),
-          plan: String(r.plan ?? ""),
-          departamento: String(r.departamento ?? ""),
-          docente: String(r.docente ?? ""),
-          matriculados: Number(r.matriculados ?? 0),
-          reprobados: Number(r.reprobados ?? 0),
-          pct_reprobados: Number(r.pct_reprobados ?? 0),
-          aprobados: Number(r.aprobados ?? 0),
-          pct_aprobados: Number(r.pct_aprobados ?? 0),
-          no_presenta: Number(r.no_presenta ?? 0),
-          pct_no_presenta: Number(r.pct_no_presenta ?? 0),
-          promedio: Number(r.promedio ?? 0),
-        }),
-      );
-    },
-  });
+/* --- Perfilar, explorar y paginar en la base (0269) ------------------------------------------ */
+
+export interface ColumnaPerfil {
+  col: string;
+  tipo: "numero" | "fecha" | "categoria" | "texto" | "vacia";
+  llenos: number;
+  distintos: number;
+  min: number | null;
+  max: number | null;
+  patron: string | null;
+  /** Dato personal según la política: no se agrupa ni se filtra por ella. */
+  personal: boolean;
+}
+export interface Perfil {
+  filas: number;
+  columnas: ColumnaPerfil[];
+}
+export type Operacion = "contar" | "sumar" | "promediar" | "mediana" | "minimo" | "maximo" | "distintos";
+export interface Medida {
+  op: Operacion;
+  col?: string;
+}
+export interface Filtro {
+  col: string;
+  op: "eq" | "ne" | "gte" | "lte" | "contiene" | "en";
+  val: string | number | string[];
+}
+export interface ResultadoExplorar {
+  grupos: number;
+  /** Grupos que la reserva de 5 ocultó. */
+  descartados: number;
+  reservado: boolean;
+  filas: { k: (string | null)[]; n: number; v: (number | null)[] }[];
+}
+export interface PaginaFilas {
+  total: number;
+  filas: Fila[];
+}
+export type ResultadoDispersion =
+  | { modo: "puntos"; total: number; xmin: number; xmax: number; ymin: number; ymax: number; puntos: [number, number][] }
+  | { modo: "celdas"; total: number; xmin: number; xmax: number; ymin: number; ymax: number; celdas: number; datos: [number, number, number][] };
+
+const FALTA_0269 = new Set(["PGRST202", "42883"]);
+async function rpcWh<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) {
+    if (FALTA_0269.has(error.code ?? "")) throw new Error("Falta aplicar la migración 0269 (perfilar y explorar en la base).");
+    throw new Error(mensajeDe(error));
+  }
+  return data as T;
 }
 
-/** Todas las filas de una carga, por páginas. Explorar busca, ordena y grafica sobre ellas en el navegador. */
-export function useFilasCompletas(carga: string | null) {
-  return useQuery({
-    queryKey: whKeys.todas(carga ?? ""),
-    enabled: Boolean(carga),
-    // Una versión guardada no cambia nunca (recargar crea otra con otro id): no hay por qué volver a pedirla.
-    staleTime: Infinity,
-    gcTime: 15 * 60_000,
-    queryFn: async () => (await todas<{ datos: Fila }>((a, b) => supabase.from("wh_filas").select("datos", { count: "exact" }).eq("carga_id", carga as string).order("n").range(a, b))).map((f) => f.datos),
+export const perfilarCarga = (carga: string) => rpcWh<Perfil>("wh_perfilar", { p_carga: carga });
+export const explorarCarga = (carga: string, dims: string[], medidas: Medida[], filtros: Filtro[] = [], orden = "valor_desc", limite = 500) =>
+  rpcWh<ResultadoExplorar>("wh_explorar", { p_carga: carga, p_dims: dims, p_medidas: medidas, p_filtros: filtros, p_orden: orden, p_limite: limite });
+export const paginaDeFilas = (carga: string, desde: number, cantidad: number, orden: string | null, filtros: Filtro[], busqueda: string) =>
+  rpcWh<PaginaFilas>("wh_filas_pagina", { p_carga: carga, p_desde: desde, p_cantidad: cantidad, p_orden: orden, p_filtros: filtros, p_busqueda: busqueda });
+
+// Una versión guardada no cambia (recargar crea otra con otro id): lo que se calcula sobre ella tampoco.
+const ESTABLE = { staleTime: Infinity, gcTime: 15 * 60_000 } as const;
+
+export const usePerfil = (carga: string | null) =>
+  useQuery({ queryKey: ["warehouse", "perfil", carga], enabled: Boolean(carga), retry: false, ...ESTABLE, queryFn: () => perfilarCarga(carga as string) });
+
+export const useExplorar = (carga: string | null, dims: string[], medidas: Medida[], filtros: Filtro[], habilitado = true) =>
+  useQuery({
+    queryKey: ["warehouse", "explorar", carga, dims, medidas, filtros],
+    enabled: Boolean(carga) && habilitado,
+    retry: false,
+    ...ESTABLE,
+    queryFn: () => explorarCarga(carga as string, dims, medidas, filtros),
   });
+
+/** La misma medida en cada periodo guardado: una consulta por carga, en paralelo. */
+export const useSerieExplorar = (cargas: { periodo: string; id: string }[], dims: string[], medidas: Medida[], filtros: Filtro[], habilitado = true) =>
+  useQuery({
+    queryKey: ["warehouse", "serie", cargas.map((c) => c.id), dims, medidas, filtros],
+    enabled: cargas.length > 0 && habilitado,
+    retry: false,
+    ...ESTABLE,
+    queryFn: async () => Promise.all(cargas.map(async (c) => ({ periodo: c.periodo, r: await explorarCarga(c.id, dims, medidas, filtros) }))),
+  });
+
+export const useFilasPagina = (carga: string | null, desde: number, orden: string | null, filtros: Filtro[], busqueda: string) =>
+  useQuery({
+    queryKey: ["warehouse", "pagina", carga, desde, orden, filtros, busqueda],
+    enabled: Boolean(carga),
+    retry: false,
+    placeholderData: (previa) => previa,
+    ...ESTABLE,
+    queryFn: () => paginaDeFilas(carga as string, desde, 100, orden, filtros, busqueda),
+  });
+
+export const useDispersion = (carga: string | null, x: string, y: string, filtros: Filtro[], habilitado = true) =>
+  useQuery({
+    queryKey: ["warehouse", "dispersion", carga, x, y, filtros],
+    enabled: Boolean(carga) && Boolean(x) && Boolean(y) && habilitado,
+    retry: false,
+    ...ESTABLE,
+    queryFn: () => rpcWh<ResultadoDispersion>("wh_dispersion", { p_carga: carga, p_x: x, p_y: y, p_filtros: filtros, p_celdas: 40 }),
+  });
+
+/** Todo lo filtrado, a CSV: páginas de 1.000 filas, una tras otra, sin guardar nada en el navegador más que el texto. */
+export async function filasACsv(carga: string, columnas: string[], orden: string | null, filtros: Filtro[], busqueda: string, avance?: (hechas: number, total: number) => void): Promise<string> {
+  const celda = (v: unknown) => {
+    const t = v === null || v === undefined ? "" : String(v);
+    return /[",;\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const lineas = [columnas.map(celda).join(",")];
+  for (let desde = 0; ; ) {
+    const pag = await rpcWh<PaginaFilas>("wh_filas_pagina", { p_carga: carga, p_desde: desde, p_cantidad: 1000, p_orden: orden, p_filtros: filtros, p_busqueda: busqueda });
+    for (const f of pag.filas) lineas.push(columnas.map((c) => celda(f[c])).join(","));
+    desde += pag.filas.length;
+    avance?.(desde, pag.total);
+    if (pag.filas.length < 1000 || desde >= pag.total) return lineas.join("\r\n");
+  }
 }
 
 /** Un renglón por estudiante: lo que las alertas por notas necesitan (wh_notas_resumen, 0157). */
@@ -260,34 +329,6 @@ export interface ResumenNotas {
   riesgo_p1: number;
   riesgo_p2: number;
   riesgo_p3: number;
-}
-
-export function useNotasResumen(periodo: string, sede: string, habilitado: boolean) {
-  return useQuery({
-    queryKey: ["warehouse", "notas", periodo, sede],
-    enabled: habilitado,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const filas = await todas<Record<string, unknown>>((a, b) => supabase.rpc("wh_notas_resumen", { p_periodo: periodo, p_sede: sede }, { count: "exact" }).range(a, b));
-      const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-      return filas.map(
-        (r): ResumenNotas => ({
-          estudiante: String(r.estudiante ?? ""),
-          programa: String(r.programa ?? ""),
-          materias: Number(r.materias ?? 0),
-          con_p1: Number(r.con_p1 ?? 0),
-          con_p2: Number(r.con_p2 ?? 0),
-          con_p3: Number(r.con_p3 ?? 0),
-          prom_p1: n(r.prom_p1),
-          prom_p2: n(r.prom_p2),
-          prom_p3: n(r.prom_p3),
-          riesgo_p1: Number(r.riesgo_p1 ?? 0),
-          riesgo_p2: Number(r.riesgo_p2 ?? 0),
-          riesgo_p3: Number(r.riesgo_p3 ?? 0),
-        }),
-      );
-    },
-  });
 }
 
 /* --- El análisis de Pilo (función warehouse-pilo) ----------------------------------------- */
@@ -322,37 +363,6 @@ export function useEstadoPilo() {
     queryFn: () => invocarPilo<{ ok: boolean; ai: boolean; motivo?: string; proveedor: string; modelo: string }>({ action: "estado" }),
     retry: false,
     staleTime: 60_000,
-  });
-}
-
-/** Un renglón por materia y grupo (wh_notas_grupos, 0159): los cursos con alta reprobación salen de aquí. */
-export function useNotasGrupos(periodo: string, sede: string, habilitado: boolean) {
-  return useQuery({
-    queryKey: ["warehouse", "notas-grupos", periodo, sede],
-    enabled: habilitado,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const filas = await todas<Record<string, unknown>>((a, b) => supabase.rpc("wh_notas_grupos", { p_periodo: periodo, p_sede: sede }, { count: "exact" }).range(a, b));
-      const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-      return filas.map(
-        (r): ResumenGrupoNotas => ({
-          codigo_materia: String(r.codigo_materia ?? ""),
-          materia: String(r.materia ?? ""),
-          grupo: String(r.grupo ?? ""),
-          programa: String(r.programa ?? ""),
-          estudiantes: Number(r.estudiantes ?? 0),
-          con_p1: Number(r.con_p1 ?? 0),
-          con_p2: Number(r.con_p2 ?? 0),
-          con_p3: Number(r.con_p3 ?? 0),
-          prom_p1: n(r.prom_p1),
-          prom_p2: n(r.prom_p2),
-          prom_p3: n(r.prom_p3),
-          bajo_p1: Number(r.bajo_p1 ?? 0),
-          bajo_p2: Number(r.bajo_p2 ?? 0),
-          bajo_p3: Number(r.bajo_p3 ?? 0),
-        }),
-      );
-    },
   });
 }
 

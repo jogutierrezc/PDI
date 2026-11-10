@@ -297,7 +297,7 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     ],
   },
   warehouse: {
-    text: "Los reportes de Master, Galileo y Davinci guardados por periodo, con alertas tempranas",
+    text: "Los reportes de Master, Galileo y Davinci guardados por periodo, para explorarlos y cruzarlos",
     color: "var(--wall-warehouse)",
     rank: 5.7,
     sections: () => {
@@ -308,7 +308,6 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
           cards: [
             { key: "wh-tablero", title: "Tablero", text: "Qué hay guardado por periodo, sede y corte", to: base },
             { key: "wh-explorar", title: "Explorar", text: "Gráficos y tablas de lo guardado", to: `${base}/explorar` },
-            { key: "wh-alertas", title: "Alertas tempranas", text: "Grupos y estudiantes con señales de riesgo académico", to: `${base}/alertas` },
           ],
         },
         {

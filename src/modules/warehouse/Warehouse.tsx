@@ -6,7 +6,6 @@
      catalogo   los conjuntos de Master, Galileo y Davinci y qué se guarda de cada uno
      cargas     cargar un reporte (Excel o desde Master) y el historial
      explorar   gráficos y tabla de lo guardado
-     alertas    alertas tempranas por grupo y por estudiante
      almacen    capas, periodos cerrados y política de privacidad
    El periodo y la sede van en la dirección (?periodo=2026b&sede=buc) para que
    un enlace lleve al mismo sitio.
@@ -23,17 +22,15 @@ import { Tablero } from "./Tablero";
 import { Catalogo } from "./Catalogo";
 import { Cargas } from "./Cargas";
 import { Explorar } from "./Explorar";
-import { Alertas } from "./Alertas";
 import { Almacen } from "./Almacen";
 import "./warehouse.css";
 
-export type Seccion = "tablero" | "catalogo" | "cargas" | "explorar" | "alertas" | "almacen";
+export type Seccion = "tablero" | "catalogo" | "cargas" | "explorar" | "almacen";
 const SECCIONES: { id: Seccion; nombre: string; descripcion: string }[] = [
   { id: "tablero", nombre: "Tablero", descripcion: "Qué hay guardado por periodo, sede y corte" },
   { id: "catalogo", nombre: "Catálogo", descripcion: "Los reportes de Master, Galileo y Davinci y qué se guarda de cada uno" },
   { id: "cargas", nombre: "Cargas", descripcion: "Cargar un reporte, traerlo de Master y revisar el historial" },
   { id: "explorar", nombre: "Explorar", descripcion: "Gráficos y tabla de lo guardado" },
-  { id: "alertas", nombre: "Alertas tempranas", descripcion: "Grupos y estudiantes con señales de riesgo académico" },
   { id: "almacen", nombre: "Almacén", descripcion: "Capas, periodos cerrados y política de privacidad" },
 ];
 const BASE = "/admin/warehouse";
@@ -145,7 +142,6 @@ export function Warehouse() {
         {seccion === "catalogo" && <Catalogo ctx={contexto} cobertura={datos} />}
         {seccion === "cargas" && <Cargas ctx={contexto} cobertura={datos} />}
         {seccion === "explorar" && <Explorar ctx={contexto} cobertura={datos} />}
-        {seccion === "alertas" && <Alertas ctx={contexto} cobertura={datos} />}
         {seccion === "almacen" && <Almacen ctx={contexto} cobertura={datos} permisos={permisos} />}
       </div>
     );

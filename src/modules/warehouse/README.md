@@ -1,6 +1,6 @@
 # Warehouse UDES
 
-Guarda por periodo los reportes de Master, Galileo y Davinci para consultarlos sin volver a pedirlos, con gráficos y alertas tempranas de rendimiento académico. Ruta: `/admin/warehouse/:seccion?` (`tablero`, `catalogo`, `cargas`, `explorar`, `alertas`, `almacen`; periodo y sede en `?periodo=2026b&sede=buc`). Pantalla de roles: `warehouse`, solo Planeación o superior (como en la base, `wh_autorizado()`). Temas claro y oscuro por tokens.
+Guarda por periodo los reportes de Master, Galileo y Davinci para consultarlos sin volver a pedirlos, con gráficos para explorarlos. Las alertas tempranas tienen su portal propio (Monitor, `src/modules/monitor`). Ruta: `/admin/warehouse/:seccion?` (`tablero`, `catalogo`, `cargas`, `explorar`, `almacen`; periodo y sede en `?periodo=2026b&sede=buc`). Pantalla de roles: `warehouse`, solo Planeación o superior (como en la base, `wh_autorizado()`). Temas claro y oscuro por tokens.
 
 ## Piezas
 | Archivo | Qué es |
@@ -8,10 +8,13 @@ Guarda por periodo los reportes de Master, Galileo y Davinci para consultarlos s
 | `supabase/migrations/0155_warehouse_udes.sql` | tablas `wh_*`, políticas de privacidad, funciones de carga, vistas |
 | `supabase/functions/warehouse/` | `motor.ts` (lógica pura, la usan también el navegador y las pruebas), `flujo.ts` (lee el .xlsx por tramos, solo Deno), `reportes.ts` (cómo se pide cada reporte) e `index.ts` (pide a las plataformas con la cuenta de servicio) |
 | `conjuntos.ts` | catálogo de conjuntos (de los HAR de `har warehouse`) |
-| `reglas.ts` | alertas tempranas, lógica pura |
+| `reglas.ts` | reglas de alertas tempranas, lógica pura (la usa `paraPilo.ts`, que alimenta a Pilo en el Monitor) |
 | `store.ts` | lectura y carga contra Supabase |
 | `graficos.tsx` | barras, anillo, líneas, mapa de calor, dispersión, apiladas (SVG con tokens) |
-| `Warehouse.tsx` + una pantalla por sección | la interfaz |
+| `Warehouse.tsx` + una pantalla por sección | la interfaz (Tablero, Catálogo, Cargas, Explorar, Almacén) |
+| `supabase/migrations/0269_warehouse_perfilar_explorar.sql` | `wh_perfilar`, `wh_explorar`, `wh_filas_pagina` y `wh_dispersion`: el cálculo de Explorar vive en la base |
+| `modelo/` | modelo semántico multi-fuente (lógica pura): dimensiones comunes, relaciones, hallazgos de reconstrucción, medidas y revisión de calidad |
+| `supabase/migrations/0270_udrive_tablero.sql` | tipo de archivo «tablero» de UDrive (solo el check de `tipo`) |
 | `tests/warehouse/` | SQL (PGlite), motor, reglas y coherencia catálogo ↔ políticas |
 
 ## Decisiones
@@ -120,12 +123,20 @@ Toda carga se guarda con un periodo (`2026b`) o con `permanente` (catálogos).
 - Si la plataforma o el archivo dicen otro periodo que el pedido, no se guarda nada. En una subida manual se hace la misma comprobación con el archivo.
 - La lista de periodos de la pantalla sale de `get_periods` de la sede (acción `periodos`) más los ya guardados; sin respuesta de la plataforma, los guardados más los calculados desde 2018b. La búsqueda `?periodo=2026b` funciona para todos los conjuntos.
 
-## Alertas de notas y Pilo (0159, función `warehouse-pilo`)
+## Alertas de notas y Pilo (0159, función `warehouse-pilo`; hoy solo en el Monitor)
 Basadas en el estudio de la UDES (Pérez et al., 2023; DOI 10.37885/230914480, `230914480.pdf` en la raíz): nota de aprobar 3,0 (Medicina 3,5), periodo de prueba bajo 3,2, éxito sobre 3,8, deserción 16,7× con promedio < 3,3 y 2,2× con 3,3–4,3, edad (21–25: 3,1×; 26+: 5,1×) y origen fuera de Santander (1,4×). `estudio.ts` guarda esas cifras; `reglas.ts` las usa. Niveles NE / ED / RS. «Cursos con alta reprobación» = Alerta Temprana 4 del estudio (`wh_notas_grupos`). `dv_matric` deriva `grupo_etario` y `origen` al cargar y sigue sin guardar la fecha de nacimiento ni la ciudad.
 Pilo (`PanelPilo.tsx`) recibe solo un resumen agregado (`paraPilo.ts`: conteos por nivel, programa y materia; sin códigos), responde en JSON y cada cifra se verifica contra los datos y el estudio (`warehouse-pilo/analisis.ts`). Usa el proveedor de IA de Mr. Pilo; bitácora en `news_runs`.
 Lo que el estudio usa y estos datos NO tienen: Saber 11, tutorías asistidas, estrato, trabajo, entorno familiar. Con ellos se podría estimar el riesgo de cada estudiante como lo hace el estudio (regresión logística); hoy solo se ordena con sus cifras.
 
+## Explorar en la base (0269)
+Explorar ya no baja las filas de una carga. `wh_perfilar` da el tipo de cada columna (número, fecha, categoría, texto), llenos, distintos, mínimo, máximo y patrón (sin valores de columnas de dato personal); `wh_explorar` agrupa y mide (contar, sumar, promediar, mediana, mínimo, máximo, distintos) con filtros y orden; `wh_filas_pagina` entrega 100 filas con orden y búsqueda en la base (hasta 1.000 para el CSV); `wh_dispersion` entrega puntos hasta 5.000 y, pasados, celdas con su conteo. Sin SQL dinámico. No se agrupa, filtra ni dispersa por una columna de `datos_personales`; medir sobre una (estudiantes distintos) descarta los grupos con menos de 5 valores distintos.
+
+## Modelo semántico (`modelo/`)
+Las fuentes son **todos** los conjuntos de `CONJUNTOS`. Se cruzan por dimensiones comunes (periodo, sede, programa, materia, departamento, docente seudónimo, jornada, estudiante como llave dentro de la base), de muchos a uno y en una sola vía, nunca fila contra fila. Lo que la base no puede leer por sí sola son *hallazgos de reconstrucción*: reglas que Pilo propone y una persona aprueba (por ejemplo, «Programa» de Rendimiento es el departamento; la materia se une por código; el periodo «2026-2» pasa a «2026b»; las columnas de periodo de las deserciones pasan a filas). Las medidas llevan nombre de negocio, receta, descripción y carpeta, y las razones usan división segura. `revisarModelo` aplica las reglas de calidad antes de publicar.
+
 ## Pendiente
+- Pantallas «Tableros propios» y «Crear tablero» (la lógica de `modelo/` y el tipo de archivo de 0270 ya están), función `pilo-tableros` y ejecución de las reglas aprobadas en la base.
+- Aplicar **0269** y **0270** (en ese orden, después de las anteriores).
 - Aplicar 0155, desplegar la función y definir `WAREHOUSE_MASTER_USER` / `WAREHOUSE_MASTER_PASSWORD` (cuenta de servicio, no la de una persona).
 - Aplicar **0193** (políticas de los conjuntos nuevos y columnas de la nómina) y volver a desplegar la función `warehouse` (`index.ts`, `flujo.ts`, `motor.ts` y `reportes.ts`; `flujo.ts` es nuevo y debe subirse). Los cambios de límites y tareas no necesitan migración.
 - `dv_fin`: sin política ni HAR completo.

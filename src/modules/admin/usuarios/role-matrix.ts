@@ -223,7 +223,7 @@ export const MODULES: ModuleDef[] = [
     screens: [{ id: "warehouse", label: "Datos de las plataformas institucionales" }],
     levels: {
       ver: { hint: "Aparece en el menú; solo se abre con capacidad de Planeación.", needs: "consulta" },
-      editar: { hint: "Consulta los datos del almacén y las alertas.", needs: "planeacion" },
+      editar: { hint: "Consulta los datos del almacén.", needs: "planeacion" },
       administrar: { hint: "Además configura conexiones y ejecuciones.", needs: "admin" },
     },
   },

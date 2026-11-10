@@ -26,15 +26,6 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
 RUN npm run build
 
 FROM nginx:alpine
-# La dirección de Supabase también la necesita nginx (microportales de Documentos,
-# /portales/…). Es pública; sale del mismo valor con que se compiló el portal. Si
-# en Coolify se define como variable de ejecución con otro nombre, SUPABASE_ORIGIN
-# tiene prioridad.
-ARG VITE_SUPABASE_URL
-# Sin valor, `proxy_pass ;` es una configuración inválida y nginx ni arranca (502 en
-# Coolify). Por eso hay un valor de respaldo: la dirección de producción.
-ENV SUPABASE_ORIGIN=${VITE_SUPABASE_URL:-https://planeacion.udes.edu.co}
-# La imagen de nginx convierte /etc/nginx/templates/*.template en conf.d/*.conf al arrancar.
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

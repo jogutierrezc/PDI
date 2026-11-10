@@ -3,13 +3,13 @@
    abierta al centro y los controles a la derecha. Guarda solo (800 ms después
    de escribir), mantiene las cifras vivas hasta enviar y marca «lista» cada
    sección según sus reglas (validacion.ts), que es lo que la base exige.
-   ?unidad=<id> elige la unidad; ?s=<n> la sección.
+   La unidad y la sede salen de «Dónde trabaja» (nadie elige la unidad); ?unidad=<id>&sede=<slug> la fijan
+   (el Tablero del ciclo); ?s=<n> la sección.
    ========================================================================== */
 
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useAuth } from "../../../lib/auth";
-import { actorDe, nombreRol } from "../../rankings/reporte/envio";
+import { nombreRol } from "../../rankings/reporte/envio";
 import { useEntrada } from "../../rankings/movimiento";
 import { esViva } from "../cifras-vivas";
 import {
@@ -23,8 +23,6 @@ import {
   useFuentes,
   useGuardarCifra,
   useGuardarSeccion,
-  useInstancias,
-  useMembresiasInforme,
   usePilares,
   useQuitarAnexo,
   useQuitarCifra,
@@ -32,16 +30,16 @@ import {
   useSedesCifras,
   useSincronizarMetas,
   useSubirAnexo,
-  useUnidades,
 } from "../datos";
 import type { DatosCifra } from "../datos";
 import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
 import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
 import { ImportarFilas } from "./ImportarFilas";
-import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, escribeInforme, plantillaSugerida } from "../plantillas";
+import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, plantillaSugerida } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
-import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, RolActor, SeccionDef, UnidadRef } from "../types";
+import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, RolActor, SeccionDef, SedeInforme, UnidadRef } from "../types";
+import { EncabezadoObjetivo, enlaceInforme, useObjetivoInforme } from "./objetivo";
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas, TablaPilares } from "./Bloques";
 import { Dimensiones } from "./Dimensiones";
 import { ElementosDrive } from "./ElementosDrive";
@@ -67,79 +65,42 @@ import { useGuia } from "../guia/contexto";
 const BASE = "/admin/informes-gestion";
 
 export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
-  const { profile, puedeGestionarInformes } = useAuth();
-  // Solo quien gestiona los informes (0192) elige cualquier unidad; el resto, las suyas y las que su rol le da.
-  const planeacion = puedeGestionarInformes;
-  const membresias = useMembresiasInforme(profile?.id);
-  const unidades = useUnidades();
-  const instancias = useInstancias(ciclo.id);
-  const [params, setParams] = useSearchParams();
+  // La unidad y la sede salen de «Dónde trabaja»; nadie las elige a mano (solo la sede, si la unidad tiene varias y no hay una asignada).
+  const o = useObjetivoInforme(ciclo.id);
 
-  const error = [membresias.error, unidades.error, instancias.error].find((e): e is Error => e instanceof Error);
-  if (error) return <Aviso error={error} />;
-  if (!profile || membresias.isPending || unidades.isPending || instancias.isPending) return <Cargando texto="Cargando su informe…" />;
-
-  const nombres = new Map((unidades.data ?? []).map((u) => [u.id, u]));
-  // Quien gestiona ve todas las facultades, vicerrectorías y oficinas (con o sin informe abierto); el resto, las suyas.
-  const opciones: UnidadRef[] = planeacion
-    ? (unidades.data ?? []).filter((u) => escribeInforme(u.kind))
-    :(membresias.data ?? []).map((m) => nombres.get(m.unidad) ?? { id: m.unidad, name: m.nombre, kind: "", code: null, parent_id: null });
-  const elegida = params.get("unidad");
-  // Una unidad ajena en la dirección se rechaza: no se carga nada de ella (la base también lo niega).
-  if (!planeacion && elegida && !opciones.some((o) => o.id === elegida)) {
-    return <Vacio>Esa unidad no está entre las suyas. Elija una de las que tiene asignadas.</Vacio>;
-  }
-  const unidad = opciones.find((o) => o.id === elegida) ?? opciones[0] ?? null;
-
-  if (!unidad) {
+  if (o.tipo === "error") return <Aviso error={o.error} />;
+  if (o.tipo === "cargando") return <Cargando texto="Cargando su informe…" />;
+  if (o.tipo === "ajena") return <Vacio>Esa unidad no está entre las suyas. Abra el informe de la unidad donde trabaja.</Vacio>;
+  if (o.tipo === "sin") {
     return (
       <Vacio>
-        {planeacion
-          ? "Todavía no se ha abierto ningún informe en este ciclo. Ábralos desde el Tablero del ciclo."
-          : "Su usuario no tiene ninguna unidad asignada. Pida a Planeación que lo agregue como Gestor, Contribuyente o Consulta, o que su rol le dé el informe de una."}
+        {o.gestiona ? (
+          <>
+            Elija el informe desde el <Link className="inf-link" to={BASE}>Tablero del ciclo</Link>: ahí están todas las unidades y sedes.
+          </>
+        ) : (
+          "Su usuario no tiene ninguna unidad asignada en «Dónde trabaja». Pida a Planeación que se la asigne, con su sede, o que su rol le dé el informe de una."
+        )}
       </Vacio>
     );
   }
 
-  const inst = (instancias.data ?? []).find((i) => i.unit_id === unidad.id) ?? null;
-  const actor = actorDe(planeacion, membresias.data ?? [], unidad.id);
-  const selector =
-    opciones.length > 1 ? (
-      <label className="inf-lab" style={{ maxWidth: 420 }}>
-        Unidad
-        <select
-          className="inf-in"
-          value={unidad.id}
-          onChange={(e) => {
-            const p = new URLSearchParams(params);
-            p.set("unidad", e.target.value);
-            p.delete("s");
-            setParams(p, { replace: true });
-          }}
-        >
-          {opciones.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
-      </label>
-    ) : null;
-
+  // La unidad con su sede: así se ve en el encabezado, la vista y el PDF.
+  const unidad: UnidadRef = { ...o.unidad, name: o.nombre };
   return (
     <>
-      {selector}
-      {inst ? (
-        <Editor key={inst.id} inst={inst} ciclo={ciclo} requisitos={requisitos} unidad={unidad} actor={actor} />
+      <EncabezadoObjetivo o={o} base={`${BASE}/mi-informe`} />
+      {o.instancia ? (
+        <Editor key={o.instancia.id} inst={o.instancia} ciclo={ciclo} requisitos={requisitos} unidad={unidad} sede={o.sede} actor={o.actor} />
       ) : (
-        <SinAbrir ciclo={ciclo} unidad={unidad} puedeAbrir={planeacion} />
+        <SinAbrir ciclo={ciclo} unidad={unidad} sede={o.sede} unidadId={o.unidad.id} puedeAbrir={o.planeacion} />
       )}
     </>
   );
 }
 
 /** La unidad aún no tiene informe en el ciclo: quien gestiona lo abre aquí mismo, con la plantilla que le toca. */
-function SinAbrir({ ciclo, unidad, puedeAbrir }: { ciclo: CicloRow; unidad: UnidadRef; puedeAbrir: boolean }) {
+function SinAbrir({ ciclo, unidad, sede, unidadId, puedeAbrir }: { ciclo: CicloRow; unidad: UnidadRef; sede: SedeInforme | null; unidadId: string; puedeAbrir: boolean }) {
   const abrir = useAbrirInforme();
   const [plantilla, setPlantilla] = useState<Plantilla>(plantillaSugerida(unidad.kind, unidad.name));
   if (!puedeAbrir) return <Vacio>Planeación todavía no abre el informe {ciclo.anio} de {unidad.name}.</Vacio>;
@@ -155,7 +116,7 @@ function SinAbrir({ ciclo, unidad, puedeAbrir }: { ciclo: CicloRow; unidad: Unid
             </option>
           ))}
         </select>
-        <button type="button" className="inf-btn inf-btn--pri" disabled={abrir.isPending} onClick={() => abrir.mutate({ ciclo: ciclo.id, unidad: unidad.id, plantilla })}>
+        <button type="button" className="inf-btn inf-btn--pri" disabled={abrir.isPending} onClick={() => abrir.mutate({ ciclo: ciclo.id, unidad: unidadId, sede: sede?.id ?? null, plantilla })}>
           {abrir.isPending ? "Abriendo…" : "Abrir el informe"}
         </button>
         {abrir.error && (
@@ -170,7 +131,7 @@ function SinAbrir({ ciclo, unidad, puedeAbrir }: { ciclo: CicloRow; unidad: Unid
 
 /* ---------- El editor ---------------------------------------------------------- */
 
-function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: UnidadRef; actor: RolActor | null }) {
+function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: UnidadRef; sede: SedeInforme | null; actor: RolActor | null }) {
   // Facultad: el Plan de Trabajo (API) trae las acciones de las secciones de metas y de dimensiones.
   const esFacultad = unidad.kind === "facultad";
   const plan = usePlanUnidad(unidad.id, esFacultad);
@@ -353,7 +314,7 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
         </div>
         <Barra valor={listas / secciones.length} etiqueta="Secciones listas" />
         <small className="inf-muted">{m.frio || estadoVista === "sent" || estadoVista === "ok" ? "Las cifras quedaron congeladas al enviar." : "Las cifras siguen en vivo hasta que envíe."}</small>
-        <Link className="inf-link" to={`${BASE}/vista?unidad=${unidad.id}`}>
+        <Link className="inf-link" to={enlaceInforme(`${BASE}/vista`, unidad.id, sede)}>
           Vista del informe en papel
         </Link>
         {demo && (

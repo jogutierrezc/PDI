@@ -6,8 +6,8 @@
    ve sale del mismo modelo que el editor y la revisión (cifras en vivo si el
    informe es borrador, foto si ya se envió).
 
-   Acceso igual al de leer el informe: Planeación ve cualquiera; el resto, los
-   de sus unidades (?unidad=<id>). Cambiar el diseño exige poder editar el
+   Acceso igual al de leer el informe: Planeación ve cualquiera; el resto, el de
+   la unidad y la sede donde trabaja (?unidad=<id>&sede=<slug>). Cambiar el diseño exige poder editar el
    informe (puedeEditar, o Planeación); el monograma, el acento, el escudo y el
    contacto son de la unidad y los cambia el Gestor o Planeación. Sin la
    migración 0189 todo se ve y se imprime con valores por defecto; solo
@@ -16,15 +16,14 @@
 
 import { AyudaPilo } from "../guia/AyudaPilo";
 import { useCallback, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useAuth } from "../../../lib/auth";
 import { Icon } from "../../../components/ui/Icon";
 import { actorDe, nombreRol } from "../../rankings/reporte/envio";
 import { congelado } from "../cifras-vivas";
-import { useDisenoInforme, useGuardarDiseno, useGuardarPerfil, useInstancias, useMembresiasInforme, usePerfilUnidad, usePilares, usePlanUnidad, useUnidades, useUrlImagen } from "../datos";
+import { useDisenoInforme, useGuardarDiseno, useGuardarPerfil, usePerfilUnidad, usePilares, usePlanUnidad, useUrlImagen } from "../datos";
 import { puedeEditar } from "../estados";
 import type { CicloRow, InstanciaRow, RequisitoRow, UnidadRef } from "../types";
 import { Aviso as AvisoError, Cargando, Vacio, fmtFecha, mensajeDe } from "../ui/comunes";
+import { EncabezadoObjetivo, useObjetivoInforme } from "../ui/objetivo";
 import { useModeloInforme } from "../ui/modelo";
 import { unidadesDelLibro, useRecursosDrive } from "./armado";
 import { EditorCierre } from "./EditorCierre";
@@ -41,61 +40,23 @@ import type { DisenoInforme, Papel, PerfilOficina } from "./perfil";
 import { Segmentado } from "./controles";
 import "./vista.css";
 
-/* ---------- Elegir la unidad (igual que Mi informe) ---------- */
+/* ---------- La unidad y la sede (igual que Mi informe) ---------- */
 
 export function VistaInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
-  const { profile, puedeGestionarInformes } = useAuth();
-  // Solo quien gestiona los informes (0192) elige cualquier unidad; el resto, las suyas y las que su rol le da.
-  const planeacion = puedeGestionarInformes;
-  const membresias = useMembresiasInforme(profile?.id);
-  const unidades = useUnidades();
-  const instancias = useInstancias(ciclo.id);
-  const [params, setParams] = useSearchParams();
-
-  const error = [membresias.error, unidades.error, instancias.error].find((e): e is Error => e instanceof Error);
-  if (error) return <AvisoError error={error} />;
-  if (!profile || membresias.isPending || unidades.isPending || instancias.isPending) return <Cargando texto="Cargando el informe…" />;
-
-  const nombres = new Map((unidades.data ?? []).map((u) => [u.id, u]));
-  const opciones: UnidadRef[] = planeacion
-    ? (instancias.data ?? []).map((i) => nombres.get(i.unit_id)).filter((u): u is UnidadRef => Boolean(u))
-    : (membresias.data ?? []).map((m) => nombres.get(m.unidad) ?? { id: m.unidad, name: m.nombre, kind: "", code: null, parent_id: null });
-  const elegida = params.get("unidad");
-  // Una unidad ajena en la dirección se rechaza: no se carga nada de ella (la base también lo niega).
-  if (!planeacion && elegida && !opciones.some((o) => o.id === elegida)) {
-    return <Vacio>Esa unidad no está entre las suyas. Elija una de las que tiene asignadas.</Vacio>;
+  const o = useObjetivoInforme(ciclo.id);
+  if (o.tipo === "error") return <AvisoError error={o.error} />;
+  if (o.tipo === "cargando") return <Cargando texto="Cargando el informe…" />;
+  if (o.tipo === "ajena") return <Vacio>Esa unidad no está entre las suyas. Abra el informe de la unidad donde trabaja.</Vacio>;
+  if (o.tipo === "sin") {
+    return <Vacio>{o.gestiona ? "Elija el informe desde el Tablero del ciclo: ahí están todas las unidades y sedes." : "Su usuario no tiene ninguna unidad asignada en «Dónde trabaja». Pida a Planeación que se la asigne, con su sede, o que su rol le dé el informe de una."}</Vacio>;
   }
-  const unidad = opciones.find((o) => o.id === elegida) ?? opciones[0] ?? null;
-
-  if (!unidad) {
-    return <Vacio>{planeacion ? "Todavía no se ha abierto ningún informe en este ciclo." : "Su usuario no tiene ninguna unidad asignada. Pida a Planeación que lo agregue como Gestor, Contribuyente o Consulta, o que su rol le dé el informe de una."}</Vacio>;
-  }
-  const inst = (instancias.data ?? []).find((i) => i.unit_id === unidad.id) ?? null;
-  const actor = actorDe(planeacion, membresias.data ?? [], unidad.id);
+  // La unidad con su sede: así sale en la portada y en el PDF.
+  const unidad: UnidadRef = { ...o.unidad, name: o.nombre };
 
   return (
     <div className="vi" style={{ display: "grid", gap: 16 }}>
-      {opciones.length > 1 && (
-        <label className="inf-lab" style={{ maxWidth: 420 }}>
-          Unidad
-          <select
-            className="inf-in"
-            value={unidad.id}
-            onChange={(e) => {
-              const p = new URLSearchParams(params);
-              p.set("unidad", e.target.value);
-              setParams(p, { replace: true });
-            }}
-          >
-            {opciones.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {inst ? <Visor key={inst.id} inst={inst} ciclo={ciclo} requisitos={requisitos} unidad={unidad} actor={actor} /> : <Vacio>Planeación todavía no abre el informe {ciclo.anio} de {unidad.name}.</Vacio>}
+      <EncabezadoObjetivo o={o} base="/admin/informes-gestion/vista" />
+      {o.instancia ? <Visor key={o.instancia.id} inst={o.instancia} ciclo={ciclo} requisitos={requisitos} unidad={unidad} actor={o.actor} /> : <Vacio>Planeación todavía no abre el informe {ciclo.anio} de {unidad.name}.</Vacio>}
     </div>
   );
 }

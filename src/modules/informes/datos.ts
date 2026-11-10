@@ -15,6 +15,8 @@ import { nombreSeguro } from "../rankings/reporte/datos";
 import { aNumero } from "./cifras-vivas";
 import type { IndicadorOd, SedeRef } from "./catalogo";
 import type { RespuestaPlan } from "./plan-decanatura";
+import { SIN_OFERTA } from "./sedes";
+import type { OfertaSedes } from "./sedes";
 import type {
   AnexoRow,
   CicloRow,
@@ -28,6 +30,7 @@ import type {
   PilarRef,
   Plantilla,
   RequisitoRow,
+  SedeInforme,
   SeccionRow,
   UnidadRef,
 } from "./types";
@@ -42,26 +45,60 @@ const FUERZA: Record<string, number> = { visor: 1, editor: 2, jefe: 3 };
  * (unit_members) más las que le da su rol de acceso (informe_mis_unidades, 0169).
  * Sin esa migración solo cuentan las primeras.
  */
+export interface MembresiaInforme {
+  unidad: string;
+  rol: "visor" | "editor" | "jefe";
+  nombre: string;
+  /** Sede de «Dónde trabaja» (campuses.id); nulo: todas las sedes. */
+  sede: string | null;
+}
+
 export function useMembresiasInforme(perfil: string | undefined) {
   return useQuery({
     queryKey: ["informes", "membresias", perfil ?? ""],
     enabled: Boolean(perfil),
     retry: false,
-    queryFn: async (): Promise<{ unidad: string; rol: "visor" | "editor" | "jefe"; nombre: string }[]> => {
-      const propias = await supabase.from("unit_members").select("unit_id, role, units(name)").eq("profile_id", perfil ?? "");
+    queryFn: async (): Promise<MembresiaInforme[]> => {
+      const propias = await supabase.from("unit_members").select("unit_id, role, campus_id, units(name)").eq("profile_id", perfil ?? "");
       if (propias.error) throw errorDe(propias.error);
-      const porUnidad = new Map<string, { unidad: string; rol: "visor" | "editor" | "jefe"; nombre: string }>();
-      const poner = (unidad: string, rol: "visor" | "editor" | "jefe", nombre: string) => {
-        const previa = porUnidad.get(unidad);
-        if (!previa || FUERZA[rol] > FUERZA[previa.rol]) porUnidad.set(unidad, { unidad, rol, nombre: nombre || previa?.nombre || "Unidad" });
+      const porClave = new Map<string, MembresiaInforme>();
+      const poner = (unidad: string, rol: "visor" | "editor" | "jefe", nombre: string, sede: string | null) => {
+        const clave = `${unidad}|${sede ?? ""}`;
+        const previa = porClave.get(clave);
+        if (!previa || FUERZA[rol] > FUERZA[previa.rol]) porClave.set(clave, { unidad, rol, nombre: nombre || previa?.nombre || "Unidad", sede });
       };
-      const filas = (propias.data as { unit_id: string; role: "visor" | "editor" | "jefe"; units: { name: string } | { name: string }[] | null }[] | null) ?? [];
-      for (const f of filas) poner(f.unit_id, f.role, (Array.isArray(f.units) ? f.units[0]?.name : f.units?.name) ?? "");
+      const filas = (propias.data as { unit_id: string; role: "visor" | "editor" | "jefe"; campus_id: string | null; units: { name: string } | { name: string }[] | null }[] | null) ?? [];
+      for (const f of filas) poner(f.unit_id, f.role, (Array.isArray(f.units) ? f.units[0]?.name : f.units?.name) ?? "", f.campus_id ?? null);
       const delRol = await supabase.rpc("informe_mis_unidades");
       if (!delRol.error) {
-        for (const f of (delRol.data as { unit_id: string; role: "editor" | "jefe" }[] | null) ?? []) poner(f.unit_id, f.role, "");
+        for (const f of (delRol.data as { unit_id: string; role: "editor" | "jefe" }[] | null) ?? []) poner(f.unit_id, f.role, "", null);
       }
-      return [...porUnidad.values()];
+      return [...porClave.values()];
+    },
+  });
+}
+
+/**
+ * Las sedes y dónde se ofrece cada programa (campuses y program_campuses). Si no se pueden leer, no hay sedes
+ * y todos los informes quedan como siempre: sin sede.
+ */
+export function useOfertaSedes() {
+  return useQuery({
+    queryKey: ["informes", "sedes"],
+    retry: false,
+    staleTime: 60_000,
+    queryFn: async (): Promise<OfertaSedes> => {
+      const [campuses, oferta] = await Promise.all([
+        supabase.from("campuses").select("id, slug, name").order("position"),
+        supabase.from("program_campuses").select("program_id, campus_id, active"),
+      ]);
+      if (campuses.error || oferta.error) return SIN_OFERTA;
+      const porPrograma = new Map<string, string[]>();
+      for (const f of (oferta.data as { program_id: string; campus_id: string; active: boolean | null }[] | null) ?? []) {
+        if (f.active === false) continue;
+        porPrograma.set(f.program_id, [...(porPrograma.get(f.program_id) ?? []), f.campus_id]);
+      }
+      return { sedes: (campuses.data as SedeInforme[] | null) ?? [], porPrograma };
     },
   });
 }
@@ -169,18 +206,22 @@ export function useUnidades() {
   });
 }
 
+const COLS_INSTANCIA = "id, ciclo_id, unit_id, plantilla, destino, estado, nota_revision, enviado_en, enviado_por, aprobado_en, aprobado_por";
+
 export function useInstancias(ciclo: string | undefined) {
   return useQuery({
     queryKey: CLAVES.instancias(ciclo ?? ""),
     enabled: Boolean(ciclo),
     retry: false,
-    queryFn: async (): Promise<InstanciaRow[]> =>
-      revisar<InstanciaRow[] | null>(
-        await supabase
-          .from("informe_instancias")
-          .select("id, ciclo_id, unit_id, plantilla, destino, estado, nota_revision, enviado_en, enviado_por, aprobado_en, aprobado_por")
-          .eq("ciclo_id", ciclo ?? ""),
-      ) ?? [],
+    queryFn: async (): Promise<InstanciaRow[]> => {
+      const con = await supabase.from("informe_instancias").select(`${COLS_INSTANCIA}, campus_id`).eq("ciclo_id", ciclo ?? "");
+      // Sin la migración 0272 no existe la sede: todos los informes quedan sin sede, como antes.
+      if (con.error && /campus_id/.test(con.error.message ?? "")) {
+        const sin = revisar<Omit<InstanciaRow, "campus_id">[] | null>(await supabase.from("informe_instancias").select(COLS_INSTANCIA).eq("ciclo_id", ciclo ?? "")) ?? [];
+        return sin.map((i) => ({ ...i, campus_id: null }));
+      }
+      return revisar<InstanciaRow[] | null>(con) ?? [];
+    },
   });
 }
 
@@ -212,8 +253,13 @@ function invalidarCiclo(cliente: QueryClient, ciclo: string) {
 export function useAbrirInforme() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async (p: { ciclo: string; unidad: string; plantilla: Plantilla; destino?: string | null }): Promise<string> =>
-      revisar<string>(await supabase.rpc("informe_abrir", { p_ciclo: p.ciclo, p_unit: p.unidad, p_plantilla: p.plantilla, p_destino: p.destino ?? null })),
+    mutationFn: async (p: { ciclo: string; unidad: string; plantilla: Plantilla; destino?: string | null; sede?: string | null }): Promise<string> => {
+      const args: Record<string, unknown> = { p_ciclo: p.ciclo, p_unit: p.unidad, p_plantilla: p.plantilla, p_destino: p.destino ?? null };
+      if (p.sede) args.p_campus = p.sede;
+      const r = await supabase.rpc("informe_abrir", args);
+      if (r.error && p.sede && (r.error as ErrorBase).code === "PGRST202") throw new FaltaMigracion("Falta aplicar la migración 0272 (informes por sede).");
+      return revisar<string>(r);
+    },
     onSuccess: (_id, p) => invalidarCiclo(cliente, p.ciclo),
   });
 }

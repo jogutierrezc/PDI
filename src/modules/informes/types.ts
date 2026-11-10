@@ -96,6 +96,8 @@ export interface InstanciaRow {
   id: string;
   ciclo_id: string;
   unit_id: string;
+  /** Sede del informe (0272); nulo: sin sede, o anterior a las sedes. */
+  campus_id?: string | null;
   plantilla: Plantilla;
   /** Unidad que lo consolida. */
   destino: string | null;
@@ -221,6 +223,13 @@ export interface UnidadRef {
   kind: string;
   code: string | null;
   parent_id: string | null;
+}
+
+/** Una sede (Bucaramanga, Cúcuta, Valledupar, Bogotá) de la tabla campuses. */
+export interface SedeInforme {
+  id: string;
+  slug: string;
+  name: string;
 }
 
 export interface PilarRef {

@@ -2,7 +2,7 @@
 # Actualiza en producción (pila exc75yz…) las funciones nuevas del Warehouse:
 #   - migración 0269: wh_perfilar, wh_explorar, wh_filas_pagina y wh_dispersion
 #   - migración 0270: tipo de archivo «tablero» de UDrive
-#   - migración 0271: permisos de las funciones auxiliares de 0269
+#   - migración 0273: permisos de las funciones auxiliares de 0269
 #   - funciones de borde `warehouse` y `pilo-tableros` (con copia de respaldo y reinicio del contenedor de funciones)
 # Uso, desde la carpeta del proyecto (pide la contraseña de «administrador» varias veces: ssh, scp y sudo):
 #   bash supabase/actualizar-warehouse.sh              (migraciones y función de borde)
@@ -19,7 +19,7 @@ STAMP="$(date +%Y%m%d-%H%M)"
 
 echo "1/3 Copiando archivos al servidor (carpeta temporal)…"
 ssh "$SRV" "rm -rf /tmp/wh-nuevo && mkdir -p /tmp/wh-nuevo/functions /tmp/wh-nuevo/tableros"
-scp "$AQUI/migrations/0269_warehouse_perfilar_explorar.sql" "$AQUI/migrations/0270_udrive_tablero.sql" "$AQUI/migrations/0271_warehouse_perfilar_permisos.sql" "$SRV:/tmp/wh-nuevo/"
+scp "$AQUI/migrations/0269_warehouse_perfilar_explorar.sql" "$AQUI/migrations/0270_udrive_tablero.sql" "$AQUI/migrations/0273_warehouse_perfilar_permisos.sql" "$SRV:/tmp/wh-nuevo/"
 [ "$FUNCION" = 1 ] && scp "$AQUI"/functions/warehouse/*.ts "$SRV:/tmp/wh-nuevo/functions/"
 [ "$FUNCION" = 1 ] && scp "$AQUI"/functions/pilo-tableros/*.ts "$SRV:/tmp/wh-nuevo/tableros/"
 
@@ -37,7 +37,7 @@ echo "2/3 Comprobando la base y aplicando las migraciones…"
   || { echo "FALTA la migración 0155 (tablas wh_*): no se aplica nada."; exit 1; }
 sed -i 's/\r$//' "$NUEVO"/*.sql
 echo "  0269…"; psqlq -1 < "$NUEVO/0269_warehouse_perfilar_explorar.sql" >/dev/null
-  echo "  0271…"; psqlq -1 < "$NUEVO/0271_warehouse_perfilar_permisos.sql" >/dev/null
+  echo "  0273…"; psqlq -1 < "$NUEVO/0273_warehouse_perfilar_permisos.sql" >/dev/null
 if [ "$(psqlq -c "select to_regclass('public.drive_archivos') is not null")" = "t" ]; then
   echo "  0270…"; psqlq -1 < "$NUEVO/0270_udrive_tablero.sql" >/dev/null
 else

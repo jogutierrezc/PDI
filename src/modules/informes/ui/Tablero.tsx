@@ -8,9 +8,11 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
 import { useCrecer, useEntrada } from "../../rankings/movimiento";
-import { condicionDe, useAbrirInforme, useGuardarCiclo, useGuardarRequisito, useInstancias, useListas, useUnidades } from "../datos";
+import { condicionDe, useAbrirInforme, useGuardarCiclo, useGuardarRequisito, useInstancias, useListas, useOfertaSedes, useUnidades } from "../datos";
 import { DIMS, LETRAS, PLANTILLAS, cifraDef, dimsDe, escribeInforme, plantillaSugerida } from "../plantillas";
-import type { CicloRow, Condicion, ConfigCiclo, EstadoCiclo, Plantilla, RequisitoRow } from "../types";
+import { buscarInstancia, nombreConSede, SIN_OFERTA, sedesPorUnidad } from "../sedes";
+import type { CicloRow, Condicion, ConfigCiclo, EstadoCiclo, Plantilla, RequisitoRow, SedeInforme } from "../types";
+import { enlaceInforme } from "./objetivo";
 import { AyudaPilo } from "../guia/AyudaPilo";
 import { Aviso, Barra, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { configDe } from "./modelo";
@@ -312,6 +314,7 @@ function DatosLibres({ ciclo }: { ciclo: CicloRow }) {
 function Entrega({ ciclo }: { ciclo: CicloRow }) {
   const unidades = useUnidades();
   const instancias = useInstancias(ciclo.id);
+  const oferta = useOfertaSedes();
   const ids = (instancias.data ?? []).map((i) => i.id);
   const listas = useListas(ciclo.id, ids);
   const abrir = useAbrirInforme();
@@ -322,20 +325,33 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
 
   const fallo = [unidades.error, instancias.error].find((e): e is Error => e instanceof Error);
   if (fallo) return <Aviso error={fallo} />;
-  if (unidades.isPending || instancias.isPending) return <Cargando texto="Cargando las unidades…" />;
+  if (unidades.isPending || instancias.isPending || oferta.isPending) return <Cargando texto="Cargando las unidades…" />;
 
-  const porUnidad = new Map((instancias.data ?? []).map((i) => [i.unit_id, i]));
-  const lista = (unidades.data ?? []).filter((u) => escribeInforme(u.kind));
-  const plantillaDe = (u: { id: string; kind: string; name: string }) => elegidas[u.id] ?? plantillaSugerida(u.kind, u.name);
-  const sinAbrir = lista.filter((u) => !porUnidad.has(u.id));
+  // Una fila por unidad y por sede donde se ofrece; las que no se ofrecen en sedes, una sola fila sin sede.
+  const sedesDe = sedesPorUnidad(unidades.data ?? [], oferta.data ?? SIN_OFERTA);
+  const filas = (unidades.data ?? [])
+    .filter((u) => escribeInforme(u.kind))
+    .flatMap((u) => {
+      const sedes = sedesDe.get(u.id) ?? [];
+      const ofrecidas = sedes;
+      return (sedes.length ? sedes : [null]).map((sede: SedeInforme | null) => ({
+        u,
+        sede,
+        clave: `${u.id}|${sede?.id ?? ""}`,
+        inst: buscarInstancia(instancias.data ?? [], u.id, sede?.id ?? null, ofrecidas),
+      }));
+    });
+  const plantillaDe = (f: { u: { kind: string; name: string }; clave: string }) => elegidas[f.clave] ?? plantillaSugerida(f.u.kind, f.u.name);
+  const sinAbrir = filas.filter((f) => !f.inst);
+  const abiertas = filas.length - sinAbrir.length;
 
   const abrirTodas = async () => {
     setError("");
-    for (const u of sinAbrir) {
+    for (const f of sinAbrir) {
       try {
-        await abrir.mutateAsync({ ciclo: ciclo.id, unidad: u.id, plantilla: plantillaDe(u) });
+        await abrir.mutateAsync({ ciclo: ciclo.id, unidad: f.u.id, sede: f.sede?.id ?? null, plantilla: plantillaDe(f) });
       } catch (e) {
-        setError(`${u.name}: ${mensajeDe(e)}`);
+        setError(`${nombreConSede(f.u.name, f.sede)}: ${mensajeDe(e)}`);
         return;
       }
     }
@@ -344,10 +360,10 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
   return (
     <section className="inf-card inf-pad" aria-labelledby="inf-entrega" data-guia="t-tabla">
       <h3 id="inf-entrega" className="inf-t">
-        Entrega por unidad <AyudaPilo zona="t-tabla" />
+        Entrega por unidad y sede <AyudaPilo zona="t-tabla" />
       </h3>
       <p className="inf-sub">
-        Fecha límite {fmtFecha(ciclo.fecha_limite)}. {porUnidad.size} de {lista.length} informes abiertos.
+        Fecha límite {fmtFecha(ciclo.fecha_limite)}. {abiertas} de {filas.length} informes abiertos.
       </p>
       {sinAbrir.length > 0 && (
         <div className="inf-row" style={{ marginBottom: "var(--space-3)" }}>
@@ -363,25 +379,26 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
         </p>
       )}
       <div className="inf-units" ref={barras}>
-        {lista.map((u) => {
-          const inst = porUnidad.get(u.id);
-          const total = PLANTILLAS[inst?.plantilla ?? plantillaDe(u)].secciones.length;
+        {filas.map((f) => {
+          const { u, sede, inst } = f;
+          const nombre = nombreConSede(u.name, sede);
+          const total = PLANTILLAS[inst?.plantilla ?? plantillaDe(f)].secciones.length;
           const hechas = inst ? (listas.data?.get(inst.id) ?? 0) : 0;
           return (
-            <div key={u.id} className="inf-u">
+            <div key={f.clave} className="inf-u">
               <div>
-                <b>{u.name}</b>
+                <b>{nombre}</b>
                 <small>{inst ? `${PLANTILLAS[inst.plantilla].nombre} · ${hechas} de ${total} secciones` : "Sin abrir"}</small>
               </div>
-              <Barra valor={hechas / total} etiqueta={`Avance de ${u.name}`} />
+              <Barra valor={hechas / total} etiqueta={`Avance de ${nombre}`} />
               <div className="inf-u__acts">
                 {inst ? (
                   <>
                     <EstadoPill estado={inst.estado} />
-                    <Link className="inf-link" to={inst.estado === "sent" ? `${BASE}/revision?informe=${inst.id}` : `${BASE}/mi-informe?unidad=${u.id}`}>
+                    <Link className="inf-link" to={inst.estado === "sent" ? `${BASE}/revision?informe=${inst.id}` : enlaceInforme(`${BASE}/mi-informe`, u.id, sede)}>
                       {inst.estado === "sent" ? "Revisar" : "Ver"}
                     </Link>
-                    <Link className="inf-link" to={`${BASE}/vista?unidad=${u.id}`}>
+                    <Link className="inf-link" to={enlaceInforme(`${BASE}/vista`, u.id, sede)}>
                       Vista del informe
                     </Link>
                   </>
@@ -390,9 +407,9 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
                     <select
                       className="inf-in"
                       style={{ width: "auto", minHeight: 32 }}
-                      value={plantillaDe(u)}
-                      onChange={(e) => setElegidas({ ...elegidas, [u.id]: e.target.value as Plantilla })}
-                      aria-label={`Plantilla de ${u.name}`}
+                      value={plantillaDe(f)}
+                      onChange={(e) => setElegidas({ ...elegidas, [f.clave]: e.target.value as Plantilla })}
+                      aria-label={`Plantilla de ${nombre}`}
                     >
                       {LETRAS.map((l) => (
                         <option key={l} value={l}>
@@ -400,7 +417,7 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
                         </option>
                       ))}
                     </select>
-                    <button type="button" className="inf-btn inf-btn--sm" disabled={abrir.isPending} onClick={() => abrir.mutate({ ciclo: ciclo.id, unidad: u.id, plantilla: plantillaDe(u) })}>
+                    <button type="button" className="inf-btn inf-btn--sm" disabled={abrir.isPending} onClick={() => abrir.mutate({ ciclo: ciclo.id, unidad: u.id, sede: sede?.id ?? null, plantilla: plantillaDe(f) })}>
                       Abrir
                     </button>
                   </>

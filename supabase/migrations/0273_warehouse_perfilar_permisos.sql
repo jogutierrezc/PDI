@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0271 · Warehouse: permisos de las funciones auxiliares del perfilado
+-- 0273 · Warehouse: permisos de las funciones auxiliares del perfilado
 --
 -- Error: «permission denied for function wh_exigir» al perfilar un reporte.
 -- Causa: wh_perfilar, wh_explorar, wh_filas_pagina y wh_dispersion son

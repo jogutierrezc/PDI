@@ -9,9 +9,11 @@ import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
 import { useFundido } from "../../rankings/movimiento";
-import { useInstancias, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
+import { useInstancias, useOfertaSedes, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
 import { componerNota, leerNota } from "../estados";
+import { nombreConSede } from "../sedes";
 import type { CicloRow, ContenidoSeccion, EstadoInstancia, InstanciaRow, PilarRef, RequisitoRow, SeccionDef } from "../types";
+import { enlaceInforme } from "./objetivo";
 import { Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
 import { AyudaPilo } from "../guia/AyudaPilo";
 import { Aviso, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
@@ -40,6 +42,7 @@ export function Revision(props: { ciclo: CicloRow; requisitos: RequisitoRow[] })
 function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
   const instancias = useInstancias(ciclo.id);
   const unidades = useUnidades();
+  const oferta = useOfertaSedes();
   const [params, setParams] = useSearchParams();
   const [filtro, setFiltro] = useState<Filtro>("sent");
   const detalle = useRef<HTMLDivElement>(null);
@@ -48,9 +51,12 @@ function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
 
   const fallo = [instancias.error, unidades.error].find((e): e is Error => e instanceof Error);
   if (fallo) return <Aviso error={fallo} />;
-  if (instancias.isPending || unidades.isPending) return <Cargando texto="Cargando los informes…" />;
+  if (instancias.isPending || unidades.isPending || oferta.isPending) return <Cargando texto="Cargando los informes…" />;
 
+  const sedes = new Map((oferta.data?.sedes ?? []).map((s) => [s.id, s]));
   const nombre = new Map((unidades.data ?? []).map((u) => [u.id, u.name]));
+  // La unidad con su sede: cada informe es de una unidad en una sede.
+  const nombreDe = (i: InstanciaRow) => nombreConSede(nombre.get(i.unit_id) ?? "Unidad", i.campus_id ? sedes.get(i.campus_id) : null);
   const kindDe = new Map((unidades.data ?? []).map((u) => [u.id, u.kind]));
   const lista = (instancias.data ?? []).filter((i) => filtro === "todos" || i.estado === filtro);
   const inst = (instancias.data ?? []).find((i) => i.id === elegido) ?? null;
@@ -78,7 +84,7 @@ function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
             {lista.map((i) => (
               <li key={i.id}>
                 <button type="button" aria-current={i.id === elegido} onClick={() => elegir(i.id)}>
-                  <b>{nombre.get(i.unit_id) ?? "Unidad"}</b>
+                  <b>{nombreDe(i)}</b>
                   <span className="inf-row">
                     <EstadoPill estado={i.estado} />
                     <span className="inf-hint">
@@ -98,7 +104,7 @@ function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
       </div>
       <div ref={detalle}>
         {inst ? (
-          <Detalle key={inst.id} inst={inst} ciclo={ciclo} requisitos={requisitos} unidad={nombre.get(inst.unit_id) ?? "Unidad"} esFacultad={kindDe.get(inst.unit_id) === "facultad"} />
+          <Detalle key={inst.id} inst={inst} ciclo={ciclo} requisitos={requisitos} unidad={nombreDe(inst)} sede={inst.campus_id ? sedes.get(inst.campus_id) : null} esFacultad={kindDe.get(inst.unit_id) === "facultad"} />
         ) : (
           <Vacio>Elija un informe de la lista para leerlo y decidir.</Vacio>
         )}
@@ -107,7 +113,7 @@ function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
   );
 }
 
-function Detalle({ inst, ciclo, requisitos, unidad, esFacultad }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: string; esFacultad: boolean }) {
+function Detalle({ inst, ciclo, requisitos, unidad, sede, esFacultad }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: string; sede: { id: string; slug: string; name: string } | null | undefined; esFacultad: boolean }) {
   const plan = usePlanUnidad(inst.unit_id, esFacultad);
   const m = useModeloInforme(inst, ciclo, requisitos, plan.data?.acciones ?? []);
   const pilares = usePilares();
@@ -157,7 +163,7 @@ function Detalle({ inst, ciclo, requisitos, unidad, esFacultad }: { inst: Instan
         {inst.enviado_en ? ` Enviado el ${fmtFecha(inst.enviado_en)}.` : ""}
       </p>
       <p className="inf-hint">
-        <Link className="inf-link" to={`/admin/informes-gestion/vista?unidad=${inst.unit_id}`}>
+        <Link className="inf-link" to={enlaceInforme("/admin/informes-gestion/vista", inst.unit_id, sede)}>
           Ver el informe como saldrá en papel (Carta, A4 y PDF)
         </Link>
       </p>

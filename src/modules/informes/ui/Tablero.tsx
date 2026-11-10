@@ -333,12 +333,11 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
     .filter((u) => escribeInforme(u.kind))
     .flatMap((u) => {
       const sedes = sedesDe.get(u.id) ?? [];
-      const ofrecidas = sedes;
       return (sedes.length ? sedes : [null]).map((sede: SedeInforme | null) => ({
         u,
         sede,
         clave: `${u.id}|${sede?.id ?? ""}`,
-        inst: buscarInstancia(instancias.data ?? [], u.id, sede?.id ?? null, ofrecidas),
+        inst: buscarInstancia(instancias.data ?? [], u.id, sede?.id ?? null, sedes),
       }));
     });
   const plantillaDe = (f: { u: { kind: string; name: string }; clave: string }) => elegidas[f.clave] ?? plantillaSugerida(f.u.kind, f.u.name);

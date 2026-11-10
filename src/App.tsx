@@ -10,6 +10,7 @@
 
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BASE as ALERTAS } from "./modules/alertas/contexto";
 import { ScrollManager } from "./components/layout/ScrollManager";
 import { TourProvider } from "./components/tour/TourProvider";
 import { TourFab } from "./components/tour/TourFab";
@@ -252,6 +253,15 @@ const Internacionalizacion = lazy(() =>
 );
 const InformesAdmin = lazy(() => import("./modules/informes/InformesAdmin").then((m) => ({ default: m.InformesAdmin })));
 const MonitorAlertas = lazy(() => import("./modules/monitor/MonitorAlertas").then((m) => ({ default: m.MonitorAlertas })));
+// Portal de alertas tempranas: el Monitor como portal propio (la dirección está en modules/alertas/contexto.ts).
+const AlertasMarco = lazy(() => import("./modules/alertas/Marco").then((m) => ({ default: m.Marco })));
+const AlertasInicio = lazy(() => import("./modules/alertas/Inicio").then((m) => ({ default: m.Inicio })));
+const AlertasPanorama = lazy(() => import("./modules/alertas/Panorama").then((m) => ({ default: m.Panorama })));
+const AlertasRiesgo = lazy(() => import("./modules/alertas/Riesgo").then((m) => ({ default: m.Riesgo })));
+const AlertasEstudiantes = lazy(() => import("./modules/alertas/Estudiantes").then((m) => ({ default: m.Estudiantes })));
+const AlertasEstudiante = lazy(() => import("./modules/alertas/Estudiante").then((m) => ({ default: m.Estudiante })));
+const AlertasCursos = lazy(() => import("./modules/alertas/Cursos").then((m) => ({ default: m.Cursos })));
+const AlertasMetodo = lazy(() => import("./modules/alertas/Metodo").then((m) => ({ default: m.Metodo })));
 const Warehouse = lazy(() => import("./modules/warehouse/Warehouse").then((m) => ({ default: m.Warehouse })));
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
@@ -610,6 +620,23 @@ export default function App() {
               </RequireRole>
             }
           />
+          {/* Portal de alertas tempranas: solo con sesión; quién ve qué lo decide la base (pantalla monitor y unidades). */}
+          <Route
+            path={ALERTAS}
+            element={
+              <RequireRole minimum="consulta" screen="monitor">
+                <AlertasMarco />
+              </RequireRole>
+            }
+          >
+            <Route index element={<AlertasInicio />} />
+            <Route path="panorama" element={<AlertasPanorama />} />
+            <Route path="riesgo" element={<AlertasRiesgo />} />
+            <Route path="estudiantes" element={<AlertasEstudiantes />} />
+            <Route path="estudiantes/:codigo" element={<AlertasEstudiante />} />
+            <Route path="cursos" element={<AlertasCursos />} />
+            <Route path="metodo" element={<AlertasMetodo />} />
+          </Route>
           {/* Warehouse UDES: los reportes de Master, Galileo y Davinci por periodo. Solo Planeación. */}
           <Route
             path="/admin/warehouse/:seccion?"

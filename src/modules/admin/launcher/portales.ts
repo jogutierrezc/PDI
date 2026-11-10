@@ -18,6 +18,7 @@ import type { ImpactoSide } from "../../../lib/auth";
 import { navigation, type AdminSection, type NavGroup } from "../components/AdminShell";
 import { STATIONS } from "../udes-en-cifras/progress";
 import { OBS_STATIONS } from "../observatorio/stations";
+import { BASE as BASE_ALERTAS } from "../../alertas/contexto";
 
 export type ModuleId = NavGroup["id"];
 
@@ -292,7 +293,10 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     sections: () => [
       {
         title: "Notas",
-        cards: [{ key: "mon", title: "Monitor de alertas tempranas", text: "Semáforo NE · ED · RS de cada nivel, con análisis de Pilo", to: "/admin/monitor-alertas" }],
+        cards: [
+          { key: "mon", title: "Monitor de alertas tempranas", text: "Semáforo NE · ED · RS de cada nivel, con análisis de Pilo", to: "/admin/monitor-alertas" },
+          { key: "mon-portal", title: "Portal de alertas tempranas", text: "Facultad, programa y semestre: trayectoria, mapa de riesgo y notas estimadas", to: BASE_ALERTAS, screen: "monitor" },
+        ],
       },
     ],
   },

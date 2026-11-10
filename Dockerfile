@@ -31,7 +31,9 @@ FROM nginx:alpine
 # en Coolify se define como variable de ejecución con otro nombre, SUPABASE_ORIGIN
 # tiene prioridad.
 ARG VITE_SUPABASE_URL
-ENV SUPABASE_ORIGIN=$VITE_SUPABASE_URL
+# Sin valor, `proxy_pass ;` es una configuración inválida y nginx ni arranca (502 en
+# Coolify). Por eso hay un valor de respaldo: la dirección de producción.
+ENV SUPABASE_ORIGIN=${VITE_SUPABASE_URL:-https://planeacion.udes.edu.co}
 # La imagen de nginx convierte /etc/nginx/templates/*.template en conf.d/*.conf al arrancar.
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html

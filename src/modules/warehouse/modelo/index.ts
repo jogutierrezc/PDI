@@ -6,3 +6,4 @@ export * from "./fuentes";
 export * from "./medidas";
 export * from "./modelo";
 export * from "./relaciones";
+export * from "./ejecutar";

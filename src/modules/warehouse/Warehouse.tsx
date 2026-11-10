@@ -6,6 +6,8 @@
      catalogo   los conjuntos de Master, Galileo y Davinci y qué se guarda de cada uno
      cargas     cargar un reporte (Excel o desde Master) y el historial
      explorar   gráficos y tabla de lo guardado
+     tableros   los tableros propios (guardados en UDrive) y su visor
+     crear      el asistente de tableros con Pilo Tableros
      almacen    capas, periodos cerrados y política de privacidad
    El periodo y la sede van en la dirección (?periodo=2026b&sede=buc) para que
    un enlace lleve al mismo sitio.
@@ -22,15 +24,19 @@ import { Tablero } from "./Tablero";
 import { Catalogo } from "./Catalogo";
 import { Cargas } from "./Cargas";
 import { Explorar } from "./Explorar";
+import { Tableros } from "./Tableros";
+import { CrearTablero } from "./CrearTablero";
 import { Almacen } from "./Almacen";
 import "./warehouse.css";
 
-export type Seccion = "tablero" | "catalogo" | "cargas" | "explorar" | "almacen";
+export type Seccion = "tablero" | "catalogo" | "cargas" | "explorar" | "tableros" | "crear" | "almacen";
 const SECCIONES: { id: Seccion; nombre: string; descripcion: string }[] = [
   { id: "tablero", nombre: "Tablero", descripcion: "Qué hay guardado por periodo, sede y corte" },
   { id: "catalogo", nombre: "Catálogo", descripcion: "Los reportes de Master, Galileo y Davinci y qué se guarda de cada uno" },
   { id: "cargas", nombre: "Cargas", descripcion: "Cargar un reporte, traerlo de Master y revisar el historial" },
   { id: "explorar", nombre: "Explorar", descripcion: "Gráficos y tabla de lo guardado" },
+  { id: "tableros", nombre: "Tableros propios", descripcion: "Los tableros que usted o su equipo armaron con cifras del Warehouse" },
+  { id: "crear", nombre: "Crear tablero", descripcion: "Una pregunta, sus fuentes y el diseño que Pilo Tableros propone" },
   { id: "almacen", nombre: "Almacén", descripcion: "Capas, periodos cerrados y política de privacidad" },
 ];
 const BASE = "/admin/warehouse";
@@ -142,6 +148,8 @@ export function Warehouse() {
         {seccion === "catalogo" && <Catalogo ctx={contexto} cobertura={datos} />}
         {seccion === "cargas" && <Cargas ctx={contexto} cobertura={datos} />}
         {seccion === "explorar" && <Explorar ctx={contexto} cobertura={datos} />}
+        {seccion === "tableros" && <Tableros ctx={contexto} cobertura={datos} />}
+        {seccion === "crear" && <CrearTablero ctx={contexto} cobertura={datos} />}
         {seccion === "almacen" && <Almacen ctx={contexto} cobertura={datos} permisos={permisos} />}
       </div>
     );

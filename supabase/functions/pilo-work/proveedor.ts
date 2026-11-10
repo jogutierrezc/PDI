@@ -327,6 +327,7 @@ export async function llamar(
     const d = lista[i];
     const espera = nivel === "rapido" && i === 0 && lista.length > 1 ? (opciones.primerMs ?? ESPERA_PRIMER_FRAGMENTO_MS.rapidoPrimero) : ESPERA_PRIMER_FRAGMENTO_MS.otros;
     const r = await intento(d, cuerpo, opciones.signal, espera);
+    console.log(`[pilo-work] ia ${d.provider}/${d.model} nivel=${nivel} ${r.response ? "ok" : `falla: ${r.motivo}`} ${r.ms}ms`);
     if (r.response) return { response: r.response, error: "", uso: { proveedor: d.provider, modelo: d.model, nivel, conmutado: i > 0, motivo: i > 0 ? primerMotivo : "", ms: r.ms } };
     if (!primerMotivo) primerMotivo = r.motivo;
     error = r.status ? `El proveedor respondió ${r.status}.` : r.motivo === "cancelado" ? "Se canceló." : r.motivo === "tardó demasiado" ? "El modelo tardó demasiado en responder." : "No se pudo hablar con el proveedor de IA.";

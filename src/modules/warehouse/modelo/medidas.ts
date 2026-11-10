@@ -37,6 +37,8 @@ export interface MedidaBI {
   reglas: TipoRegla[];
   /** Se marca sola en una pregunta de riesgo académico. */
   recomendada?: boolean;
+  /** Columnas por las que se puede desglosar además de las dimensiones comunes, escritas «col:nombre_de_columna». Las traen las medidas automáticas. */
+  dimensiones?: string[];
 }
 
 const agg = (fuente: string, op: OperacionBI, columna?: string, filtros?: FiltroBI[]): Calculo => ({ tipo: "agregado", fuente, op, columna, filtros });
@@ -72,7 +74,59 @@ export const MEDIDAS: MedidaBI[] = [
   { id: "resultado_evaluacion", nombre: "Resultado de la evaluación docente", carpeta: "Docentes", receta: "Promedio de los resultados de la evaluación consolidada.", descripcion: "Un docente, un valor. El docente va como seudónimo.", formato: "decimal", calculo: agg("ms_eval", "promediar", "promedio_de_los_resultados"), reglas: [] },
 ];
 
-export const medidaPorId = (id: string): MedidaBI | undefined => MEDIDAS.find((m) => m.id === id);
+/** Las medidas automáticas que el tablero guardó consigo: se registran al abrirlo para que el cálculo las encuentre por su id. */
+const PROPIAS = new Map<string, MedidaBI>();
+export function registrarMedidas(lista: MedidaBI[] | undefined) {
+  for (const m of lista ?? []) if (m && typeof m.id === "string" && m.id.startsWith("auto:") && m.calculo) PROPIAS.set(m.id, m);
+}
+export const medidaPorId = (id: string): MedidaBI | undefined => MEDIDAS.find((m) => m.id === id) ?? PROPIAS.get(id);
+
+/** Lo que el perfil de la base dice de una columna (forma de `ColumnaPerfil` del store, sin traerlo aquí). */
+export interface ColumnaDePerfil {
+  col: string;
+  tipo: string;
+  llenos: number;
+  distintos: number;
+  personal: boolean;
+}
+
+const bonito = (col: string) => {
+  const t = col.replace(/_/g, " ").trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+/**
+ * Las medidas que se pueden armar con cualquier fuente a partir de su perfil: filas, promedio y suma de cada columna numérica,
+ * y personas distintas por cada columna con dato personal (la reserva de 5 la aplica la base). Los nombres son de negocio y
+ * no llevan guiones bajos. Se desglosan por las columnas de categoría (nunca por datos personales).
+ */
+export function medidasAutomaticas(fuenteId: string, fuenteNombre: string, perfil: ColumnaDePerfil[]): MedidaBI[] {
+  const carpeta = `Automáticas · ${fuenteNombre}`;
+  const dims = perfil.filter((c) => !c.personal && c.tipo === "categoria" && c.distintos >= 2 && c.distintos <= 80).map((c) => `col:${c.col}`);
+  const base = (id: string, nombre: string, receta: string, descripcion: string, formato: Formato, op: OperacionBI, columna?: string): MedidaBI => ({
+    id: `auto:${fuenteId}:${id}`,
+    nombre,
+    carpeta,
+    receta,
+    descripcion,
+    formato,
+    calculo: { tipo: "agregado", fuente: fuenteId, op, columna },
+    reglas: [],
+    dimensiones: dims,
+  });
+  const salida: MedidaBI[] = [base("filas", `Filas de ${fuenteNombre}`, "Cantidad de filas del reporte.", "Cuenta las filas guardadas. Una fila es un registro del reporte; no necesariamente una persona.", "entero", "contar")];
+  for (const c of perfil.filter((x) => x.tipo === "numero" && !x.personal && x.llenos > 0).slice(0, 8)) {
+    salida.push(base(`prom:${c.col}`, `Promedio de ${bonito(c.col).toLowerCase()}`, `Promedio de «${c.col}» sobre las filas que la traen llena.`, `Las filas sin dato no cuentan. Todas pesan igual.`, "decimal", "promediar", c.col));
+    salida.push(base(`suma:${c.col}`, `Suma de ${bonito(c.col).toLowerCase()}`, `Suma de «${c.col}».`, "Solo tiene sentido si la columna es una cantidad que se puede acumular.", "decimal", "sumar", c.col));
+  }
+  for (const c of perfil.filter((x) => x.personal && x.llenos > 0).slice(0, 3)) {
+    salida.push(base(`dist:${c.col}`, `Personas distintas por ${bonito(c.col).toLowerCase()}`, `Valores distintos de «${c.col}».`, "Cuenta personas, no filas. La reserva de 5 oculta los grupos más pequeños.", "entero", "distintos", c.col));
+  }
+  for (const c of perfil.filter((x) => !x.personal && x.tipo === "categoria" && x.distintos >= 2).slice(0, 3)) {
+    salida.push(base(`dist:${c.col}`, `${bonito(c.col)} distintos`, `Valores distintos de «${c.col}».`, "Cuántos valores diferentes hay en la columna.", "entero", "distintos", c.col));
+  }
+  return salida;
+}
 
 /** División segura: vacío si el denominador no existe o es cero. */
 export function razonSegura(numerador: number | null, denominador: number | null, porCien = false): number | null {

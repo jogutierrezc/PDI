@@ -146,12 +146,14 @@ function mensajeEntra(desc: string): string {
 
 async function pedirToken(parametros: Record<string, string>): Promise<Any> {
   const c = config();
+  const ini = Date.now();
   const r = await fetch(tokenUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     signal: AbortSignal.timeout(20_000),
     body: new URLSearchParams({ client_id: c.clientId, client_secret: c.secret, ...parametros }),
   });
+  console.log(`[pw-microsoft] token ${parametros.grant_type ?? "?"} ${r.status} ${Date.now() - ini}ms`);
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(mensajeEntra(String(data?.error_description ?? data?.error ?? "")));
   return data;
@@ -185,13 +187,18 @@ async function tokenDe(admin: Any, userId: string): Promise<{ t: string; scopes:
 
 /** Un pedido a Graph con tope de tiempo y errores en español. `ruta` puede ser absoluta (nextLink). */
 async function graphRaw(token: string, ruta: string, init: RequestInit = {}): Promise<Response> {
+  const ini = Date.now();
+  const donde = ruta.replace(/^https:\/\/graph\.microsoft\.com\/v1\.0/, "").split("?")[0].replace(/[A-Za-z0-9_=%-]{25,}/g, ":id");
   try {
-    return await fetch(ruta.startsWith("https://") ? ruta : `${GRAPH}${ruta}`, {
+    const r = await fetch(ruta.startsWith("https://") ? ruta : `${GRAPH}${ruta}`, {
       ...init,
       signal: AbortSignal.timeout(TIEMPO_GRAPH_MS),
       headers: { Authorization: `Bearer ${token}`, Prefer: `outlook.timezone="${TZ}"`, ...(init.headers ?? {}) },
     });
+    console.log(`[pw-microsoft] graph ${init.method ?? "GET"} ${donde} ${r.status} ${Date.now() - ini}ms`);
+    return r;
   } catch (e) {
+    console.log(`[pw-microsoft] graph ${init.method ?? "GET"} ${donde} FALLA ${e instanceof Error ? e.name : "?"} ${Date.now() - ini}ms`);
     if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new Error("Microsoft tardó demasiado en responder. Intente de nuevo.");
     throw new Error("No se pudo hablar con Microsoft.");
   }
@@ -344,6 +351,8 @@ Deno.serve(async (request) => {
     return json({ error: "El pedido no se entiende." }, 400);
   }
   const action = text(body?.action, 40);
+  const t0 = Date.now();
+  const traza = (fase: string) => console.log(`[pw-microsoft] ${action} ${fase} +${Date.now() - t0}ms`);
 
   try {
     /* El cron de pw-avisos llega con la clave de servicio, sin persona. */
@@ -397,8 +406,10 @@ Deno.serve(async (request) => {
       });
     }
 
+    traza("sesión verificada");
     const { data: rol } = await mine.rpc("pw_mi_rol");
     if (!rol) return json({ error: "Su cuenta no tiene un rol en Pilo at Work.", code: "sin_rol" }, 403);
+    traza(`rol ${rol}`);
     const conCorreo = rol !== "colaborador";
 
     if (action === "estado") {
@@ -451,7 +462,9 @@ Deno.serve(async (request) => {
     }
 
     const { t, scopes } = await tokenDe(admin, user.id);
+    traza("token de Microsoft listo");
     const { funciones, subida_max_mb } = await leerFunciones(admin);
+    traza("funciones leídas");
     const tiene = (a: string) => scopes.toLowerCase().includes(a.toLowerCase());
     const requiere = (modulo: "correo" | "agenda" | "archivos") => {
       if (funciones[modulo] === false) throw new Error("La administración apagó esta función por ahora.");

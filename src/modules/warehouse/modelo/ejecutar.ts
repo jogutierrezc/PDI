@@ -12,7 +12,7 @@
 
 import { DIMENSIONES, normalizarNombre, type DimensionId } from "./dimensiones";
 import { fuentePorId } from "./fuentes";
-import { medidaPorId, razonSegura, type Calculo, type FiltroBI, type OperacionBI } from "./medidas";
+import { medidaPorId, razonSegura, type Calculo, type FiltroBI, type MedidaBI, type OperacionBI } from "./medidas";
 
 export interface PeticionLectura {
   fuente: string;
@@ -48,15 +48,20 @@ export interface ContextoEjecucion {
   periodo: string;
   /** El periodo anterior en la tabla de periodos (para el cambio entre periodos). */
   anterior: string | null;
-  dims: DimensionId[];
+  /** Dimensiones comunes (periodo, programa…) o columnas propias de la fuente, escritas «col:nombre». */
+  dims: string[];
   leer: Lector;
 }
 
+/** Cómo se llama una dimensión ante la persona. */
+export const nombreDeDimension = (d: string) => (d.startsWith("col:") ? d.slice(4).replace(/_/g, " ") : (DIMENSIONES[d as DimensionId]?.nombre ?? d));
+
 /** La columna de una fuente que representa una dimensión, sin datos personales. Prefiere la de nombre a la de código. */
-export function columnaParaDimension(fuenteId: string, dim: DimensionId): string | null {
+export function columnaParaDimension(fuenteId: string, dim: string): string | null {
+  if (dim.startsWith("col:")) return dim.slice(4);
   const f = fuentePorId(fuenteId);
   if (!f) return null;
-  const candidatas = Object.entries(f.columnas).filter(([, c]) => c.dimension === dim && !c.personal).map(([nombre]) => nombre);
+  const candidatas = Object.entries(f.columnas).filter(([, c]) => c.dimension === (dim as DimensionId) && !c.personal).map(([nombre]) => nombre);
   if (!candidatas.length) return null;
   return candidatas.find((c) => /nombre/.test(c)) ?? candidatas.find((c) => !/^cod/.test(c)) ?? candidatas[0];
 }
@@ -68,6 +73,9 @@ export function dimensionesDesglosables(c: Calculo): DimensionId[] {
     (d) => !DIMENSIONES[d].personal && d !== "periodo" && d !== "sede" && fuentes.length > 0 && fuentes.every((f) => columnaParaDimension(f, d) !== null),
   );
 }
+
+/** Todo por lo que se puede desglosar una medida: las dimensiones comunes y, si es automática, las columnas de categoría de su fuente. */
+export const dimensionesDeLaMedida = (m: MedidaBI): string[] => [...new Set([...dimensionesDesglosables(m.calculo), ...(m.dimensiones ?? [])])];
 
 function fuentesDeCalculo(c: Calculo): string[] {
   if (c.tipo === "agregado") return [c.fuente];
@@ -84,7 +92,7 @@ async function agregado(c: Extract<Calculo, { tipo: "agregado" }>, ctx: Contexto
   const dims: string[] = [];
   for (const d of ctx.dims) {
     const col = columnaParaDimension(c.fuente, d);
-    if (!col) throw new NoCalculable(`«${fuente?.nombre ?? c.fuente}» no tiene ${DIMENSIONES[d].nombre.toLowerCase()}: no se puede desglosar por ahí.`);
+    if (!col) throw new NoCalculable(`«${fuente?.nombre ?? c.fuente}» no tiene ${nombreDeDimension(d).toLowerCase()}: no se puede desglosar por ahí.`);
     dims.push(col);
   }
   const lectura = await ctx.leer({ fuente: c.fuente, periodo, dims, medida: { op: c.op, col: c.columna }, filtros: c.filtros ?? [] });
@@ -120,8 +128,9 @@ async function calcular(c: Calculo, ctx: ContextoEjecucion, periodo: string): Pr
 export async function ejecutarMedida(id: string, ctx: ContextoEjecucion): Promise<ResultadoMedida> {
   const m = medidaPorId(id);
   if (!m) throw new NoCalculable("Esa medida no existe en el catálogo.");
-  const bloqueadas = ctx.dims.filter((d) => !dimensionesDesglosables(m.calculo).includes(d));
-  if (bloqueadas.length) throw new NoCalculable(`«${m.nombre}» no se puede desglosar por ${bloqueadas.map((d) => DIMENSIONES[d].nombre.toLowerCase()).join(" y ")} con las fuentes que usa.`);
+  const permitidas = dimensionesDeLaMedida(m);
+  const bloqueadas = ctx.dims.filter((d) => !permitidas.includes(d));
+  if (bloqueadas.length) throw new NoCalculable(`«${m.nombre}» no se puede desglosar por ${bloqueadas.map((d) => nombreDeDimension(d).toLowerCase()).join(" y ")} con las fuentes que usa.`);
   const r = await calcular(m.calculo, ctx, ctx.periodo);
   // Sin dimensiones, la base devuelve un solo grupo; si no hubo filas (fuente sin carga) queda vacío.
   return r;

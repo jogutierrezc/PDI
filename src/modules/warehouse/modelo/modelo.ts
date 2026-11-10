@@ -6,7 +6,7 @@
    periodos, medidas con nombre y descripción, límite de visuales por página y nada de datos personales a la vista. */
 
 import { DIMENSIONES, type DimensionId } from "./dimensiones";
-import { MEDIDAS, noDisponible, medidaPorId } from "./medidas";
+import { MEDIDAS, noDisponible, medidaPorId, registrarMedidas, type MedidaBI } from "./medidas";
 import { detectarHallazgos, dimensionesComunes, relacionesDe, relacionesEntreDimensiones, type Perfiles, type TipoRegla } from "./relaciones";
 
 export type PlantillaId = "ejecutivo" | "diagnostico" | "detalle";
@@ -27,8 +27,20 @@ export interface VisualBI {
   titulo: string;
   /** Ids de MEDIDAS. */
   medidas: string[];
-  /** Por qué se agrupa o se cruza. Nunca una dimensión personal. */
-  dimensiones: DimensionId[];
+  /** Por qué se agrupa o se cruza: dimensiones comunes o columnas de categoría de la fuente («col:nombre»). Nunca un dato personal. */
+  dimensiones: string[];
+}
+
+/** Lo que Pilo concluyó sobre cómo se relacionan las fuentes elegidas. Se guarda con el tablero para que se vea qué se asumió. */
+export interface AnalisisRelaciones {
+  resumen: string;
+  relaciones: { desde: { fuente: string; columna: string }; hacia: { fuente: string; columna: string }; tipo: "muchos-a-uno" | "uno-a-uno" | "muchos-a-muchos"; calidad: "alta" | "media" | "baja"; nota: string }[];
+  /** Reconstrucciones que Pilo recomienda aprobar; las aprueba la persona. */
+  reglas: { regla: TipoRegla; motivo: string }[];
+  riesgos: string[];
+  /** Fuentes que no se pudieron relacionar con ninguna otra. */
+  aisladas: string[];
+  avisos: string[];
 }
 
 export interface PaginaBI {
@@ -48,8 +60,12 @@ export interface ModeloBI {
   fuentes: string[];
   /** Reglas de reconstrucción que la persona aprobó. */
   reglas: TipoRegla[];
-  /** Ids de MEDIDAS elegidas. */
+  /** Ids de MEDIDAS elegidas (del catálogo o automáticas, «auto:fuente:…»). */
   medidas: string[];
+  /** Definición de las medidas automáticas elegidas: el tablero las lleva consigo para no depender del perfil de la carga. */
+  medidasPropias?: MedidaBI[];
+  /** El análisis de relaciones de Pilo Tableros, si se hizo. */
+  analisis?: AnalisisRelaciones;
   paginas: PaginaBI[];
 }
 
@@ -69,6 +85,7 @@ const esNombreDeNegocio = (nombre: string) => nombre.trim().length >= 4 && !/[_]
 
 /** La revisión que se ve antes de publicar: cada regla dice si pasa y qué hacer. */
 export function revisarModelo(m: ModeloBI, perfiles: Perfiles = {}): ReglaCalidad[] {
+  registrarMedidas(m.medidasPropias);
   const r: ReglaCalidad[] = [];
   const hallazgos = detectarHallazgos(m.fuentes, perfiles).filter((h) => h.requiereAprobacion);
   const abiertos = hallazgos.filter((h) => !m.reglas.includes(h.id));
@@ -82,6 +99,12 @@ export function revisarModelo(m: ModeloBI, perfiles: Perfiles = {}): ReglaCalida
     ok: m.fuentes.length < 2 || dimensionesComunes(m.fuentes).length > 0 || relaciones.some((x) => x.dimension === "periodo"),
     severidad: "error",
     texto: m.fuentes.length < 2 ? "Con una sola fuente no hay cruce." : "Las fuentes comparten al menos una dimensión (periodo, sede…). Se cruzan por dimensiones, no fila contra fila.",
+  });
+  r.push({
+    id: "analisis",
+    ok: m.fuentes.length < 2 || Boolean(m.analisis),
+    severidad: "aviso",
+    texto: m.fuentes.length < 2 ? "Con una sola fuente no hay relaciones que revisar." : m.analisis ? "Pilo analizó cómo se relacionan las fuentes." : "Falta que Pilo analice cómo se relacionan las fuentes.",
   });
   r.push({ id: "periodos", ok: m.fuentes.length === 0 || relaciones.some((x) => x.dimension === "periodo"), severidad: "error", texto: "Hay una tabla de periodos: ordena, compara con el anterior y dice si el periodo está abierto." });
   r.push({
@@ -102,7 +125,7 @@ export function revisarModelo(m: ModeloBI, perfiles: Perfiles = {}): ReglaCalida
     const max = PLANTILLAS[p.plantilla].maxVisuales;
     r.push({ id: `visuales_${p.id}`, ok: p.visuales.length <= max, severidad: "aviso", texto: `«${p.nombre}»: ${p.visuales.length} visuales. Máximo recomendado: ${max}.` });
     r.push({ id: `titulos_${p.id}`, ok: p.visuales.every((v) => v.titulo.trim().length > 0), severidad: "aviso", texto: `«${p.nombre}»: cada visual tiene título.` });
-    const personal = p.visuales.flatMap((v) => v.dimensiones).filter((d) => DIMENSIONES[d].personal);
+    const personal = p.visuales.flatMap((v) => v.dimensiones).filter((d) => DIMENSIONES[d as DimensionId]?.personal);
     r.push({ id: `personales_${p.id}`, ok: personal.length === 0, severidad: "error", texto: `«${p.nombre}»: ningún visual agrupa por una dimensión con dato personal.` });
     const sueltas = p.visuales.flatMap((v) => v.medidas).filter((id) => !m.medidas.includes(id));
     r.push({ id: `medidas_${p.id}`, ok: sueltas.length === 0, severidad: "error", texto: `«${p.nombre}»: usa solo medidas elegidas en el modelo.` });

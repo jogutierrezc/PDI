@@ -18,7 +18,7 @@ Maqueta aprobada (comportamiento y diseño de referencia): `docs/informes/maquet
 | --- | --- |
 | `informe_ciclos` | `anio` (único), `nombre`, `fecha_limite`, `corte`, `estado` (preparacion \| abierto \| cerrado), `config` jsonb `{limite_propios, exigir_fuente, exigir_pilar}` |
 | `informe_requisitos` | `ciclo_id`, `plantilla` (A–D), `clave` (cifra), `condicion` (justificar \| sugerido \| no) |
-| `informe_instancias` | `ciclo_id`, `unit_id`, `plantilla` (A–D), `estado` (draft \| sent \| ok \| back), `nota_revision`, `enviado_en/por`, `aprobado_en/por`; único (`ciclo_id`,`unit_id`) |
+| `informe_instancias` | `ciclo_id`, `unit_id`, `plantilla` (A–D), `estado` (draft \| sent \| ok \| back), `nota_revision`, `enviado_en/por`, `aprobado_en/por`, `campus_id` (0272); único (`ciclo_id`,`unit_id`,`campus_id`, el nulo cuenta como un valor) |
 | `informe_secciones` | `instancia_id`, `clave` (`s1`…), `orden`, `contenido` jsonb (texto con tokens, filas de metas, logros, etc. según el tipo), `listo` bool |
 | `informe_cifras` | `instancia_id`, `clave`, `etiqueta`, `fuente_tipo`, `fuente_nombre`, `valor` (solo excel/manual), `unidad`, `meta`, `anterior`, `incluida`, `justificacion`, `propia`, `pilar`, `visto` (último valor aceptado), y la foto: `foto_valor`, `foto_en`, `foto_fuente` |
 | `informe_fuentes` | catálogo de fuentes (`clave`, `nombre`, `tipo`, `consulta` jsonb, `activa`) |
@@ -71,7 +71,7 @@ Lo que quedó en la base. La interfaz y `pilo-informes` se apoyan en esto; las p
 | --- | --- |
 | `informe_ciclos` | `id` uuid · `anio` int único · `nombre` text · `fecha_limite` date · `corte` date · `estado` (`preparacion`\|`abierto`\|`cerrado`) · `config` jsonb `{limite_propios:3, exigir_fuente:true, exigir_pilar:false}` · `created_at` · `updated_at` |
 | `informe_requisitos` | `id` · `ciclo_id` · `plantilla` (A–D) · `clave` · `condicion` (`justificar`\|`sugerido`\|`no`); único (`ciclo_id`,`plantilla`,`clave`) |
-| `informe_instancias` | `id` · `ciclo_id` · `unit_id` · `plantilla` (A–D) · `destino` uuid (unidad) · `estado` (`draft`\|`sent`\|`ok`\|`back`) · `nota_revision` text · `enviado_en` · `enviado_por` · `aprobado_en` · `aprobado_por` · `updated_by` · `created_at` · `updated_at`; único (`ciclo_id`,`unit_id`) |
+| `informe_instancias` | `id` · `ciclo_id` · `unit_id` · `plantilla` (A–D) · `destino` uuid (unidad) · `estado` (`draft`\|`sent`\|`ok`\|`back`) · `nota_revision` text · `enviado_en` · `enviado_por` · `aprobado_en` · `aprobado_por` · `updated_by` · `created_at` · `updated_at`; `campus_id` (0272); único (`ciclo_id`,`unit_id`,`campus_id`) |
 | `informe_secciones` | `id` · `instancia_id` · `clave` (`s1`…) · `orden` int (sale de la clave) · `contenido` jsonb (objeto) · `listo` bool · `updated_by` · `updated_at`; único (`instancia_id`,`clave`) |
 | `informe_cifras` | `id` · `instancia_id` · `clave` · `etiqueta` · `seccion_clave` · `fuente_tipo` (`auto`\|`pdi`\|`aportes`\|`excel`\|`manual`\|`url`) · `fuente_nombre` · `fuente_clave` · `consulta` jsonb · `valor` numeric (nulo en `auto`/`pdi`) · `unidad` text · `meta` · `anterior` · `incluida` bool (true) · `justificacion` text · `propia` bool calculada · `pilar` text · `visto` numeric · `foto_valor` numeric · `foto_en` timestamptz · `foto_fuente` text · `updated_by` · `updated_at`; único (`instancia_id`,`clave`) |
 | `informe_fuentes` | `clave` text pk · `nombre` · `tipo` (`auto`\|`pdi`) · `consulta` jsonb · `activa` bool · `created_at` · `updated_at` |
@@ -184,3 +184,11 @@ Recorrido de 24 pasos (los de «Para quien gestiona» solo los ve quien gestiona
 - **Voz.** La oficial de Pilo (`sayOfficial`, la de /pregunta y la app: configurada por el admin, reproductor único con detección del tipo de audio). No usa la voz del navegador: si no hay audio, muestra «La voz de Pilo no está disponible en este momento». El reproductor no da avance por palabra: se resalta el párrafo mientras suena y la boca de Pilo se mueve con el audio.
 - **Recuerda en el navegador** (localStorage, `informes:guia:*`): banner cerrado e interruptor «Leer cada paso». Nada va a la base.
 - **Límites.** Textos estáticos; el consolidador es una pantalla de próxima fase y su paso lo dice; solo tema claro; el foco usa el elemento `data-guia` tal como está en pantalla (la tarjeta se recoloca sola, y se puede arrastrar).
+
+## Un informe por unidad y por sede (0272)
+
+La unidad y la sede del informe salen de «Dónde trabaja» (`unit_members`: unidad y `campus_id`, vacío = todas las sedes). Nadie elige la unidad en Mi informe ni en la Vista: se abre la de la persona (si trabaja en varias, la de mayor función y, a igual función, la primera del organigrama) y se enlazan las otras. Quien gestiona llega desde el Tablero del ciclo con `?unidad=<id>&sede=<slug>`; los enlaces viejos con solo `?unidad=` siguen sirviendo.
+- **Sedes de una unidad** (`sedes.ts`): las de `program_campuses` del programa o, en una facultad u otra unidad, las de los programas que cuelgan de ella. Sin oferta, el informe queda sin sede. Con una sola sede, esa es; con varias y sin sede asignada, la persona elige la SEDE (no la unidad).
+- **Un informe sin sede** de una unidad que sí tiene sedes se muestra como el de su primera sede (`buscarInstancia`). La migración deja con sede los de unidades ofrecidas en una sola.
+- **Plan y metas** (`informe-plan`, `informe_metas_deseadas`, perfil y diseño de la unidad) siguen siendo de la UNIDAD: el plan aplica a todas sus sedes y cada informe lo toma igual. No se reparte por sede.
+- **Base**: `informe_abrir(..., p_campus)`, `informe_sede_ok(unidad, sede)` y el guardián, que rechaza una sede fuera de la pertenencia y no deja cambiarla. Sin la migración, las pantallas funcionan como antes (sin sede) y abrir un informe con sede avisa que falta aplicarla.

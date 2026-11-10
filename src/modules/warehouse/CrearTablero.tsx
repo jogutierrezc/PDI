@@ -1,26 +1,33 @@
-/* Warehouse UDES · Crear tablero: la pregunta, las fuentes, las reconstrucciones que se aprueban, las medidas y el diseño.
+/* Warehouse UDES · Crear tablero: la pregunta, las fuentes (todo el catálogo), el análisis de relaciones de Pilo,
+   las medidas y el diseño.
 
-   Pilo Tableros propone el diseño con las medidas del catálogo (lo que invente se descarta); sin IA hay un diseño básico
-   que se arma solo. Antes de guardar se muestra la revisión de calidad: lo que es error bloquea, lo que es aviso no. */
+   Cualquier reporte del catálogo puede ser fuente. Sus medidas salen del perfil de columnas de la carga más reciente
+   (filas, promedios, sumas, personas distintas) y las del catálogo aparecen cuando las fuentes que necesitan están elegidas.
+   Pilo Tableros primero analiza cómo se relacionan las fuentes (solo nombres, tipos y conteos de columnas, nunca filas) y
+   después propone el diseño; lo que invente se descarta. Sin IA hay un diseño básico. Antes de guardar se muestra la
+   revisión de calidad: lo que es error bloquea, lo que es aviso no. */
 
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
 import { useContenido, useCrearItem, useGuardarContenido } from "../udrive/datos";
+import { CONJUNTOS, GRUPOS, agrupar } from "./conjuntos";
 import {
-  DIMENSIONES,
   detectarHallazgos,
   fuentePorId,
   fuentesDe,
   hayErrores,
   MEDIDAS,
+  medidaPorId,
+  medidasAutomaticas,
   medidasRecomendadas,
   modeloVacio,
   noDisponible,
   PLANTILLAS,
   PUBLICOS,
+  registrarMedidas,
   revisarModelo,
-  type DimensionId,
+  type MedidaBI,
   type ModeloBI,
   type PaginaBI,
   type PublicoId,
@@ -29,10 +36,21 @@ import {
   type VisualBI,
 } from "./modelo";
 import { mensajeDe, type Cobertura } from "./store";
-import { dimensionesDeMedida, leerModelo, modeloParaGuardar, nombreDimension, proponerTablero, useEstadoPiloTableros } from "./tablerosDatos";
+import {
+  analizarRelacionesPilo,
+  armarPedidoRelaciones,
+  dimensionesDeMedida,
+  leerModelo,
+  modeloParaGuardar,
+  nombreDimension,
+  proponerTablero,
+  useDatosFuentes,
+  useEstadoPiloTableros,
+} from "./tablerosDatos";
 import type { Contexto } from "./Warehouse";
 
 const nuevoId = () => crypto.randomUUID().slice(0, 8);
+const MAX_FUENTES = 12;
 const TIPOS_VISUAL: { id: TipoVisual; nombre: string }[] = [
   { id: "kpi", nombre: "Cifras clave" },
   { id: "barras", nombre: "Barras" },
@@ -41,11 +59,13 @@ const TIPOS_VISUAL: { id: TipoVisual; nombre: string }[] = [
   { id: "tabla", nombre: "Tabla" },
   { id: "narrativa", nombre: "Lectura de Pilo" },
 ];
-const DIM_PREFERIDAS: DimensionId[] = ["programa", "departamento", "materia", "jornada", "docente"];
+const DIM_PREFERIDAS = ["programa", "departamento", "materia", "jornada", "docente"];
+const nombreMedida = (id: string) => medidaPorId(id)?.nombre ?? id;
+const nombreFuente = (id: string) => fuentePorId(id)?.nombre ?? id;
 
 /** El diseño que no necesita IA: cifras clave, barras de las dos primeras medidas y su evolución. */
 export function disenoBasico(medidas: string[]): PaginaBI[] {
-  const lista = MEDIDAS.filter((m) => medidas.includes(m.id));
+  const lista = medidas.map((id) => medidaPorId(id)).filter((x): x is MedidaBI => Boolean(x));
   if (!lista.length) return [];
   const visuales: VisualBI[] = [{ id: nuevoId(), tipo: "kpi", titulo: "Cifras clave", medidas: lista.slice(0, 3).map((m) => m.id), dimensiones: [] }];
   for (const m of lista.slice(0, 2)) {
@@ -71,35 +91,76 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
   const [m, setM] = useState<ModeloBI>(inicial);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [pensando, setPensando] = useState(false);
+  const [analizando, setAnalizando] = useState(false);
+  const [falloAnalisis, setFalloAnalisis] = useState("");
   const [notasPilo, setNotasPilo] = useState<string[]>([]);
+  const [busca, setBusca] = useState("");
   const pilo = useEstadoPiloTableros();
   const crear = useCrearItem();
   const guardar = useGuardarContenido();
 
   const cambiar = (c: Partial<ModeloBI>) => setM((x) => ({ ...x, ...c }));
-  const fuentesPosibles = useMemo(() => {
-    const ids = new Set<string>();
-    for (const med of MEDIDAS) fuentesDe(med.calculo).forEach((f) => ids.add(f));
-    return [...ids].map((f) => fuentePorId(f)).filter((f): f is NonNullable<typeof f> => Boolean(f));
-  }, []);
   const hayCarga = (f: string) => cobertura.some((c) => c.conjunto === f && c.sede === ctx.sede);
-  const hallazgos = useMemo(() => detectarHallazgos(m.fuentes, {}).filter((h) => h.requiereAprobacion), [m.fuentes]);
-  const calidad = useMemo(() => revisarModelo(m), [m]);
+  const datos = useDatosFuentes(m.fuentes, cobertura, ctx.sede);
+
+  // Las medidas automáticas salen del perfil de cada fuente; las que el tablero ya guardó se conservan aunque falte la carga.
+  const propias = useMemo(() => {
+    const salida = new Map<string, MedidaBI>();
+    for (const x of m.medidasPropias ?? []) if (m.fuentes.includes(fuentesDe(x.calculo)[0] ?? "")) salida.set(x.id, x);
+    for (const f of m.fuentes) {
+      const perfil = datos.perfiles[f];
+      if (perfil) for (const x of medidasAutomaticas(f, nombreFuente(f), perfil)) salida.set(x.id, x);
+    }
+    return [...salida.values()];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m.fuentes, m.medidasPropias, datos.perfiles]);
+  useMemo(() => registrarMedidas(propias), [propias]);
+  const modelo: ModeloBI = useMemo(() => ({ ...m, medidasPropias: propias }), [m, propias]);
+
+  const hallazgos = useMemo(() => detectarHallazgos(m.fuentes, datos.perfiles).filter((h) => h.requiereAprobacion), [m.fuentes, datos.perfiles]);
+  const calidad = useMemo(() => revisarModelo(modelo, datos.perfiles), [modelo, datos.perfiles]);
   const bloqueado = hayErrores(calidad) || !m.nombre.trim() || !m.pregunta.trim();
 
-  // Quitar una fuente deja sin efecto lo que dependía de ella.
+  const grupos = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return agrupar(CONJUNTOS.filter((c) => !q || `${c.nombre} ${c.id}`.toLowerCase().includes(q)));
+  }, [busca]);
+
+  // Quitar una fuente deja sin efecto lo que dependía de ella, y el análisis de relaciones ya no vale.
   const alternarFuente = (f: string) => {
+    if (!m.fuentes.includes(f) && m.fuentes.length >= MAX_FUENTES) {
+      setAviso({ tipo: "error", texto: `Se pueden cruzar hasta ${MAX_FUENTES} fuentes en un tablero.` });
+      return;
+    }
+    setAviso(null);
     const fuentes = m.fuentes.includes(f) ? m.fuentes.filter((x) => x !== f) : [...m.fuentes, f];
-    const medidas = m.medidas.filter((mid) => {
-      const med = MEDIDAS.find((x) => x.id === mid);
-      return med && fuentesDe(med.calculo).every((x) => fuentes.includes(x));
+    const sigue = (mid: string) => {
+      const med = medidaPorId(mid);
+      return Boolean(med) && fuentesDe(med!.calculo).every((x) => fuentes.includes(x));
+    };
+    setM((x) => {
+      const medidas = x.medidas.filter(sigue);
+      return { ...x, fuentes, medidas, analisis: undefined, paginas: x.paginas.map((p) => ({ ...p, visuales: p.visuales.filter((v) => v.medidas.every((mid) => medidas.includes(mid))) })) };
     });
-    setM((x) => ({ ...x, fuentes, medidas, paginas: x.paginas.map((p) => ({ ...p, visuales: p.visuales.filter((v) => v.medidas.every((mid) => medidas.includes(mid))) })) }));
   };
   const alternarRegla = (r: TipoRegla) => cambiar({ reglas: m.reglas.includes(r) ? m.reglas.filter((x) => x !== r) : [...m.reglas, r] });
   const alternarMedida = (mid: string) => cambiar({ medidas: m.medidas.includes(mid) ? m.medidas.filter((x) => x !== mid) : [...m.medidas, mid] });
 
-  const usables = MEDIDAS.filter((x) => noDisponible(x, m.fuentes, m.reglas) === null);
+  const catalogo = MEDIDAS.filter((x) => fuentesDe(x.calculo).every((f) => m.fuentes.includes(f)));
+  const usables = [...catalogo.filter((x) => noDisponible(x, m.fuentes, m.reglas) === null), ...propias];
+
+  const analizar = async () => {
+    setAnalizando(true);
+    setFalloAnalisis("");
+    try {
+      const r = await analizarRelacionesPilo(armarPedidoRelaciones(m.pregunta, m.fuentes, datos.perfiles));
+      cambiar({ analisis: r.analisis });
+    } catch (e) {
+      setFalloAnalisis(mensajeDe(e));
+    } finally {
+      setAnalizando(false);
+    }
+  };
 
   const pedirAPilo = async () => {
     setPensando(true);
@@ -108,8 +169,9 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
       const r = await proponerTablero({
         pregunta: m.pregunta,
         publico: PUBLICOS[m.publico],
-        fuentes: m.fuentes.map((f) => fuentePorId(f)?.nombre ?? f),
-        medidas: usables.map((x) => ({ id: x.id, nombre: x.nombre, descripcion: x.descripcion, dimensiones: dimensionesDeMedida(x.id) })),
+        fuentes: m.fuentes.map(nombreFuente),
+        contexto: m.analisis?.resumen,
+        medidas: usables.slice(0, 90).map((x) => ({ id: x.id, nombre: x.nombre, descripcion: x.descripcion, dimensiones: dimensionesDeMedida(x.id) })),
       });
       const p = r.propuesta;
       setM((x) => ({
@@ -129,7 +191,7 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
 
   const guardarTablero = async () => {
     setAviso(null);
-    const contenido = modeloParaGuardar(m);
+    const contenido = modeloParaGuardar(modelo);
     try {
       if (id) {
         await guardar.mutateAsync({ id, contenido });
@@ -151,6 +213,9 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
       return JSON.stringify(limpias) === JSON.stringify(x.paginas) ? x : { ...x, paginas: limpias };
     });
   }, [m.medidas]);
+
+  const piloListo = pilo.data?.ai !== false && !pilo.error;
+  const a = m.analisis;
 
   return (
     <div className="wh-pila">
@@ -185,65 +250,202 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
       <section className="wh-panel" aria-labelledby="ct-2">
         <div className="wh-panel__cabeza">
           <h2 id="ct-2">2. Las fuentes</h2>
-          <span className="wh-muted">Se cruzan por periodo, programa, materia… no fila contra fila.</span>
+          <span className="wh-muted">
+            {m.fuentes.length} de {MAX_FUENTES} elegidas. Todo el catálogo sirve: se cruzan por periodo, programa, materia… no fila contra fila.
+          </span>
         </div>
-        <div className="wh-panel__cuerpo wh-fila" role="group" aria-label="Fuentes del Warehouse">
-          {fuentesPosibles.map((f) => (
-            <button key={f.id} type="button" className="wh-chip" aria-pressed={m.fuentes.includes(f.id)} onClick={() => alternarFuente(f.id)} title={f.grano}>
-              {f.nombre}
-              {!hayCarga(f.id) ? " · sin carga en esta sede" : ""}
-            </button>
+        <div className="wh-panel__cuerpo wh-pila">
+          <div className="wh-fila">
+            <label className="wh-campo">
+              <span className="sr-only">Buscar un reporte</span>
+              <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar un reporte del catálogo…" aria-label="Buscar un reporte del catálogo" />
+            </label>
+            {m.fuentes.length > 0 && (
+              <button type="button" className="button-secondary" onClick={() => setM((x) => ({ ...x, fuentes: [], medidas: [], analisis: undefined, paginas: [] }))}>
+                Quitar todas
+              </button>
+            )}
+          </div>
+          {grupos.map((g) => (
+            <div key={g.grupo}>
+              <h3 className="wh-grupo">
+                {GRUPOS[g.grupo].nombre}
+                <small> · {GRUPOS[g.grupo].detalle}</small>
+              </h3>
+              <div className="wh-fila" role="group" aria-label={GRUPOS[g.grupo].nombre}>
+                {g.conjuntos.map((c) => (
+                  <button key={c.id} type="button" className="wh-chip" aria-pressed={m.fuentes.includes(c.id)} onClick={() => alternarFuente(c.id)} title={fuentePorId(c.id)?.grano}>
+                    {c.nombre}
+                    {!hayCarga(c.id) ? " · sin carga aquí" : ""}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
+          {grupos.length === 0 && <p className="wh-muted">Ningún reporte coincide con la búsqueda.</p>}
         </div>
       </section>
 
-      {hallazgos.length > 0 && (
-        <section className="wh-panel" aria-labelledby="ct-3">
-          <div className="wh-panel__cabeza">
-            <h2 id="ct-3">3. Reconstrucciones por aprobar</h2>
-            <span className="wh-muted">Cambian cómo se leen los datos: las aprueba una persona.</span>
-          </div>
-          <div className="wh-panel__cuerpo wh-reglas">
-            {hallazgos.map((h) => (
-              <div key={h.id} className="wh-regla">
-                <label>
-                  <input type="checkbox" checked={m.reglas.includes(h.id)} onChange={() => alternarRegla(h.id)} /> {h.titulo}
-                </label>
-                <small>{h.detalle}</small>
-                <small>{h.accion}</small>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="wh-panel" aria-labelledby="ct-4">
+      <section className="wh-panel" aria-labelledby="ct-3">
         <div className="wh-panel__cabeza">
-          <h2 id="ct-4">4. Las medidas</h2>
-          <button type="button" className="button-secondary" disabled={!m.fuentes.length} onClick={() => cambiar({ medidas: medidasRecomendadas(m.fuentes, m.reglas) })}>
-            Marcar las recomendadas
+          <h2 id="ct-3">3. Cómo se relacionan</h2>
+          <button type="button" className="button-primary" disabled={analizando || datos.cargando || m.fuentes.length < 2 || !piloListo} onClick={() => void analizar()}>
+            {analizando ? "Pilo está analizando…" : a ? "Analizar de nuevo" : "Que Pilo analice las relaciones"}
           </button>
         </div>
         <div className="wh-panel__cuerpo wh-pila">
-          {m.fuentes.length === 0 && <p className="wh-muted">Elija al menos una fuente para ver qué se puede medir.</p>}
-          {[...new Set(MEDIDAS.map((x) => x.carpeta))].map((carpeta) => (
-            <div key={carpeta}>
-              <h3 className="wh-grupo">{carpeta}</h3>
+          {m.fuentes.length === 0 && <p className="wh-muted">Elija las fuentes y Pilo revisará cómo se unen entre sí.</p>}
+          {m.fuentes.length === 1 && <p className="wh-muted">Con una sola fuente no hay relaciones que revisar. Pase a las medidas.</p>}
+          {m.fuentes.length >= 2 && (
+            <p className="wh-nota-chica wh-muted">Pilo solo recibe los nombres, tipos y conteos de las columnas de cada fuente. Nunca recibe filas ni valores.</p>
+          )}
+          {datos.sinCarga.length > 0 && (
+            <p className="wh-aviso wh-aviso--ambar">
+              No hay carga en esta sede de: {datos.sinCarga.map(nombreFuente).join(", ")}. De ellas Pilo solo conoce las columnas confirmadas y no se arman medidas automáticas. Cárguelas en la sección Cargas.
+            </p>
+          )}
+          {datos.errores.length > 0 && <p className="wh-aviso wh-aviso--ambar">No se pudo leer el perfil de alguna fuente: {datos.errores[0]}</p>}
+          {!piloListo && m.fuentes.length >= 2 && <p className="wh-aviso wh-aviso--ambar">Pilo no está disponible ahora ({pilo.data?.motivo ?? (pilo.error ? mensajeDe(pilo.error) : "sin IA configurada")}). Puede seguir: las reconstrucciones que detecta la aplicación están abajo.</p>}
+          {falloAnalisis && (
+            <p className="wh-aviso wh-aviso--rojo" role="alert">
+              {falloAnalisis}
+            </p>
+          )}
+          {datos.cargando && <p className="wh-muted">Leyendo el perfil de las fuentes…</p>}
+
+          {a && (
+            <>
+              <p>{a.resumen}</p>
+              {a.relaciones.length > 0 && (
+                <div className="wh-tabla-envuelta">
+                  <table className="wh-tabla">
+                    <thead>
+                      <tr>
+                        <th scope="col">Desde</th>
+                        <th scope="col">Hacia</th>
+                        <th scope="col">Tipo</th>
+                        <th scope="col">Calidad</th>
+                        <th scope="col">Nota</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {a.relaciones.map((r, i) => (
+                        <tr key={i}>
+                          <td>
+                            {nombreFuente(r.desde.fuente)} <span className="wh-mono">{r.desde.columna}</span>
+                          </td>
+                          <td>
+                            {nombreFuente(r.hacia.fuente)} <span className="wh-mono">{r.hacia.columna}</span>
+                          </td>
+                          <td>{r.tipo}</td>
+                          <td>
+                            <span className="wh-etiqueta" data-t={r.calidad === "alta" ? "listo" : r.calidad === "media" ? "sin_politica" : "sin_har"}>
+                              {r.calidad}
+                            </span>
+                          </td>
+                          <td>{r.nota}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {a.aisladas.length > 0 && <p className="wh-aviso wh-aviso--ambar">Sin relación con las demás: {a.aisladas.map(nombreFuente).join(", ")}. Se pueden usar, pero no se cruzan con el resto.</p>}
+              {a.riesgos.length > 0 && (
+                <div>
+                  <h3 className="wh-grupo">Cuidado con</h3>
+                  <ul>
+                    {a.riesgos.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {a.avisos.map((x, i) => (
+                <p key={i} className="wh-aviso wh-aviso--ambar">
+                  {x}
+                </p>
+              ))}
+            </>
+          )}
+
+          {hallazgos.length > 0 && (
+            <div>
+              <h3 className="wh-grupo">
+                Reconstrucciones por aprobar<small> · cambian cómo se leen los datos: las aprueba una persona</small>
+              </h3>
               <div className="wh-reglas">
-                {MEDIDAS.filter((x) => x.carpeta === carpeta).map((x) => {
-                  const razon = noDisponible(x, m.fuentes, m.reglas);
+                {hallazgos.map((h) => {
+                  const sugerida = a?.reglas.find((r) => r.regla === h.id);
                   return (
-                    <div key={x.id} className={razon ? "wh-regla wh-regla--bloqueada" : "wh-regla"}>
+                    <div key={h.id} className="wh-regla">
                       <label>
-                        <input type="checkbox" disabled={razon !== null} checked={m.medidas.includes(x.id)} onChange={() => alternarMedida(x.id)} /> {x.nombre}
+                        <input type="checkbox" checked={m.reglas.includes(h.id)} onChange={() => alternarRegla(h.id)} /> {h.titulo}
                       </label>
-                      <small>{razon ?? x.descripcion}</small>
+                      <small>{h.detalle}</small>
+                      {sugerida && <small>Pilo la recomienda: {sugerida.motivo}</small>}
+                      <small>{h.accion}</small>
                     </div>
                   );
                 })}
               </div>
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="wh-panel" aria-labelledby="ct-4">
+        <div className="wh-panel__cabeza">
+          <h2 id="ct-4">4. Las medidas</h2>
+          <button type="button" className="button-secondary" disabled={!m.fuentes.length} onClick={() => cambiar({ medidas: [...new Set([...medidasRecomendadas(m.fuentes, m.reglas), ...(m.medidas.filter((x) => x.startsWith("auto:")))])] })}>
+            Marcar las recomendadas
+          </button>
+        </div>
+        <div className="wh-panel__cuerpo wh-pila">
+          {m.fuentes.length === 0 && <p className="wh-muted">Elija al menos una fuente para ver qué se puede medir.</p>}
+          {[...new Set(catalogo.map((x) => x.carpeta))].map((carpeta) => (
+            <div key={carpeta}>
+              <h3 className="wh-grupo">{carpeta}</h3>
+              <div className="wh-reglas">
+                {catalogo
+                  .filter((x) => x.carpeta === carpeta)
+                  .map((x) => {
+                    const razon = noDisponible(x, m.fuentes, m.reglas);
+                    return (
+                      <div key={x.id} className={razon ? "wh-regla wh-regla--bloqueada" : "wh-regla"}>
+                        <label>
+                          <input type="checkbox" disabled={razon !== null} checked={m.medidas.includes(x.id)} onChange={() => alternarMedida(x.id)} /> {x.nombre}
+                        </label>
+                        <small>{razon ?? x.descripcion}</small>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
           ))}
+          {m.fuentes.map((f) => {
+            const lista = propias.filter((x) => fuentesDe(x.calculo)[0] === f);
+            if (!lista.length) return null;
+            const elegidas = lista.filter((x) => m.medidas.includes(x.id)).length;
+            return (
+              <details key={f} open={elegidas > 0}>
+                <summary>
+                  Automáticas de {nombreFuente(f)} ({lista.length}
+                  {elegidas ? `, ${elegidas} elegidas` : ""})
+                </summary>
+                <div className="wh-reglas" style={{ marginTop: 10 }}>
+                  {lista.map((x) => (
+                    <div key={x.id} className="wh-regla">
+                      <label>
+                        <input type="checkbox" checked={m.medidas.includes(x.id)} onChange={() => alternarMedida(x.id)} /> {x.nombre}
+                      </label>
+                      <small>{x.descripcion}</small>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            );
+          })}
         </div>
       </section>
 
@@ -251,7 +453,7 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
         <div className="wh-panel__cabeza">
           <h2 id="ct-5">5. El diseño</h2>
           <div className="wh-fila">
-            <button type="button" className="button-primary" disabled={pensando || m.pregunta.trim().length < 8 || usables.length === 0 || pilo.data?.ai === false} onClick={() => void pedirAPilo()}>
+            <button type="button" className="button-primary" disabled={pensando || m.pregunta.trim().length < 8 || usables.length === 0 || !piloListo} onClick={() => void pedirAPilo()}>
               {pensando ? "Pilo está diseñando…" : "Que Pilo lo proponga"}
             </button>
             <button type="button" className="button-secondary" disabled={m.medidas.length === 0} onClick={() => cambiar({ paginas: disenoBasico(m.medidas) })}>
@@ -260,8 +462,7 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
           </div>
         </div>
         <div className="wh-panel__cuerpo wh-pila">
-          {pilo.data?.ai === false && <p className="wh-aviso wh-aviso--ambar">Pilo no está disponible ahora ({pilo.data.motivo ?? "sin IA configurada"}). Use el diseño básico y ajústelo a mano.</p>}
-          {pilo.error && <p className="wh-aviso wh-aviso--ambar">{mensajeDe(pilo.error)} El diseño básico sigue disponible.</p>}
+          {!piloListo && <p className="wh-aviso wh-aviso--ambar">Pilo no está disponible ahora ({pilo.data?.motivo ?? (pilo.error ? mensajeDe(pilo.error) : "sin IA configurada")}). Use el diseño básico y ajústelo a mano.</p>}
           {notasPilo.map((n, i) => (
             <p key={i} className="wh-aviso">
               {n}
@@ -316,15 +517,16 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
 
 function Pagina({ pagina, medidas, onChange, onQuitar }: { pagina: PaginaBI; medidas: string[]; onChange: (p: PaginaBI) => void; onQuitar: () => void }) {
   const [nuevo, setNuevo] = useState<{ tipo: TipoVisual; medida: string; dim1: string; dim2: string }>({ tipo: "barras", medida: medidas[0] ?? "", dim1: "", dim2: "" });
-  const dimsDe = dimensionesDeMedida(nuevo.medida);
+  const medidaActual = medidas.includes(nuevo.medida) ? nuevo.medida : (medidas[0] ?? "");
+  const dimsDe = dimensionesDeMedida(medidaActual);
   const necesita = nuevo.tipo === "barras" || nuevo.tipo === "tabla" ? 1 : nuevo.tipo === "calor" ? 2 : 0;
-  const puede = nuevo.tipo === "narrativa" || (Boolean(nuevo.medida) && (necesita < 1 || Boolean(nuevo.dim1)) && (necesita < 2 || (Boolean(nuevo.dim2) && nuevo.dim2 !== nuevo.dim1)));
+  const puede = nuevo.tipo === "narrativa" || (Boolean(medidaActual) && (necesita < 1 || Boolean(nuevo.dim1)) && (necesita < 2 || (Boolean(nuevo.dim2) && nuevo.dim2 !== nuevo.dim1)));
 
   const agregar = () => {
-    const dims = [nuevo.dim1, nuevo.dim2].slice(0, necesita).filter(Boolean) as DimensionId[];
-    const nombre = MEDIDAS.find((x) => x.id === nuevo.medida)?.nombre ?? "";
+    const dims = [nuevo.dim1, nuevo.dim2].slice(0, necesita).filter(Boolean);
+    const nombre = nombreMedida(medidaActual);
     const titulo = nuevo.tipo === "narrativa" ? "Qué dicen las cifras" : nuevo.tipo === "kpi" ? nombre : nuevo.tipo === "lineas" ? `${nombre} por periodo` : `${nombre} por ${dims.map((d) => nombreDimension(d).toLowerCase()).join(" y ")}`;
-    onChange({ ...pagina, visuales: [...pagina.visuales, { id: nuevoId(), tipo: nuevo.tipo, titulo, medidas: nuevo.tipo === "narrativa" ? [] : [nuevo.medida], dimensiones: nuevo.tipo === "narrativa" ? [] : dims }] });
+    onChange({ ...pagina, visuales: [...pagina.visuales, { id: nuevoId(), tipo: nuevo.tipo, titulo, medidas: nuevo.tipo === "narrativa" ? [] : [medidaActual], dimensiones: nuevo.tipo === "narrativa" ? [] : dims }] });
   };
   const max = PLANTILLAS[pagina.plantilla].maxVisuales;
 
@@ -343,12 +545,14 @@ function Pagina({ pagina, medidas, onChange, onQuitar }: { pagina: PaginaBI; med
           Quitar página
         </button>
       </div>
-      <small>{PLANTILLAS[pagina.plantilla].descripcion} Hasta {max} visuales; hay {pagina.visuales.length}.</small>
+      <small>
+        {PLANTILLAS[pagina.plantilla].descripcion} Hasta {max} visuales; hay {pagina.visuales.length}.
+      </small>
       {pagina.visuales.map((v, i) => (
         <div key={v.id} className="wh-fila">
           <span className="wh-etiqueta">{TIPOS_VISUAL.find((t) => t.id === v.tipo)?.nombre}</span>
           <input className="wh-texto" aria-label="Título del visual" value={v.titulo} maxLength={120} onChange={(e) => onChange({ ...pagina, visuales: pagina.visuales.map((x, j) => (j === i ? { ...x, titulo: e.target.value } : x)) })} />
-          <small className="wh-muted">{[...v.medidas.map((id) => MEDIDAS.find((x) => x.id === id)?.nombre ?? id), ...v.dimensiones.map((d) => DIMENSIONES[d].nombre)].join(" · ")}</small>
+          <small className="wh-muted">{[...v.medidas.map(nombreMedida), ...v.dimensiones.map(nombreDimension)].join(" · ")}</small>
           <button type="button" className="button-secondary" aria-label={`Quitar «${v.titulo}»`} onClick={() => onChange({ ...pagina, visuales: pagina.visuales.filter((_, j) => j !== i) })}>
             <Icon name="trash" size={14} />
           </button>
@@ -363,10 +567,10 @@ function Pagina({ pagina, medidas, onChange, onQuitar }: { pagina: PaginaBI; med
           ))}
         </select>
         {nuevo.tipo !== "narrativa" && (
-          <select className="wh-select" aria-label="Medida" value={nuevo.medida} onChange={(e) => setNuevo({ ...nuevo, medida: e.target.value, dim1: "", dim2: "" })}>
-            {medidas.map((id) => (
-              <option key={id} value={id}>
-                {MEDIDAS.find((x) => x.id === id)?.nombre ?? id}
+          <select className="wh-select" aria-label="Medida" value={medidaActual} onChange={(e) => setNuevo({ ...nuevo, medida: e.target.value, dim1: "", dim2: "" })}>
+            {medidas.map((mid) => (
+              <option key={mid} value={mid}>
+                {nombreMedida(mid)}
               </option>
             ))}
           </select>
@@ -384,11 +588,13 @@ function Pagina({ pagina, medidas, onChange, onQuitar }: { pagina: PaginaBI; med
         {necesita >= 2 && (
           <select className="wh-select" aria-label="Y por" value={nuevo.dim2} onChange={(e) => setNuevo({ ...nuevo, dim2: e.target.value })}>
             <option value="">Y por…</option>
-            {dimsDe.filter((d) => d !== nuevo.dim1).map((d) => (
-              <option key={d} value={d}>
-                {nombreDimension(d)}
-              </option>
-            ))}
+            {dimsDe
+              .filter((d) => d !== nuevo.dim1)
+              .map((d) => (
+                <option key={d} value={d}>
+                  {nombreDimension(d)}
+                </option>
+              ))}
           </select>
         )}
         <button type="button" className="button-secondary" disabled={!puede} onClick={agregar}>

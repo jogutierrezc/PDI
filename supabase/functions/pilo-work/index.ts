@@ -373,6 +373,10 @@ Deno.serve(async (request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !anonKey || !serviceKey) return json({ error: "Falta la configuración del servidor." }, 500);
   const token = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  // Tiempos por fase, a los registros del contenedor (sin contenidos): dicen dónde se atasca un pedido.
+  const t0 = Date.now();
+  let accionT = "?";
+  const traza = (fase: string) => console.log(`[pilo-work] ${accionT} ${fase} +${Date.now() - t0}ms`);
   if (!token) return json({ error: "Inicie sesión para usar Pilo at Work.", code: "sesion" }, 401);
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
@@ -388,6 +392,8 @@ Deno.serve(async (request) => {
     return json({ error: "El pedido no se entiende." }, 400);
   }
   const action = typeof body?.action === "string" ? body.action : Array.isArray(body?.messages) ? "chat" : "";
+  accionT = action || "?";
+  traza("sesión y cuerpo leídos");
 
   // Las dos acciones de administración de Planeación (/admin/pilo-work) no piden rol de Pilo at Work: las valida el rol del portal.
   const { data: rol } = await mine.rpc("pw_mi_nivel"); // pw_mi_rol o «invitado» (0261)
@@ -401,6 +407,7 @@ Deno.serve(async (request) => {
   }
   const cfg = await leerConfig(admin);
   const destinos = await leerProveedores(admin, cfg);
+  traza("rol, configuración e IA leídos");
   if (action === "estado") return json({ rol, ia: Boolean(destinos.principal), funciones: cfg.funciones });
 
   /* Administración de Planeación (rol admin del portal): estado del enrutamiento y prueba de conexión. */
@@ -531,11 +538,15 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
             }
           };
           // SIEMPRE se emite un cierre (RUN_FINISHED o RUN_ERROR), una sola vez.
-          const terminar = (error: string | null, finishReason = "stop") => {
+          // Una ronda que deja herramientas DEL NAVEGADOR sin responder cierra como «stop» con esas llamadas en
+          // `pendingToolCallIds`: así el cliente las ejecuta y vuelve con el resultado. Con finishReason «tool_calls»
+          // @tanstack/ai-client cree que el servidor seguirá hablando en el mismo flujo y se queda esperando («pensando»).
+          const terminar = (error: string | null, finishReason = "stop", pendientesCliente: string[] = []) => {
             if (cerrado) return;
             if (error) falloMsg = error;
+            traza(error ? `cierre con error: ${error.slice(0, 120)}` : `cierre ${finishReason}`);
             if (error) send({ type: "RUN_ERROR", message: error, code: "pilo_work" });
-            else send({ type: "RUN_FINISHED", threadId, runId, finishReason });
+            else send({ type: "RUN_FINISHED", threadId, runId, finishReason, ...(pendientesCliente.length ? { outcome: { type: "success", pendingToolCallIds: pendientesCliente } } : {}) });
             cerrado = true;
             try {
               controller.close();
@@ -555,6 +566,7 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
                 { messages: trabajo, temperature: 0.3, max_tokens: nivel === "capacidad" ? Math.max(cfg.max_tokens, 3000) : cfg.max_tokens, stream: true, tools: herramientas },
                 { signal: request.signal, nivel, primerMs },
               );
+              traza(`ronda ${ronda + 1}: ${uso ? `${uso.proveedor}/${uso.modelo} empezó a responder` : `el modelo no respondió (${error})`}`);
               if (!response?.body || !uso) return terminar(error || "El modelo no respondió.");
               usoUltimo = uso;
               // Aviso discreto: qué modelo responde (y por qué cambió, si cambió). El chip lo muestra.
@@ -607,6 +619,7 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
               }
               if (abierto) send({ type: "TEXT_MESSAGE_END", messageId });
               const pendientes = [...llamadas.values()].filter((l) => l.name);
+              traza(`ronda ${ronda + 1}: ${texto.length} caracteres, herramientas: ${pendientes.map((l) => l.name).join(",") || "ninguna"}`);
               if (!pendientes.length) {
                 if (!abierto) {
                   // El modelo no dijo nada: se avisa en vez de dejar un silencio.
@@ -625,13 +638,13 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
                 content: texto,
                 tool_calls: pendientes.map((l) => ({ id: l.id, type: "function", function: { name: l.name, arguments: l.args || "{}" } })),
               });
-              let hayCliente = false;
+              const idsCliente: string[] = [];
               for (const l of pendientes) {
                 send({ type: "TOOL_CALL_START", toolCallId: l.id, toolCallName: l.name, parentMessageId: messageId });
                 send({ type: "TOOL_CALL_ARGS", toolCallId: l.id, delta: l.args || "{}" });
                 send({ type: "TOOL_CALL_END", toolCallId: l.id, toolCallName: l.name });
                 if (!NOMBRES_SERVIDOR.has(l.name)) {
-                  hayCliente = true;
+                  idsCliente.push(l.id);
                   continue;
                 }
                 let args: Any = {};
@@ -670,7 +683,7 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
                 send({ type: "TOOL_CALL_RESULT", messageId: crypto.randomUUID(), toolCallId: l.id, content: contenido, role: "tool" });
               }
               // Si alguna herramienta es del navegador, la ronda sigue allá: el cliente vuelve con el resultado.
-              if (hayCliente) return terminar(null, "tool_calls");
+              if (idsCliente.length) return terminar(null, "stop", idsCliente);
             }
             return terminar(null);
           } catch (e) {

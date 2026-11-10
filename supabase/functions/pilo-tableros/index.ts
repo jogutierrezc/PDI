@@ -6,6 +6,7 @@
      estado    {}                                  → { ok, ai, motivo?, proveedor, modelo }
      proponer  { pedido }                          → { ok, propuesta }   páginas y visuales con medidas del catálogo
      narrar    { cifras }                          → { ok, narracion }   lectura escrita sobre cifras ya calculadas
+     relaciones { pedido }                         → { ok, analisis }    cómo se relacionan las fuentes elegidas (solo perfiles de columnas)
 
    Reglas:
      · Solo con sesión y solo Planeación o más (wh_autorizado).
@@ -20,7 +21,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { elegirProveedor, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts";
 import { AltoProveedor, crearIA } from "../pilo-informes/ia.ts";
-import { leerNarracion, leerPropuesta, mensajesNarrar, mensajesProponer, validarNarrar, validarPedido } from "./propuesta.ts";
+import { leerNarracion, leerPropuesta, leerRelaciones, mensajesNarrar, mensajesProponer, mensajesRelaciones, validarNarrar, validarPedido, validarRelaciones } from "./propuesta.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
 const CORS = {
@@ -31,7 +32,7 @@ const CORS = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 const FUENTE_BITACORA = "Pilo Tableros";
 
-Deno.serve(async (request: Request) => {
+async function atender(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (request.method !== "POST") return json({ error: "Método no permitido." }, 405);
 
@@ -49,7 +50,7 @@ Deno.serve(async (request: Request) => {
     return json({ error: "Cuerpo inválido." }, 400);
   }
   const accion = String(cuerpo.action ?? "");
-  if (!["estado", "proponer", "narrar"].includes(accion)) return json({ error: "Acción desconocida." }, 400);
+  if (!["estado", "proponer", "narrar", "relaciones"].includes(accion)) return json({ error: "Acción desconocida." }, 400);
 
   const authorization = request.headers.get("Authorization") ?? "";
   if (!authorization.startsWith("Bearer ") || authorization.slice(7) === anonKey) return json({ error: "Falta la sesión." }, 401);
@@ -59,6 +60,7 @@ Deno.serve(async (request: Request) => {
 
   const db = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
   const almacen = await db.rpc("wh_autorizado");
+  console.log(`[pilo-tableros] ${accion} wh_autorizado: ${almacen.error ? `error ${almacen.error.code ?? ""} ${almacen.error.message.slice(0, 120)}` : String(almacen.data)}`);
   if (almacen.error) {
     const falta = almacen.error.code === "PGRST202" || /wh_autorizado/.test(almacen.error.message);
     return json({ error: falta ? "Falta aplicar la migración 0155 (Warehouse UDES)." : almacen.error.message, code: falta ? "migracion" : undefined }, 500);
@@ -104,6 +106,17 @@ Deno.serve(async (request: Request) => {
       await bitacora(1, 0, null);
       return json({ ok: true, propuesta: r.valor, ...enUso });
     }
+    if (accion === "relaciones") {
+      const pedido = validarRelaciones(cuerpo.pedido);
+      if (!pedido.ok) return json({ error: pedido.error }, 400);
+      const r = await ia.llamarVerificado(mensajesRelaciones(pedido.valor), 2600, (crudo) => leerRelaciones(crudo, pedido.valor));
+      if (!r.ok) {
+        await bitacora(0, 1, r.error);
+        return json({ error: `Pilo no logró un análisis de relaciones que se apoye en las fuentes: ${r.error}`, code: "verificacion" }, 422);
+      }
+      await bitacora(1, 0, null);
+      return json({ ok: true, analisis: r.valor, ...enUso });
+    }
     const cifras = validarNarrar(cuerpo.cifras);
     if (!cifras.ok) return json({ error: cifras.error }, 400);
     const r = await ia.llamarVerificado(mensajesNarrar(cifras.valor), 1800, (crudo) => leerNarracion(crudo, cifras.valor));
@@ -120,5 +133,16 @@ Deno.serve(async (request: Request) => {
     }
     await bitacora(0, 1, e instanceof Error ? e.message : String(e));
     return json({ error: "No se pudo completar la petición." }, 500);
+  }
+}
+
+// Cualquier fallo interno se registra (sin contenidos) y se devuelve con su motivo, no como un 500 mudo.
+Deno.serve(async (request: Request) => {
+  try {
+    return await atender(request);
+  } catch (e) {
+    const motivo = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    console.error(`[pilo-tableros] fallo interno: ${motivo.slice(0, 300)}`);
+    return json({ error: `Pilo Tableros falló por dentro (${motivo.slice(0, 160)}).`, code: "interno" }, 500);
   }
 });

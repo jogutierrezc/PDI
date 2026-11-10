@@ -13,8 +13,8 @@
 --              (portales/<id>-<sello>/index.html), así que la fila sigue siendo
 --              «archivo con ruta» y la restricción doc_items_source no cambia.
 --
--- El sitio se sirve desde nginx en /portales/<carpeta>/…, que lo lee del bucket
--- y le pone el tipo y la política de seguridad correctos (ver nginx.conf).
+-- El sitio se abre directamente desde el bucket (público, con CORS abierto): sus
+-- enlaces relativos se resuelven bajo la misma carpeta. No hay servidor intermedio.
 -- =============================================================================
 
 alter table public.doc_items

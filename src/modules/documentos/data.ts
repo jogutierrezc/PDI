@@ -222,12 +222,13 @@ export function documentFileUrl(path: string | null | undefined): string | null 
 }
 
 /**
- * La dirección de un microportal: la sirve nginx en /portales/<carpeta>/…, no el
- * bucket, porque Storage entrega el .html como texto y con una política que
- * impide ejecutarlo.
+ * La dirección de un microportal: su página de entrada en el bucket. Los enlaces
+ * relativos del sitio (otras páginas, estilos, imágenes, datos) se resuelven bajo
+ * la misma carpeta, así que no hace falta ningún servidor intermedio. Storage
+ * responde con CORS abierto, que es lo que necesita un sitio aislado.
  */
 export const portalUrl = (item: Pick<DocItem, "siteDir" | "path">): string | null =>
-  item.siteDir && item.path ? `/${item.path}` : null;
+  item.siteDir ? documentFileUrl(item.path) : null;
 
 /** A dónde lleva un documento: su enlace, su microportal o su archivo. */
 export const documentHref = (item: DocItem): string | null =>

@@ -418,6 +418,26 @@ export async function uploadPortalZip(
   };
 }
 
+/**
+ * ¿El servidor entrega la página de entrada como una página web? Algunos
+ * almacenamientos la devuelven como texto o con una política que impide
+ * ejecutarla. Devuelve el motivo si no, o nulo si todo está bien.
+ */
+export async function checkPortalServed(entryPath: string): Promise<string | null> {
+  try {
+    const url = supabase.storage.from(DOC_BUCKET).getPublicUrl(entryPath).data.publicUrl;
+    const response = await fetch(url, { method: "HEAD", cache: "no-store" });
+    if (!response.ok) return `El servidor respondió ${response.status} al pedir la página de entrada.`;
+    const type = (response.headers.get("content-type") ?? "").toLowerCase();
+    if (!type.startsWith("text/html")) return `El servidor entrega la página como «${type || "tipo desconocido"}» y no como página web, así que el navegador la mostraría como texto.`;
+    const policy = response.headers.get("content-security-policy") ?? "";
+    if (/default-src\s+'none'|script-src\s+'none'/i.test(policy)) return "El servidor añade una política de seguridad que impide ejecutar los scripts y estilos del sitio.";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Todos los archivos bajo una carpeta del bucket, bajando por las subcarpetas. */
 async function listPortalFiles(dir: string): Promise<string[]> {
   const out: string[] = [];

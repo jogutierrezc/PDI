@@ -231,8 +231,8 @@ function HtmlView({ url, mobile }: { url: string; mobile: boolean }) {
 /**
  * Un microportal: un sitio entero con sus páginas, estilos y datos. Se abre por su
  * dirección (no con srcDoc) para que sus enlaces relativos funcionen. Sin
- * `allow-same-origin` queda en un origen aparte: no ve la sesión del portal. nginx
- * repite la misma política en la cabecera, por si alguien abre la dirección sola.
+ * `allow-same-origin` queda en un origen aparte: no ve la sesión del portal. Sus
+ * archivos vienen del bucket «documentos», que responde con CORS abierto.
  */
 function PortalView({ url, mobile }: { url: string; mobile: boolean }) {
   return (

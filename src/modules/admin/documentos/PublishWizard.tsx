@@ -38,6 +38,7 @@ import {
   extensionOf,
   formatBytes,
   removeDocFiles,
+  checkPortalServed,
   removePortalDir,
   uploadDocFile,
   uploadPortalZip,
@@ -203,7 +204,7 @@ export function PublishWizard({
   const [saving, setSaving] = useState(false);
   const [dragging, setDragging] = useState(false);
   /** Lo que trajo el .zip de esta sesión (para las comprobaciones). */
-  const [portalInfo, setPortalInfo] = useState<{ files: number; bytes: number } | null>(null);
+  const [portalInfo, setPortalInfo] = useState<{ files: number; bytes: number; warning?: string | null } | null>(null);
 
   const [checks, setChecks] = useState<Check[]>([]);
   const [checksDone, setChecksDone] = useState(false);
@@ -288,7 +289,7 @@ export function PublishWizard({
       portalDirs.current.push(up.dir);
       const flavor = await detectFlavor(up.entryFile);
       setFile(up.entryFile);
-      setPortalInfo({ files: up.fileCount, bytes: up.totalBytes });
+      setPortalInfo({ files: up.fileCount, bytes: up.totalBytes, warning: await checkPortalServed(up.entryPath) });
       setForm((current) => ({
         ...current,
         kind: "archivo",
@@ -498,6 +499,15 @@ export function PublishWizard({
           title: portalInfo ? `${plural(portalInfo.files, "archivo", "archivos")} · ${formatBytes(portalInfo.bytes)}` : "Sitio ya publicado",
           detail: "Entrada: index.html. Los enlaces entre páginas, las imágenes y los estilos del sitio funcionan tal cual, porque se sirven desde su propia carpeta.",
         }),
+      });
+      jobs.push({
+        pending: "Comprobando que el servidor lo entrega bien",
+        run: async () => {
+          const warning = portalInfo?.warning ?? (portalInfo ? null : await checkPortalServed(form.path ?? ""));
+          return warning
+            ? { state: "warn", title: "El servidor no entrega bien el sitio", detail: `${warning} Se puede guardar, pero el sitio no se verá bien hasta que se corrija en el servidor de archivos.` }
+            : { state: "ok", title: "El servidor entrega la página como página web", detail: "Tipo de contenido correcto y sin políticas que bloqueen el sitio." };
+        },
       });
       jobs.push({
         pending: "Revisando el aislamiento",

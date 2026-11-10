@@ -24,13 +24,13 @@ export function Anillo({ logros, retos }: { logros: number; retos: number }) {
   );
 }
 
-/** Cien puntos, los primeros `p` rellenos: qué parte del total se logró. */
-export function Puntos({ p, reto }: { p: number; reto?: boolean }) {
-  const n = Math.max(0, Math.min(100, Math.round(p)));
+/** Una fila de puntos (por defecto 50): los primeros `p` % rellenos, qué parte del total se logró. */
+export function Puntos({ p, reto, n = 50 }: { p: number; reto?: boolean; n?: number }) {
+  const llenos = Math.max(0, Math.min(n, Math.round((p / 100) * n)));
   return (
-    <div className={`lb-puntos${reto ? " r" : ""}`} aria-hidden="true">
-      {Array.from({ length: 100 }, (_, i) => (
-        <b key={i} className={i < n ? "f" : undefined} />
+    <div className={`lb-puntos${reto ? " r" : ""}`} aria-hidden="true" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
+      {Array.from({ length: n }, (_, i) => (
+        <b key={i} className={i < llenos ? "f" : undefined} />
       ))}
     </div>
   );

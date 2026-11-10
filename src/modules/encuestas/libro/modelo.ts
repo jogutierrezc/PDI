@@ -24,7 +24,7 @@ export const MODULOS: readonly { id: IdModulo; nombre: string }[] = [
   { id: "dependencias", nombre: "Logros y retos por dependencia" },
   { id: "retos", nombre: "Retos" },
   { id: "ods", nombre: "Aportes por ODS" },
-  { id: "foco", nombre: "Una dependencia en foco" },
+  { id: "foco", nombre: "Dependencias en resumen" },
   { id: "compromisos", nombre: "Lo que sigue" },
 ];
 export const nombreModulo = (id: IdModulo) => MODULOS.find((m) => m.id === id)?.nombre ?? id;
@@ -41,9 +41,12 @@ export const FORMATOS: Record<Formato, { nombre: string; ancho: number; alto: nu
   a4: { nombre: "A4", ancho: 210, alto: 297 },
 };
 
+/** Recomendación visible: el libro cabe en 5 a 10 páginas, pero el contenido manda (no se recorta). */
 export const MIN_PAGINAS = 5;
 export const MAX_PAGINAS = 10;
 const MIN_MODULOS = 3;
+/** Un texto de página es de una o dos frases. */
+export const MAX_TEXTO = 320;
 export const MAX_MODULOS = 8;
 
 /** Los textos de página: el que escribió una persona o Pilo (editado = true protege lo de la persona). */
@@ -64,7 +67,8 @@ export interface ConfigLibro {
   estado: FiltroEstado;
   /** Dependencias que NO entran (por defecto entran todas). */
   excluidas: string[];
-  foco: string | null;
+  /** Dependencias del módulo «Dependencias en resumen»: null = todas las que tengan aportes. */
+  resumen: string[] | null;
   largo: 1 | 2;
   tono: "i" | "c";
   textos: Record<string, TextoPagina>;
@@ -84,7 +88,7 @@ export const CONFIG_INICIAL: ConfigLibro = {
   portada: { composicion: 1, paleta: "azul", titulo: "Construyamos juntos", subtitulo: "Logros y retos de la UDES en cifras", fecha: "Rendición de Cuentas Institucional 2026", imagen: null, contraImagen: null },
   estado: "video",
   excluidas: [],
-  foco: null,
+  resumen: null,
   largo: 1,
   tono: "i",
   textos: {},
@@ -107,7 +111,7 @@ export function leerConfigLibro(raw: unknown): ConfigLibro {
   if (activas.length < MIN_MODULOS) activas = b.activas;
   const p = esObj(raw.portada) ? raw.portada : {};
   const textos: Record<string, TextoPagina> = {};
-  if (esObj(raw.textos)) for (const [k, v] of Object.entries(raw.textos)) if (esObj(v) && typeof v.t === "string") textos[k.slice(0, 30)] = { t: v.t.slice(0, 900), editado: v.editado === true };
+  if (esObj(raw.textos)) for (const [k, v] of Object.entries(raw.textos)) if (esObj(v) && typeof v.t === "string") textos[k.slice(0, 30)] = { t: v.t.slice(0, MAX_TEXTO), editado: v.editado === true };
   const ods: Record<string, number[]> = {};
   if (esObj(raw.ods)) for (const [k, v] of Object.entries(raw.ods)) if (Array.isArray(v)) ods[k] = [...new Set(v.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 17))].slice(0, 3);
   return {
@@ -128,7 +132,7 @@ export function leerConfigLibro(raw: unknown): ConfigLibro {
     },
     estado: raw.estado === "rev" || raw.estado === "todo" ? raw.estado : "video",
     excluidas: Array.isArray(raw.excluidas) ? (raw.excluidas as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 200) : [],
-    foco: typeof raw.foco === "string" ? raw.foco : null,
+    resumen: Array.isArray(raw.resumen) ? (raw.resumen as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 200) : null,
     largo: raw.largo === 2 ? 2 : 1,
     tono: raw.tono === "c" ? "c" : "i",
     textos,
@@ -137,12 +141,109 @@ export function leerConfigLibro(raw: unknown): ConfigLibro {
   };
 }
 
-/** Las páginas del libro, en orden de lectura: portada, módulos activos, notas si hace falta y contraportada. Siempre un total par. */
-export function paginasDe(cfg: ConfigLibro): IdPagina[] {
-  const mid = cfg.orden.filter((id) => cfg.activas.includes(id));
-  const p: IdPagina[] = ["portada", ...mid];
-  if ((p.length + 1) % 2 === 1) p.push("notas");
-  p.push("contra");
+/* ---------- paginación ----------
+   Cada lista larga se reparte en páginas de continuación con un cálculo determinista: la altura
+   de cada fila está fija en la hoja de estilos (libro.css) y aquí se cuenta cuántas caben. Las
+   medidas están en «u» (1 % del ancho de la hoja), igual que el CSS. Si se cambia una altura en
+   un lado hay que cambiarla en el otro. */
+
+/** Alto de la hoja en u. */
+export const altoU = (f: Formato): number => (100 * FORMATOS[f].alto) / FORMATOS[f].ancho;
+export const MEDIDAS = {
+  /** margen superior e inferior de la hoja */
+  arriba: 6,
+  abajo: 8,
+  /** encabezado, título, texto de Pilo, leyenda y hueco entre bloques */
+  hd: 4.2,
+  ttl: 5.1,
+  nar: 7.2,
+  leg: 2.4,
+  gap: 2.8,
+  /** colchón contra redondeos de la fuente */
+  colchon: 1.5,
+  /** retos: ficha destacada (2 por fila) y fila de lista */
+  ficha: 14.2,
+  fichaGap: 1.8,
+  fila: 5,
+  /** logros destacados: una fila por logro */
+  feat: 11.5,
+  /** dependencias: fila del gráfico de barras y fila de la tabla de cifras; títulos y encabezado de la tabla */
+  dvFila: 3.5,
+  heatFila: 2.9,
+  dvFijo: 12.6,
+  /** dependencias en resumen: una ficha por dependencia */
+  resFila: 7.6,
+} as const;
+
+/** Alto libre (u) para el cuerpo de una página de lista: con o sin el texto de Pilo de la primera página. */
+export function altoLibre(f: Formato, primera: boolean): number {
+  const m = MEDIDAS;
+  const bloques = primera ? 5 : 4;
+  return altoU(f) - m.arriba - m.abajo - m.hd - m.ttl - m.leg - (primera ? m.nar : 0) - (bloques - 1) * m.gap - m.colchon;
+}
+
+export interface Pag {
+  id: IdPagina;
+  /** Número de parte (1 = la primera) y total de partes del módulo. */
+  parte: number;
+  partes: number;
+  /** Elementos de la lista que van en esta página: de `desde` (incluido) a `hasta` (excluido). */
+  desde: number;
+  hasta: number;
+}
+
+/** Reparte n elementos en páginas: la primera con capacidad `c1` y las demás con `c2`. */
+export function repartir(n: number, c1: number, c2: number): [number, number][] {
+  const c = [Math.max(1, Math.floor(c1)), Math.max(1, Math.floor(c2))];
+  const r: [number, number][] = [];
+  let i = 0;
+  do {
+    const cap = r.length === 0 ? c[0] : c[1];
+    r.push([i, Math.min(n, i + cap)]);
+    i += cap;
+  } while (i < n);
+  return r;
+}
+
+/** Los retos que van como ficha destacada en la primera página. */
+export const FICHAS_RETOS = 4;
+export const CIFRAS_RESUMEN = 3;
+
+export function dependenciasResumen(c: Calculo, cfg: ConfigLibro): string[] {
+  return cfg.resumen ? c.deps.filter((d) => cfg.resumen!.some((x) => claveDep(x) === claveDep(d))) : c.deps;
+}
+
+/** Cuántos elementos caben por página en cada módulo con lista. */
+export function capacidades(f: Formato): Record<"retos" | "dependencias" | "foco", [number, number]> & { destacados: number } {
+  const m = MEDIDAS;
+  const l1 = altoLibre(f, true);
+  const l2 = altoLibre(f, false);
+  const fichasAlto = 2 * m.ficha + m.fichaGap;
+  return {
+    destacados: Math.max(3, Math.floor(l1 / m.feat)),
+    retos: [FICHAS_RETOS + Math.max(1, Math.floor((l1 - fichasAlto - m.gap) / m.fila)), Math.floor(l2 / m.fila)],
+    dependencias: [Math.floor((l1 - m.dvFijo) / (m.dvFila + m.heatFila)), Math.floor((l2 - m.dvFijo) / (m.dvFila + m.heatFila))],
+    foco: [Math.floor(l1 / m.resFila), Math.floor(l2 / m.resFila)],
+  };
+}
+
+/** Las páginas del libro, en orden de lectura: portada, módulos activos (con sus continuaciones), notas si hace falta y contraportada. Siempre un total par. */
+export function paginasDe(cfg: ConfigLibro, c: Calculo): Pag[] {
+  const cap = capacidades(cfg.formato);
+  const una = (id: IdPagina): Pag => ({ id, parte: 1, partes: 1, desde: 0, hasta: 0 });
+  const partes = (id: IdPagina, n: number, [c1, c2]: [number, number]): Pag[] => {
+    const r = repartir(n, c1, c2);
+    return r.map(([desde, hasta], i) => ({ id, parte: i + 1, partes: r.length, desde, hasta }));
+  };
+  const p: Pag[] = [una("portada")];
+  for (const id of cfg.orden.filter((x) => cfg.activas.includes(x))) {
+    if (id === "retos") p.push(...partes(id, c.R.length, cap.retos));
+    else if (id === "dependencias") p.push(...partes(id, c.deps.length, cap.dependencias));
+    else if (id === "foco") p.push(...partes(id, dependenciasResumen(c, cfg).length, cap.foco));
+    else p.push(una(id));
+  }
+  if ((p.length + 1) % 2 === 1) p.push(una("notas"));
+  p.push(una("contra"));
   return p;
 }
 
@@ -192,23 +293,62 @@ export function cortoDe(dep: string): string {
   return u.length > 16 ? `${u.slice(0, 15).trim()}.` : u || dep.slice(0, 16);
 }
 
-/** Las dependencias distintas de los aportes, sin repetir por mayúsculas o espacios. */
+const sinTilde = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+/** La clave con la que se reconoce una dependencia: sin tildes, sin mayúsculas, sin signos ni espacios de más. */
+export const claveDep = (d: string): string =>
+  sinTilde(d)
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const PARTICULAS = new Set(["de", "del", "la", "las", "los", "el", "y", "e", "en", "para", "con", "a", "o", "u"]);
+/** Palabras de nombres de oficinas que llevan tilde (se escriben sin ella en los datos). */
+const CON_TILDE: Record<string, string> = Object.fromEntries(
+  [
+    "Vicerrectoría", "Rectoría", "Dirección", "Coordinación", "Administración", "Planeación", "Comunicación", "Comunicaciones", "Educación", "Información", "Tecnología", "Tecnologías",
+    "Gestión", "Académica", "Académico", "Investigación", "Internacionalización", "Extensión", "Proyección", "Evaluación", "Autoevaluación", "Acreditación", "Admisión", "Psicología", "Pedagogía",
+    "Biología", "Química", "Física", "Matemáticas", "Nutrición", "Enfermería", "Odontología", "Ingeniería", "Ingenierías", "Económicas", "Económica", "Jurídicas", "Jurídica", "Políticas", "Política",
+    "Pública", "Públicas", "Relación", "Relaciones", "Secretaría", "Auditoría", "Tesorería", "Contraloría", "Bogotá", "Cúcuta", "Géneros", "Género", "Inclusión", "Innovación", "Formación", "Atención", "Graduación",
+    "Egresados", "Teología", "Filosofía", "Geología", "Sociología", "Antropología", "Metodología", "Comunicación", "Gerontología", "Fonoaudiología", "Kinesiología", "Terapia", "Música", "Ética", "Estadística", "Logística",
+    "Mercadeo", "Cultura", "Cátedra", "Pastoral", "Análisis", "Sostenibilidad", "Bioética", "Bioética", "Cooperación", "Convenios", "Movilidad", "Educación",
+  ].map((w) => [sinTilde(w).toLowerCase(), w]),
+);
+/** Un nombre de oficina con formato único: «VICERRECTORIA DE POSGRADOS» → «Vicerrectoría de Posgrados». */
+export function canonDep(d: string): string {
+  const limpio = d.replace(/\s+/g, " ").trim();
+  return limpio
+    .split(" ")
+    .map((w, i) => {
+      const k = sinTilde(w).toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (CON_TILDE[k]) return w.replace(/[A-Za-zÀ-ÿ]+/, CON_TILDE[k]);
+      if (i > 0 && PARTICULAS.has(k)) return w.toLowerCase();
+      const mayus = w === w.toUpperCase();
+      const minus = w === w.toLowerCase();
+      if (mayus && w.length <= 4 && /^[A-ZÁÉÍÓÚÑ0-9]+$/.test(w) && !PARTICULAS.has(k)) return w; // siglas (UDES, TIC)
+      if (mayus || minus) return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      return w;
+    })
+    .join(" ");
+}
+
+/** Las dependencias distintas de los aportes: las variantes de un mismo nombre cuentan como una sola. */
 export function dependenciasDe(aportes: Aporte[]): string[] {
   const vistas = new Map<string, string>();
   for (const a of aportes) {
-    const d = a.dependencia.replace(/\s+/g, " ").trim();
-    if (d && !vistas.has(d.toLowerCase())) vistas.set(d.toLowerCase(), d);
+    const k = claveDep(a.dependencia);
+    if (k && !vistas.has(k)) vistas.set(k, canonDep(a.dependencia));
   }
   return [...vistas.values()].sort((a, b) => a.localeCompare(b, "es"));
 }
 
-const normDep = (d: string) => d.replace(/\s+/g, " ").trim();
+const normDep = canonDep;
 
 export function filasDe(aportes: Aporte[], cfg: ConfigLibro): Fila[] {
-  const fuera = new Set(cfg.excluidas.map((d) => d.toLowerCase()));
+  const fuera = new Set(cfg.excluidas.map(claveDep));
   return aportes
     .filter((a) => {
-      if (fuera.has(normDep(a.dependencia).toLowerCase())) return false;
+      if (fuera.has(claveDep(a.dependencia))) return false;
       if (a.estado === "rechazado" || a.estado === "descartado") return false;
       if (cfg.estado === "video") return a.estado === "para_video";
       if (cfg.estado === "rev") return a.estado === "revisado" || a.estado === "para_video";
@@ -277,8 +417,20 @@ export function calcular(filas: Fila[]): Calculo {
 /* ---------- formato ---------- */
 
 export const fmtN = (n: number): string => new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(n);
-/** Dinero en pesos: desde un millón se abrevia en millones («$ 480 M»). */
-export const fmtDinero = (v: number): string => (v >= 1_000_000 ? `$ ${fmtN(Math.round(v / 1_000_000))} M` : `$ ${fmtN(v)}`);
+/** Dinero en pesos: desde un millón se dice en millones («$480 millones»). Es la forma que ve el lector y la que recibe Pilo. */
+export const fmtDinero = (v: number): string => (v >= 1_000_000_000 ? `$${fmtN(Math.round(v / 1e8) / 10)} miles de millones` : v >= 1_000_000 ? `$${fmtN(Math.round(v / 1_000_000))} millones` : `$${fmtN(v)}`);
+/** Solo la cifra del dinero, sin la palabra («$480»): para números grandes con la unidad aparte. */
+export const fmtDineroNum = (v: number): string => (v >= 1_000_000_000 ? `$${fmtN(Math.round(v / 1e8) / 10)}` : v >= 1_000_000 ? `$${fmtN(Math.round(v / 1_000_000))}` : `$${fmtN(v)}`);
+/** La unidad que se escribe debajo de la cifra de dinero. */
+export const unidadDinero = (v: number): string => (v >= 1_000_000_000 ? "miles de millones de pesos" : v >= 1_000_000 ? "millones de pesos" : "pesos");
+/** Recorta con puntos suspensivos a un máximo de caracteres, sin cortar una palabra. */
+export function recortar(t: string, max: number): string {
+  const s = t.replace(/\s+/g, " ").trim();
+  if (s.length <= max) return s;
+  const corte = s.slice(0, max - 1);
+  const e = corte.lastIndexOf(" ");
+  return `${(e > max * 0.6 ? corte.slice(0, e) : corte).replace(/[\s,.;:]+$/, "")}…`;
+}
 export const valorDe = (c: Cif): string => (c.tipo === "porcentaje" ? `${fmtN(c.v)} %` : c.tipo === "dinero" ? fmtDinero(c.v) : fmtN(c.v));
 export const principal = (a: Fila): Cif | undefined => a.c.find((c) => c.tipo === "estudiantes") ?? a.c[0];
 
@@ -309,9 +461,9 @@ export function datosDePagina(id: IdPagina, c: Calculo, cfg: ConfigLibro): DatoP
   const d = (etiqueta: string, numero: number, texto = fmtN(numero)): DatoPagina => ({ etiqueta, numero, texto });
   switch (id) {
     case "presentacion":
-      return [d("Dependencias con aportes", c.nd), d("Logros", c.L.length), d("Retos", c.R.length), d("Estudiantes alcanzados por los logros", c.est), d("Programas y proyectos de los logros", c.prog)];
+      return [d("Dependencias con aportes", c.nd), d("Logros", c.L.length), d("Retos", c.R.length), d("Estudiantes alcanzados por los logros", c.est), d("Programas y proyectos de los logros", c.prog), ...(c.din > 0 ? [d("Inversión de los logros", c.din, fmtDinero(c.din))] : [])];
     case "cifras":
-      return [d("Aportes recibidos", c.r.length), d("Cifras reportadas", c.nc), d("Logros", c.L.length), d("Retos", c.R.length), d("Inversión de los logros en pesos", c.din, fmtDinero(c.din))];
+      return [d("Aportes recibidos", c.r.length), d("Cifras reportadas", c.nc), d("Logros", c.L.length), d("Retos", c.R.length), ...(c.din > 0 ? [d("Inversión de los logros", c.din, fmtDinero(c.din))] : []), d("Estudiantes alcanzados por los logros", c.est), d("Programas y proyectos de los logros", c.prog)];
     case "destacados":
       return topLogros(c).flatMap((a) => {
         const f = principal(a);
@@ -326,9 +478,9 @@ export function datosDePagina(id: IdPagina, c: Calculo, cfg: ConfigLibro): DatoP
       return top.map((n) => d(`Aportes del ODS ${n}`, c.ods[n].L + c.ods[n].R));
     }
     case "foco": {
-      const dep = depFoco(c, cfg);
-      const b = dep ? c.byDep[dep] : null;
-      return b ? [d("Logros de la dependencia", b.L), d("Retos de la dependencia", b.R)] : [];
+      const ds = dependenciasResumen(c, cfg);
+      const top = ds.slice().sort((x, y) => c.byDep[y].L + c.byDep[y].R - (c.byDep[x].L + c.byDep[x].R)).slice(0, 3);
+      return [d("Dependencias en el resumen", ds.length), ...top.map((x) => d(`Aportes de ${cortoDe(x)}`, c.byDep[x].L + c.byDep[x].R))];
     }
     case "compromisos":
       return [d("Retos convertidos en compromisos", Math.min(5, c.R.length)), d("Retos reportados", c.R.length)];
@@ -339,7 +491,6 @@ export function datosDePagina(id: IdPagina, c: Calculo, cfg: ConfigLibro): DatoP
   }
 }
 
-export const depFoco = (c: Calculo, cfg: ConfigLibro): string | null => (cfg.foco && c.byDep[cfg.foco] ? cfg.foco : c.deps[0] ?? null);
 
 /** El texto de plantilla de una página (el que se usa mientras Pilo no redacte). */
 export function plantilla(id: IdPagina, c: Calculo, cfg: ConfigLibro): string {
@@ -348,35 +499,30 @@ export function plantilla(id: IdPagina, c: Calculo, cfg: ConfigLibro): string {
   const cer = cfg.tono === "c";
   const razon = R ? fmtN(Math.round((L / R) * 10) / 10) : null;
   const top = odsPrincipales(c);
-  const dep = depFoco(c, cfg);
   const P: Partial<Record<IdPagina, string[]>> = {
     presentacion: [
-      cer ? `Este año ${c.nd} dependencias nos contaron qué lograron y qué falta.` : `En este corte, ${c.nd} dependencias reportaron ${L} logros y ${R} retos.`,
-      cer ? `Juntas llegaron a ${fmtN(c.est)} estudiantes y a ${fmtN(c.prog)} programas y proyectos.` : `Los logros alcanzan a ${fmtN(c.est)} estudiantes y a ${fmtN(c.prog)} programas y proyectos.`,
-      "Este libro reúne lo esencial, con cifras que cada dependencia puede respaldar.",
+      cer ? `${c.nd} dependencias nos contaron ${L} logros y ${R} retos.` : `En este corte, ${c.nd} dependencias reportaron ${L} logros y ${R} retos.`,
+      cer ? `Los logros llegan a ${fmtN(c.est)} estudiantes y a ${fmtN(c.prog)} programas y proyectos.` : `Los logros alcanzan a ${fmtN(c.est)} estudiantes y a ${fmtN(c.prog)} programas y proyectos.`,
     ],
     cifras: [
-      `Recibimos ${c.r.length} aportes con ${c.nc} cifras. Hay ${L} logros y ${R} retos.`,
-      razon ? (cer ? `Por cada reto hay ${razon} logros: vamos bien y todavía falta.` : `La relación es de ${razon} logros por cada reto.`) : "Todavía no hay retos reportados con los filtros actuales.",
-      c.din > 0 ? `Los logros que reportan inversión suman ${fmtDinero(c.din)}.` : "",
+      `Recibimos ${c.r.length} aportes con ${c.nc} cifras: ${L} logros y ${R} retos.`,
+      c.din > 0 ? `Los logros que reportan inversión suman ${fmtDinero(c.din)}.` : razon ? `Hay ${razon} logros por cada reto.` : "",
     ],
-    destacados: ["Estos son los logros que llegan a más personas.", "Cada cifra la reportó la dependencia y está disponible para consulta.", "Los puntos muestran qué parte del total logró cada iniciativa."],
+    destacados: ["Los logros que llegan a más personas.", "Cada cifra la reportó la dependencia."],
     dependencias: [
-      "Cada dependencia reportó logros y retos. A la izquierda lo conseguido, a la derecha lo que falta.",
-      cer ? "La tabla de abajo muestra qué tipo de cifra aportó cada una." : "La tabla inferior indica el tipo de cifra que aportó cada dependencia.",
-      "",
+      `${c.nd} dependencias: a la izquierda lo conseguido, a la derecha lo que falta.`,
+      "La tabla muestra el tipo de cifra que aportó cada una.",
     ],
-    retos: ["Estos retos piden más esfuerzo y decisiones en el próximo año.", cer ? "Los porcentajes indican dónde estamos hoy, no la meta." : "Los porcentajes muestran la situación actual, no la meta.", ""],
+    retos: [`${R} retos que piden más esfuerzo el próximo año.`, "Las cifras muestran la situación actual, no la meta."],
     ods: [
       top.length ? `Los aportes se concentran en los ODS ${top.join(", ")}.` : "Todavía no hay aportes clasificados por ODS. Pida a Pilo que los clasifique.",
-      "Pilo asignó cada aporte a los objetivos que toca y una persona lo confirma.",
-      "",
+      c.clasificados ? `${c.clasificados} de ${c.r.length} aportes quedaron clasificados.` : "",
     ],
-    foco: ["Una mirada de cerca a una dependencia, con sus logros y retos.", dep ? "Cambie la dependencia en foco desde el panel." : "", ""],
-    compromisos: ["Los retos se vuelven compromisos con una dependencia responsable.", "Las fechas son una propuesta de Pilo y cada dependencia las confirma.", ""],
-    contra: [cer ? "Gracias por construir con nosotros. Cada cifra de este libro la puso una dependencia." : "Cada cifra de este libro la reportó una dependencia de la UDES.", "Sigamos construyendo juntos.", ""],
+    foco: [`${dependenciasResumen(c, cfg).length} dependencias, cada una con sus logros, retos y cifras más fuertes.`, "", ""],
+    compromisos: [`Los primeros ${Math.min(12, R)} de ${R} retos, con una dependencia responsable.`, "Las fechas son una propuesta y cada dependencia las confirma."],
+    contra: [cer ? `Gracias a las ${c.nd} dependencias que pusieron ${c.nc} cifras en este libro.` : `${c.nc} cifras de ${c.nd} dependencias de la UDES.`, "Sigamos construyendo juntos."],
   };
-  return (P[id] ?? [""]).slice(0, cfg.largo === 1 ? 2 : 3).filter(Boolean).join(" ");
+  return (P[id] ?? [""]).filter(Boolean).slice(0, cfg.largo === 1 ? 1 : 2).join(" ");
 }
 
 /** El texto que se ve: lo editado o redactado y guardado; si no, la plantilla. */
@@ -409,8 +555,41 @@ export const ODS: readonly { n: number; nombre: string; color: string }[] = [
   { n: 17, nombre: "Alianzas", color: "#19486A" },
 ];
 
-/** ¿Qué texto de aviso corresponde al total de páginas? */
-export function resumenPaginas(cfg: ConfigLibro): { total: number; contenido: number; notas: boolean } {
-  const p = paginasDe(cfg);
-  return { total: p.length, contenido: cfg.activas.length, notas: p.includes("notas") };
+/** Cuántas páginas tiene el libro y si pasa de la recomendación. */
+export function resumenPaginas(paginas: Pag[]): { total: number; notas: boolean; largo: boolean } {
+  return { total: paginas.length, notas: paginas.some((p) => p.id === "notas"), largo: paginas.length > MAX_PAGINAS };
+}
+
+/* ---------- datos de la página «Dependencias en resumen» ---------- */
+
+export interface ResumenDep {
+  dep: string;
+  L: number;
+  R: number;
+  /** Hasta 3 cifras agregadas más fuertes: valor ya formateado y qué mide. */
+  cifras: { v: string; q: string }[];
+  /** El logro (o, si no hay, el reto) con la cifra más grande. */
+  principal: { t: "L" | "R"; ti: string } | null;
+}
+
+export function resumenDe(c: Calculo, dep: string): ResumenDep {
+  const fs = c.r.filter((a) => a.dep === dep);
+  const sum = (tipo: TipoCifra) => fs.filter((a) => a.t === "L").reduce((t, a) => t + a.c.filter((x) => x.tipo === tipo).reduce((u, x) => u + x.v, 0), 0);
+  const est = sum("estudiantes");
+  const prog = sum("programas");
+  const din = sum("dinero");
+  const nc = fs.reduce((t, a) => t + a.c.length, 0);
+  const cifras: { v: string; q: string }[] = [];
+  if (est > 0) cifras.push({ v: fmtN(est), q: "estudiantes" });
+  if (din > 0) cifras.push({ v: fmtDineroNum(din), q: `inversión, ${unidadDinero(din)}` });
+  if (prog > 0) cifras.push({ v: fmtN(prog), q: "programas" });
+  if (cifras.length < CIFRAS_RESUMEN) cifras.push({ v: fmtN(nc), q: "cifras" });
+  const peso = (a: Fila) => {
+    const f = principal(a);
+    return f ? (f.tipo === "estudiantes" ? f.v : f.v * 0.01) : 0;
+  };
+  const mejor = (t: "L" | "R") => fs.filter((a) => a.t === t).sort((a, b) => peso(b) - peso(a))[0];
+  const p = mejor("L") ?? mejor("R");
+  const b = c.byDep[dep];
+  return { dep, L: b?.L ?? 0, R: b?.R ?? 0, cifras: cifras.slice(0, CIFRAS_RESUMEN), principal: p ? { t: p.t, ti: p.ti } : null };
 }

@@ -7,8 +7,9 @@
      · ods     los ODS (1 a 17) a los que contribuye cada aporte.
 
    Verificación: en un texto solo puede haber números que vengan en los datos de esa
-   página (o un año 2025 a 2027). Si Pilo escribe una cifra que no está, la respuesta
-   se rechaza y se le devuelve una vez con el motivo. Esta capa no inventa nada.
+   página (o un año 2025 a 2027), en la forma en que se leen o en una equivalencia segura
+   del mismo valor. Se verifica página por página: la que falla se le devuelve a Pilo una
+   vez con el motivo y, si sigue mal, solo esa página usa la plantilla del panel.
    ========================================================================== */
 
 import { extraerJson, type Lectura, type Mensaje } from "../pilo-rankingsod/logica.ts";
@@ -67,25 +68,35 @@ export function validarOds(c: unknown): Lectura<AporteOds[]> {
   return { ok: true, valor: salida };
 }
 
-const RANGO = { 1: [25, 45], 2: [40, 60] } as const;
+/** Palabras por página: una frase (largo 1) o dos (largo 2). El libro es de cifras, el texto es corto. */
+const RANGO = { 1: [12, 30], 2: [22, 50] } as const;
 
-export function mensajesNarrar(p: PedidoNarrar): Mensaje[] {
+export function mensajesNarrar(p: PedidoNarrar, rechazos: { clave: string; error: string }[] = []): Mensaje[] {
   const [min, max] = RANGO[p.largo];
-  return [
+  const frases = p.largo === 1 ? "UNA sola frase" : "una o dos frases";
+  const m: Mensaje[] = [
     {
       role: "system",
       content: [
-        "Eres Mr. Pilo, el comunicador de la Universidad de Santander (UDES). Redactas el texto breve de cada página de un libro de rendición de cuentas.",
+        "Eres Mr. Pilo, el comunicador de la Universidad de Santander (UDES). Redactas el texto breve de cada página de un libro de rendición de cuentas. El libro es de cifras: el texto solo las presenta.",
         "Reglas:",
-        "- Usa solo las cifras que recibes, tal como vienen escritas. No calcules, no redondees, no agregues otras.",
+        "- Cada dato trae «etiqueta» y «texto». Usa las cifras SOLO como están escritas en «texto» (por ejemplo «$7.321 millones», «6.375», «72 %»). No las conviertas a otra unidad, no las escribas en pesos completos, no las redondees, no las calcules, no agregues otras.",
         "- Cada frase se apoya en al menos una cifra. No inventes hechos, causas, nombres, fechas ni logros.",
-        `- Entre ${min} y ${max} palabras por página, sin viñetas, sin títulos, sin rayas largas.`,
+        `- ${frases}, entre ${min} y ${max} palabras por página, sin viñetas, sin títulos, sin rayas largas.`,
         `- Español de Colombia, tono ${p.tono === "c" ? "cercano y directo" : "institucional y sobrio"}.`,
         'Responde SOLO un JSON: {"textos":{"<clave>":"texto"}} con una entrada por cada página recibida.',
       ].join("\n"),
     },
-    { role: "user", content: JSON.stringify({ paginas: p.paginas }) },
+    // Pilo ve cómo se lee cada cifra en la página, no el número crudo: así no escribe «7.321.085.840» donde la hoja dice «$7.321 millones».
+    { role: "user", content: JSON.stringify({ paginas: p.paginas.map((x) => ({ clave: x.clave, pagina: x.pagina, datos: x.datos.map((d) => ({ etiqueta: d.etiqueta, texto: d.texto })) })) }) },
   ];
+  if (rechazos.length) {
+    m.push({
+      role: "user",
+      content: `Tu respuesta anterior se rechazó. ${rechazos.map((r) => `En «${r.clave}»: ${r.error}`).join(" ")} Vuelve a escribir solo esas páginas usando únicamente las cifras de «texto», tal cual.`,
+    });
+  }
+  return m;
 }
 
 const NOMBRES_ODS = [
@@ -123,27 +134,68 @@ export function contarPalabras(t: string): number {
   return (t.match(/[\p{L}\p{N}]+/gu) ?? []).length;
 }
 
-export function leerNarracion(crudo: string, p: PedidoNarrar): Lectura<Record<string, string>> {
+const esEntero = (t: string) => /^\d+$/.test(t) || /^\d{1,3}(\.\d{3})+$/.test(t);
+
+/**
+ * ¿La cifra que escribió Pilo es una de la página? Acepta el valor tal como se lee («7.321»), el valor crudo,
+ * y, en el dinero, sus equivalentes en millones y en miles de millones («7.321 millones», «7,3 mil millones»).
+ * Un número entero puede ser el redondeo del dato (diferencia hasta medio punto). Nada más.
+ */
+export function cifraPermitida(v: number, entero: boolean, datos: DatoPagina[]): boolean {
+  const base: number[] = [];
+  for (const d of datos) {
+    base.push(d.numero);
+    for (const m of `${d.texto} ${d.etiqueta}`.match(/\d[\d.,]*/g) ?? []) {
+      const n = numeroDe(m);
+      if (Number.isFinite(n)) base.push(n);
+    }
+    if (/\$|millones/i.test(d.texto) && d.numero >= 1_000_000) base.push(d.numero / 1_000_000, d.numero / 1_000_000_000);
+  }
+  return base.some((b) => Math.abs(b - v) < 0.051 || (entero && Math.abs(b - v) <= 0.51));
+}
+
+/** Verifica un texto de una página. Devuelve el texto limpio o el motivo del rechazo. */
+export function verificarTexto(texto: string, pag: PedidoPagina, largo: 1 | 2): { ok: true; texto: string } | { ok: false; error: string } {
+  const [min, max] = RANGO[largo];
+  const n = contarPalabras(texto);
+  if (n < min - 6 || n > max + 12) return { ok: false, error: `el texto tiene ${n} palabras y debe tener entre ${min} y ${max}.` };
+  for (const m of texto.match(/\d[\d.,]*/g) ?? []) {
+    const limpio = m.replace(/[.,]+$/, "");
+    const v = numeroDe(limpio);
+    if (!Number.isFinite(v) || [2025, 2026, 2027].includes(v)) continue;
+    if (!cifraPermitida(v, esEntero(limpio), pag.datos)) {
+      const ayuda = pag.datos.slice(0, 6).map((d) => d.texto).join(", ");
+      return { ok: false, error: `aparece la cifra ${limpio}, que no está en los datos de la página. Use solo: ${ayuda}.` };
+    }
+  }
+  return { ok: true, texto };
+}
+
+export interface ResultadoNarracion {
+  /** Textos que pasaron la verificación. */
+  buenos: Record<string, string>;
+  /** Páginas que no pasaron, con el motivo. */
+  malos: { clave: string; error: string }[];
+}
+
+/** Lee la respuesta de Pilo página por página: una página mala no tira las demás. Solo falla si no es un JSON entendible. */
+export function leerNarracionParcial(crudo: string, p: PedidoNarrar): Lectura<ResultadoNarracion> {
   const j = extraerJson(crudo);
   if (!j.ok) return j;
   const t = (j.valor.textos ?? j.valor) as Record<string, unknown>;
-  const [min, max] = RANGO[p.largo];
-  const salida: Record<string, string> = {};
+  const buenos: Record<string, string> = {};
+  const malos: { clave: string; error: string }[] = [];
   for (const pag of p.paginas) {
     const texto = limpio(t?.[pag.clave], 900).replace(/[—–]/g, ",");
-    if (!texto) return { ok: false, error: `Falta el texto de la página «${pag.clave}».` };
-    const n = contarPalabras(texto);
-    if (n < min - 8 || n > max + 12) return { ok: false, error: `El texto de «${pag.clave}» tiene ${n} palabras y debe tener entre ${min} y ${max}.` };
-    const permitidos = pag.datos.map((d) => d.numero);
-    for (const m of texto.match(/\d[\d.,]*/g) ?? []) {
-      const v = numeroDe(m);
-      if (!Number.isFinite(v)) continue;
-      if ([2025, 2026, 2027].includes(v)) continue;
-      if (!permitidos.some((x) => Math.abs(x - v) < 0.051)) return { ok: false, error: `En «${pag.clave}» aparece la cifra ${m}, que no está en los datos de la página.` };
+    if (!texto) {
+      malos.push({ clave: pag.clave, error: "falta el texto." });
+      continue;
     }
-    salida[pag.clave] = texto;
+    const r = verificarTexto(texto, pag, p.largo);
+    if (r.ok) buenos[pag.clave] = r.texto;
+    else malos.push({ clave: pag.clave, error: r.error });
   }
-  return { ok: true, valor: salida };
+  return { ok: true, valor: { buenos, malos } };
 }
 
 export function leerOds(crudo: string, aportes: AporteOds[]): Lectura<Record<string, number[]>> {

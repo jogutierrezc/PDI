@@ -83,9 +83,15 @@ async function invocar<T>(cuerpo: Record<string, unknown>): Promise<T> {
 
 export const estadoPilo = (encuestaId: string) => invocar<{ ok: boolean; ai: boolean; motivo?: string }>({ action: "estado", encuesta_id: encuestaId });
 
-export async function narrarConPilo(encuestaId: string, paginas: { clave: IdPagina; pagina: string; datos: DatoPagina[] }[], tono: "i" | "c", largo: 1 | 2): Promise<Record<string, string>> {
-  const r = await invocar<{ ok: boolean; textos: Record<string, string> }>({ action: "narrar", encuesta_id: encuestaId, paginas, tono, largo });
-  return r.textos;
+/** Lo que devuelve Pilo: los textos que pasaron la verificación y las páginas que quedan con plantilla (con el motivo). */
+export interface RespuestaNarrar {
+  textos: Record<string, string>;
+  plantilla: { clave: string; motivo: string }[];
+}
+
+export async function narrarConPilo(encuestaId: string, paginas: { clave: IdPagina; pagina: string; datos: DatoPagina[] }[], tono: "i" | "c", largo: 1 | 2): Promise<RespuestaNarrar> {
+  const r = await invocar<{ ok: boolean; textos: Record<string, string>; plantilla?: { clave: string; motivo: string }[] }>({ action: "narrar", encuesta_id: encuestaId, paginas, tono, largo });
+  return { textos: r.textos ?? {}, plantilla: r.plantilla ?? [] };
 }
 
 export async function clasificarOds(encuestaId: string, aportes: { id: string; tipo: "logro" | "reto"; titulo: string; descripcion: string; dependencia: string }[]): Promise<Record<string, number[]>> {

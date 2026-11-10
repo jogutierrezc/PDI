@@ -20,7 +20,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { elegirProveedor, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts";
 import { AltoProveedor, crearIA } from "../pilo-informes/ia.ts";
-import { leerNarracion, leerOds, mensajesNarrar, mensajesOds, validarNarrar, validarOds } from "./texto.ts";
+import { leerNarracionParcial, leerOds, mensajesNarrar, mensajesOds, validarNarrar, validarOds } from "./texto.ts";
+import type { PedidoNarrar, ResultadoNarracion } from "./texto.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
 const CORS = {
@@ -97,13 +98,31 @@ async function atender(request: Request): Promise<Response> {
     if (accion === "narrar") {
       const pedido = validarNarrar(cuerpo);
       if (!pedido.ok) return json({ error: pedido.error }, 400);
-      const r = await ia.llamarVerificado(mensajesNarrar(pedido.valor), 2200, (crudo) => leerNarracion(crudo, pedido.valor));
-      if (!r.ok) {
-        await bitacora(0, 1, r.error);
-        return json({ error: `Pilo no logró textos que se apoyen en las cifras: ${r.error}`, code: "verificacion" }, 422);
+      const ronda = (ped: PedidoNarrar, rechazos: { clave: string; error: string }[]) =>
+        ia.llamarVerificado<ResultadoNarracion>(mensajesNarrar(ped, rechazos), 2200, (crudo) => leerNarracionParcial(crudo, ped));
+      const primera = await ronda(pedido.valor, []);
+      if (!primera.ok) {
+        await bitacora(0, 1, primera.error);
+        return json({ error: `Pilo no logró textos que se apoyen en las cifras: ${primera.error}`, code: "verificacion" }, 422);
       }
-      await bitacora(Object.keys(r.valor).length, 0, null);
-      return json({ ok: true, textos: r.valor });
+      const textos: Record<string, string> = { ...primera.valor.buenos };
+      let malos = primera.valor.malos;
+      // Un reintento solo con las páginas rechazadas, diciéndole a Pilo qué cifra falló.
+      if (malos.length) {
+        try {
+          const claves = new Set(malos.map((m) => m.clave));
+          const segunda = await ronda({ ...pedido.valor, paginas: pedido.valor.paginas.filter((p) => claves.has(p.clave)) }, malos);
+          if (segunda.ok) {
+            Object.assign(textos, segunda.valor.buenos);
+            malos = segunda.valor.malos;
+          }
+        } catch (e) {
+          if (!(e instanceof AltoProveedor)) throw e;
+          // sin tiempo o sin cupo para el reintento: esas páginas quedan con plantilla
+        }
+      }
+      await bitacora(Object.keys(textos).length, malos.length, malos.length ? malos.map((m) => `${m.clave}: ${m.error}`).join(" ") : null);
+      return json({ ok: true, textos, plantilla: malos.map((m) => ({ clave: m.clave, motivo: m.error })) });
     }
     const pedido = validarOds(cuerpo);
     if (!pedido.ok) return json({ error: pedido.error }, 400);

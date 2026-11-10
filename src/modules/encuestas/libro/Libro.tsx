@@ -19,7 +19,7 @@ import type { Encuesta } from "../tipos";
 import { FaltaMigracionLibro, clasificarOds, estadoPilo, guardarLibro, leerLibro, narrarConPilo, quitarImagen, subirImagen, urlImagen, validarImagen } from "./api";
 import { CtxLibro, Hoja, HojaVacia } from "./Hoja";
 import type { CtxHoja } from "./Hoja";
-import { CLAVES_TEXTO, FORMATOS, MAX_MODULOS, MIN_PAGINAS, MAX_PAGINAS, MODULOS, PALETAS, calcular, datosDePagina, dependenciasDe, filasDe, nombrePagina, paginasDe, pliegos, sinTextosViejos } from "./modelo";
+import { CLAVES_TEXTO, FORMATOS, claveDep, MAX_MODULOS, MAX_PAGINAS, MAX_TEXTO, MIN_PAGINAS, MODULOS, PALETAS, calcular, datosDePagina, dependenciasDe, filasDe, nombrePagina, paginasDe, pliegos, resumenPaginas, sinTextosViejos } from "./modelo";
 import type { ConfigLibro, FiltroEstado, IdModulo } from "./modelo";
 import "./libro.css";
 
@@ -65,12 +65,18 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
   /* ---- derivados ---- */
   const filas = useMemo(() => filasDe(aportes, cfg), [aportes, cfg.estado, cfg.excluidas, cfg.ods]); // eslint-disable-line react-hooks/exhaustive-deps
   const calc = useMemo(() => calcular(filas), [filas]);
-  const paginas = useMemo(() => paginasDe(cfg), [cfg.orden, cfg.activas]); // eslint-disable-line react-hooks/exhaustive-deps
+  const paginas = useMemo(() => paginasDe(cfg, calc), [cfg.orden, cfg.activas, cfg.formato, cfg.resumen, calc]); // eslint-disable-line react-hooks/exhaustive-deps
   const vista = ancho < 560 ? "hoja" : cfg.vista;
   const lista = useMemo(() => pliegos(paginas.length, vista), [paginas.length, vista]);
   const actual = Math.min(cur, lista.length - 1);
   const dependencias = useMemo(() => dependenciasDe(aportes), [aportes]);
-  const resumen = { total: paginas.length, notas: paginas.includes("notas") };
+  const resumen = resumenPaginas(paginas);
+  /** Cuántas páginas ocupa cada módulo (las de continuación van agrupadas bajo su módulo). */
+  const paginasPorModulo = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of paginas) m[p.id] = (m[p.id] ?? 0) + 1;
+    return m;
+  }, [paginas]);
 
   const cambiar = useCallback((f: (c: ConfigLibro) => ConfigLibro) => setCfg((c) => f(c)), []);
   /** Cambios que dejan viejos los textos de Pilo (filtros, tono, extensión). */
@@ -213,13 +219,13 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
   }, [actual, giro, vista, cfg.formato, calc, paginas.length]);
 
   /* ---- texto ---- */
-  const onTexto = useCallback((clave: string, t: string) => cambiar((c) => ({ ...c, textos: { ...c.textos, [clave]: { t: t.slice(0, 900), editado: true } } })), [cambiar]);
+  const onTexto = useCallback((clave: string, t: string) => cambiar((c) => ({ ...c, textos: { ...c.textos, [clave]: { t: t.slice(0, MAX_TEXTO), editado: true } } })), [cambiar]);
 
   const ctx: CtxHoja = useMemo(() => ({ calc, cfg, paginas, urls, onTexto, editable: puedeEditar, guias }), [calc, cfg, paginas, urls, onTexto, puedeEditar, guias]);
 
   /* ---- Pilo ---- */
   const redactar = async () => {
-    const claves = paginas.filter((p) => (CLAVES_TEXTO as readonly string[]).includes(p) && !cfg.textos[p]?.editado);
+    const claves = paginas.filter((p) => p.parte === 1 && (CLAVES_TEXTO as readonly string[]).includes(p.id) && !cfg.textos[p.id]?.editado).map((p) => p.id);
     const pedido = claves.map((p) => ({ clave: p, pagina: nombrePagina(p), datos: datosDePagina(p, calc, cfg) })).filter((p) => p.datos.length > 0);
     if (!pedido.length) {
       setAvisoPilo({ texto: "No hay datos para redactar con los filtros actuales." });
@@ -228,13 +234,21 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
     setTrabajando("texto");
     setAvisoPilo(null);
     try {
-      const textos = await narrarConPilo(encuesta.id, pedido, cfg.tono, cfg.largo);
+      const r = await narrarConPilo(encuesta.id, pedido, cfg.tono, cfg.largo);
       cambiar((c) => {
         const n = { ...c.textos };
-        for (const [k, t] of Object.entries(textos)) if (!n[k]?.editado) n[k] = { t, editado: false };
+        for (const [k, t] of Object.entries(r.textos)) if (!n[k]?.editado) n[k] = { t: t.slice(0, MAX_TEXTO), editado: false };
+        // la página que Pilo no logró deja de tener un texto viejo suyo: vuelve a la plantilla
+        for (const q of r.plantilla) if (!n[q.clave]?.editado) delete n[q.clave];
         return { ...c, textos: n };
       });
-      setAvisoPilo({ texto: `Pilo redactó ${Object.keys(textos).length} textos con las cifras de cada página. Revíselos antes de imprimir.` });
+      const hechos = Object.keys(r.textos).length;
+      const con = r.plantilla.map((q) => nombrePagina(q.clave as never)).join(", ");
+      setAvisoPilo(
+        r.plantilla.length
+          ? { texto: `Pilo redactó ${hechos} de ${hechos + r.plantilla.length} textos. Quedaron con texto de plantilla: ${con}. Pilo no logró apoyar esos textos en las cifras de la página.`, error: hechos === 0 }
+          : { texto: `Pilo redactó ${hechos} textos con las cifras de cada página. Revíselos antes de imprimir.` },
+      );
     } catch (e) {
       setAvisoPilo({ texto: `${(e as Error).message} Mientras tanto el libro usa los textos de plantilla.`, error: true });
     } finally {
@@ -325,11 +339,12 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
   /* ---- lo que se pinta ---- */
   const capa = (i: number, rol: "base" | "sale" | "entra") => (
     <div className="lb-capa" data-rol={rol} key={`${rol}-${i}`} style={{ zIndex: rol === "base" ? 0 : rol === "sale" ? 3 : 4 }}>
-      {i < 0 ? <HojaVacia /> : <Hoja id={paginas[i]} indice={i} />}
+      {i < 0 ? <HojaVacia /> : <Hoja pag={paginas[i]} indice={i} />}
       {rol !== "base" && <div className="lb-sombra" style={{ position: "absolute", inset: 0, background: "#0a1e3c", opacity: 0, pointerEvents: "none", zIndex: 8 }} />}
     </div>
   );
   const par = lista[actual];
+  const etiquetaPagina = (p: (typeof paginas)[number]) => (p.partes > 1 ? `${nombrePagina(p.id)} ${p.parte}/${p.partes}` : nombrePagina(p.id));
   const capas = (lado: 0 | 1): React.ReactNode => {
     if (!giro) return capa(par[lado], "base");
     const dir = giro.b > giro.a ? 1 : -1;
@@ -340,7 +355,7 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
   };
 
   const una = vista === "hoja";
-  const edicionPropia = par.filter((i) => i >= 0).some((i) => cfg.textos[paginas[i]]?.editado);
+  const edicionPropia = par.filter((i) => i >= 0).some((i) => cfg.textos[paginas[i].id]?.editado);
   const sinDatos = filas.length === 0;
   const f = FORMATOS[cfg.formato];
   const conteo = (e: FiltroEstado) => aportes.filter((a) => (e === "video" ? a.estado === "para_video" : e === "rev" ? a.estado === "revisado" || a.estado === "para_video" : a.estado !== "rechazado" && a.estado !== "descartado")).length;
@@ -407,8 +422,13 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
             <summary>Páginas del libro</summary>
             <div className="lb-in">
               <p className="lb-nota">
-                {nActivas} páginas de contenido, {resumen.total} con portada y contraportada{resumen.notas ? " (incluye 1 de notas para cerrar el pliego)" : ""}. Rango permitido: {MIN_PAGINAS} a {MAX_PAGINAS}.
+                {resumen.total} páginas con portada y contraportada{resumen.notas ? " (incluye 1 de notas para cerrar el pliego)" : ""}. Lo recomendable es de {MIN_PAGINAS} a {MAX_PAGINAS}.
               </p>
+              {resumen.largo && (
+                <p className="lb-aviso" role="status">
+                  El libro tiene {resumen.total} páginas por la cantidad de aportes. Puede filtrar por estado o dependencia para acortarlo.
+                </p>
+              )}
               <ul className="lb-mods">
                 {cfg.orden.map((id, i) => {
                   const m = MODULOS.find((x) => x.id === id)!;
@@ -418,6 +438,7 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
                     <li key={id} className={on ? "on" : ""}>
                       <label>
                         <input type="checkbox" checked={on} disabled={bloqueado} onChange={(e) => alternar(id, e.target.checked)} /> {m.nombre}
+                        {on && (paginasPorModulo[id] ?? 0) > 1 && <span className="lb-cont"> · {paginasPorModulo[id]} páginas</span>}
                       </label>
                       <button type="button" className="lb-mv" aria-label={`Subir ${m.nombre}`} disabled={i === 0} onClick={() => mover(i, -1)}>
                         ↑
@@ -429,7 +450,7 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
                   );
                 })}
               </ul>
-              <p className="lb-nota">La portada y la contraportada siempre van.</p>
+              <p className="lb-nota">La portada y la contraportada siempre van. Si una lista no cabe en una página, sigue en la página siguiente.</p>
             </div>
           </details>
 
@@ -516,20 +537,42 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
                 <div className="lb-checks">
                   {dependencias.map((d) => (
                     <label key={d} className="lb-chk">
-                      <input type="checkbox" checked={!cfg.excluidas.some((x) => x.toLowerCase() === d.toLowerCase())} onChange={(e) => cambiarDatos((c) => ({ ...c, excluidas: e.target.checked ? c.excluidas.filter((x) => x.toLowerCase() !== d.toLowerCase()) : [...c.excluidas, d] }))} /> {d}
+                      <input type="checkbox" checked={!cfg.excluidas.some((x) => claveDep(x) === claveDep(d))} onChange={(e) => cambiarDatos((c) => ({ ...c, excluidas: e.target.checked ? c.excluidas.filter((x) => claveDep(x) !== claveDep(d)) : [...c.excluidas, d] }))} /> {d}
                     </label>
                   ))}
                   {!dependencias.length && <p className="lb-nota">La encuesta todavía no tiene aportes.</p>}
                 </div>
               </div>
-              <div className="ed-field">
-                <label htmlFor="lb-foco">Dependencia en foco</label>
-                <select id="lb-foco" className="ed-in" value={cfg.foco ?? ""} onChange={(e) => cambiar((c) => ({ ...c, foco: e.target.value || null }))}>
-                  <option value="">La primera con aportes</option>
-                  {calc.deps.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+              <div>
+                <div className="lb-fila" style={{ justifyContent: "space-between" }}>
+                  <span className="lb-lbl" style={{ margin: 0 }}>En «Dependencias en resumen»</span>
+                  <span className="lb-fila">
+                    <button type="button" className="ed-btn ed-btn--sm" onClick={() => cambiar((c) => ({ ...c, resumen: null }))}>Todas</button>
+                    <button type="button" className="ed-btn ed-btn--sm" onClick={() => cambiar((c) => ({ ...c, resumen: [] }))}>Ninguna</button>
+                  </span>
+                </div>
+                <div className="lb-checks">
+                  {calc.deps.map((d) => {
+                    const entra = !cfg.resumen || cfg.resumen.some((x) => claveDep(x) === claveDep(d));
+                    return (
+                      <label key={d} className="lb-chk">
+                        <input
+                          type="checkbox"
+                          checked={entra}
+                          onChange={(e) =>
+                            cambiar((c) => {
+                              const actual = c.resumen ?? calc.deps;
+                              const sin = actual.filter((x) => claveDep(x) !== claveDep(d));
+                              const nuevo = e.target.checked ? [...sin, d] : sin;
+                              return { ...c, resumen: nuevo.length === calc.deps.length ? null : nuevo };
+                            })
+                          }
+                        />{" "}
+                        {d}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </details>
@@ -591,7 +634,7 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
           <div className="lb-chips" role="group" aria-label="Ir a una página">
             {lista.map((p, i) => (
               <button key={i} type="button" aria-current={i === actual ? "true" : undefined} onClick={() => ir(i)}>
-                {p.filter((x) => x >= 0).map((x) => nombrePagina(paginas[x])).join(" y ")}
+                {p.filter((x) => x >= 0).map((x) => etiquetaPagina(paginas[x])).join(" y ")}
               </button>
             ))}
           </div>
@@ -603,9 +646,9 @@ function Editor({ encuesta, puedeEditar, decir, inicial, aportes, pilo }: Props 
         createPortal(
           <CtxLibro.Provider value={{ ...ctx, editable: false, guias: false }}>
             <div className="lb-print-root" style={{ ["--lb-w" as string]: `${f.ancho + (cfg.sangrado ? 6 : 0)}mm`, ["--lb-h" as string]: `${f.alto + (cfg.sangrado ? 6 : 0)}mm`, ["--sg" as string]: cfg.sangrado ? "3mm" : "0mm" } as React.CSSProperties}>
-              {paginas.map((id, i) => (
-                <div className="lb-hoja" key={`${id}-${i}`}>
-                  <Hoja id={id} indice={i} />
+              {paginas.map((pag, i) => (
+                <div className="lb-hoja" key={`${pag.id}-${i}`}>
+                  <Hoja pag={pag} indice={i} />
                 </div>
               ))}
             </div>

@@ -26,6 +26,7 @@ import { textoEstadoEncuesta } from "../tipos";
 import type { Aporte, Encuesta } from "../tipos";
 import { Acceso } from "./Acceso";
 import { Editor } from "./Editor";
+import { Libro } from "../libro/Libro";
 import { ListaEncuestas } from "./ListaEncuestas";
 import { Papelera } from "./Papelera";
 import { Presentacion } from "./Presentacion";
@@ -35,7 +36,7 @@ import { TablaRespuestas } from "./TablaRespuestas";
 import "./encuestas.css";
 import "./editor.css";
 
-type Vista = "editor" | "presentacion" | "acceso" | "respuestas" | "resultados" | "historial";
+type Vista = "editor" | "presentacion" | "acceso" | "respuestas" | "resultados" | "historial" | "libro";
 const VISTAS: readonly { id: Vista; texto: string; pestana: string }[] = [
   { id: "editor", texto: "Editor", pestana: "ed" },
   { id: "presentacion", texto: "Presentación y salida", pestana: "pres" },
@@ -44,6 +45,8 @@ const VISTAS: readonly { id: Vista; texto: string; pestana: string }[] = [
   { id: "resultados", texto: "Resultados", pestana: "res" },
   { id: "historial", texto: "Historial", pestana: "hist" },
 ];
+/** El libro de la Rendición de Cuentas solo existe para la encuesta de aportes con cifras. */
+const VISTA_LIBRO = { id: "libro", texto: "Libro", pestana: "libro" } as const;
 
 interface Aviso {
   texto: string;
@@ -158,10 +161,11 @@ function Espacio({ encuesta, globalEditor, vista, onVista, onVolver, decir }: { 
   const legado = leerConfig(encuesta.config_pilo).flujo === "aportes";
   const borrador: Estructura | undefined = (versiones.data?.find((v) => !v.fijada) ?? versiones.data?.[0])?.estructura;
 
+  const vistas = legado ? [...VISTAS, VISTA_LIBRO] : VISTAS;
   const alTeclear = (e: KeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    const i = VISTAS.findIndex((v) => v.id === vista);
-    const sig = VISTAS[(i + (e.key === "ArrowRight" ? 1 : VISTAS.length - 1)) % VISTAS.length];
+    const i = vistas.findIndex((v) => v.id === vista);
+    const sig = vistas[(i + (e.key === "ArrowRight" ? 1 : vistas.length - 1)) % vistas.length];
     onVista(sig.id);
     window.setTimeout(() => document.getElementById(`en-tab-${sig.pestana}`)?.focus(), 0);
   };
@@ -189,7 +193,7 @@ function Espacio({ encuesta, globalEditor, vista, onVista, onVolver, decir }: { 
         </span>
       </div>
       <div className="ed-pestanas" role="tablist" aria-label="Vistas de la encuesta" onKeyDown={alTeclear}>
-        {VISTAS.map((v) => (
+        {vistas.map((v) => (
           <button key={v.id} type="button" role="tab" id={`en-tab-${v.pestana}`} aria-selected={vista === v.id} aria-controls={`en-panel-${v.pestana}`} tabIndex={vista === v.id ? 0 : -1} onClick={() => onVista(v.id)}>
             {v.texto}
           </button>
@@ -216,6 +220,11 @@ function Espacio({ encuesta, globalEditor, vista, onVista, onVolver, decir }: { 
       {vista === "respuestas" && (legado ? <RespuestasAportes encuesta={encuesta} puedeEditar={puedeEditar} decir={decir} /> : <RespuestasNuevas encuesta={encuesta} estructura={borrador} puedeEditar={puedeEditar} decir={decir} />)}
       {vista === "resultados" && borrador && <ResultadosDe encuesta={encuesta} estructura={borrador} legado={legado} />}
       {vista === "historial" && <Historial encuestaId={encuesta.id} />}
+      {vista === "libro" && legado && (
+        <div role="tabpanel" id="en-panel-libro" aria-labelledby="en-tab-libro">
+          <Libro encuesta={encuesta} puedeEditar={puedeEditar} decir={decir} />
+        </div>
+      )}
     </div>
   );
 }

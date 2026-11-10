@@ -12,7 +12,7 @@ import { Link, useParams } from "react-router-dom";
 import { Icon } from "../../components/ui/Icon";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
 import { ESTUDIO_UDES } from "../warehouse/estudio";
-import { clasificar, nivelDeNota, pareceSeudonimo, tieneCorte, type Corte, type FilaMonitor } from "../monitor/logica";
+import { clasificar, nivelDeNota, pareceSeudonimo, tieneCorte, type Corte } from "../monitor/logica";
 import { useEntrada } from "../monitor/piezas";
 import { factoresDe, siguientePeriodo, trayectorias } from "./cohorte";
 import { useAlertas } from "./contexto";
@@ -63,7 +63,7 @@ export function Estudiante() {
       </>
     );
 
-  const fila = t.actual.fila as FilaMonitor;
+  const fila = t.actual.fila;
   const corte = corteElegido ?? t.actual.corte;
   const c = clasificar(fila, corte);
   const promedios = t.puntos.map((p) => p.promedio);

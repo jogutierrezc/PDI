@@ -931,7 +931,6 @@
 
 .al-rank__pista i[data-est] {
   background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--surface) 70%, transparent) 4px 6px);
-  background-color: color-mix(in srgb, currentColor 0%, transparent);
 }
 
 .al-rank__cifra {
@@ -1072,8 +1071,9 @@
 
 .al-codigo {
   color: var(--ink);
-  font-family: ui-monospace, Consolas, monospace;
   font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-decoration: none;
 }
 

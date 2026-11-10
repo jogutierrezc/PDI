@@ -228,6 +228,25 @@ function HtmlView({ url, mobile }: { url: string; mobile: boolean }) {
   );
 }
 
+/**
+ * Un microportal: un sitio entero con sus páginas, estilos y datos. Se abre por su
+ * dirección (no con srcDoc) para que sus enlaces relativos funcionen. Sin
+ * `allow-same-origin` queda en un origen aparte: no ve la sesión del portal. nginx
+ * repite la misma política en la cabecera, por si alguien abre la dirección sola.
+ */
+function PortalView({ url, mobile }: { url: string; mobile: boolean }) {
+  return (
+    <div className="dv-frame" data-mobile={mobile}>
+      <iframe
+        title="Microportal"
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms"
+        referrerPolicy="no-referrer"
+        src={url}
+      />
+    </div>
+  );
+}
+
 function CodeView({ url, name }: { url: string; name: string }) {
   const file = useFetched(url, asText);
   const lines = useMemo(() => (file.data ? highlightLines(file.data) : []), [file.data]);
@@ -260,7 +279,8 @@ export function DocViewer({ item }: { item: DocItem }) {
   const sourceUrl = documentFileUrl(item.sourcePath);
   const [tab, setTab] = useState<"doc" | "code">("doc");
   const [mobile, setMobile] = useState(false);
-  const isWeb = format === "html" || format === "qmd" || format === "r";
+  const isPortal = format === "portal";
+  const isWeb = format === "html" || format === "qmd" || format === "r" || isPortal;
   const sourceLabel = format === "qmd" ? "Código (.qmd)" : "Código (.R)";
 
   useEffect(() => setTab("doc"), [item.id]);
@@ -269,7 +289,7 @@ export function DocViewer({ item }: { item: DocItem }) {
     <div className="dv">
       {isWeb && (
         <div className="dv-tabs">
-          {sourceUrl ? (
+          {sourceUrl && !isPortal ? (
             <div className="dv-seg" role="tablist" aria-label="Qué ver">
               <button type="button" role="tab" aria-selected={tab === "doc"} onClick={() => setTab("doc")}>
                 {format === "r" ? "Resultado" : "Documento"}
@@ -289,7 +309,7 @@ export function DocViewer({ item }: { item: DocItem }) {
               </button>
             </div>
           )}
-          <span className="dv-tabs__note">{FORMAT_LABEL[format]} mostrado en un marco aislado, sin acceso a tu sesión.</span>
+          <span className="dv-tabs__note">{isPortal ? "Sitio completo" : FORMAT_LABEL[format]} mostrado en un marco aislado, sin acceso a tu sesión.</span>
         </div>
       )}
       <div className="dv-body">
@@ -300,7 +320,13 @@ export function DocViewer({ item }: { item: DocItem }) {
         ) : format === "doc" ? (
           <DocxView url={url} />
         ) : isWeb ? (
-          tab === "code" && sourceUrl ? <CodeView url={sourceUrl} name={item.sourceName} /> : <HtmlView url={url} mobile={mobile} />
+          isPortal ? (
+            <PortalView url={url} mobile={mobile} />
+          ) : tab === "code" && sourceUrl ? (
+            <CodeView url={sourceUrl} name={item.sourceName} />
+          ) : (
+            <HtmlView url={url} mobile={mobile} />
+          )
         ) : format === "md" ? (
           <MarkdownView url={url} />
         ) : (

@@ -11,7 +11,7 @@
 
 import type { DocItem } from "./data";
 
-export type DocFormat = "pdf" | "doc" | "html" | "qmd" | "r" | "md" | "repo" | "link" | "file";
+export type DocFormat = "pdf" | "doc" | "html" | "qmd" | "r" | "md" | "portal" | "repo" | "link" | "file";
 
 export const REPO_HOST = "repositorio.udes.edu.co";
 
@@ -22,6 +22,7 @@ export const FORMAT_LABEL: Record<DocFormat, string> = {
   qmd: "Quarto",
   r: "R",
   md: "Markdown",
+  portal: "Microportal",
   repo: "Repositorio",
   link: "Enlace",
   file: "Archivo",
@@ -35,16 +36,17 @@ export const FORMAT_ABBR: Record<DocFormat, string> = {
   qmd: "QMD",
   r: "R",
   md: "MD",
+  portal: "WEB",
   repo: "REPO",
   link: "URL",
   file: "FILE",
 };
 
 /** Orden en que se ofrecen los filtros por tipo. */
-export const FORMAT_ORDER: DocFormat[] = ["pdf", "doc", "html", "qmd", "r", "md", "repo", "link", "file"];
+export const FORMAT_ORDER: DocFormat[] = ["pdf", "doc", "html", "qmd", "r", "md", "portal", "repo", "link", "file"];
 
 /** Los que el portal abre dentro de su visor. */
-const PREVIEWABLE: ReadonlySet<DocFormat> = new Set<DocFormat>(["pdf", "doc", "html", "qmd", "r", "md"]);
+const PREVIEWABLE: ReadonlySet<DocFormat> = new Set<DocFormat>(["pdf", "doc", "html", "qmd", "r", "md", "portal"]);
 export const isPreviewableFormat = (format: DocFormat) => PREVIEWABLE.has(format);
 
 /** Lo que cada tipo explica al elegir la miniatura. */
@@ -55,6 +57,7 @@ export const THUMB_NOTE: Record<DocFormat, string> = {
   qmd: "Una captura del documento. Si sale en blanco, se genera una portada.",
   r: "Una captura del documento. Si sale en blanco, se genera una portada.",
   md: "Una portada generada con el título.",
+  portal: "Una captura de la página de entrada. Si sale en blanco, se genera una portada.",
   repo: "Una portada generada con el título.",
   link: "Una portada generada con el título y el sitio.",
   file: "Una portada generada con el título.",
@@ -75,8 +78,9 @@ export function hostOf(url: string | null | undefined): string {
 }
 
 /** Qué es este documento. */
-export function formatOf(item: Pick<DocItem, "kind" | "url" | "path" | "fileName" | "flavor">): DocFormat {
+export function formatOf(item: Pick<DocItem, "kind" | "url" | "path" | "fileName" | "flavor"> & { siteDir?: string | null }): DocFormat {
   if (item.kind === "enlace") return hostOf(item.url) === REPO_HOST ? "repo" : "link";
+  if (item.siteDir) return "portal";
   const extension = extensionOf(item.fileName || item.path || "");
   if (extension === "pdf") return "pdf";
   if (extension === "doc" || extension === "docx") return "doc";

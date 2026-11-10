@@ -75,6 +75,8 @@ export interface DocItem {
   sourceName: string;
   /** Miniatura (imagen) en el bucket. */
   thumbPath: string | null;
+  /** Carpeta del microportal en el bucket (portales/<id>-<sello>); nulo si no lo es. `path` es su página de entrada. */
+  siteDir: string | null;
   position: number;
   updatedAt: string;
 }
@@ -123,6 +125,7 @@ export interface ItemRow {
   source_path?: string | null;
   source_name?: string | null;
   thumb_path?: string | null;
+  site_dir?: string | null;
   position: number;
   updated_at: string;
 }
@@ -175,6 +178,7 @@ export const itemFrom = (r: ItemRow): DocItem => ({
   sourcePath: r.source_path ?? null,
   sourceName: r.source_name ?? "",
   thumbPath: r.thumb_path ?? null,
+  siteDir: r.site_dir ?? null,
   position: r.position,
   updatedAt: r.updated_at,
 });
@@ -203,6 +207,7 @@ export const itemTo = (i: Omit<DocItem, "updatedAt">) => ({
   source_path: i.sourcePath,
   source_name: i.sourceName,
   thumb_path: i.thumbPath,
+  site_dir: i.siteDir,
   position: i.position,
 });
 
@@ -216,9 +221,17 @@ export function documentFileUrl(path: string | null | undefined): string | null 
   return supabase.storage.from(DOC_BUCKET).getPublicUrl(value).data.publicUrl;
 }
 
-/** A dónde lleva un documento: su enlace, o su archivo. */
+/**
+ * La dirección de un microportal: la sirve nginx en /portales/<carpeta>/…, no el
+ * bucket, porque Storage entrega el .html como texto y con una política que
+ * impide ejecutarlo.
+ */
+export const portalUrl = (item: Pick<DocItem, "siteDir" | "path">): string | null =>
+  item.siteDir && item.path ? `/${item.path}` : null;
+
+/** A dónde lleva un documento: su enlace, su microportal o su archivo. */
 export const documentHref = (item: DocItem): string | null =>
-  item.kind === "enlace" ? (item.url ?? null) : documentFileUrl(item.path);
+  item.kind === "enlace" ? (item.url ?? null) : (portalUrl(item) ?? documentFileUrl(item.path));
 
 /** «2018-2025», «2025», o vacío si ninguno declara año. */
 export function yearRange(items: DocItem[]): string {

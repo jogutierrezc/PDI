@@ -167,7 +167,7 @@ export async function autoThumbnail(file: File, format: DocFormat): Promise<Blob
   try {
     if (format === "pdf") return await fromPdf(file);
     if (format === "doc") return await fromDocx(file);
-    if (format === "html" || format === "qmd" || format === "r") return await fromHtml(file);
+    if (format === "html" || format === "qmd" || format === "r" || format === "portal") return await fromHtml(file);
     return null;
   } catch {
     return null;

@@ -122,9 +122,11 @@ export function useRemoveCollection() {
       const nodes = (children ?? []) as { id: string; cover: string | null }[];
       const ids = [collection.id, ...nodes.map((node) => node.id)];
 
-      const { data } = await supabase.from("doc_items").select("path,source_path,thumb_path").in("collection_id", ids);
-      const paths = ((data ?? []) as { path: string | null; source_path: string | null; thumb_path: string | null }[])
-        .flatMap((row) => [row.path, row.source_path, row.thumb_path])
+      const { data } = await supabase.from("doc_items").select("path,source_path,thumb_path,site_dir").in("collection_id", ids);
+      const rows = (data ?? []) as { path: string | null; source_path: string | null; thumb_path: string | null; site_dir: string | null }[];
+      const siteDirs = rows.map((row) => row.site_dir).filter((dir): dir is string => Boolean(dir));
+      const paths = rows
+        .flatMap((row) => [row.site_dir ? null : row.path, row.source_path, row.thumb_path])
         .filter((path): path is string => Boolean(path));
       for (const node of nodes) if (node.cover) paths.push(node.cover);
       if (collection.cover) paths.push(collection.cover);
@@ -132,6 +134,7 @@ export function useRemoveCollection() {
       const { error } = await supabase.from("doc_collections").delete().eq("id", collection.id);
       if (error) throw describeDatabaseError(error);
       await removeDocFiles(paths);
+      for (const dir of siteDirs) await removePortalDir(dir);
     },
     onSuccess: refresh,
   });
@@ -156,7 +159,8 @@ export function useRemoveItem() {
     mutationFn: async (item: DocItem) => {
       const { error } = await supabase.from("doc_items").delete().eq("id", item.id);
       if (error) throw describeDatabaseError(error);
-      await removeDocFiles([item.path, item.sourcePath, item.thumbPath]);
+      await removeDocFiles([item.siteDir ? null : item.path, item.sourcePath, item.thumbPath]);
+      await removePortalDir(item.siteDir);
     },
     onSuccess: refresh,
   });
@@ -293,6 +297,155 @@ function uploadError(message: string) {
       ? 'No existe el bucket "documentos" en Storage. Aplica la migración 0051 o créalo a mano: público en lectura, 50 MB por archivo.'
       : `No se pudo subir el archivo: ${message}`,
   );
+}
+
+/* --- Microportales ---------------------------------------------------------------------- */
+
+export const MAX_PORTAL_ZIP_BYTES = 200 * 1024 * 1024;
+const MAX_PORTAL_FILES = 4000;
+const MAX_PORTAL_FILE_BYTES = MAX_DOC_BYTES;
+
+/** El tipo con que se entrega cada archivo; sin él un navegador no ejecuta el sitio. */
+const PORTAL_TYPES: Record<string, string> = {
+  html: "text/html; charset=utf-8", htm: "text/html; charset=utf-8",
+  css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", mjs: "text/javascript; charset=utf-8",
+  json: "application/json", geojson: "application/geo+json", map: "application/json", webmanifest: "application/manifest+json",
+  xml: "application/xml", txt: "text/plain; charset=utf-8", csv: "text/csv; charset=utf-8", md: "text/markdown; charset=utf-8",
+  bib: "text/plain; charset=utf-8", yml: "text/plain; charset=utf-8", yaml: "text/plain; charset=utf-8",
+  svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+  avif: "image/avif", ico: "image/x-icon", bmp: "image/bmp",
+  woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", otf: "font/otf", eot: "application/vnd.ms-fontobject",
+  mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", m4a: "audio/mp4", mp4: "video/mp4", webm: "video/webm",
+  pdf: "application/pdf", wasm: "application/wasm", zip: "application/zip",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+/** Lo que Storage acepta en el nombre de un archivo. Los acentos y la «ñ» no. */
+const PORTAL_NAME = /^[A-Za-z0-9_\-./ ()+,=@]+$/;
+
+export interface UploadedPortal {
+  /** portales/<id>-<sello> */
+  dir: string;
+  /** portales/<id>-<sello>/index.html */
+  entryPath: string;
+  fileCount: number;
+  totalBytes: number;
+  /** La página de entrada, para medirla y sacarle la miniatura. */
+  entryFile: File;
+}
+
+const mimeOf = (name: string) => PORTAL_TYPES[name.slice(name.lastIndexOf(".") + 1).toLowerCase()] ?? "application/octet-stream";
+
+/**
+ * Descomprime un .zip con un sitio ya renderizado y sube cada archivo a
+ * portales/<id>-<sello>/. Si el .zip trae una carpeta madre (docs/, _site/, el
+ * nombre del proyecto…), se toma como raíz la carpeta que contiene el index.html
+ * más cercano a la superficie.
+ */
+export async function uploadPortalZip(
+  itemId: string,
+  zip: File,
+  onProgress: (done: number, total: number) => void,
+): Promise<UploadedPortal> {
+  if (extensionOf(zip.name) !== ".zip") throw new FriendlyError(`«${zip.name}» no es un .zip. Comprime la carpeta del sitio (la que tiene el index.html) y vuelve a elegirla.`);
+  if (zip.size > MAX_PORTAL_ZIP_BYTES) throw new FriendlyError(`«${zip.name}» pesa ${formatBytes(zip.size)} y el máximo son ${formatBytes(MAX_PORTAL_ZIP_BYTES)}.`);
+
+  const { unzipSync } = await import("fflate");
+  let entries: Record<string, Uint8Array>;
+  try {
+    entries = unzipSync(new Uint8Array(await zip.arrayBuffer()), {
+      // Lo que nunca es parte del sitio: no se descomprime siquiera.
+      filter: (info) => !/(^|\/)(__MACOSX\/|\.[^/]*$|Thumbs\.db$)/i.test(info.name) && !info.name.endsWith("/"),
+    });
+  } catch {
+    throw new FriendlyError("No se pudo abrir el .zip. Puede estar dañado o protegido con contraseña.");
+  }
+
+  const names = Object.keys(entries);
+  const indexes = names.filter((name) => /(^|\/)index\.html$/i.test(name)).sort((a, b) => a.split("/").length - b.split("/").length);
+  if (!indexes.length) throw new FriendlyError("El .zip no trae ningún index.html. Comprime la carpeta que lo contiene (en Quarto, la carpeta docs/ o _site/).");
+  const rootDir = indexes[0].slice(0, indexes[0].length - "index.html".length);
+  const files = names.filter((name) => name.startsWith(rootDir)).map((name) => ({ name: name.slice(rootDir.length), data: entries[name] }));
+
+  if (files.length > MAX_PORTAL_FILES) throw new FriendlyError(`El sitio trae ${files.length} archivos y el máximo son ${MAX_PORTAL_FILES}.`);
+  const big = files.find((file) => file.data.length > MAX_PORTAL_FILE_BYTES);
+  if (big) throw new FriendlyError(`«${big.name}» pesa ${formatBytes(big.data.length)} y el máximo por archivo son ${formatBytes(MAX_PORTAL_FILE_BYTES)}. Quítalo del sitio o enlázalo desde otro lado.`);
+  const badNames = files.filter((file) => !PORTAL_NAME.test(file.name)).map((file) => file.name);
+  if (badNames.length) {
+    throw new FriendlyError(
+      `Hay ${badNames.length} archivo(s) con acentos, «ñ» o símbolos que el almacenamiento no admite: ${badNames.slice(0, 4).join(", ")}${badNames.length > 4 ? "…" : ""}. Renómbralos sin esos caracteres (y corrige los enlaces que los usan) y vuelve a comprimir.`,
+    );
+  }
+
+  const dir = `portales/${itemId}-${Date.now().toString(36)}`;
+  const total = files.length;
+  let done = 0;
+  let next = 0;
+  let failure = null as FriendlyError | null;
+
+  // Seis a la vez: suficiente para ir rápido sin saturar al servidor.
+  async function worker() {
+    while (!failure) {
+      const index = next++;
+      if (index >= total) return;
+      const file = files[index];
+      const { error } = await supabase.storage.from(DOC_BUCKET).upload(`${dir}/${file.name}`, new Blob([file.data as BlobPart], { type: mimeOf(file.name) }), {
+        contentType: mimeOf(file.name),
+        upsert: true,
+      });
+      if (error) {
+        failure = uploadError(`${file.name}: ${error.message}`);
+        return;
+      }
+      done += 1;
+      onProgress(done, total);
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  if (failure) {
+    await removePortalDir(dir);
+    throw failure;
+  }
+
+  const entry = files.find((file) => file.name === "index.html")!;
+  return {
+    dir,
+    entryPath: `${dir}/index.html`,
+    fileCount: total,
+    totalBytes: files.reduce((sum, file) => sum + file.data.length, 0),
+    entryFile: new File([entry.data as BlobPart], "index.html", { type: "text/html" }),
+  };
+}
+
+/** Todos los archivos bajo una carpeta del bucket, bajando por las subcarpetas. */
+async function listPortalFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  const pending = [dir];
+  while (pending.length) {
+    const folder = pending.pop() as string;
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase.storage.from(DOC_BUCKET).list(folder, { limit: 1000, offset });
+      if (error || !data?.length) break;
+      for (const entry of data) {
+        // Una carpeta no trae id ni metadatos.
+        if (entry.id) out.push(`${folder}/${entry.name}`);
+        else pending.push(`${folder}/${entry.name}`);
+      }
+      if (data.length < 1000) break;
+    }
+  }
+  return out;
+}
+
+/** Borra la carpeta entera de un microportal. Un fallo no tumba la edición. */
+export async function removePortalDir(dir: string | null | undefined) {
+  if (!dir || !/^portales\/[A-Za-z0-9_-]+$/.test(dir)) return;
+  const files = await listPortalFiles(dir);
+  for (let i = 0; i < files.length; i += 200) {
+    const { error } = await supabase.storage.from(DOC_BUCKET).remove(files.slice(i, i + 200));
+    if (error) console.warn("No se pudo borrar parte del microportal:", error.message);
+  }
 }
 
 /** Borra archivos del bucket. Un fallo aquí no debe tumbar la edición. */

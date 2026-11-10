@@ -28,7 +28,7 @@ export function ThumbCover({ format, size = "md" }: { format: DocFormat; size?: 
           <i style={{ width: "60%" }} />
           <span className="dv-tn__blk" />
         </>
-      ) : format === "html" ? (
+      ) : format === "html" || format === "portal" ? (
         <>
           <i className="dv-tn__h" />
           <span className="dv-tn__bars">

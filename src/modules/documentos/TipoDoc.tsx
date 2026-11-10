@@ -15,6 +15,7 @@ const ICON: Record<DocFormat, "document" | "code" | "external"> = {
   qmd: "code",
   r: "code",
   md: "document",
+  portal: "code",
   repo: "external",
   link: "external",
   file: "document",

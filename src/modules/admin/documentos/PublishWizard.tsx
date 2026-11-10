@@ -34,17 +34,20 @@ import { enterList, reducedMotion, sleep } from "./motion";
 import { autoThumbnail, thumbFromImage } from "./miniatura";
 import {
   MAX_DOC_BYTES,
+  MAX_PORTAL_ZIP_BYTES,
   extensionOf,
   formatBytes,
   removeDocFiles,
+  removePortalDir,
   uploadDocFile,
+  uploadPortalZip,
   uploadSourceFile,
   uploadThumb,
   useSaveItem,
 } from "./store";
 
 export type Draft = Omit<DocItem, "updatedAt">;
-type Mode = "file" | "md" | "link";
+type Mode = "file" | "md" | "link" | "portal";
 type CheckState = "wait" | "ok" | "warn";
 
 interface Check {
@@ -88,6 +91,7 @@ export const blankItem = (collectionId: string, position: number): Draft => ({
   sourcePath: null,
   sourceName: "",
   thumbPath: null,
+  siteDir: null,
   position,
 });
 
@@ -198,6 +202,8 @@ export function PublishWizard({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [dragging, setDragging] = useState(false);
+  /** Lo que trajo el .zip de esta sesión (para las comprobaciones). */
+  const [portalInfo, setPortalInfo] = useState<{ files: number; bytes: number } | null>(null);
 
   const [checks, setChecks] = useState<Check[]>([]);
   const [checksDone, setChecksDone] = useState(false);
@@ -212,6 +218,9 @@ export function PublishWizard({
 
   /** Lo subido en esta sesión: se borra si se cancela, y lo que sobre, al guardar. */
   const uploaded = useRef<string[]>([]);
+  /** Carpetas de microportales subidas en esta sesión. */
+  const portalDirs = useRef<string[]>([]);
+  const originalDir = useRef<string | null>(item?.siteDir ?? null);
   const originals = useRef<(string | null)[]>([item?.path ?? null, item?.sourcePath ?? null, item?.thumbPath ?? null]);
   const savedRef = useRef(false);
   const titleEdited = useRef(Boolean(item));
@@ -219,6 +228,7 @@ export function PublishWizard({
   const stepHead = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
   const filePicker = useRef<HTMLInputElement>(null);
+  const portalPicker = useRef<HTMLInputElement>(null);
   const sourcePicker = useRef<HTMLInputElement>(null);
   const imagePicker = useRef<HTMLInputElement>(null);
   const checksList = useRef<HTMLUListElement>(null);
@@ -259,6 +269,54 @@ export function PublishWizard({
     }
   }
 
+  /** Suelta la carpeta de un microportal subida en esta sesión (la original se borra al guardar). */
+  async function dropPortalSession(dir: string | null) {
+    if (dir && portalDirs.current.includes(dir)) {
+      portalDirs.current = portalDirs.current.filter((own) => own !== dir);
+      await removePortalDir(dir);
+    }
+  }
+
+  async function pickPortal(picked: File | undefined) {
+    if (!picked) return;
+    setError("");
+    setBusy("Abriendo el .zip…");
+    try {
+      const up = await uploadPortalZip(form.id, picked, (done, total) => setBusy(`Subiendo el sitio… ${done} de ${total} archivos`));
+      await dropPortalSession(form.siteDir);
+      await dropSession(form.path);
+      portalDirs.current.push(up.dir);
+      const flavor = await detectFlavor(up.entryFile);
+      setFile(up.entryFile);
+      setPortalInfo({ files: up.fileCount, bytes: up.totalBytes });
+      setForm((current) => ({
+        ...current,
+        kind: "archivo",
+        url: null,
+        path: up.entryPath,
+        fileName: "index.html",
+        fileType: "HTML",
+        sizeBytes: up.totalBytes,
+        flavor,
+        siteDir: up.dir,
+        title: titleEdited.current ? current.title : cleanTitle(picked.name),
+      }));
+      setAuto(NO_THUMB);
+      setThumbCleared(false);
+      setThumbNote("");
+      if (step === 3) {
+        const blob = await autoThumbnail(up.entryFile, "portal");
+        setAuto(makeThumb(blob));
+        if (!blob) setThumbNote("Se usará una portada con el tipo y el título.");
+      }
+    } catch (failure) {
+      setError(message(failure, "No se pudo subir el sitio. Revisa tu conexión e inténtalo de nuevo."));
+    } finally {
+      setBusy("");
+      if (portalPicker.current) portalPicker.current.value = "";
+    }
+  }
+
   async function pickFile(picked: File | undefined) {
     if (!picked) return;
     setError("");
@@ -266,9 +324,11 @@ export function PublishWizard({
     try {
       const up = await uploadDocFile(form.collectionId, picked);
       await dropSession(form.path);
+      await dropPortalSession(form.siteDir);
       uploaded.current.push(up.path);
       const flavor = await detectFlavor(picked);
       setFile(picked);
+      setPortalInfo(null);
       setForm((current) => ({
         ...current,
         kind: "archivo",
@@ -278,6 +338,7 @@ export function PublishWizard({
         fileType: up.fileType,
         sizeBytes: up.sizeBytes,
         flavor,
+        siteDir: null,
         title: titleEdited.current ? current.title : cleanTitle(up.fileName),
       }));
       // Una miniatura de otro archivo ya no sirve.
@@ -335,6 +396,11 @@ export function PublishWizard({
         setError("Elige un archivo para continuar.");
         return;
       }
+    } else if (mode === "portal") {
+      if (!form.siteDir || !file) {
+        setError("Elige el .zip del sitio para continuar.");
+        return;
+      }
     } else if (mode === "md") {
       if (!mdText.trim()) {
         setError("Escribe algo de texto antes de continuar.");
@@ -345,7 +411,9 @@ export function PublishWizard({
         const written = new File([mdText], "documento.md", { type: "text/markdown" });
         const up = await uploadDocFile(form.collectionId, written);
         await dropSession(form.path);
+        await dropPortalSession(form.siteDir);
         uploaded.current.push(up.path);
+        setPortalInfo(null);
         const heading = /^#{1,4}\s+(.+)$/m.exec(mdText)?.[1].trim() ?? "";
         setFile(written);
         setForm((current) => ({
@@ -357,6 +425,7 @@ export function PublishWizard({
           fileType: up.fileType,
           sizeBytes: up.sizeBytes,
           flavor: "",
+          siteDir: null,
           title: titleEdited.current ? current.title : heading,
         }));
       } catch (failure) {
@@ -372,7 +441,9 @@ export function PublishWizard({
         return;
       }
       setFile(null);
-      setForm((current) => ({ ...current, kind: "enlace", url, path: null, fileName: "", fileType: "", sizeBytes: null, flavor: "" }));
+      await dropPortalSession(form.siteDir);
+      setPortalInfo(null);
+      setForm((current) => ({ ...current, kind: "enlace", url, path: null, fileName: "", fileType: "", sizeBytes: null, flavor: "", siteDir: null }));
     }
     setChecks([]);
     setChecksDone(false);
@@ -418,6 +489,26 @@ export function PublishWizard({
           title: `Dirección válida (${hostOf(form.url)})`,
           detail: "El portal no puede comprobar que la página exista: si el sitio de destino la mueve, el enlace se rompe sin avisar.",
         }),
+      });
+    } else if (kind === "portal") {
+      jobs.push({
+        pending: "Contando los archivos del sitio",
+        run: async () => ({
+          state: "ok",
+          title: portalInfo ? `${plural(portalInfo.files, "archivo", "archivos")} · ${formatBytes(portalInfo.bytes)}` : "Sitio ya publicado",
+          detail: "Entrada: index.html. Los enlaces entre páginas, las imágenes y los estilos del sitio funcionan tal cual, porque se sirven desde su propia carpeta.",
+        }),
+      });
+      jobs.push({
+        pending: "Revisando el aislamiento",
+        run: async () => {
+          const { scripts } = await htmlReport();
+          return {
+            state: "ok",
+            title: scripts > 0 ? `La entrada trae ${plural(scripts, "script", "scripts")}` : "La entrada no trae scripts",
+            detail: "El sitio se ejecuta en un marco aislado: no ve la sesión del portal ni puede usar el almacenamiento del navegador (localStorage). Si algo del sitio guarda preferencias, no las recordará.",
+          };
+        },
       });
     } else if (file) {
       jobs.push({
@@ -671,6 +762,10 @@ export function PublishWizard({
       const stale = [...uploaded.current, ...originals.current].filter((path): path is string => Boolean(path) && !used.has(path));
       savedRef.current = true;
       void removeDocFiles(stale);
+      // Los sitios que quedaron atrás (uno reemplazado, o el de un documento que dejó de serlo).
+      for (const dir of [...portalDirs.current, originalDir.current]) {
+        if (dir && dir !== final.siteDir) void removePortalDir(dir);
+      }
       onSaved(
         final,
         status === "publicado"
@@ -687,11 +782,14 @@ export function PublishWizard({
 
   function handleClosed() {
     // Cancelar antes de guardar: lo subido en esta sesión no queda huérfano.
-    if (!savedRef.current) void removeDocFiles(uploaded.current);
+    if (!savedRef.current) {
+      void removeDocFiles(uploaded.current);
+      for (const dir of portalDirs.current) void removePortalDir(dir);
+    }
     onClose();
   }
 
-  const modeTitle = editing ? "Editar el documento" : mode === "link" ? "Añadir enlace" : mode === "md" ? "Escribir documento" : "Subir y publicar";
+  const modeTitle = editing ? "Editar el documento" : mode === "link" ? "Añadir enlace" : mode === "md" ? "Escribir documento" : mode === "portal" ? "Publicar un microportal" : "Subir y publicar";
   const sectionOptions = [root, ...sections];
   const isWeb = format === "html" || format === "qmd" || format === "r";
   const wasPublished = item?.status === "publicado";
@@ -787,6 +885,37 @@ export function PublishWizard({
                           <small className="doc-hint">Para un informe de Quarto o R: el lector podrá alternar entre el resultado y el código.</small>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {mode === "portal" && (
+                    <div role="tabpanel" id="da-panel-portal" aria-labelledby="da-tab-portal">
+                      <div
+                        className="da-drop"
+                        data-over={dragging || undefined}
+                        data-filled={form.siteDir ? "" : undefined}
+                        onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+                        onDragLeave={() => setDragging(false)}
+                        onDrop={(event) => { event.preventDefault(); setDragging(false); void pickPortal(event.dataTransfer.files?.[0]); }}
+                      >
+                        <Icon name="upload" size={22} />
+                        <strong>Suelta aquí el .zip del sitio</strong>
+                        <p>
+                          La carpeta que deja <b>Quarto</b> (<code>docs/</code> o <code>_site/</code>), R Markdown, Jupyter Book, MkDocs o Vite, ya renderizada y comprimida. Tiene que traer un <code>index.html</code>. Hasta {formatBytes(MAX_PORTAL_ZIP_BYTES)}.
+                        </p>
+                        <input ref={portalPicker} type="file" accept=".zip,application/zip" className="sr-only" tabIndex={-1} aria-label="Elegir el .zip del sitio" onChange={(event) => void pickPortal(event.target.files?.[0])} />
+                        <button type="button" className="button-secondary" data-autofocus disabled={Boolean(busy)} onClick={() => portalPicker.current?.click()}>
+                          {form.siteDir ? "Elegir otro .zip" : "Elegir el .zip"}
+                        </button>
+                      </div>
+                      {form.siteDir && portalInfo && (
+                        <p className="doc-hint">
+                          Listo: {plural(portalInfo.files, "archivo", "archivos")} · {formatBytes(portalInfo.bytes)}. Todavía no es público: se publica en el último paso.
+                        </p>
+                      )}
+                      <p className="doc-hint">
+                        Los nombres de archivo no pueden llevar acentos ni «ñ». El sitio se muestra en un marco aislado, sin acceso a la sesión del portal.
+                      </p>
                     </div>
                   )}
 
@@ -965,13 +1094,23 @@ export function PublishWizard({
                               {form.sizeBytes ? ` · ${formatBytes(form.sizeBytes)}` : ""}
                             </span>
                           </p>
-                          <span className="da-inline">
-                            <input ref={filePicker} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-label="Elegir el archivo que reemplaza al actual" onChange={(event) => void pickFile(event.target.files?.[0])} />
-                            <button type="button" className="oda-link-button" disabled={Boolean(busy)} onClick={() => filePicker.current?.click()}>
-                              Reemplazar el archivo
-                            </button>
-                            <small className="doc-hint">Hasta {formatBytes(MAX_DOC_BYTES)}. El anterior se borra al guardar.</small>
-                          </span>
+                          {form.siteDir ? (
+                            <span className="da-inline">
+                              <input ref={portalPicker} type="file" accept=".zip,application/zip" className="sr-only" tabIndex={-1} aria-label="Elegir el .zip que reemplaza al sitio actual" onChange={(event) => void pickPortal(event.target.files?.[0])} />
+                              <button type="button" className="oda-link-button" disabled={Boolean(busy)} onClick={() => portalPicker.current?.click()}>
+                                Reemplazar el sitio (.zip)
+                              </button>
+                              <small className="doc-hint">Hasta {formatBytes(MAX_PORTAL_ZIP_BYTES)}. El sitio anterior se borra al guardar.</small>
+                            </span>
+                          ) : (
+                            <span className="da-inline">
+                              <input ref={filePicker} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-label="Elegir el archivo que reemplaza al actual" onChange={(event) => void pickFile(event.target.files?.[0])} />
+                              <button type="button" className="oda-link-button" disabled={Boolean(busy)} onClick={() => filePicker.current?.click()}>
+                                Reemplazar el archivo
+                              </button>
+                              <small className="doc-hint">Hasta {formatBytes(MAX_DOC_BYTES)}. El anterior se borra al guardar.</small>
+                            </span>
+                          )}
                         </div>
                       )}
 
@@ -1180,6 +1319,7 @@ function PreviewThumb({ item, url, size }: { item: DocItem; url: string | null; 
 function ModeTabs({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
   const tabs: { id: Mode; label: string; icon: "upload" | "pen" | "link" }[] = [
     { id: "file", label: "Subir archivo", icon: "upload" },
+    { id: "portal", label: "Subir sitio (.zip)", icon: "upload" },
     { id: "md", label: "Escribir en Markdown", icon: "pen" },
     { id: "link", label: "Pegar enlace", icon: "link" },
   ];

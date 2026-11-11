@@ -20,3 +20,7 @@
 .obs-visor__datos summary small { color: var(--ink-3, #5f7089); font-weight: 500; margin-left: 6px; }
 .obs-visor__guia { margin-top: 14px; display: grid; gap: 6px; }
 .obs-visor__guia h3 { margin: 0; font-size: 15px; }
+.obs-visor__vista { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line, #dfe6f0); border-radius: 999px; background: #fff; width: fit-content; }
+.obs-visor__vista button { all: unset; cursor: pointer; padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.obs-visor__vista button[aria-pressed="true"] { background: #153f7e; color: #fff; }
+.obs-visor__vista button:focus-visible { outline: 2px solid var(--blue, #2166d6); outline-offset: 2px; }

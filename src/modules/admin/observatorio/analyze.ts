@@ -73,6 +73,8 @@ const TIME_HEADER = /(a[ñn]o|year|vigencia|cohorte|periodo|per[ií]odo|semestre
 const MUNICIPIO_HEADER = /(municipio|ciudad|lugar|procedencia|origen|residencia|expedici[oó]n)/i;
 const DEPARTAMENTO_HEADER = /(departamento|depto|dpto)/i;
 const PAIS_HEADER = /(pa[ií]s|nacionalidad|country)/i;
+/** Títulos de columnas que miden algo (dinero, puntajes, tasas): sus números largos y distintos no son documentos. */
+const MEASURE_HEADER = /(ingreso|costo|gasto|excedente|n[oó]mina|valor|monto|saldo|presupuesto|recaudo|pago|descuento|aporte|contribuci|equilibrio|puntaje|promedio|total|%|porcentaje|tasa|proporci)/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PERIOD = /^\s*(19|20)\d{2}\s*[-_ ]?\s*(0?[12]|I{1,2}|[AB])\s*$/i;
 const DATE = /^\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/;
@@ -112,7 +114,8 @@ function profileColumn(header: string, values: string[], index: number, key: str
   if (filled.filter((v) => EMAIL.test(v)).length / filled.length > 0.3) return { ...base, role: "personal", reason: "Los valores son correos electrónicos." };
   // Números largos casi todos distintos: documentos, códigos, teléfonos.
   const longDigits = filled.filter((v) => /^\+?\d[\d\s-]{5,14}$/.test(v)).length / filled.length;
-  if (longDigits > 0.8 && uniqueShare > 0.85 && rows > 10) return { ...base, role: "identificador", reason: "Números largos distintos en casi cada fila: parecen documentos o códigos." };
+  const medida = MEASURE_HEADER.test(header);
+  if (!medida && longDigits > 0.8 && uniqueShare > 0.85 && rows > 10) return { ...base, role: "identificador", reason: "Números largos distintos en casi cada fila: parecen documentos o códigos." };
 
   // Tiempo
   const years = numeric.filter((n) => Number.isInteger(n) && n >= 1990 && n <= 2100).length / filled.length;
@@ -150,7 +153,7 @@ function profileColumn(header: string, values: string[], index: number, key: str
   // Texto
   const avgLength = filled.reduce((s, v) => s + v.length, 0) / filled.length;
   if (uniqueShare > 0.8 && avgLength > 35 && rows > 10) return { ...base, role: "texto_libre", reason: "Respuestas abiertas: pueden nombrar a alguien." };
-  if (!institutional && uniqueShare > 0.95 && rows > 30) return { ...base, role: "identificador", reason: "Un valor distinto en casi cada fila: identifica registros." };
+  if (!institutional && !medida && uniqueShare > 0.95 && rows > 30) return { ...base, role: "identificador", reason: "Un valor distinto en casi cada fila: identifica registros." };
   return { ...base, role: "categoria", reason: distinct <= 12 ? `${distinct} categorías.` : `${distinct} valores distintos.` };
 }
 

@@ -30,7 +30,8 @@ import { ObservatoriosPanel } from "./publicar/ObservatoriosPanel";
 import { InsertarPanel } from "./publicar/InsertarPanel";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { TOPICS, plural, topicConfig, topicTone } from "./model";
-import type { ObsState } from "./model";
+import type { ObsState, ObsTopicInfo } from "./model";
+import { useObservatorios } from "./publicar/api";
 import { useObsCommit, useObsState, useSyncObsTopics } from "./store";
 import { CaptureStation } from "./stations/CaptureStation";
 import { DesignStation } from "./stations/DesignStation";
@@ -68,6 +69,11 @@ export function ObsAdmin() {
   const topic = TOPICS.find((t) => t.slug === topicParam)?.slug ?? TOPICS[0].slug;
   const current = OBS_STATIONS.find((s) => s.id === station)!;
   const go = (s: ObsStationId, t = topic, q = "") => navigate(`/admin/observatorio/${s}/${t}${q ? `?${q}` : ""}`);
+  // El taller trabaja de a un observatorio: el del tema abierto. Los temas sin dato son del principal.
+  const observatorios = useObservatorios().data ?? [];
+  const principal = observatorios.find((o) => o.principal)?.id ?? null;
+  const obsActivo = obsDeTema(TOPICS.find((t) => t.slug === topic), principal);
+  const temas = TOPICS.filter((t) => obsDeTema(t, principal) === obsActivo);
 
   return (
     <AdminShell section="observatorio" kicker="Observatorio de Analítica" title={panelInfo?.label ?? current.label} description={panelInfo?.hint ?? current.hint}>
@@ -97,10 +103,18 @@ export function ObsAdmin() {
           )}
 
           <PanelesNav actual={null} />
-          <ObsStationBar station={station} topic={topic} state={query.data} visibles={visibles.map((s) => s.id)} />
+          <ObservatorioActivo
+            observatorios={observatorios.filter((o) => o.estado !== "archivado" && TOPICS.some((t) => obsDeTema(t, principal) === o.id))}
+            activo={obsActivo}
+            onPick={(id) => {
+              const primero = TOPICS.find((t) => obsDeTema(t, principal) === id);
+              if (primero) go(station, primero.slug);
+            }}
+          />
+          <ObsStationBar station={station} topic={topic} temas={temas} state={query.data} visibles={visibles.map((s) => s.id)} />
 
           <div className="oda-workspace obs-workspace" data-station={station}>
-            {station !== "diseno" && station !== "boletin" && <TopicRail state={query.data} active={topic} onPick={(slug) => go(station, slug)} />}
+            {station !== "diseno" && station !== "boletin" && <TopicRail state={query.data} temas={temas} active={topic} onPick={(slug) => go(station, slug)} />}
             <section className="oda-stage" aria-label={current.label}>
               {visibles.length > 0 && station === "captura" && <CaptureStation state={query.data} topic={topic} canEdit={canEdit} go={go} />}
               {station === "diseno" && <DesignStation state={query.data} topic={topic} canEdit={canEdit} go={go} />}
@@ -132,28 +146,55 @@ function PanelesNav({ actual }: { actual: "observatorios" | "insertar" | null })
   );
 }
 
+/** Observatorio de un tema; sin dato, el principal. */
+function obsDeTema(t: ObsTopicInfo | undefined, principal: string | null) {
+  return t?.obs ?? principal;
+}
+
+/** Observatorio en el que se trabaja: todo el taller (riel, cifras, selector de tema) sigue a este. */
+function ObservatorioActivo({ observatorios, activo, onPick }: { observatorios: { id: string; nombre: string; estado: string }[]; activo: string | null; onPick: (id: string) => void }) {
+  if (observatorios.length < 2) return null;
+  return (
+    <label className="obs-select obs-activo">
+      <span>Observatorio en el que trabajas</span>
+      <select value={activo ?? ""} onChange={(e) => onPick(e.target.value)}>
+        {observatorios.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.nombre}
+            {o.estado === "borrador" ? " · borrador" : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 /* --- Barra de estaciones ------------------------------------------------------------ */
 
-function ObsStationBar({ station, topic, state, visibles }: { station: ObsStationId; topic: string; state: ObsState; visibles: ObsStationId[] }) {
-  const real = state.datasets.filter((d) => !d.sample);
-  const topicsWithData = new Set(state.datasets.map((d) => d.topic)).size;
-  const topicsWithViews = new Set(state.views.filter((v) => v.visible).map((v) => v.topic)).size;
-  const published = state.topics.filter((t) => t.status === "publicado").length;
+function ObsStationBar({ station, topic, temas, state, visibles }: { station: ObsStationId; topic: string; temas: ObsTopicInfo[]; state: ObsState; visibles: ObsStationId[] }) {
+  const slugs = new Set(temas.map((t) => t.slug));
+  const total = temas.length;
+  const datasets = state.datasets.filter((d) => slugs.has(d.topic));
+  const real = datasets.filter((d) => !d.sample);
+  const topicsWithData = new Set(datasets.map((d) => d.topic)).size;
+  const views = state.views.filter((v) => slugs.has(v.topic));
+  const topicsWithViews = new Set(views.filter((v) => v.visible).map((v) => v.topic)).size;
+  const published = state.topics.filter((t) => slugs.has(t.slug) && t.status === "publicado").length;
   const summary: Record<ObsStationId, { value: string; detail: string; state: "ok" | "pendiente" | "vacio" }> = {
     captura: {
-      value: plural(state.datasets.length, "tabla", "tablas"),
-      detail: `${topicsWithData} de ${TOPICS.length} temas · ${real.length} con datos reales`,
-      state: topicsWithData === 0 ? "vacio" : topicsWithData >= TOPICS.length ? "ok" : "pendiente",
+      value: plural(datasets.length, "tabla", "tablas"),
+      detail: `${topicsWithData} de ${total} temas · ${real.length} con datos reales`,
+      state: topicsWithData === 0 ? "vacio" : topicsWithData >= total ? "ok" : "pendiente",
     },
     diseno: {
-      value: plural(state.views.length, "visor", "visores"),
-      detail: `${topicsWithViews} de ${TOPICS.length} temas con visores`,
-      state: state.views.length === 0 ? "vacio" : topicsWithViews >= TOPICS.length ? "ok" : "pendiente",
+      value: plural(views.length, "visor", "visores"),
+      detail: `${topicsWithViews} de ${total} temas con visores`,
+      state: views.length === 0 ? "vacio" : topicsWithViews >= total ? "ok" : "pendiente",
     },
     tableros: {
-      value: `${published} de ${TOPICS.length}`,
+      value: `${published} de ${total}`,
       detail: "temas publicados",
-      state: published === 0 ? "vacio" : published >= TOPICS.length ? "ok" : "pendiente",
+      state: published === 0 ? "vacio" : published >= total ? "ok" : "pendiente",
     },
     boletin: {
       value: state.bulletins.length ? plural(state.bulletins.length, "boletín", "boletines") : "Sin crear",
@@ -188,10 +229,10 @@ function ObsStationBar({ station, topic, state, visibles }: { station: ObsStatio
 
 /* --- Temas -------------------------------------------------------------------------------- */
 
-function TopicRail({ state, active, onPick }: { state: ObsState; active: string; onPick: (slug: string) => void }) {
+function TopicRail({ state, temas, active, onPick }: { state: ObsState; temas: ObsTopicInfo[]; active: string; onPick: (slug: string) => void }) {
   const counts = useMemo(() => {
     const map = new Map<string, { tables: number; views: number; sample: boolean }>();
-    for (const t of TOPICS) map.set(t.slug, { tables: 0, views: 0, sample: false });
+    for (const t of temas) map.set(t.slug, { tables: 0, views: 0, sample: false });
     for (const d of state.datasets) {
       const c = map.get(d.topic);
       if (c) {
@@ -205,15 +246,15 @@ function TopicRail({ state, active, onPick }: { state: ObsState; active: string;
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, TOPICS.length]);
+  }, [state, temas]);
   return (
     <aside className="oda-rail obs-rail" aria-label="Temas del Observatorio">
       <div className="oda-rail__head">
-        <strong>{TOPICS.length} temas</strong>
+        <strong>{temas.length} temas</strong>
         <span className="obs-rail__legend">tablas · visores</span>
       </div>
       <ul>
-        {TOPICS.map((t) => {
+        {temas.map((t) => {
           const c = counts.get(t.slug)!;
           const config = topicConfig(state, t.slug);
           return (
@@ -244,11 +285,14 @@ function TopicRail({ state, active, onPick }: { state: ObsState; active: string;
 
 /** Selector compacto de tema, para las estaciones que necesitan el ancho. */
 export function TopicSelect({ value, onChange, label = "Tema" }: { value: string; onChange: (slug: string) => void; label?: string }) {
+  // Solo los temas del observatorio del tema abierto.
+  const principal = useObservatorios().data?.find((o) => o.principal)?.id ?? null;
+  const obs = obsDeTema(TOPICS.find((t) => t.slug === value), principal);
   return (
     <label className="obs-select">
       <span>{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}>
-        {TOPICS.map((t) => (
+        {TOPICS.filter((t) => obsDeTema(t, principal) === obs).map((t) => (
           <option key={t.slug} value={t.slug}>
             {t.code} · {t.name}
           </option>

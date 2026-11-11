@@ -40,6 +40,9 @@ import type { MetaCartel } from "./rediseno";
 import { datosTablero, obsIcono as obsIconoTablero } from "./tablero";
 
 const LiveTopicBody = lazy(() => import("./LiveTopic"));
+const PortalIga = lazy(() => import("./PortalIga"));
+/** Páginas con tablero a medida (lee las tablas publicadas y conectadas en la Guía de datos). */
+const TABLERO_IGA = new Set(["iga-financiero"]);
 import "../datos-abiertos.css";
 import "./observatorio.css";
 
@@ -375,7 +378,12 @@ export function ObservatoryTopic() {
         <Cartel d={datos} indice={index} total={lista.length} atras={atras} pregunta={real?.live.config.intro || topic.question} meta={meta} ilustrativo={!real && !topic.vacio} />
         <Franja d={datos} />
         <div className="obsr-wrap">
-          {real ? (
+          {TABLERO_IGA.has(topic.slug) ? (
+            <Suspense fallback={<div className="obs-live__loading" aria-busy="true" />}>
+              <PortalIga obsId={topic.obsId} />
+              <Montado onMontado={alMontar} />
+            </Suspense>
+          ) : real ? (
             <Suspense fallback={<div className="obs-live__loading" aria-busy="true" />}>
               <LiveTopicBody live={real.live} slug={topic.slug} />
               <Montado onMontado={alMontar} />

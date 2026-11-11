@@ -188,6 +188,8 @@ export interface ObsTopicInfo {
   source: string;
   /** Temas creados en la base (0248): color propio, si lo tienen. */
   color?: string | null;
+  /** Observatorio al que pertenece (0230). Sin dato: el principal. */
+  obs?: string | null;
 }
 
 /**
@@ -200,6 +202,8 @@ const BASE_TOPICS = TOPICS.length;
 
 /** Deja en TOPICS los de siempre más los de la base que no están en la constante. */
 export function syncTopics(extra: ObsTopicInfo[]) {
+  // Los de siempre también se leen de la base: de ahí sale su observatorio.
+  for (const t of TOPICS.slice(0, BASE_TOPICS)) t.obs = extra.find((e) => e.slug === t.slug)?.obs ?? t.obs;
   TOPICS.splice(BASE_TOPICS, TOPICS.length - BASE_TOPICS, ...extra.filter((t) => !OBS_TOPICS.some((b) => b.slug === t.slug)));
 }
 

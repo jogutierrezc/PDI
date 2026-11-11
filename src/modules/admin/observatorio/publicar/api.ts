@@ -145,17 +145,22 @@ export const useArchivarObservatorio = () => useRpc<{ p_id: string; p_archivar?:
 /** Cambios directos permitidos por RLS al panel Observatorios (nivel editar): identidad, líneas, temas y personas responsables. */
 export function useEditarObservatorios() {
   const client = useQueryClient();
-  const run = async (migracion: string, p: PromiseLike<{ data: unknown; error: DatabaseError | null }>) => {
-    revisar(migracion, await p);
+  // `exigirFila`: un update que la base filtra por permisos no da error, solo cero filas. Sin esta
+  // comprobación la pantalla diría «guardado» y el tema seguiría en borrador.
+  const run = async (migracion: string, p: PromiseLike<{ data: unknown; error: DatabaseError | null }>, exigirFila = false) => {
+    const data = revisar(migracion, await p);
+    if (exigirFila && Array.isArray(data) && data.length === 0) {
+      throw new Error("No se guardó: tu rol no puede editar esto. Hace falta el nivel Editar con capacidad de Planeación en este observatorio (o ser su responsable).");
+    }
     void client.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("obs-") });
   };
   return {
-    identidad: (id: string, c: Partial<Pick<Observatorio, "nombre" | "descripcion" | "color" | "icono" | "responsable" | "estado">>) => run("0231", supabase.from("obs_observatorios").update(c).eq("id", id)),
+    identidad: (id: string, c: Partial<Pick<Observatorio, "nombre" | "descripcion" | "color" | "icono" | "responsable" | "estado">>) => run("0231", supabase.from("obs_observatorios").update(c).eq("id", id).select("id"), true),
     linea: (l: Partial<Linea> & { observatorio_id: string }) => run("0230", supabase.from("obs_lineas").upsert(l)),
     quitarLinea: (id: string) => run("0230", supabase.from("obs_lineas").delete().eq("id", id)),
-    tema: (slug: string, c: Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden" | "archivado" | "status" | "color" | "icono">>) => run("0230", supabase.from("obs_topics").update(c).eq("slug", slug)),
+    tema: (slug: string, c: Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden" | "archivado" | "status" | "color" | "icono">>) => run("0230", supabase.from("obs_topics").update(c).eq("slug", slug).select("slug"), true),
     /** Apariencia del tablero público: color, icono, foto y degradado. Migración 0251. */
-    apariencia: (slug: string, c: Partial<Pick<Tema, "color" | "icono" | "imagen_url" | "degradado" | "alcance" | "encuadre_x" | "encuadre_y">>) => run("0251", supabase.from("obs_topics").update(c).eq("slug", slug)),
+    apariencia: (slug: string, c: Partial<Pick<Tema, "color" | "icono" | "imagen_url" | "degradado" | "alcance" | "encuadre_x" | "encuadre_y">>) => run("0251", supabase.from("obs_topics").update(c).eq("slug", slug).select("slug"), true),
     /** Tema nuevo (nace en borrador). El enlace es único en todo el portal: si choca, el llamador elige otro. */
     crearTema: (t: Pick<Tema, "slug" | "observatorio_id"> & Partial<Pick<Tema, "linea_id" | "codigo" | "nombre" | "resumen" | "pregunta" | "fuente" | "orden">>) => run("0230", supabase.from("obs_topics").insert({ ...t, status: "borrador" })),
     asignar: (r: Responsable) => run("0230", supabase.from("obs_responsables").upsert(r)),

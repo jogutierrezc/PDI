@@ -420,27 +420,31 @@ function ImportFlow({ topic, position, onCancel, onSaved }: { topic: string; pos
     if (guess !== meta.dataType) setMeta((m) => ({ ...m, dataType: guess }));
   }, [recs, draft, typeTouched, meta.dataType]);
 
-  const save = () => {
+  // Dos guardados seguidos con mutateAsync: llamar a mutate() dentro del onSuccess de otro mutate()
+  // del mismo hook borra sus opciones y TanStack falla leyendo onSettled.
+  const save = async () => {
     if (!draft || !result) return;
     const id = newId();
     const dataset: ObsDataset = { ...draft, id, title: meta.title.trim() || "Tabla importada" };
-    commit.mutate(
-      { kind: "dataset", value: dataset },
-      {
-        onSuccess: () => {
-          const top = recs.find((r) => r.type !== "tabla");
-          if (meta.withView && top) {
-            const section: ObsSection =
-              top.type === "lineas" || top.type === "area" ? "tendencia" : top.type.startsWith("mapa") && top.type !== "mapa_calor" ? "territorio" : top.type === "cifras" ? "panorama" : ["dona", "circular", "mosaico", "barras_100"].includes(top.type) ? "composicion" : "detalle";
-            commit.mutate({
-              kind: "view",
-              value: { ...top.encoding, id: newId(), datasetId: id, topic, key: "v1", title: dataset.title, section, size: "media", visible: true, position: 99 },
-            });
-          }
-          onSaved(id);
-        },
-      },
-    );
+    try {
+      await commit.mutateAsync({ kind: "dataset", value: dataset });
+    } catch {
+      return; // el error queda en commit.error
+    }
+    const top = recs.find((r) => r.type !== "tabla");
+    if (meta.withView && top) {
+      const section: ObsSection =
+        top.type === "lineas" || top.type === "area" ? "tendencia" : top.type.startsWith("mapa") && top.type !== "mapa_calor" ? "territorio" : top.type === "cifras" ? "panorama" : ["dona", "circular", "mosaico", "barras_100"].includes(top.type) ? "composicion" : "detalle";
+      try {
+        await commit.mutateAsync({
+          kind: "view",
+          value: { ...top.encoding, id: newId(), datasetId: id, topic, key: "v1", title: dataset.title, section, size: "media", visible: true, position: 99 },
+        });
+      } catch {
+        // la tabla ya quedó guardada; el visor sugerido se arma luego en Diseño
+      }
+    }
+    onSaved(id);
   };
 
   const steps: { id: Step; label: string }[] = [

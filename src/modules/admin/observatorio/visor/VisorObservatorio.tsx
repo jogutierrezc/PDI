@@ -24,6 +24,8 @@ import type { ObsDataset } from "../model";
 import { usePermisosObservatorio } from "../publicar/permisos";
 import { useObsState, useSyncObsTopics } from "../store";
 import { BoardPreview } from "../stations/BoardsStation";
+import { visoresSugeridos } from "./sugeridas";
+import { PaginaFinanciero } from "../tablero-iga/PaginaFinanciero";
 import { origenVisible, useIndicadores } from "../guia/api";
 import { useFiltrosTablero, useObservatorioPorEnlace } from "../guia/tablero";
 import { SIN_FILTROS, filtrarDataset, hayFiltros, opcionesDe } from "./estructura";
@@ -119,7 +121,19 @@ export function VisorObservatorio() {
             {actual === "guia" ? (
               <GuiaLectura filas={indicadores.data?.filas ?? []} temas={temas} falta={Boolean(indicadores.data?.falta)} ir={(slug) => navigate(`/admin/observatorio-ver/${enlace}/${slug}`)} />
             ) : actual ? (
-              estado.data && <PaginaTema slug={actual} estado={estado.data} filtros={f} />
+              estado.data && (
+                actual === "iga-financiero" && sp.get("vista") !== "taller" ? (
+                  <>
+                    <VistaTema sp={sp} setSp={setSp} />
+                    <PaginaFinanciero enlace={enlace ?? ""} indicadores={indicadores.data?.filas ?? []} datasets={datasets} filtros={f} poner={poner} />
+                  </>
+                ) : (
+                  <>
+                    {actual === "iga-financiero" && <VistaTema sp={sp} setSp={setSp} />}
+                    <PaginaTema slug={actual} estado={estado.data} filtros={f} />
+                  </>
+                )
+              )
             ) : (
               <p className="obs-empty">Este observatorio aún no tiene páginas.</p>
             )}
@@ -127,6 +141,18 @@ export function VisorObservatorio() {
         </div>
       )}
     </AdminShell>
+  );
+}
+
+/** Alterna entre el tablero a medida y las gráficas que arma el taller. */
+function VistaTema({ sp, setSp }: { sp: URLSearchParams; setSp: (p: URLSearchParams, o?: { replace?: boolean }) => void }) {
+  const taller = sp.get("vista") === "taller";
+  const poner = (v: "" | "taller") => { const n = new URLSearchParams(sp); if (v) n.set("vista", v); else n.delete("vista"); setSp(n, { replace: true }); };
+  return (
+    <div className="obs-visor__vista" role="group" aria-label="Forma de ver el tema">
+      <button type="button" aria-pressed={!taller} onClick={() => poner("")}>Tablero</button>
+      <button type="button" aria-pressed={taller} onClick={() => poner("taller")}>Gráficas del taller</button>
+    </div>
   );
 }
 
@@ -166,7 +192,10 @@ function Filtros({ f, poner, opciones, ofrece, activo, limpiar }: { f: FiltrosEs
 
 function PaginaTema({ slug, estado, filtros }: { slug: string; estado: NonNullable<ReturnType<typeof useObsState>["data"]>; filtros: FiltrosEstructura }) {
   const config = topicConfig(estado, slug);
-  const views = useMemo(() => estado.views.filter((v) => v.topic === slug && v.visible).sort((a, b) => a.position - b.position), [estado.views, slug]);
+  const guardados = useMemo(() => estado.views.filter((v) => v.topic === slug && v.visible).sort((a, b) => a.position - b.position), [estado.views, slug]);
+  // Sin visores guardados, la vista previa dibuja los que el taller recomienda para las tablas del tema.
+  const views = useMemo(() => (guardados.length ? guardados : visoresSugeridos(estado.datasets.filter((d) => d.topic === slug && !d.sample), slug)), [guardados, estado.datasets, slug]);
+  const sugeridas = guardados.length === 0 && views.length > 0;
   const usados = useMemo(() => [...new Set(views.map((v) => v.datasetId))].map((id) => estado.datasets.find((d) => d.id === id)).filter((d): d is ObsDataset => Boolean(d)), [views, estado.datasets]);
   const filtrados = useMemo(() => usados.map((d) => ({ d, r: filtrarDataset(d, filtros) })), [usados, filtros]);
   const mapa = useMemo(() => new Map(filtrados.map(({ d, r }) => [d.id, r.dataset])), [filtrados]);
@@ -174,6 +203,11 @@ function PaginaTema({ slug, estado, filtros }: { slug: string; estado: NonNullab
 
   return (
     <>
+      {sugeridas && (
+        <p className="obs-guia-aviso" role="note">
+          <Icon name="alert" size={15} /> Vista previa con gráficas sugeridas: este tema aún no tiene visores guardados. Se arman y guardan en Diseño visual; el portal solo muestra los guardados y publicados.
+        </p>
+      )}
       {hayFiltros(filtros) && ignorados.length > 0 && (
         <p className="obs-guia-aviso" role="note">
           <Icon name="alert" size={15} /> Algunas gráficas vienen agregadas sin la columna de {ignorados.join(", ")}: ese filtro no las cambia.

@@ -194,7 +194,7 @@ export function FinancieroIga({ programas, filtros, poner, onDetalle }: { progra
 
 /* --- Piezas --------------------------------------------------------------------------------- */
 
-function Kpi({ etiqueta, n, f, detalle, bueno }: { etiqueta: string; n: number; f: (v: number) => string; detalle?: string; bueno?: boolean }) {
+export function Kpi({ etiqueta, n, f, detalle, bueno }: { etiqueta: string; n: number; f: (v: number) => string; detalle?: string; bueno?: boolean }) {
   return (
     <div className="iga-kpi" role="listitem">
       <Cuenta valor={n} formato={f} />

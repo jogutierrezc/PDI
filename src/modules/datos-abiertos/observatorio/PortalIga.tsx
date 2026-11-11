@@ -20,6 +20,8 @@ import { CLAVES_FIN, NOMBRE_TABLA, construirProgramas, tablasFinancieras } from 
 import type { FiltroFin } from "../../admin/observatorio/tablero-iga/financiero-datos";
 import { DetallePrograma } from "../../admin/observatorio/tablero-iga/DetallePrograma";
 import { useDetalleUrl } from "../../admin/observatorio/tablero-iga/detalle-url";
+import { PaginaTemaIga } from "../../admin/observatorio/tablero-iga/PaginaTemaIga";
+import { TEMAS_IGA } from "../../admin/observatorio/tablero-iga/temas";
 import "../../admin/observatorio/tablero-iga/tablero-iga.css";
 
 function usePublicadoIga(obsId: string | null) {
@@ -38,7 +40,7 @@ function usePublicadoIga(obsId: string | null) {
   });
 }
 
-export default function PortalIga({ obsId }: { obsId: string | null }) {
+export default function PortalIga({ obsId, slug }: { obsId: string | null; slug: string }) {
   const [sp, setSp] = useSearchParams();
   const detalle = useDetalleUrl();
   const q = usePublicadoIga(obsId);
@@ -53,7 +55,15 @@ export default function PortalIga({ obsId }: { obsId: string | null }) {
     setSp(n, { replace: true });
   };
 
+  const cfg = TEMAS_IGA[slug];
   if (q.isPending) return <div className="obs-live__loading" aria-busy="true" />;
+  if (cfg && q.data) {
+    return (
+      <section className="iga iga--portal" aria-label={`Tablero de ${cfg.nombre}`}>
+        <PaginaTemaIga cfg={cfg} datasets={q.data.datasets} indicadores={q.data.indicadores} filtros={filtros} poner={poner} conBarra />
+      </section>
+    );
+  }
   if (q.isError || !programas.length) {
     return (
       <section className="obs-views" aria-label="Datos de Financiero">

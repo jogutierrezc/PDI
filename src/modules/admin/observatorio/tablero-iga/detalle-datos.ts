@@ -46,6 +46,26 @@ export function formatoMedida(c: Pick<ObsColumn, "key" | "format">, v: number): 
   return Number.isInteger(v) ? num(v) : new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(v);
 }
 
+/** La facultad de un programa, tomada de la primera tabla que la traiga. */
+export function facultadDe(datasets: ObsDataset[], programa: string): string {
+  for (const ds of datasets) {
+    const cp = col(ds, "programa"), cf = col(ds, "facultad");
+    if (!cp || !cf) continue;
+    const r = ds.rows.find((x) => x.kind === "dato" && textOf(x.cells[cp.key]) === programa);
+    if (r) return textOf(r.cells[cf.key]);
+  }
+  return "";
+}
+
+/** Tablas de los temas IGA que no están conectadas a un indicador también cuentan para el detalle. */
+export function indicadoresEfectivos(indicadores: Indicador[], datasets: ObsDataset[]): Indicador[] {
+  const usadas = new Set(indicadores.map((i) => i.origen_ref).filter(Boolean));
+  const extra = datasets
+    .filter((d) => /^iga-/.test(d.topic) && d.topic !== "iga-financiero" && !usadas.has(d.id))
+    .map((d) => ({ id: d.id, observatorio_id: "", tema_slug: d.topic, clave: d.topic, orden: 0, nombre: d.title, fuente: "", cobertura: "", nivel: "programa", estado: "ok", hojas: [], conjunto_vivo: null, libro_existente: null, vista: null, vista_pestana: null, origen_tipo: "tabla", origen_ref: d.id, origen_version: 1, origen_nota: null, origen_en: null }) as Indicador);
+  return [...indicadores, ...extra];
+}
+
 export function bloquesDelPrograma(indicadores: Indicador[], datasets: ObsDataset[], p: { programa: string; sede: string; facultad: string }, excluir: (i: Indicador) => boolean = () => false): BloqueDetalle[] {
   const out: BloqueDetalle[] = [];
   for (const ind of indicadores) {

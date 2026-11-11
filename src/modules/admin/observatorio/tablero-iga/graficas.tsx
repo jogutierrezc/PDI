@@ -182,6 +182,11 @@ export function Lineas({ xs, series, fmt, etiqueta }: { xs: string[]; series: Se
   const X = (i: number) => mL + (xs.length === 1 ? (W - mL - mR) / 2 : ((W - mL - mR) * i) / (xs.length - 1));
   const Y = (v: number) => mT + (H - mT - mB) * (1 - (v - lo) / (hi - lo));
   const ticks = [lo + pad, (lo + hi) / 2, hi - pad];
+  // Con muchos periodos no caben todas las etiquetas: se muestra una de cada `paso`, siempre la última.
+  const ancho = Math.max(...xs.map((x) => x.length), 4) * 6.4 + 16;
+  const paso = Math.max(1, Math.ceil(xs.length / Math.max(2, Math.floor((W - mL - mR) / ancho))));
+  const conEtiqueta = (i: number) => (xs.length - 1 - i) % paso === 0;
+  const radio = xs.length > 30 ? 2.2 : xs.length > 14 ? 3 : 4;
   return (
     <svg className="iga-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={etiqueta}>
       {ticks.map((t) => (
@@ -192,7 +197,10 @@ export function Lineas({ xs, series, fmt, etiqueta }: { xs: string[]; series: Se
       ))}
       <line x1={mL} x2={W - mR} y1={Y(0)} y2={Y(0)} className="iga-eje" />
       {xs.map((x, i) => (
-        <text key={x} x={X(i)} y={H - 10} textAnchor="middle" className="iga-t">{x}</text>
+        <g key={x}>
+          <line x1={X(i)} x2={X(i)} y1={H - mB} y2={H - mB + (conEtiqueta(i) ? 5 : 3)} className="iga-eje" />
+          {conEtiqueta(i) && <text x={X(i)} y={H - 10} textAnchor="middle" className="iga-t">{x}</text>}
+        </g>
       ))}
       {series.map((s) => {
         // Un periodo sin cifra corta la línea en vez de unir los vecinos.
@@ -207,7 +215,7 @@ export function Lineas({ xs, series, fmt, etiqueta }: { xs: string[]; series: Se
           <g key={s.label} stroke={s.color} fill={s.color}>
             {tramos.map((t, j) => <polyline key={j} points={t.map((p) => p.join(",")).join(" ")} fill="none" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />)}
             {s.vals.map((v, i) => v !== null && (
-              <circle key={i} cx={X(i)} cy={Y(v)} r="4" stroke="var(--iga-surface)" strokeWidth="2">
+              <circle key={i} cx={X(i)} cy={Y(v)} r={radio} stroke="var(--iga-surface)" strokeWidth={xs.length > 14 ? 1 : 2}>
                 <title>{`${s.label} · ${xs[i]}: ${fmt(v)}`}</title>
               </circle>
             ))}
@@ -273,5 +281,29 @@ export function TablaOrdenable<T>({ filas, cols, orden, desc = true, clave, onFi
         <button type="button" className="oda-link-button" onClick={() => setTodo((t) => !t)}>{todo ? "Ver menos" : `Ver las ${ordenadas.length} filas`}</button>
       )}
     </div>
+  );
+}
+
+/* --- Barras apiladas: una fila por categoría, un tramo por serie ---------------------------- */
+
+export interface FilaApilada { k: string; etiqueta: string; partes: { l: string; v: number; texto: string }[] }
+
+export function BarrasApiladas({ filas, series, total }: { filas: FilaApilada[]; series: string[]; total: (f: FilaApilada) => string }) {
+  const max = Math.max(...filas.map((f) => f.partes.reduce((s, p) => s + p.v, 0)), 1e-9);
+  return (
+    <>
+      <Leyenda items={series.map((l, i) => ({ l, c: COLORES[i % COLORES.length] }))} />
+      <div className="iga-barras" role="list">
+        {filas.map((f) => (
+          <div key={f.k} role="listitem" className="iga-barras__fila" title={`${f.etiqueta}: ${f.partes.map((p) => `${p.l} ${p.texto}`).join(", ")}`}>
+            <span className="iga-barras__l">{f.etiqueta}</span>
+            <span className="iga-barras__t">
+              {f.partes.map((p) => <i key={p.l} style={{ width: `${(p.v / max) * 100}%`, background: COLORES[Math.max(0, series.indexOf(p.l)) % COLORES.length] }} />)}
+            </span>
+            <span className="iga-barras__v">{total(f)}</span>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

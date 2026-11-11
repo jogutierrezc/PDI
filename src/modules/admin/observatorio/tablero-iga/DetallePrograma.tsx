@@ -16,7 +16,7 @@ import type { Indicador } from "../guia/api";
 import { Aviso, Cascada, Leyenda, Lineas, Mancuerna } from "./graficas";
 import { dinero, num, pct, sumar } from "./financiero-datos";
 import type { ProgramaFin } from "./financiero-datos";
-import { bloquesDelPrograma, formatoMedida } from "./detalle-datos";
+import { bloquesDelPrograma, facultadDe, formatoMedida, indicadoresEfectivos } from "./detalle-datos";
 
 const reducido = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const esFinanciero = (i: Indicador) => i.clave.startsWith("financiero.");
@@ -33,9 +33,9 @@ const PASOS: [keyof NonNullable<ProgramaFin["fp"][string]>, string][] = [
 export function DetallePrograma({ k, programas, indicadores, datasets, onCerrar, onFiltrar }: { k: string; programas: ProgramaFin[]; indicadores: Indicador[]; datasets: ObsDataset[]; onCerrar: () => void; onFiltrar?: (programa: string, sede: string) => void }) {
   const fin = programas.find((p) => p.k === k);
   const [programa, sede] = fin ? [fin.programa, fin.sede] : k.split("|");
-  const facultad = fin?.facultad ?? "";
+  const facultad = fin?.facultad ?? facultadDe(datasets, programa);
 
-  const bloques = useMemo(() => bloquesDelPrograma(indicadores, datasets, { programa, sede, facultad }, esFinanciero), [indicadores, datasets, programa, sede, facultad]);
+  const bloques = useMemo(() => bloquesDelPrograma(indicadoresEfectivos(indicadores, datasets), datasets, { programa, sede, facultad }, esFinanciero), [indicadores, datasets, programa, sede, facultad]);
   const tendencias = bloques.filter((b) => b.programa.filter((v) => v !== null).length >= 3);
 
   /* --- Hoja ---------------------------------------------------------------------------- */

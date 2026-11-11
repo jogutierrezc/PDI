@@ -119,6 +119,7 @@ export function CaptureStation({ state, topic, canEdit, go }: ObsStationProps) {
         <ImportFlow
           topic={topic}
           position={datasets.length}
+          existentes={datasets}
           onCancel={() => pick(selected?.id ?? null)}
           onSaved={(id) => pick(id)}
         />
@@ -330,7 +331,12 @@ export function Acta({ act }: { act: NonNullable<ObsDataset["anonymization"]> })
 
 type Step = "archivo" | "analisis" | "resultado";
 
-function ImportFlow({ topic, position, onCancel, onSaved }: { topic: string; position: number; onCancel: () => void; onSaved: (id: string) => void }) {
+/** Resultado de cada archivo cuando se importan varios a la vez. */
+interface ResultadoLote { nombre: string; estado: "espera" | "guardada" | "actualizada" | "revisar" | "error"; detalle: string }
+const claveTitulo = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const tituloDeArchivo = (nombre: string) => nombre.replace(/\.(xlsx|csv)$/i, "").replace(/[_-]+/g, " ");
+
+function ImportFlow({ topic, position, existentes, onCancel, onSaved }: { topic: string; position: number; existentes: ObsDataset[]; onCancel: () => void; onSaved: (id: string) => void }) {
   const info = topicInfo(topic)!;
   const [step, setStep] = useState<Step>("archivo");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -342,6 +348,7 @@ function ImportFlow({ topic, position, onCancel, onSaved }: { topic: string; pos
   const [pasted, setPasted] = useState("");
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [lote, setLote] = useState<ResultadoLote[] | null>(null);
   const [meta, setMeta] = useState({ title: "", description: "", source: info.source, dataType: "conteo" as ObsDataType, withView: true });
   const commit = useObsCommit();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -383,6 +390,61 @@ function ImportFlow({ topic, position, onCancel, onSaved }: { topic: string; pos
     } finally {
       setReading(false);
     }
+  };
+
+  /** La primera hoja con datos de un libro, o el CSV tal cual. */
+  const leerGrilla = async (file: File): Promise<string[][] | null> => {
+    if (/\.csv$/i.test(file.name) || file.type === "text/csv") return parseCsv(await file.text());
+    const { default: readXlsxFile } = await import("read-excel-file/browser");
+    const raw = (await readXlsxFile(file)) as unknown as { sheet: string; data: unknown[][] }[];
+    const hoja = raw.map((s) => s.data.map((row) => row.map((c) => (c instanceof Date ? c.toISOString().slice(0, 10) : String(c ?? ""))))).find((d) => d.length > 1);
+    return hoja ?? null;
+  };
+
+  /** Varios archivos: cada uno se analiza y se guarda con la configuración por defecto. Los de microdatos piden decidir cómo se agregan y quedan para importarlos solos. */
+  const importarLote = async (files: File[]) => {
+    setError("");
+    setReading(true);
+    const salida: ResultadoLote[] = files.map((f) => ({ nombre: f.name, estado: "espera", detalle: "" }));
+    setLote([...salida]);
+    const previas = new Map(existentes.map((d) => [claveTitulo(d.title), d]));
+    let pos = position;
+    for (let i = 0; i < files.length; i += 1) {
+      const f = files[i];
+      try {
+        const grid = await leerGrilla(f);
+        const a = grid ? analyzeGrid(f.name, grid) : null;
+        if (!a) {
+          salida[i] = { nombre: f.name, estado: "error", detalle: "No trae filas de datos bajo una fila de títulos." };
+        } else if (a.shape === "microdatos") {
+          salida[i] = { nombre: f.name, estado: "revisar", detalle: "Trae microdatos: impórtalo solo para elegir cómo se agrega." };
+        } else {
+          const r = buildDataset(a, defaultPlan(a));
+          if (!r.rows.length) {
+            salida[i] = { nombre: f.name, estado: "revisar", detalle: "No quedaron filas después de anonimizar." };
+          } else {
+            const titulo = tituloDeArchivo(f.name);
+            const previa = previas.get(claveTitulo(titulo));
+            const base: ObsDataset = { id: previa?.id ?? newId(), topic, title: titulo, description: previa?.description ?? "", source: previa?.source ?? info.source, dataType: "conteo", temporality: r.temporality, periodLabel: "", columns: r.columns, rows: r.rows, anonymization: r.anonymization, sample: false, status: previa?.status ?? "borrador", position: previa?.position ?? pos++, updatedAt: new Date().toISOString() };
+            const lead = recommend(base)[0]?.type;
+            const dataType: ObsDataType = lead === "mapa" || lead === "mapa_municipal" ? "georreferenciado" : lead === "lineas" ? "serie" : lead === "bosque" ? "modelo" : lead === "histograma" ? "distribucion" : base.columns.some((c) => c.format === "porcentaje") ? "tasa" : "conteo";
+            await commit.mutateAsync({ kind: "dataset", value: { ...base, dataType } });
+            const fuera = r.anonymization.removed.length;
+            salida[i] = { nombre: f.name, estado: previa ? "actualizada" : "guardada", detalle: `${plural(r.rows.length, "fila", "filas")}${fuera ? ` · ${fuera} columnas fuera` : ""}${previa?.status === "publicado" ? " · sigue publicada" : ""}` };
+          }
+        }
+      } catch (e) {
+        salida[i] = { nombre: f.name, estado: "error", detalle: e instanceof Error ? e.message : "No se pudo leer el archivo." };
+      }
+      setLote([...salida]);
+    }
+    setReading(false);
+  };
+
+  const cargar = (lista: FileList | File[] | null | undefined) => {
+    const files = Array.from(lista ?? []);
+    if (files.length > 1) void importarLote(files);
+    else void load(files[0]);
   };
 
   const result = useMemo(() => (analysis && plan ? buildDataset(analysis, plan) : null), [analysis, plan]);
@@ -486,7 +548,25 @@ function ImportFlow({ topic, position, onCancel, onSaved }: { topic: string; pos
 
         {step === "archivo" && (
           <div className="obs-drop-wrap">
-            {book ? (
+            {lote ? (
+              <div className="obs-lote" role="status" aria-live="polite">
+                <strong>{reading ? `Importando ${lote.filter((l) => l.estado !== "espera").length} de ${lote.length}…` : `${lote.filter((l) => l.estado === "guardada" || l.estado === "actualizada").length} de ${lote.length} tablas guardadas`}</strong>
+                <ul>
+                  {lote.map((l) => (
+                    <li key={l.nombre} data-estado={l.estado}>
+                      <span className="obs-lote__estado">{l.estado === "espera" ? "…" : l.estado === "guardada" ? "Guardada" : l.estado === "actualizada" ? "Actualizada" : l.estado === "revisar" ? "Revisar" : "Error"}</span>
+                      <span className="obs-lote__nombre">{l.nombre}</span>
+                      <small>{l.detalle}</small>
+                    </li>
+                  ))}
+                </ul>
+                <div className="obs-drop__actions">
+                  <button type="button" className="button-primary" disabled={reading} onClick={onCancel}>Listo</button>
+                  <button type="button" className="button-secondary" disabled={reading} onClick={() => setLote(null)}>Importar más archivos</button>
+                </div>
+                <small>Las tablas quedan en borrador. Si ya existía una con el mismo nombre, se actualiza y conserva sus conexiones y visores.</small>
+              </div>
+            ) : book ? (
               <div className="obs-sheets">
                 <strong>«{book.name}» tiene {book.sheets.length} hojas con datos. ¿Cuál se importa?</strong>
                 <div>
@@ -517,15 +597,15 @@ function ImportFlow({ topic, position, onCancel, onSaved }: { topic: string; pos
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragging(false);
-                  void load(e.dataTransfer.files[0]);
+                  cargar(e.dataTransfer.files);
                 }}
               >
                 <Icon name="upload" size={26} />
-                <strong>{reading ? "Leyendo el archivo…" : "Suelta aquí un Excel o CSV"}</strong>
+                <strong>{reading ? "Leyendo el archivo…" : "Suelta aquí uno o varios Excel o CSV"}</strong>
                 <span>Microdatos o tabla agregada. Las columnas con documentos, nombres, correos o teléfonos se detectan y se quitan.</span>
                 <div className="obs-drop__actions">
                   <button type="button" className="button-secondary" disabled={reading} onClick={() => fileInput.current?.click()}>
-                    <Icon name="document" size={15} /> Elegir archivo
+                    <Icon name="document" size={15} /> Elegir archivos
                   </button>
                   <button type="button" className="button-ghost" onClick={() => setPasting((p) => !p)} aria-expanded={pasting}>
                     Pegar una tabla
@@ -535,9 +615,10 @@ function ImportFlow({ topic, position, onCancel, onSaved }: { topic: string; pos
                   ref={fileInput}
                   type="file"
                   hidden
+                  multiple
                   accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                   onChange={(e) => {
-                    void load(e.target.files?.[0]);
+                    cargar(e.target.files);
                     e.target.value = "";
                   }}
                 />

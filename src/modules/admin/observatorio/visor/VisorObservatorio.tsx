@@ -26,6 +26,8 @@ import { useObsState, useSyncObsTopics } from "../store";
 import { BoardPreview } from "../stations/BoardsStation";
 import { visoresSugeridos } from "./sugeridas";
 import { PaginaFinanciero } from "../tablero-iga/PaginaFinanciero";
+import { PaginaTemaIga } from "../tablero-iga/PaginaTemaIga";
+import { TEMAS_IGA } from "../tablero-iga/temas";
 import { origenVisible, useIndicadores } from "../guia/api";
 import { useFiltrosTablero, useObservatorioPorEnlace } from "../guia/tablero";
 import { SIN_FILTROS, filtrarDataset, hayFiltros, opcionesDe } from "./estructura";
@@ -122,14 +124,18 @@ export function VisorObservatorio() {
               <GuiaLectura filas={indicadores.data?.filas ?? []} temas={temas} falta={Boolean(indicadores.data?.falta)} ir={(slug) => navigate(`/admin/observatorio-ver/${enlace}/${slug}`)} />
             ) : actual ? (
               estado.data && (
-                actual === "iga-financiero" && sp.get("vista") !== "taller" ? (
+                (actual === "iga-financiero" || TEMAS_IGA[actual]) && sp.get("vista") !== "taller" ? (
                   <>
                     <VistaTema sp={sp} setSp={setSp} />
-                    <PaginaFinanciero enlace={enlace ?? ""} indicadores={indicadores.data?.filas ?? []} datasets={datasets} filtros={f} poner={poner} />
+                    {actual === "iga-financiero" ? (
+                      <PaginaFinanciero enlace={enlace ?? ""} indicadores={indicadores.data?.filas ?? []} datasets={datasets} filtros={f} poner={poner} />
+                    ) : (
+                      <PaginaTemaIga cfg={TEMAS_IGA[actual]} indicadores={indicadores.data?.filas ?? []} datasets={datasets} filtros={f} poner={poner} />
+                    )}
                   </>
                 ) : (
                   <>
-                    {actual === "iga-financiero" && <VistaTema sp={sp} setSp={setSp} />}
+                    {(actual === "iga-financiero" || TEMAS_IGA[actual]) && <VistaTema sp={sp} setSp={setSp} />}
                     <PaginaTema slug={actual} estado={estado.data} filtros={f} />
                   </>
                 )

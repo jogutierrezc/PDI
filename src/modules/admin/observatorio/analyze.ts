@@ -113,7 +113,8 @@ function profileColumn(header: string, values: string[], index: number, key: str
   if (!institutional && PERSONAL_HEADER.test(header)) return { ...base, role: "personal", reason: "El título dice que es un dato personal." };
   if (filled.filter((v) => EMAIL.test(v)).length / filled.length > 0.3) return { ...base, role: "personal", reason: "Los valores son correos electrónicos." };
   // Números largos casi todos distintos: documentos, códigos, teléfonos.
-  const longDigits = filled.filter((v) => /^\+?\d[\d\s-]{5,14}$/.test(v)).length / filled.length;
+  // Un periodo («2024-1») no es un documento aunque cada valor aparezca una sola vez.
+  const longDigits = filled.filter((v) => /^\+?\d[\d\s-]{5,14}$/.test(v) && !PERIOD.test(v)).length / filled.length;
   const medida = MEASURE_HEADER.test(header);
   if (!medida && longDigits > 0.8 && uniqueShare > 0.85 && rows > 10) return { ...base, role: "identificador", reason: "Números largos distintos en casi cada fila: parecen documentos o códigos." };
 

@@ -31,3 +31,15 @@
 .obs-guia__hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .obs-guia__hist li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--line, #dfe6f0); }
 .obs-guia__hist small { display: block; color: var(--ink-3, #5f7089); }
+
+/* Importar varios archivos a la vez */
+.obs-lote { display: grid; gap: 10px; }
+.obs-lote ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.obs-lote li { display: grid; grid-template-columns: 96px minmax(0, 1.4fr) minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 10px; border: 1px solid var(--line, #dfe6f0); border-radius: 8px; background: #fff; font-size: 13.5px; }
+.obs-lote__estado { font-weight: 700; font-size: 12px; letter-spacing: .02em; }
+.obs-lote__nombre { overflow-wrap: anywhere; }
+.obs-lote li small { color: var(--ink-3, #5f7089); }
+.obs-lote li[data-estado="guardada"] .obs-lote__estado, .obs-lote li[data-estado="actualizada"] .obs-lote__estado { color: #12833a; }
+.obs-lote li[data-estado="revisar"] .obs-lote__estado { color: #8a6200; }
+.obs-lote li[data-estado="error"] .obs-lote__estado { color: #b32d2d; }
+@media (max-width: 700px) { .obs-lote li { grid-template-columns: minmax(0, 1fr); gap: 2px; } }

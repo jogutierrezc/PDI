@@ -42,7 +42,7 @@ import { datosTablero, obsIcono as obsIconoTablero } from "./tablero";
 const LiveTopicBody = lazy(() => import("./LiveTopic"));
 const PortalIga = lazy(() => import("./PortalIga"));
 /** Páginas con tablero a medida (lee las tablas publicadas y conectadas en la Guía de datos). */
-const TABLERO_IGA = new Set(["iga-financiero"]);
+const TABLERO_IGA = new Set(["iga-financiero", "iga-calidad", "iga-estudiantes", "iga-profesores", "iga-gestion", "iga-internacional", "iga-extension", "iga-investigacion"]);
 import "../datos-abiertos.css";
 import "./observatorio.css";
 
@@ -380,7 +380,7 @@ export function ObservatoryTopic() {
         <div className="obsr-wrap">
           {TABLERO_IGA.has(topic.slug) ? (
             <Suspense fallback={<div className="obs-live__loading" aria-busy="true" />}>
-              <PortalIga obsId={topic.obsId} />
+              <PortalIga obsId={topic.obsId} slug={topic.slug} />
               <Montado onMontado={alMontar} />
             </Suspense>
           ) : real ? (

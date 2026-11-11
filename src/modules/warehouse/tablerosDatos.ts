@@ -6,6 +6,7 @@
    el Warehouse no ve cifras. Aquí vive todo lo que toca la red; las reglas están en ./modelo.
    ========================================================================== */
 
+import type { CSSProperties } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { supabase, readFunctionError } from "../../lib/supabase";
 import { useArchivos } from "../udrive/datos";
@@ -26,6 +27,7 @@ import {
   type FilaResultado,
   type Lector,
   type ModeloBI,
+  type PaletaBI,
   type Perfiles,
   type VisualBI,
 } from "./modelo";
@@ -53,8 +55,36 @@ export function modeloParaGuardar(m: ModeloBI): ModeloBI {
     medidas: m.medidas,
     ...(propias.length ? { medidasPropias: propias } : {}),
     ...(m.analisis ? { analisis: m.analisis } : {}),
+    ...(limpiarPaleta(m.paleta) ? { paleta: limpiarPaleta(m.paleta)! } : {}),
     paginas: m.paginas,
   };
+}
+
+/* --- Paleta (opcional) -------------------------------------------------------------------------- */
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/** Una paleta solo es válida con colores #rrggbb: lo demás se descarta para que un archivo ajeno no meta estilos raros. */
+export function limpiarPaleta(p: unknown): PaletaBI | null {
+  const o = p as Partial<PaletaBI> | null;
+  if (!o || typeof o !== "object") return null;
+  const lista = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && HEX.test(x)).map((x) => x.toLowerCase()) : []);
+  const categorica = lista(o.categorica).slice(0, 8);
+  const secuencial = lista(o.secuencial);
+  if (categorica.length < 3 || secuencial.length !== 5) return null;
+  return { nombre: String(o.nombre ?? "Paleta").slice(0, 60), descripcion: String(o.descripcion ?? "").slice(0, 240), categorica, secuencial };
+}
+
+/** Variables CSS que reemplazan los colores del tema solo dentro del tablero; sin paleta no cambia nada. */
+export function estiloPaleta(p: PaletaBI | undefined): CSSProperties | undefined {
+  const v = limpiarPaleta(p);
+  if (!v) return undefined;
+  const estilo: Record<string, string> = {};
+  for (let i = 0; i < 8; i++) estilo[`--od-line-${i + 1}`] = v.categorica[i % v.categorica.length];
+  v.secuencial.forEach((c, i) => (estilo[`--od-seq-${i + 1}`] = c));
+  estilo["--od-seq-ink-light"] = "#0d1c31";
+  estilo["--od-seq-ink-dark"] = "#ffffff";
+  return estilo as CSSProperties;
 }
 
 export function leerModelo(contenido: unknown): ModeloBI | null {
@@ -72,6 +102,7 @@ export function leerModelo(contenido: unknown): ModeloBI | null {
     medidas: m.medidas ?? [],
     ...(propias.length ? { medidasPropias: propias } : {}),
     ...(m.analisis ? { analisis: m.analisis } : {}),
+    ...(limpiarPaleta(m.paleta) ? { paleta: limpiarPaleta(m.paleta)! } : {}),
     paginas: m.paginas,
   };
 }
@@ -284,6 +315,9 @@ export function armarPedidoRelaciones(pregunta: string, fuentes: string[], perfi
     reglas_permitidas: hallazgos.filter((h) => h.requiereAprobacion).map((h) => h.id),
   };
 }
+
+export const disenarPaleta = (pedido: { tema: string; pregunta: string; nombre: string }) =>
+  invocarTableros<{ ok: boolean; paleta: PaletaBI & { avisos: string[] } }>({ action: "paleta", pedido });
 
 export const analizarRelacionesPilo = (pedido: PedidoRelaciones) => invocarTableros<{ ok: boolean; analisis: AnalisisRelaciones & { avisos: string[] } }>({ action: "relaciones", pedido });
 

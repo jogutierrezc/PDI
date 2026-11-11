@@ -40,6 +40,8 @@ import {
   analizarRelacionesPilo,
   armarPedidoRelaciones,
   dimensionesDeMedida,
+  disenarPaleta,
+  estiloPaleta,
   leerModelo,
   modeloParaGuardar,
   nombreDimension,
@@ -95,6 +97,9 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
   const [falloAnalisis, setFalloAnalisis] = useState("");
   const [notasPilo, setNotasPilo] = useState<string[]>([]);
   const [busca, setBusca] = useState("");
+  const [temaColor, setTemaColor] = useState("");
+  const [coloreando, setColoreando] = useState(false);
+  const [avisosPaleta, setAvisosPaleta] = useState<string[]>([]);
   const pilo = useEstadoPiloTableros();
   const crear = useCrearItem();
   const guardar = useGuardarContenido();
@@ -186,6 +191,21 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
       setAviso({ tipo: "error", texto: mensajeDe(e) });
     } finally {
       setPensando(false);
+    }
+  };
+
+  const pedirPaleta = async () => {
+    setColoreando(true);
+    setAviso(null);
+    try {
+      const r = await disenarPaleta({ tema: temaColor, pregunta: m.pregunta, nombre: m.nombre });
+      const { avisos, ...paleta } = r.paleta;
+      cambiar({ paleta });
+      setAvisosPaleta(avisos ?? []);
+    } catch (e) {
+      setAviso({ tipo: "error", texto: mensajeDe(e) });
+    } finally {
+      setColoreando(false);
     }
   };
 
@@ -468,6 +488,50 @@ function Asistente({ ctx, cobertura, id, inicial }: { ctx: Contexto; cobertura: 
               {n}
             </p>
           ))}
+          <details open={Boolean(m.paleta)}>
+            <summary>Colores del tablero (opcional)</summary>
+            <div className="wh-pila" style={{ marginTop: 10 }}>
+              <p className="wh-nota-chica wh-muted">Sin paleta, el tablero usa los colores UDES del tema. Pilo propone una y la revisa por contraste, distinción y daltonismo.</p>
+              <div className="wh-fila">
+                <label className="wh-campo">
+                  <span className="sr-only">Ambiente de color</span>
+                  <input value={temaColor} onChange={(e) => setTemaColor(e.target.value)} maxLength={200} placeholder="Ej.: sostenibilidad, sobrio institucional…" />
+                </label>
+                <button type="button" className="button-secondary" disabled={coloreando || !piloListo || (temaColor.trim().length < 3 && m.pregunta.trim().length < 8)} onClick={() => void pedirPaleta()}>
+                  {coloreando ? "Pilo está eligiendo colores…" : "Que Pilo proponga colores"}
+                </button>
+                {m.paleta && (
+                  <button type="button" className="button-secondary" onClick={() => { cambiar({ paleta: undefined }); setAvisosPaleta([]); }}>
+                    Usar colores UDES
+                  </button>
+                )}
+              </div>
+              {m.paleta && (
+                <div className="wh-pila" style={estiloPaleta(m.paleta)}>
+                  <p>
+                    <strong>{m.paleta.nombre}</strong>
+                    {m.paleta.descripcion && <span className="wh-muted"> · {m.paleta.descripcion}</span>}
+                  </p>
+                  <div className="wh-fila" aria-label="Colores de series">
+                    {m.paleta.categorica.map((c) => (
+                      <span key={c} title={c} style={{ background: c, width: 30, height: 30, borderRadius: 6, display: "inline-block" }} />
+                    ))}
+                  </div>
+                  <div className="wh-fila" aria-label="Escala de calor">
+                    {m.paleta.secuencial.map((c) => (
+                      <span key={c} title={c} style={{ background: c, width: 30, height: 30, borderRadius: 6, display: "inline-block" }} />
+                    ))}
+                  </div>
+                  <small className="wh-muted">{[...m.paleta.categorica, ...m.paleta.secuencial].join(" · ")}</small>
+                  {avisosPaleta.map((a, i) => (
+                    <p key={i} className="wh-aviso wh-aviso--ambar">
+                      {a}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
           {m.paginas.length === 0 && <p className="wh-muted">Todavía no hay páginas. Pida el diseño a Pilo o arme el básico.</p>}
           {m.paginas.map((p, pi) => (
             <Pagina key={p.id} pagina={p} medidas={m.medidas} onChange={(np) => cambiar({ paginas: m.paginas.map((x, i) => (i === pi ? np : x)) })} onQuitar={() => cambiar({ paginas: m.paginas.filter((_, i) => i !== pi) })} />

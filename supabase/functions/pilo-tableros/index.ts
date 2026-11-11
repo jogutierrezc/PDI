@@ -7,6 +7,7 @@
      proponer  { pedido }                          → { ok, propuesta }   páginas y visuales con medidas del catálogo
      narrar    { cifras }                          → { ok, narracion }   lectura escrita sobre cifras ya calculadas
      relaciones { pedido }                         → { ok, analisis }    cómo se relacionan las fuentes elegidas (solo perfiles de columnas)
+     paleta    { pedido }                          → { ok, paleta }      colores del tablero (opcional), comprobados por contraste y distinción
 
    Reglas:
      · Solo con sesión y solo Planeación o más (wh_autorizado).
@@ -21,7 +22,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { elegirProveedor, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts";
 import { AltoProveedor, crearIA } from "../pilo-informes/ia.ts";
-import { leerNarracion, leerPropuesta, leerRelaciones, mensajesNarrar, mensajesProponer, mensajesRelaciones, validarNarrar, validarPedido, validarRelaciones } from "./propuesta.ts";
+import { leerNarracion, leerPaleta, leerPropuesta, leerRelaciones, mensajesNarrar, mensajesPaleta, mensajesProponer, mensajesRelaciones, validarNarrar, validarPedido, validarPedidoPaleta, validarRelaciones } from "./propuesta.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
 const CORS = {
@@ -50,7 +51,7 @@ async function atender(request: Request): Promise<Response> {
     return json({ error: "Cuerpo inválido." }, 400);
   }
   const accion = String(cuerpo.action ?? "");
-  if (!["estado", "proponer", "narrar", "relaciones"].includes(accion)) return json({ error: "Acción desconocida." }, 400);
+  if (!["estado", "proponer", "narrar", "relaciones", "paleta"].includes(accion)) return json({ error: "Acción desconocida." }, 400);
 
   const authorization = request.headers.get("Authorization") ?? "";
   if (!authorization.startsWith("Bearer ") || authorization.slice(7) === anonKey) return json({ error: "Falta la sesión." }, 401);
@@ -105,6 +106,17 @@ async function atender(request: Request): Promise<Response> {
       }
       await bitacora(1, 0, null);
       return json({ ok: true, propuesta: r.valor, ...enUso });
+    }
+    if (accion === "paleta") {
+      const pedido = validarPedidoPaleta(cuerpo.pedido);
+      if (!pedido.ok) return json({ error: pedido.error }, 400);
+      const r = await ia.llamarVerificado(mensajesPaleta(pedido.valor), 1200, (crudo) => leerPaleta(crudo));
+      if (!r.ok) {
+        await bitacora(0, 1, r.error);
+        return json({ error: `Pilo no logró una paleta que pase la revisión de contraste y distinción: ${r.error}`, code: "verificacion" }, 422);
+      }
+      await bitacora(1, 0, null);
+      return json({ ok: true, paleta: r.valor, ...enUso });
     }
     if (accion === "relaciones") {
       const pedido = validarRelaciones(cuerpo.pedido);

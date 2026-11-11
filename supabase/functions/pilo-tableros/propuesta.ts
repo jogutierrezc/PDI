@@ -70,17 +70,24 @@ export function validarPedido(d: unknown): Lectura<PedidoProponer> {
   };
 }
 
-const SISTEMA_PROPONER = `Eres Pilo Tableros, el diseñador de tableros de la Universidad de Santander (UDES). Armas el tablero que responde mejor a una pregunta, con buenas prácticas de BI: poco por página, un titular claro por visual, comparar con el periodo anterior cuando ayuda y nunca datos personales.
+const SISTEMA_PROPONER = `Eres Pilo Tableros, el diseñador de tableros de la Universidad de Santander (UDES). Armas el tablero que responde mejor a una pregunta, con buenas prácticas de BI y de narración con datos: poco por página, una idea por visual, comparar con el periodo anterior cuando ayuda y nunca datos personales.
 
-REGLAS
+REGLAS DE CATÁLOGO
 1. Usa SOLO medidas de la lista MEDIDAS (por su id) y SOLO dimensiones que esa medida admite en «dimensiones». No inventes ids.
 2. Tipos de visual: kpi (una cifra, sin dimensiones), barras (1 dimensión), lineas (evolución por periodo, sin dimensiones), calor (exactamente 2 dimensiones), tabla (1 o 2 dimensiones), narrativa (texto escrito después por Pilo, sin medidas).
 3. Plantillas: ejecutivo (máx. 6 visuales; cifras y una lectura), diagnostico (máx. 8; comparar y buscar causas), detalle (máx. 6; tabla grande).
-4. Cada visual lleva un titulo que dice lo que muestra, en español de Colombia, sin guiones bajos.
-5. Una a tres páginas. Empieza por lo que responde la pregunta.
+
+REGLAS DE DISEÑO
+4. Propósito primero: antes de elegir visuales, resume el tablero en una frase «responde [pregunta] para [público] que debe [decidir o hacer]». Si no cabe en una frase, el tablero hace demasiado: recorta.
+5. Jerarquía en cada página: primero las cifras clave (kpi, 3 a 5 como máximo, arriba), luego la evolución (lineas), después los desgloses (barras, calor) y al final el detalle (tabla). Lo más importante va arriba a la izquierda.
+6. Una página, una idea; un visual, una pregunta. No repitas la misma medida y dimensión en dos visuales. Todo el tablero debe quedarse en unas 8 cifras distintas: más es ruido.
+7. Elige el visual por lo que se quiere mostrar: comparar categorías → barras; cambio en el tiempo → lineas (máximo 3 medidas por gráfico); cruce de dos dimensiones → calor; una cifra con su contexto → kpi; búsqueda de un caso → tabla. Para partes de un todo con 2 o 3 partes sirve una cifra por parte; con más, barras.
+8. El título es la pregunta que responde el visual, no el nombre de la variable: «¿Dónde está más alta la deserción?» y no «Deserción por programa». Sin guiones bajos, en español de Colombia. Un título no afirma un hallazgo que aún no se ha visto.
+9. Público: consejo y rectoría → plantilla ejecutivo, pocas cifras y una lectura; decanos y programas → diagnostico por su unidad; planeación → diagnostico y detalle.
+10. Una a tres páginas. La primera responde la pregunta sola; las demás explican el porqué.
 
 RESPONDE SOLO UN OBJETO JSON, sin texto antes ni después:
-{"nombre": "nombre del tablero", "paginas": [{"nombre": "", "plantilla": "ejecutivo|diagnostico|detalle", "visuales": [{"tipo": "", "titulo": "", "medidas": ["id"], "dimensiones": ["dimension"]}]}], "notas": ["por qué se armó así, 1 a 3 frases"]}`;
+{"proposito": "responde … para … que debe …", "nombre": "nombre del tablero", "paginas": [{"nombre": "", "plantilla": "ejecutivo|diagnostico|detalle", "visuales": [{"tipo": "", "titulo": "", "medidas": ["id"], "dimensiones": ["dimension"]}]}], "notas": ["por qué se armó así, 1 a 3 frases"]}`;
 
 export function mensajesProponer(p: PedidoProponer): Mensaje[] {
   return [
@@ -113,6 +120,8 @@ export function leerPropuesta(crudo: string, p: PedidoProponer): Lectura<Propues
     const pg = (raw ?? {}) as Record<string, unknown>;
     const plantilla = (Object.keys(PLANTILLAS) as Plantilla[]).includes(pg.plantilla as Plantilla) ? (pg.plantilla as Plantilla) : "diagnostico";
     const visuales: VisualPropuesto[] = [];
+    const vistos = new Set<string>();
+    let kpis = 0;
     for (const rv of Array.isArray(pg.visuales) ? pg.visuales : []) {
       const v = (rv ?? {}) as Record<string, unknown>;
       const tipo = TIPOS.find((t) => t === v.tipo);
@@ -132,13 +141,26 @@ export function leerPropuesta(crudo: string, p: PedidoProponer): Lectura<Propues
         notas.push(`Se descartó «${titulo}»: las dimensiones no encajan con las medidas.`);
         continue;
       }
+      const huella = `${tipo}|${medidas.join(",")}|${dimensiones.join(",")}`;
+      if (vistos.has(huella)) {
+        notas.push(`Se descartó «${titulo}»: repetía otro visual de la página.`);
+        continue;
+      }
+      if (tipo === "kpi" && kpis >= 5) {
+        notas.push(`Se descartó «${titulo}»: una página no pasa de 5 cifras clave.`);
+        continue;
+      }
+      vistos.add(huella);
+      if (tipo === "kpi") kpis++;
       medidas.forEach((m) => usadas.add(m));
       visuales.push({ tipo, titulo, medidas: tipo === "narrativa" ? [] : medidas.slice(0, 3), dimensiones: tipo === "narrativa" ? [] : dimensiones.slice(0, tipo === "tabla" ? 2 : necesita) });
     }
     if (visuales.length) paginas.push({ nombre: texto(pg.nombre, 60) || `Página ${paginas.length + 1}`, plantilla, visuales: visuales.slice(0, PLANTILLAS[plantilla]) });
   }
   if (!paginas.length) return { ok: false, error: "Ningún visual usó medidas y dimensiones del catálogo. Usa solo ids de MEDIDAS y sus dimensiones." };
+  const proposito = texto(j.proposito, 300);
   const propias = (Array.isArray(j.notas) ? j.notas : []).map((n: unknown) => texto(n, 300)).filter(Boolean).slice(0, 3);
+  if (proposito) propias.unshift(`Propósito: ${proposito}`);
   return { ok: true, valor: { nombre: texto(j.nombre, 80) || "Tablero nuevo", medidas: [...usadas], paginas, notas: [...propias, ...notas] } };
 }
 
@@ -192,7 +214,13 @@ REGLAS
 3. Distingue lo que muestran los datos de una hipótesis: «podría estar relacionado con…» y qué dato habría que mirar.
 4. Responde primero la pregunta del tablero. Cierra con lo que estos datos no permiten afirmar.
 
-RESPONDE SOLO UN OBJETO JSON: {"titular": "una frase", "parrafos": ["2 a 4 párrafos cortos"], "limites": ["1 a 3 límites"]}`;
+NARRACIÓN CON DATOS
+5. El titular afirma el hallazgo principal con una cifra de los DATOS («La deserción de Ingeniería casi duplica la de Derecho»), no el tema («Análisis de deserción»).
+6. Los párrafos siguen un hilo: (a) contexto en una frase: qué se midió y en qué periodo; (b) el hallazgo y la evidencia que lo respalda, con las cifras literales; (c) por qué importa para quien decide; (d) una sola acción o pregunta de seguimiento, concreta, que se pueda emprender esta semana.
+7. Elige el arco según la pregunta: si hay evolución, cuenta el cambio (antes, ahora, qué lo movió); si hay comparación, di quién destaca y quién se rezaga; si hay riesgo, di dónde mirar primero. Una sola idea central por lectura.
+8. Una cifra por frase, con su contexto (contra qué se compara). Cuenta lo que ves, sin adjetivos grandilocuentes. No te contradigas con los límites.
+
+RESPONDE SOLO UN OBJETO JSON: {"titular": "una frase con el hallazgo", "parrafos": ["2 a 4 párrafos cortos: contexto, hallazgo, por qué importa, qué hacer"], "limites": ["1 a 3 límites"]}`;
 
 export function mensajesNarrar(p: PedidoNarrar): Mensaje[] {
   return [
@@ -360,4 +388,135 @@ export function leerRelaciones(crudo: string, p: PedidoRelaciones): Lectura<Anal
   const fuera = cifrasNoRespaldadas([a.resumen, ...a.riesgos, ...relaciones.map((r) => r.nota), ...reglas.map((r) => r.motivo)].join(" "), p);
   if (fuera.length > 3) return { ok: false, error: `Citaste cifras que no están en los datos: ${fuera.slice(0, 8).join(", ")}. Usa solo cifras recibidas.` };
   return { ok: true, valor: { ...a, avisos: [...avisos, ...fuera.map((c) => `La cifra «${c}» no se pudo comprobar en los datos.`)] } };
+}
+
+/* --- Paleta de colores ----------------------------------------------------------------------------
+   Pilo propone los colores; esta función los comprueba con números, no con confianza: formato, contraste
+   contra el fondo claro y el oscuro, distancia entre colores y escalera secuencial ordenada. Lo que no
+   pasa se le devuelve a Pilo una vez y, si insiste, no sale. */
+
+export interface PedidoPaleta {
+  tema: string;
+  pregunta: string;
+  nombre: string;
+}
+export interface Paleta {
+  nombre: string;
+  descripcion: string;
+  /** 6 a 8 colores para series y categorías, distinguibles entre sí. */
+  categorica: string[];
+  /** 5 pasos de claro a oscuro para mapas de calor. */
+  secuencial: string[];
+  avisos: string[];
+}
+
+export function validarPedidoPaleta(d: unknown): Lectura<PedidoPaleta> {
+  const o = d as Partial<PedidoPaleta> | null;
+  if (!o || typeof o !== "object") return { ok: false, error: "Falta el pedido de la paleta." };
+  const tema = texto(o.tema, 200);
+  const pregunta = texto(o.pregunta, 400);
+  if (tema.length < 3 && pregunta.length < 8) return { ok: false, error: "Cuente de qué trata el tablero o qué ambiente de color busca." };
+  return { ok: true, valor: { tema, pregunta, nombre: texto(o.nombre, 80) } };
+}
+
+const FONDO_CLARO = "#ffffff";
+const FONDO_OSCURO = "#151d28";
+const TINTA_OSCURA = "#0d1c31";
+const TINTA_CLARA = "#ffffff";
+const HEX = /^#[0-9a-f]{6}$/i;
+
+const canales = (h: string): [number, number, number] => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const lineal = (c: number) => {
+  const v = c / 255;
+  return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+};
+const luminancia = (h: string) => {
+  const [r, g, b] = canales(h);
+  return 0.2126 * lineal(r) + 0.7152 * lineal(g) + 0.0722 * lineal(b);
+};
+export const contraste = (a: string, b: string) => {
+  const [x, y] = [luminancia(a), luminancia(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+function lab([r, g, b]: [number, number, number]): [number, number, number] {
+  const [lr, lg, lb] = [lineal(r), lineal(g), lineal(b)];
+  const x = (0.4124 * lr + 0.3576 * lg + 0.1805 * lb) / 0.95047;
+  const y = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  const z = (0.0193 * lr + 0.1192 * lg + 0.9505 * lb) / 1.08883;
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+const distancia = (a: [number, number, number], b: [number, number, number]) => {
+  const [p, q] = [lab(a), lab(b)];
+  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+};
+const DEUTAN = [
+  [0.625, 0.375, 0],
+  [0.7, 0.3, 0],
+  [0, 0.3, 0.7],
+];
+const PROTAN = [
+  [0.567, 0.433, 0],
+  [0.558, 0.442, 0],
+  [0, 0.242, 0.758],
+];
+const simular = (c: [number, number, number], m: number[][]): [number, number, number] => [0, 1, 2].map((i) => m[i][0] * c[0] + m[i][1] * c[1] + m[i][2] * c[2]) as [number, number, number];
+
+const SISTEMA_PALETA = `Eres Pilo Tableros, el diseñador de color de los tableros de la Universidad de Santander (UDES). Propones la paleta de un tablero de datos. El color es significado, no adorno: ayuda a distinguir y a enfocar la atención, y tiene que funcionar para personas daltónicas, en pantalla clara y oscura, y en escala de grises.
+
+REGLAS
+1. «categorica»: de 6 a 8 colores hex (#rrggbb) para series y categorías. Deben distinguirse entre sí por tono y por luminosidad, no solo por tono. Evita dos tonos de la misma familia seguidos; alterna cálidos y fríos. Cada uno debe leerse sobre fondo blanco (#ffffff) Y sobre fondo oscuro (#151d28): usa tonos medios, ni casi blancos ni casi negros.
+2. «secuencial»: exactamente 5 colores hex de la MISMA gama, del más claro al más oscuro, con saltos parejos. Sirven para mapas de calor: mayor valor, más oscuro. Los tres primeros llevan texto oscuro (#0d1c31) y los dos últimos texto blanco, así que los tres primeros deben ser claros y los dos últimos oscuros.
+3. El rojo, el ámbar y el verde de estado (alerta, atención, bien) están reservados para semáforos: no los uses como colores de categorías. Si el tema pide verdes (sostenibilidad), usa verdes azulados o amarillentos, y combínalos con otros tonos.
+4. El primer color de «categorica» es el protagonista: el que se usará cuando una gráfica tenga una sola serie. Debe expresar el tema del tablero.
+5. Respeta la identidad: la base institucional UDES es azul (#1f5fbf), verde azulado (#0b7481), óxido (#a4471f), violeta (#6b3fa0), ocre (#7f6200), frambuesa (#ad2f58), pizarra (#43536b), verde (#2e6b2f). Parte de ahí y desplázate hacia el tema pedido sin perder sobriedad.
+6. Nunca uses colores neón ni degradados caprichosos. «descripcion» explica en una frase, en español de Colombia, por qué esa paleta sirve para este tablero.
+
+RESPONDE SOLO UN OBJETO JSON, sin texto antes ni después:
+{"nombre": "nombre corto de la paleta", "descripcion": "una frase", "categorica": ["#rrggbb"], "secuencial": ["#rrggbb", "#rrggbb", "#rrggbb", "#rrggbb", "#rrggbb"]}`;
+
+export function mensajesPaleta(p: PedidoPaleta): Mensaje[] {
+  return [
+    { role: "system", content: SISTEMA_PALETA },
+    { role: "user", content: `TABLERO: «${p.nombre || "(sin nombre)"}»\nPREGUNTA: «${p.pregunta || "(no indicada)"}»\nAMBIENTE O TEMA DE COLOR PEDIDO: ${p.tema || "(el que mejor sirva a la pregunta)"}` },
+  ];
+}
+
+/** La paleta de Pilo, comprobada con números. */
+export function leerPaleta(crudo: string): Lectura<Paleta> {
+  const j = jsonDe(crudo);
+  if (!j) return { ok: false, error: "La respuesta no es un objeto JSON válido." };
+  const colores = (v: unknown) => (Array.isArray(v) ? v.map((x) => texto(x, 12).toLowerCase()) : []);
+  const categorica = [...new Set(colores(j.categorica))];
+  const secuencial = colores(j.secuencial);
+  const errores: string[] = [];
+  const mal = [...categorica, ...secuencial].filter((c) => !HEX.test(c));
+  if (mal.length) errores.push(`Estos valores no son colores #rrggbb: ${mal.slice(0, 4).join(", ")}.`);
+  if (categorica.length < 6 || categorica.length > 8) errores.push(`«categorica» debe tener de 6 a 8 colores distintos y tiene ${categorica.length}.`);
+  if (secuencial.length !== 5) errores.push(`«secuencial» debe tener exactamente 5 colores y tiene ${secuencial.length}.`);
+  if (errores.length) return { ok: false, error: errores.join(" ") };
+
+  const pobres = categorica.filter((c) => contraste(c, FONDO_CLARO) < 3 || contraste(c, FONDO_OSCURO) < 3);
+  if (pobres.length) errores.push(`Estos colores de «categorica» no se leen a la vez sobre fondo blanco y fondo oscuro (necesitan contraste 3:1 con ambos): ${pobres.join(", ")}. Usa tonos medios.`);
+  const cercanos: string[] = [];
+  const avisos: string[] = [];
+  for (let i = 0; i < categorica.length; i++) {
+    for (let k = i + 1; k < categorica.length; k++) {
+      const [a, b] = [canales(categorica[i]), canales(categorica[k])];
+      if (distancia(a, b) < 15) cercanos.push(`${categorica[i]} y ${categorica[k]}`);
+      else if (i < 5 && k < 5 && (distancia(simular(a, DEUTAN), simular(b, DEUTAN)) < 8 || distancia(simular(a, PROTAN), simular(b, PROTAN)) < 8)) avisos.push(`${categorica[i]} y ${categorica[k]} pueden confundirse con daltonismo rojo-verde.`);
+    }
+  }
+  if (cercanos.length) errores.push(`Estos pares de «categorica» se parecen demasiado: ${cercanos.slice(0, 4).join("; ")}. Sepáralos en tono y luminosidad.`);
+  const luz = secuencial.map(luminancia);
+  if (!luz.every((l, i) => i === 0 || l < luz[i - 1] - 0.02)) errores.push("«secuencial» debe ir de claro a oscuro con saltos visibles entre un paso y el siguiente.");
+  const sinTinta = secuencial.filter((c, i) => (i < 3 ? contraste(c, TINTA_OSCURA) : contraste(c, TINTA_CLARA)) < 4.5);
+  if (sinTinta.length) errores.push(`En «secuencial» el texto no se lee sobre ${sinTinta.join(", ")}: los 3 primeros deben ser claros (texto oscuro) y los 2 últimos oscuros (texto blanco), con contraste 4.5:1.`);
+  if (errores.length) return { ok: false, error: errores.join(" ") };
+
+  return {
+    ok: true,
+    valor: { nombre: texto(j.nombre, 60) || "Paleta propuesta", descripcion: texto(j.descripcion, 240), categorica, secuencial, avisos: [...new Set(avisos)].slice(0, 3) },
+  };
 }

@@ -101,6 +101,10 @@ export function useMapaMonitor(periodo: string, sede: string) {
           unidad: (r.unidad as string | null) ?? null,
           facultad_id: (r.facultad_id as string | null) ?? null,
           facultad: (r.facultad as string | null) ?? null,
+          snies: (r.snies as string | null) ?? null,
+          vicerrectoria: (r.vicerrectoria as string | null) ?? null,
+          vicerrectoria_posgrados: (r.vicerrectoria_posgrados as string | null) ?? null,
+          en_sede: (r.en_sede as boolean | null) ?? null,
         }),
       );
     },
@@ -221,15 +225,31 @@ export function usePlanesMonitor(periodo: string, sede: string) {
 }
 
 /** Las unidades «programa» del organigrama, para asignarles los códigos de Davinci. */
+export interface ProgramaOrganigrama {
+  id: string;
+  name: string;
+  snies: string | null;
+  facultad: string | null;
+  /** Códigos de sede donde se ofrece (BUC, CUC, VAL, BOG). */
+  sedes: string[];
+}
+
 export function useProgramasDelOrganigrama(habilitado: boolean) {
   return useQuery({
     queryKey: ["monitor", "organigrama"],
     enabled: habilitado,
     staleTime: 10 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from("units").select("id,name,parent_id").eq("kind", "programa").order("name");
+      // v_estructura trae una fila por programa y sede: se agrupa para dar SNIES, facultad y sedes de cada programa.
+      const { data, error } = await supabase.from("v_estructura").select("programa_id,programa,snies,facultad,campus_codigo").order("programa");
       if (error) throw new Error(mensajeDe(error));
-      return (data ?? []) as { id: string; name: string; parent_id: string | null }[];
+      const por = new Map<string, ProgramaOrganigrama>();
+      for (const r of (data ?? []) as { programa_id: string; programa: string; snies: string | null; facultad: string | null; campus_codigo: string }[]) {
+        const u = por.get(r.programa_id) ?? { id: r.programa_id, name: r.programa, snies: r.snies, facultad: r.facultad, sedes: [] };
+        u.sedes.push(r.campus_codigo);
+        por.set(r.programa_id, u);
+      }
+      return [...por.values()];
     },
   });
 }

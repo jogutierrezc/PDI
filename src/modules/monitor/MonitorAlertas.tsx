@@ -292,6 +292,7 @@ function RecorridoEstudiantes({ filas, gruposData, programas, periodo, sede, par
   );
 
   const sinAsignar = programas.filter((x) => !x.unit_id);
+  const fueraDeSede = programas.filter((x) => x.unit_id && x.en_sede === false);
   const elegirEstudiante = (r: FilaMonitor) => fijar({ f: programas.find((x) => x.codigo_programa === r.codigo_programa)?.facultad_id ?? "sin-facultad", p: r.codigo_programa, m: null, g: null, e: r.estudiante });
 
   return (
@@ -349,7 +350,7 @@ function RecorridoEstudiantes({ filas, gruposData, programas, periodo, sede, par
         </section>
       )}
 
-      {asignar && sinAsignar.length > 0 && <AdministrarProgramas sinAsignar={sinAsignar} periodo={periodo} sede={sede} />}
+      {asignar && (sinAsignar.length > 0 || fueraDeSede.length > 0) && <AdministrarProgramas sinAsignar={sinAsignar} fueraDeSede={fueraDeSede} periodo={periodo} sede={sede} />}
     </>
   );
 }
@@ -1009,14 +1010,14 @@ function ComoLeer() {
 /* --- Asignar programas a unidades (Planeación) ------------------------------------------------------------------ */
 
 /** Solo Planeación, y escondido al pie: las facultades y los programas no ven nada de esto. */
-function AdministrarProgramas({ sinAsignar, periodo, sede }: { sinAsignar: Programa[]; periodo: string; sede: string }) {
+function AdministrarProgramas({ sinAsignar, fueraDeSede, periodo, sede }: { sinAsignar: Programa[]; fueraDeSede: Programa[]; periodo: string; sede: string }) {
   const [abierto, setAbierto] = useState(false);
   return (
     <div style={{ display: "grid", gap: "var(--space-4)" }}>
       <button type="button" className="mo-ir" style={{ justifySelf: "start", background: "none", border: 0, cursor: "pointer", font: "inherit", padding: 0 }} aria-expanded={abierto} onClick={() => setAbierto(!abierto)}>
-        {abierto ? "Ocultar" : "Planeación:"} asignación de programas a unidades ({sinAsignar.length} sin unidad)
+        {abierto ? "Ocultar" : "Planeación:"} asignación de programas a unidades ({sinAsignar.length} sin unidad{fueraDeSede.length > 0 ? `, ${fueraDeSede.length} fuera de su sede` : ""})
       </button>
-      {abierto && <AsignarProgramas sinAsignar={sinAsignar} periodo={periodo} sede={sede} />}
+      {abierto && <AsignarProgramas sinAsignar={[...sinAsignar, ...fueraDeSede]} periodo={periodo} sede={sede} />}
     </div>
   );
 }
@@ -1026,6 +1027,9 @@ function AsignarProgramas({ sinAsignar, periodo, sede }: { sinAsignar: Programa[
   const asignar = useAsignarPrograma();
   const auto = useAutoasignar(periodo, sede);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  // Primero los programas que se ofrecen en la sede cargada: Derecho tiene un SNIES por sede y el nombre solo no basta.
+  const codigoSede = sede.toUpperCase();
+  const opciones = [...(unidades.data ?? [])].sort((a, b) => Number(b.sedes.includes(codigoSede)) - Number(a.sedes.includes(codigoSede)) || a.name.localeCompare(b.name, "es"));
   return (
     <section className="mo-seccion" aria-labelledby="mo-asig">
       <div className="mo-seccion__cabeza">
@@ -1067,13 +1071,15 @@ function AsignarProgramas({ sinAsignar, periodo, sede }: { sinAsignar: Programa[
                     disabled={unidades.isPending || asignar.isPending}
                     onChange={(ev) => ev.target.value && asignar.mutate({ codigo: p.codigo_programa, nombre: p.nombre, unit: ev.target.value }, { onError: (e) => setMensaje((e as Error).message) })}
                   >
-                    <option value="">Elegir…</option>
-                    {(unidades.data ?? []).map((u) => (
+                    <option value="">{p.unit_id ? `Hoy: ${p.unidad}${p.snies ? ` · SNIES ${p.snies}` : ""}. Cambiar…` : "Elegir…"}</option>
+                    {opciones.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name}
+                        {u.name} · SNIES {u.snies ?? "—"} · {u.sedes.join(", ")}
+                        {u.facultad ? ` · ${u.facultad}` : ""}
                       </option>
                     ))}
                   </select>
+                  {p.unit_id && p.en_sede === false && <small className="mo-aviso">La unidad asignada no se ofrece en esta sede.</small>}
                 </td>
               </tr>
             ))}

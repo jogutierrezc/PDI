@@ -43,6 +43,16 @@ export interface AnalisisRelaciones {
   avisos: string[];
 }
 
+/** Colores propios de un tablero (opcional). Sin paleta, el tablero usa los colores UDES del tema. */
+export interface PaletaBI {
+  nombre: string;
+  descripcion: string;
+  /** 6 a 8 colores #rrggbb para series y categorías. */
+  categorica: string[];
+  /** 5 pasos #rrggbb de claro a oscuro para mapas de calor. */
+  secuencial: string[];
+}
+
 export interface PaginaBI {
   id: string;
   nombre: string;
@@ -66,6 +76,8 @@ export interface ModeloBI {
   medidasPropias?: MedidaBI[];
   /** El análisis de relaciones de Pilo Tableros, si se hizo. */
   analisis?: AnalisisRelaciones;
+  /** La paleta de colores, si se eligió una; opcional. */
+  paleta?: PaletaBI;
   paginas: PaginaBI[];
 }
 

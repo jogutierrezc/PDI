@@ -61,6 +61,13 @@ export interface Programa {
   unidad: string | null;
   facultad_id: string | null;
   facultad: string | null;
+  /** SNIES de la unidad asignada. */
+  snies?: string | null;
+  vicerrectoria?: string | null;
+  /** Los posgrados, además de su facultad, se conectan con la Vicerrectoría de Posgrados. */
+  vicerrectoria_posgrados?: string | null;
+  /** false = el programa asignado no se ofrece en la sede cargada (posible código repetido entre sedes). */
+  en_sede?: boolean | null;
 }
 
 export interface Umbrales {

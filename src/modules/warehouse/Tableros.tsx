@@ -12,7 +12,7 @@ import { CORTES } from "./conjuntos";
 import { Barras, Lineas, MapaCalor } from "./graficos";
 import { medidaPorId, PLANTILLAS, type Formato, type ModeloBI, type VisualBI } from "./modelo";
 import { mensajeDe, type Cobertura } from "./store";
-import { cifrasDeVisual, consultaVisual, leerModelo, mejores, narrarTablero, nombreDimension, useTablerosGuardados, useVisual, type ContextoVisual, type DatosVisual, type NarracionPilo } from "./tablerosDatos";
+import { cifrasDeVisual, consultaVisual, estiloPaleta, leerModelo, mejores, narrarTablero, nombreDimension, useTablerosGuardados, useVisual, type ContextoVisual, type DatosVisual, type NarracionPilo } from "./tablerosDatos";
 import type { Contexto } from "./Warehouse";
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
@@ -111,7 +111,7 @@ function TableroAbierto({ ctx, cobertura, id, modelo }: { ctx: Contexto; cobertu
   };
 
   return (
-    <div className="wh-pila">
+    <div className="wh-pila" style={estiloPaleta(modelo.paleta)}>
       <section className="wh-panel">
         <div className="wh-panel__cabeza">
           <div>

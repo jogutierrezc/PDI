@@ -76,7 +76,7 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
   // «Leer» en Pregúntele a Pilo: las respuestas suenan con la voz de IA (la de Voz), no con la del navegador.
   const speaks = rule.fns.includes("leer");
   const fns = (voice: boolean): Fn[] => (voice ? ["preguntar", "leer"] : ["preguntar"]);
-  const voiceName = s.voice_engine !== "proveedor" ? "" : s.speech_provider === "nvidia" ? "NVIDIA" : s.speech_provider === "fishaudio" ? "Fish Audio" : s.speech_provider === "elevenlabs" ? "ElevenLabs" : "Free.ai";
+  const voiceName = s.voice_engine !== "proveedor" ? "" : s.speech_provider === "nvidia" ? "NVIDIA" : s.speech_provider === "fishaudio" ? "Fish Audio" : s.speech_provider === "elevenlabs" ? "ElevenLabs" : s.speech_provider === "otro" ? "el servidor propio" : "Free.ai";
   const answers = useSavedAnswers();
   const hide = useHideAnswer();
   const [modalOpen, setModalOpen] = useState(false);

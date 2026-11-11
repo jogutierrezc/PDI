@@ -29,6 +29,7 @@ import { VoiceStyles } from "./VoiceStyles";
 import { WidgetGroup } from "./WidgetGroup";
 import { ExtrasGroup } from "./ExtrasGroup";
 import { ElevenLabsVoice } from "./ElevenLabsVoice";
+import { VozPropia } from "./VozPropia";
 import { DisenoVozModo } from "./DisenoVozModo";
 import { VoiceExpressionsEditor } from "./VoiceExpressionsEditor";
 
@@ -342,16 +343,20 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
 
 export function VoiceSection({ ed }: { ed: EditorApi }) {
   const { s, setS, set, dirty, keys } = ed;
-  const choice: "freeai" | "nvidia" | "fishaudio" | "elevenlabs" | "navegador" =
-    s.voice_engine !== "proveedor" ? "navegador" : s.speech_provider === "nvidia" || s.speech_provider === "fishaudio" || s.speech_provider === "elevenlabs" ? s.speech_provider : "freeai";
-  const who = choice === "nvidia" ? "NVIDIA" : choice === "fishaudio" ? "Fish Audio" : choice === "elevenlabs" ? "ElevenLabs" : "Free.ai";
+  const choice: "freeai" | "nvidia" | "fishaudio" | "elevenlabs" | "otro" | "navegador" =
+    s.voice_engine !== "proveedor"
+      ? "navegador"
+      : s.speech_provider === "nvidia" || s.speech_provider === "fishaudio" || s.speech_provider === "elevenlabs" || s.speech_provider === "otro"
+        ? s.speech_provider
+        : "freeai";
+  const who = choice === "nvidia" ? "NVIDIA" : choice === "fishaudio" ? "Fish Audio" : choice === "elevenlabs" ? "ElevenLabs" : choice === "otro" ? "el servidor propio" : "Free.ai";
   const [sampling, setSampling] = useState(false);
   const [sampleText, setSampleText] = useState("Escuche cómo suena Mr. Pilo.");
   const pick = (next: typeof choice) =>
     setS((prev) =>
       next === "navegador"
         ? { ...prev, voice_engine: "navegador" }
-        : { ...prev, voice_engine: "proveedor", speech_provider: next !== "freeai" ? next : prev.speech_provider === "otro" ? "otro" : "freeai" },
+        : { ...prev, voice_engine: "proveedor", speech_provider: next },
     );
   const sample = async () => {
     const line = "Hola, soy Mr. Pilo. Le leo las cifras de la universidad.";
@@ -390,17 +395,22 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
             <strong>Voz de Free.ai</strong>
             <span>Masculina y natural (em_alex). Usa la clave de Free.ai y su cupo.</span>
           </button>
+          <button type="button" role="radio" aria-checked={choice === "otro"} onClick={() => pick("otro")}>
+            <strong>Servidor propio</strong>
+            <span>Un servidor de voz con formato OpenAI (Kokoro, Voice Studio…), en la nube o en un computador de la universidad. Usted pone la dirección, el modelo y la clave.</span>
+          </button>
           <button type="button" role="radio" aria-checked={choice === "navegador"} onClick={() => pick("navegador")}>
             <strong>Voz del navegador</strong>
             <span>Gratis, sin clave. Siempre es el respaldo si la otra no responde.</span>
           </button>
         </div>
-        {choice === "freeai" && s.speech_provider !== "otro" && keys?.keys && !keys.keys.freeai?.has && (
+        {choice === "freeai" && keys?.keys && !keys.keys.freeai?.has && (
           <KeyField which="freeai" label="Clave de Free.ai (hace falta para su voz)" has={false} last4="" />
         )}
       </Group>
 
       {(choice === "nvidia" || choice === "fishaudio") && <VoiceStyles key={choice} ed={ed} provider={choice} />}
+      {choice === "otro" && <VozPropia ed={ed} />}
       {choice === "elevenlabs" && <ElevenLabsVoice ed={ed} />}
       {choice === "elevenlabs" && <DisenoVozModo ed={ed} />}
 
@@ -426,6 +436,9 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
         )}
         {choice === "elevenlabs" && (
           <p className="pis-small">Con ElevenLabs, la voz y la emoción se eligen arriba; la velocidad de aquí no se usa (use la de ElevenLabs). El tono de arriba es solo del navegador.</p>
+        )}
+        {choice === "otro" && (
+          <p className="pis-small">Con un servidor propio, la velocidad de aquí viaja en cada pedido (speed) si el servidor la entiende; el tono de arriba es solo del navegador.</p>
         )}
         {choice === "fishaudio" && (
           <p className="pis-small">Con Fish Audio, la voz la pone la muestra y el tono se elige en cada estilo. La velocidad sí se aplica; el tono de arriba es solo del navegador.</p>

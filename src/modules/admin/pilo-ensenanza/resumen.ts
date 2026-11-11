@@ -43,6 +43,7 @@ export function voiceName(shared: { voice_engine?: string; speech_provider?: str
   if (shared.speech_provider === "nvidia") return "la voz de NVIDIA";
   if (shared.speech_provider === "fishaudio") return "la voz de Fish Audio";
   if (shared.speech_provider === "elevenlabs") return "la voz de ElevenLabs";
+  if (shared.speech_provider === "otro") return "la voz del servidor propio";
   return "la voz de Free.ai";
 }
 

@@ -146,6 +146,7 @@ describe("piezas del resumen", () => {
     expect(voiceName({ voice_engine: "navegador", speech_provider: "nvidia" })).toBe("la voz del navegador");
     expect(voiceName({ voice_engine: "proveedor", speech_provider: "nvidia" })).toBe("la voz de NVIDIA");
     expect(voiceName({ voice_engine: "proveedor", speech_provider: "fishaudio" })).toBe("la voz de Fish Audio");
+    expect(voiceName({ voice_engine: "proveedor", speech_provider: "otro" })).toBe("la voz del servidor propio");
     expect(voiceName({ voice_engine: "proveedor", speech_provider: "freeai" })).toBe("la voz de Free.ai");
   });
 });

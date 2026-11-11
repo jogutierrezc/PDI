@@ -25,7 +25,7 @@ import { OBS_TOPICS } from "../../datos-abiertos/observatorio/data";
 /* --- Tipos ------------------------------------------------------------------------ */
 
 /** Tipos de gráfica que solo tenían los informes de UDES en Cifras. */
-export type ObsExtraType = "mapa_calor" | "mosaico" | "embudo" | "puntos" | "bosque" | "ranking" | "mapa_municipal";
+export type ObsExtraType = "mapa_calor" | "mosaico" | "embudo" | "puntos" | "bosque" | "ranking" | "mapa_municipal" | "dispersion";
 export type ObsChartType = FreeChartType | ObsExtraType;
 
 /** Columna: la de los conjuntos libres, con el municipio como territorio más. */
@@ -279,6 +279,14 @@ const EXTRA: Record<ObsExtraType, ChartSpec> = {
     origin: "Informes",
     category: "texto",
     series: "una",
+  },
+  dispersion: {
+    label: "Dispersión",
+    hint: "Cada punto es una categoría (un programa, una sede) con dos cifras: una en el eje horizontal y otra en el vertical.",
+    family: "Relación",
+    origin: "Informes",
+    category: "texto",
+    series: "dos",
   },
   mapa_municipal: {
     label: "Mapa por municipio",

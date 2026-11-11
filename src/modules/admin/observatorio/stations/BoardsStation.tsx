@@ -16,6 +16,8 @@ import { ChartThumb, ObsChart } from "../ObsCharts";
 import { CHARTS, SECTIONS, SECTION_HINT, SECTION_LABEL, TEMPLATES, plural, topicConfig, topicInfo, topicTone } from "../model";
 import type { ObsDataset, ObsSection, ObsTemplate, ObsTopicConfig, ObsView } from "../model";
 import { useObsCommit } from "../store";
+import { useObsDeTema } from "../fuenteWarehouse";
+import { AjustesTablero } from "../guia/AjustesTablero";
 
 /** Esquema de cada plantilla, para elegirla sin leer la descripción. */
 function TemplateSketch({ id }: { id: ObsTemplate }) {
@@ -71,6 +73,7 @@ export function BoardsStation({ state, topic, canEdit, go }: ObsStationProps) {
   const [order, setOrder] = useState<ObsView[]>(views);
   const [device, setDevice] = useState<"escritorio" | "movil">("escritorio");
   const commit = useObsCommit();
+  const obsId = useObsDeTema(topic).data ?? null;
 
   // Solo cuando cambia lo GUARDADO (no en cada refresco en segundo plano): así «Publicado» no se pierde antes de guardar.
   const guardado = JSON.stringify(saved);
@@ -133,6 +136,7 @@ export function BoardsStation({ state, topic, canEdit, go }: ObsStationProps) {
 
   return (
     <div className="obs-boards">
+      {obsId && <AjustesTablero obsId={obsId} canEdit={canEdit} />}
       <div className="obs-boards__controls">
         <Panel
           id="obs-tipo-informe"

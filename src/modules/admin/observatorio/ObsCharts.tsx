@@ -174,6 +174,8 @@ function ExtraChart({ dataset, view }: { dataset: ObsDataset; view: Drawable }) 
       return <Forest t={t} dataset={dataset} view={view} />;
     case "ranking":
       return <Ranking t={t} dataset={dataset} view={view} />;
+    case "dispersion":
+      return <Scatter t={t} dataset={dataset} view={view} />;
     case "mapa_municipal":
       return <MunicipalMap t={t} dataset={dataset} view={view} />;
     default:
@@ -413,6 +415,58 @@ function DotPlot({ t, dataset, view }: ExtraProps) {
               })}
             </svg>
           </>
+        );
+      }}
+    </Canvas>
+  );
+}
+
+/* --- Dispersión ----------------------------------------------------------------------------- */
+
+function Scatter({ t, dataset, view }: ExtraProps) {
+  const [hover, setHover] = useState<string | null>(null);
+  const [sx, sy] = (view.series ?? []).slice(0, 2).map((k) => col(dataset, k)!);
+  const rows = dataRows(dataset);
+  const labels = [...new Set(rows.map((r) => textOf(r.cells[view.category!])).filter(Boolean))];
+  const pts = labels
+    .map((label) => {
+      const own = rows.filter((r) => textOf(r.cells[view.category!]) === label);
+      return { label, x: totalsBy(own, view.category!, sx.key).items[0]?.value ?? null, y: totalsBy(own, view.category!, sy.key).items[0]?.value ?? null };
+    })
+    .filter((p): p is { label: string; x: number; y: number } => p.x !== null && p.y !== null);
+  if (!pts.length) return <p className="obs-chart-empty">Ninguna categoría tiene las dos cifras.</p>;
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const x0 = Math.min(0, ...xs);
+  const x1 = Math.max(...xs, 1);
+  const y0 = Math.min(0, ...ys);
+  const y1 = Math.max(...ys, 1);
+  const m = { l: 56, r: 16, t: 14, b: 44 };
+  return (
+    <Canvas>
+      {(width) => {
+        const w = width - m.l - m.r;
+        const h = 280 - m.t - m.b;
+        const X = (v: number) => m.l + ((v - x0) / (x1 - x0 || 1)) * w;
+        const Y = (v: number) => m.t + h - ((v - y0) / (y1 - y0 || 1)) * h;
+        return (
+          <svg width={width} height={280} className="obs-svg" role="img" aria-label={`${view.title}: dispersión de ${sy.label} frente a ${sx.label}`}>
+            {[0, 0.5, 1].map((f) => (
+              <g key={f}>
+                <line x1={m.l} x2={m.l + w} y1={Y(y0 + (y1 - y0) * f)} y2={Y(y0 + (y1 - y0) * f)} stroke={t.line} />
+                <text x={m.l - 8} y={Y(y0 + (y1 - y0) * f) + 4} textAnchor="end" className="obs-tick">{formatValue(y0 + (y1 - y0) * f, sy.format ?? "decimal")}</text>
+                <text x={X(x0 + (x1 - x0) * f)} y={280 - 24} textAnchor="middle" className="obs-tick">{formatValue(x0 + (x1 - x0) * f, sx.format ?? "decimal")}</text>
+              </g>
+            ))}
+            {y0 < 0 && <line x1={m.l} x2={m.l + w} y1={Y(0)} y2={Y(0)} stroke={t.secondary} />}
+            <text x={m.l + w / 2} y={276} textAnchor="middle" className="obs-label">{sx.label}</text>
+            <text x={12} y={m.t + h / 2} textAnchor="middle" className="obs-label" transform={`rotate(-90 12 ${m.t + h / 2})`}>{sy.label}</text>
+            {pts.map((p) => (
+              <circle key={p.label} cx={X(p.x)} cy={Y(p.y)} r={hover === p.label ? 8 : 5.5} fill={p.y < 0 ? t.cats[1] : t.cats[0]} fillOpacity={0.8} stroke={t.surface} strokeWidth={1.5} tabIndex={0} onMouseEnter={() => setHover(p.label)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(p.label)} onBlur={() => setHover(null)}>
+                <title>{`${p.label}: ${fmtOf(sx, p.x)} · ${fmtOf(sy, p.y)}`}</title>
+              </circle>
+            ))}
+          </svg>
         );
       }}
     </Canvas>
@@ -848,6 +902,14 @@ const THUMBS: Record<ObsChartType, ReactNode> = {
           <rect x="16" y={8 + i * 10} width={[46, 36, 26, 18][i]} height="6" rx="1.5" fill={i === 0 ? P : L} />
         </g>
       ))}
+    </>
+  ),
+  dispersion: (
+    <>
+      {[[18, 36], [28, 24], [38, 30], [46, 14], [54, 22], [30, 12]].map(([cx, cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r="3.2" fill={i === 1 ? S : P} fillOpacity="0.8" />
+      ))}
+      <path d="M12 40h48M12 8v32" stroke={L} strokeWidth="1" />
     </>
   ),
   mapa_municipal: (

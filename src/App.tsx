@@ -148,6 +148,9 @@ const PublicBulletinList = lazy(() =>
 const OdAdmin = lazy(() =>
   import("./modules/admin/udes-en-cifras/OdAdmin").then((m) => ({ default: m.OdAdmin })),
 );
+const VisorObservatorio = lazy(() =>
+  import("./modules/admin/observatorio/visor/VisorObservatorio").then((m) => ({ default: m.VisorObservatorio })),
+);
 const ObsAdmin = lazy(() =>
   import("./modules/admin/observatorio/ObsAdmin").then((m) => ({ default: m.ObsAdmin })),
 );
@@ -661,6 +664,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="cifras">
                 <IntranetBulletinPage />
+              </RequireRole>
+            }
+          />
+          {/* Observatorio por dentro: lo que armó el taller, con filtros por la estructura. Ver lee e interactúa; no escribe. */}
+          <Route
+            path="/admin/observatorio-ver/:enlace/:tema?"
+            element={
+              <RequireRole minimum="consulta" screen="observatorio">
+                <VisorObservatorio />
               </RequireRole>
             }
           />

@@ -29,6 +29,7 @@ import type { ObsDataType, ObsDataset, ObsSection, ObsView } from "../model";
 import { useObsCommit } from "../store";
 import { useObsDeTema } from "../fuenteWarehouse";
 import { FuenteWarehouse, OrigenWarehouse } from "./FuenteWarehouse";
+import { GuiaDatos } from "../guia/GuiaDatos";
 
 export function CaptureStation({ state, topic, canEdit, go }: ObsStationProps) {
   const [params, setParams] = useSearchParams();
@@ -50,6 +51,7 @@ export function CaptureStation({ state, topic, canEdit, go }: ObsStationProps) {
 
   return (
     <>
+      <GuiaDatos topic={topic} obsId={obsId} canEdit={canEdit} datasets={datasets} />
       <Panel
         id="obs-tablas"
         title={`Tablas de datos · ${info.name}`}

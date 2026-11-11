@@ -23,6 +23,8 @@ import type { ModeloInforme } from "./modelo";
 import { PanelSintesis } from "./Sintesis";
 import { LecturaTexto, resolverDe } from "./Texto";
 import { ElementosDriveLectura } from "./ElementosDrive";
+import { TablaLibreVista } from "./BloquesLibres";
+import { tablaConDatos } from "../tabla-libre";
 
 type Filtro = "sent" | "back" | "ok" | "todos";
 const FILTROS: { id: Filtro; texto: string }[] = [
@@ -310,6 +312,26 @@ function LecturaBase({ def, c, m, pilares, resolver }: { def: SeccionDef; c: Con
             </li>
           ))}
         </ul>
+      ) : (
+        sinNada
+      );
+    case "libre":
+      return (c.bloques ?? []).length ? (
+        <>
+          {(c.bloques ?? []).map((b) =>
+            b.tipo === "texto" ? (
+              b.texto.trim() ? (
+                <div key={b.id} className="inf-pv">
+                  <LecturaTexto texto={b.texto} resolver={resolver} />
+                </div>
+              ) : null
+            ) : b.tipo === "drive" ? (
+              <ElementosDriveLectura key={b.id} elementos={b.drive} />
+            ) : tablaConDatos(b) ? (
+              <TablaLibreVista key={b.id} b={b} />
+            ) : null,
+          )}
+        </>
       ) : (
         sinNada
       );

@@ -10,7 +10,7 @@ import type { PlanLocal } from "./plan-importar";
 import type { CriterioPropio, IndicadorManual } from "./indicadores-manual";
 
 export type Plantilla = "A" | "B" | "C" | "D";
-export type TipoSeccion = "narr" | "pdi" | "metas" | "dim" | "matriz" | "filas" | "logros" | "evid" | "anexos";
+export type TipoSeccion = "narr" | "pdi" | "metas" | "dim" | "matriz" | "filas" | "logros" | "evid" | "anexos" | "libre";
 export type EstadoInstancia = "draft" | "sent" | "ok" | "back";
 export type EstadoCiclo = "preparacion" | "abierto" | "cerrado";
 export type Condicion = "justificar" | "sugerido" | "no";
@@ -36,6 +36,10 @@ export interface SeccionDef {
   funcion?: string;
   /** Columnas de las secciones de filas. */
   columnas?: string[];
+  /** Planeación la dejó en solo lectura para la unidad (0276): se muestra lo ya definido, sin edición. */
+  soloLectura?: boolean;
+  /** Sección «libre» creada por Planeación en el ciclo (clave x1, x2…). */
+  libre?: boolean;
 }
 
 export interface PlantillaDef {
@@ -132,8 +136,34 @@ export interface ElementoDrive {
   nota: string;
 }
 
+/** Un bloque de una sección libre. Para sumar otro tipo (p. ej. una tabla pegada de Excel) se agrega aquí y en BloquesLibres. */
+export type BloqueLibre =
+  | { id: string; tipo: "texto"; texto: string }
+  | { id: string; tipo: "drive"; drive: ElementoDrive[] }
+  /** Copia fija de una tabla pegada o subida desde Excel (tabla-libre.ts). */
+  | { id: string; tipo: "tabla"; titulo: string; nota: string; origen: string; cargada: string; encabezados: string[]; filas: string[][] };
+
+/** Fila de informe_secciones_config (0276): cómo Planeación arma una plantilla en un ciclo. */
+export interface SeccionConfigRow {
+  ciclo_id: string;
+  plantilla: Plantilla;
+  clave: string;
+  activa: boolean;
+  /** Posición explícita; nulo: la de la plantilla. */
+  orden: number | null;
+  /** Título propio; nulo: el de la plantilla. */
+  titulo: string | null;
+  editable_por_unidad: boolean;
+  /** Sección nueva (clave x1…), no de la plantilla. */
+  libre: boolean;
+  /** Palabras mínimas del texto de una sección libre. */
+  minimo: number | null;
+}
+
 export interface ContenidoSeccion {
   texto?: string;
+  /** Sección libre: bloques de texto y de UDrive en orden. */
+  bloques?: BloqueLibre[];
   /** Pilares del PDI con los que se articula (id del pilar). */
   pilares?: string[];
   /** Metas adicionales que escribe la unidad (las de sus indicadores no se guardan aquí). */

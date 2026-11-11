@@ -93,13 +93,33 @@ const TPL: Record<Plantilla, Omit<SeccionPlantilla, "clave">[]> = {
 
 export const esPlantilla = (p: unknown): p is Plantilla => typeof p === "string" && (PLANTILLAS as string[]).includes(p);
 
-/** Las secciones de una plantilla, con su clave s1…sN. */
-export function seccionesDe(plantilla: Plantilla): SeccionPlantilla[] {
-  return TPL[plantilla].map((x, i) => ({ ...x, clave: `s${i + 1}` }));
+/** Una fila de informe_secciones_config (0276): lo que Planeación cambió de la plantilla en el ciclo. */
+export interface SeccionConfig {
+  plantilla: string;
+  clave: string;
+  activa: boolean;
+  titulo: string | null;
+  libre: boolean;
 }
 
-export function seccionDe(plantilla: Plantilla, clave: string): SeccionPlantilla | null {
-  return seccionesDe(plantilla).find((x) => x.clave === clave) ?? null;
+/**
+ * Las secciones de una plantilla, con su clave s1…sN. Con la configuración del ciclo (0276):
+ * sin las desactivadas, con el título propio y sumando las libres (clave x1…, tipo «libre»,
+ * texto simple: Pilo no las redacta ni aprende de ellas, solo las lee como contexto).
+ */
+export function seccionesDe(plantilla: Plantilla, config: SeccionConfig[] = []): SeccionPlantilla[] {
+  const filas = config.filter((f) => f.plantilla === plantilla);
+  const base = TPL[plantilla].map((x, i) => {
+    const clave = `s${i + 1}`;
+    const f = filas.find((y) => y.clave === clave);
+    return f && !f.activa ? null : { ...x, clave, titulo: f?.titulo?.trim() || x.titulo };
+  });
+  const libres = filas.filter((f) => f.libre && f.activa).map((f): SeccionPlantilla => ({ clave: f.clave, titulo: f.titulo?.trim() || "Sección nueva", ty: "libre", tipo: "otra", extension: null }));
+  return [...base.filter((x): x is SeccionPlantilla => x !== null), ...libres];
+}
+
+export function seccionDe(plantilla: Plantilla, clave: string, config: SeccionConfig[] = []): SeccionPlantilla | null {
+  return seccionesDe(plantilla, config).find((x) => x.clave === clave) ?? null;
 }
 
 /** La plantilla de un informe 2025 por el nombre del archivo o de la unidad (sin IA). */

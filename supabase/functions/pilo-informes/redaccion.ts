@@ -61,10 +61,28 @@ export function puedeUsar(
 /* ---------- Contenido de una sección --------------------------------------- */
 
 /** El texto narrativo de `informe_secciones.contenido` (texto, text, narrativa o html). */
+/** Una tabla de Excel de una sección libre en texto compacto: título, encabezados y las primeras filas. */
+function compactaTabla(b: Record<string, unknown>): string {
+  const filas = Array.isArray(b.filas) ? (b.filas as unknown[][]) : [];
+  const enc = Array.isArray(b.encabezados) ? (b.encabezados as unknown[]) : [];
+  if (!filas.some((f) => Array.isArray(f) && f.some((c) => String(c ?? "").trim()))) return "";
+  const lin = (f: unknown[]) => f.map((c) => String(c ?? "").replace(/\s+/g, " ").trim()).join(" | ");
+  const resto = filas.length - 8;
+  return [typeof b.titulo === "string" && b.titulo.trim() ? `Tabla: ${b.titulo.trim()}` : "", lin(enc), ...filas.slice(0, 8).filter(Array.isArray).map(lin), resto > 0 ? `(${resto} filas más)` : ""].filter(Boolean).join("\n");
+}
+
 export function textoDeContenido(contenido: unknown): string {
   if (typeof contenido === "string") return contenido;
   if (!contenido || typeof contenido !== "object") return "";
   const c = contenido as Record<string, unknown>;
+  // Sección libre (0276): sus bloques de texto, juntos.
+  if (Array.isArray(c.bloques)) {
+    const t = (c.bloques as Record<string, unknown>[])
+      .map((b) => (b?.tipo === "texto" && typeof b.texto === "string" ? b.texto : b?.tipo === "tabla" ? compactaTabla(b) : ""))
+      .filter(Boolean)
+      .join("\n\n");
+    if (t) return t;
+  }
   for (const k of ["texto", "text", "narrativa", "html"]) {
     if (typeof c[k] === "string" && c[k]) {
       const t = c[k] as string;

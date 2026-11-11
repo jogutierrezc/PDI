@@ -300,9 +300,9 @@ function celda(c: { tipo: string }, v: unknown): ReactNode {
   return typeof v === "number" ? textoNumero(v) : String(v);
 }
 
-function unidadesDrive(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[] {
-  return s.drive.flatMap((e, k): Unidad[] => {
-    const clave = `${s.clave}:drive:${k}`;
+function unidadesDrive(s: SeccionLibro, i: number, r: RecursosDrive, elementos: ElementoDrive[] = s.drive, prefijo = `${s.clave}:drive`): Unidad[] {
+  return elementos.flatMap((e, k): Unidad[] => {
+    const clave = `${prefijo}:${k}`;
     if (e.tipo === "tabla") {
       const t = r.tablas.get(e.archivoId);
       if (!t) return [unidadFija(clave, i, <p className="vi-vacio">{r.listo ? "No se pudo leer la tabla de UDrive: ya no existe o no tiene permiso para verla." : "Cargando la tabla…"}</p>)];
@@ -548,6 +548,23 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
         );
       } else sinContenido();
       break;
+    case "libre": {
+      s.bloques.forEach((b, n) => {
+        if (b.tipo === "texto") texto(`b${n}`, b.texto);
+        else if (b.tipo === "drive") u.push(...unidadesDrive(s, i, r, b.drive, k(`b${n}:drive`)));
+        else
+          u.push(
+            unidadTabla(k(`b${n}:tabla`), i, {
+              titulo: b.titulo.trim() || undefined,
+              columnas: b.encabezados.map((c) => ({ etiqueta: c })),
+              filas: b.filas.map((f) => ({ celdas: b.encabezados.map((_, x) => f[x] ?? "") })),
+              nota: b.nota.trim() || undefined,
+            }),
+          );
+      });
+      if (!s.bloques.some((b) => (b.tipo === "texto" ? b.texto : b.tipo === "drive" ? b.drive.length : b.filas.length))) sinContenido();
+      break;
+    }
     case "evid":
     case "anexos":
       if (s.anexos.length) {
@@ -571,7 +588,7 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
       break;
   }
 
-  u.push(...unidadesDrive(s, i, r));
+  if (s.tipo !== "libre") u.push(...unidadesDrive(s, i, r));
 
   if (s.fuente) {
     u.push(

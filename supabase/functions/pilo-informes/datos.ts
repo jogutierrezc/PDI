@@ -8,6 +8,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import type { EjemploCorpus, FilaEjemplo } from "./corpus.ts";
 import type { CifraInforme } from "./redaccion.ts";
+import type { SeccionConfig } from "./plantillas.ts";
 
 type DB = SupabaseClient<any, any, any>;
 const PAGINA = 1000;
@@ -106,6 +107,12 @@ export async function leerInstancia(admin: DB, id: string): Promise<Instancia | 
 }
 
 /** La última decisión de Planeación sobre una sección (aprobado | devuelto), si la hay. */
+/** La estructura del ciclo (0276). Sin la migración, vacía: manda la plantilla del código. */
+export async function leerConfigSecciones(admin: DB, cicloId: string): Promise<SeccionConfig[]> {
+  const { data, error } = await admin.from("informe_secciones_config").select("plantilla, clave, activa, titulo, libre").eq("ciclo_id", cicloId);
+  return error ? [] : ((data as SeccionConfig[] | null) ?? []);
+}
+
 export async function decisionDeSeccion(admin: DB, instanciaId: string, clave: string): Promise<string | null> {
   const { data, error } = await admin.from("informe_revisiones").select("decision").eq("instancia_id", instanciaId).eq("seccion_clave", clave).order("en", { ascending: false }).limit(1);
   if (error) throw error;

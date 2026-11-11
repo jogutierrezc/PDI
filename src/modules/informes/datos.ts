@@ -225,20 +225,21 @@ export function useInstancias(ciclo: string | undefined) {
   });
 }
 
-/** Secciones listas por instancia del ciclo (para el avance del tablero). */
-export function useListas(ciclo: string | undefined, instancias: string[]) {
+/** Secciones listas por instancia del ciclo (para el avance del tablero). `inactivas`: por instancia, las secciones que Planeación desactivó (no cuentan). */
+export function useListas(ciclo: string | undefined, instancias: string[], inactivas?: ReadonlyMap<string, ReadonlySet<string>>) {
+  const firma = inactivas ? JSON.stringify([...inactivas].map(([i, c]) => [i, [...c]])) : "";
   return useQuery({
-    queryKey: [...CLAVES.listas(ciclo ?? ""), instancias.length],
+    queryKey: [...CLAVES.listas(ciclo ?? ""), instancias.length, firma],
     enabled: Boolean(ciclo) && instancias.length > 0,
     retry: false,
     queryFn: async (): Promise<Map<string, number>> => {
       const conteo = new Map<string, number>();
       for (let i = 0; i < instancias.length; i += 200) {
         const filas =
-          revisar<{ instancia_id: string }[] | null>(
-            await supabase.from("informe_secciones").select("instancia_id").eq("listo", true).in("instancia_id", instancias.slice(i, i + 200)),
+          revisar<{ instancia_id: string; clave: string }[] | null>(
+            await supabase.from("informe_secciones").select("instancia_id, clave").eq("listo", true).in("instancia_id", instancias.slice(i, i + 200)),
           ) ?? [];
-        for (const f of filas) conteo.set(f.instancia_id, (conteo.get(f.instancia_id) ?? 0) + 1);
+        for (const f of filas) if (!inactivas?.get(f.instancia_id)?.has(f.clave)) conteo.set(f.instancia_id, (conteo.get(f.instancia_id) ?? 0) + 1);
       }
       return conteo;
     },

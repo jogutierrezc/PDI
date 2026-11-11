@@ -189,14 +189,14 @@ Deno.serve(async (request: Request) => {
     if (inst.estado !== "ok") return json({ error: "Pilo solo aprende de informes aprobados.", code: "no_aprobado" }, 409);
     if (!esPlantilla(inst.plantilla)) return json({ error: `Plantilla desconocida: ${inst.plantilla}.` }, 400);
     try {
-      const [secciones, cifras] = await Promise.all([datos.leerSecciones(admin, inst.id), datos.leerCifras(admin, inst.id)]);
+      const [secciones, cifras, estructura] = await Promise.all([datos.leerSecciones(admin, inst.id), datos.leerCifras(admin, inst.id), datos.leerConfigSecciones(admin, inst.ciclo_id)]);
       const etiquetas = new Map(cifras.map((c) => [c.clave, c.etiqueta]));
       const filas: FilaEjemplo[] = [];
       const vistos = new Set<string>();
       let repetidas = 0;
       let aprendizaje = 0;
       for (const s of secciones) {
-        const def = seccionDe(inst.plantilla, s.clave);
+        const def = seccionDe(inst.plantilla, s.clave, estructura);
         const original = textoDeContenido(s.contenido).trim();
         if (!def?.extension || !original) continue;
         aprendizaje += await datos.completarFinal(admin, inst.id, s.clave, original);
@@ -302,7 +302,8 @@ Deno.serve(async (request: Request) => {
   const inst = instancia!;
   const clave = String(cuerpo.seccion_clave ?? "");
   if (!esPlantilla(inst.plantilla)) return json({ error: `Plantilla desconocida: ${inst.plantilla}.` }, 400);
-  const def = seccionDe(inst.plantilla, clave);
+  const estructura = await datos.leerConfigSecciones(admin, inst.ciclo_id);
+  const def = seccionDe(inst.plantilla, clave, estructura);
   if (!def) return json({ error: `La plantilla ${inst.plantilla} no tiene la sección ${clave || "(vacía)"}.` }, 404);
   if (!def.extension) return json({ error: `«${def.titulo}» es una lista: Pilo no la redacta.` }, 400);
   if (inst.estado === "sent" || inst.estado === "ok") return json({ error: inst.estado === "ok" ? "El informe está aprobado: Pilo no lo reescribe." : "El informe está enviado: Pilo no lo reescribe.", code: "cerrado" }, 409);
@@ -312,7 +313,7 @@ Deno.serve(async (request: Request) => {
     const [secciones, todasCifras, filasEjemplos] = await Promise.all([datos.leerSecciones(admin, inst.id), datos.leerCifras(admin, inst.id), datos.leerEjemplos(admin, def.tipo)]);
     const cifras = cifrasValidas(todasCifras);
     const actual = textoDeContenido(secciones.find((s) => s.clave === clave)?.contenido);
-    const titulos = new Map(seccionesDe(inst.plantilla).map((s) => [s.clave, s.titulo]));
+    const titulos = new Map(seccionesDe(inst.plantilla, estructura).map((s) => [s.clave, s.titulo]));
     const otras = ["resumen", "conclusiones", "presentacion"].includes(def.tipo)
       ? secciones
           .filter((s) => s.clave !== clave)

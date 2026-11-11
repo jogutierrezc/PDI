@@ -1,6 +1,7 @@
 /* El informe armado para la pantalla: secciones, cifras (guardadas + vivas),
    anexos y el avance de cada sección. Lo usan el editor y la revisión. */
 
+import { useMemo } from "react";
 import { congelado, esViva, vistaCifra } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
 import { condicionDe, useAnexos, useCifras, useCifrasVivas, useSecciones } from "../datos";
@@ -15,6 +16,8 @@ import { armarSintesis, cifrasDeSintesis } from "../sintesis";
 import { estadoMeta } from "../vista/estados";
 import type { PlanAccion } from "../plan-decanatura";
 import { PLANTILLAS, cifraDef, clavesDe, DIMS } from "../plantillas";
+import { clavesInactivas, resolverSecciones } from "../secciones-config";
+import { useConfigSecciones } from "../secciones-datos";
 import { avanceSeccion } from "../validacion";
 import type { Avance, ContextoSeccion } from "../validacion";
 import type { CicloRow, ConfigCiclo, ContenidoSeccion, InstanciaRow, RequisitoRow, SeccionDef } from "../types";
@@ -31,7 +34,11 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   const frio = congelado(inst.estado);
   const vivas = useCifrasVivas(inst.id, !frio);
   const anexos = useAnexos(inst.id);
-  const plantilla = PLANTILLAS[inst.plantilla];
+  const lecturaEstructura = useConfigSecciones(ciclo.id);
+  const filasEstructura = lecturaEstructura.data?.filas;
+  /** La plantilla del código con la estructura que Planeación fijó en el ciclo (0276). */
+  const plantilla = useMemo(() => ({ ...PLANTILLAS[inst.plantilla], secciones: resolverSecciones(inst.plantilla, filasEstructura ?? []) }), [inst.plantilla, filasEstructura]);
+  const inactivas = useMemo(() => clavesInactivas(inst.plantilla, filasEstructura ?? []), [inst.plantilla, filasEstructura]);
   const config = configDe(ciclo);
 
   const porClave = new Map((filas.data ?? []).map((f) => [f.clave, f]));
@@ -39,12 +46,14 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
     vistaCifra(clave, { fila: porClave.get(clave), viva: vivas.data?.[clave], estado: inst.estado, condicion: condicionDe(requisitos, inst.plantilla, clave) });
 
   const dePlantilla = new Set(clavesDe(inst.plantilla));
-  const extras = (filas.data ?? []).filter((f) => !dePlantilla.has(f.clave) && !esMetaDelPrograma(f.clave));
+  /** Las cifras de la plantilla que siguen en el informe: las de las dimensiones de secciones activas. */
+  const activasDePlantilla = new Set(plantilla.secciones.flatMap((s) => s.dims ?? []).flatMap((d) => DIMS[d].cifras));
+  const extras = (filas.data ?? []).filter((f) => !dePlantilla.has(f.clave) && !esMetaDelPrograma(f.clave) && !inactivas.has(f.seccion_clave ?? ""));
   /** Datos propios: la unidad los escribe (Excel, manual, URL). */
   const propias = extras.filter((f) => !esViva(f.fuente_tipo)).map((f) => ({ fila: f, vista: vista(f.clave) }));
   /** Indicadores que la unidad conectó a UDES en Cifras o al PDI además de los de la plantilla. */
   const agregadas = extras.filter((f) => esViva(f.fuente_tipo)).map((f) => ({ fila: f, vista: vista(f.clave) }));
-  const delInforme = [...dePlantilla].map(vista);
+  const delInforme = [...dePlantilla].filter((k) => activasDePlantilla.has(k)).map(vista);
   /** Una cifra de la plantilla sin indicador conectado no tiene qué mostrar: no entra a la matriz ni al texto. */
   const conectada = (c: CifraVista) => c.valor !== null || c.propia;
   /** Indicadores que la unidad escribió a mano en Resultados por dimensión, por sección. */
@@ -115,10 +124,10 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
 
   const avance = (def: SeccionDef, contenido?: ContenidoSeccion): Avance => avanceSeccion(def, contenido ?? contenidoGuardado(def.clave), contexto(def, contenido));
 
-  const cargando = secciones.isPending || filas.isPending || anexos.isPending;
+  const cargando = secciones.isPending || filas.isPending || anexos.isPending || lecturaEstructura.isPending;
   const error = [secciones.error, filas.error, anexos.error, vivas.error].find((e): e is Error => e instanceof Error) ?? null;
 
-  return { plantilla, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, manuales, manualesDe, sintesis, citables, contenidoGuardado, contexto, avance, requeridos, requeridosDe, cargando, error };
+  return { plantilla, inactivas, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, manuales, manualesDe, sintesis, citables, contenidoGuardado, contexto, avance, requeridos, requeridosDe, cargando, error };
 }
 
 export type ModeloInforme = ReturnType<typeof useModeloInforme>;

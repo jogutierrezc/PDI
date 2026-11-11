@@ -77,3 +77,28 @@ export async function leerHoja(archivo: File, nombre: string): Promise<string[][
   });
   return filas;
 }
+
+/** Los nombres de las hojas de un .xlsx. */
+export async function nombresDeHojas(archivo: File): Promise<string[]> {
+  const { default: ExcelJS } = await import("exceljs");
+  const libro = new ExcelJS.Workbook();
+  await libro.xlsx.load(await archivo.arrayBuffer());
+  return libro.worksheets.map((h) => h.name);
+}
+
+/** La hoja con sus posiciones (las filas y columnas vacías se conservan, para leer un rango tipo «B2:E20»). Tope: 2000 filas y 60 columnas. */
+export async function leerHojaPosicional(archivo: File, nombre: string): Promise<string[][]> {
+  const { default: ExcelJS } = await import("exceljs");
+  const libro = new ExcelJS.Workbook();
+  await libro.xlsx.load(await archivo.arrayBuffer());
+  const hoja = libro.getWorksheet(nombre) ?? libro.worksheets[0];
+  if (!hoja) return [];
+  const filas: string[][] = [];
+  const nf = Math.min(hoja.rowCount, 2000);
+  const nc = Math.min(hoja.columnCount, 60);
+  for (let i = 1; i <= nf; i++) {
+    const fila = hoja.getRow(i);
+    filas.push(Array.from({ length: nc }, (_, j) => textoDeCelda(fila.getCell(j + 1).value)));
+  }
+  return filas;
+}

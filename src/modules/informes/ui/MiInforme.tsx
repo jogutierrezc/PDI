@@ -36,6 +36,7 @@ import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
 import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
 import { ImportarFilas } from "./ImportarFilas";
+import { BloquesLibres } from "./BloquesLibres";
 import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, plantillaSugerida } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
 import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, RolActor, SeccionDef, SedeInforme, UnidadRef } from "../types";
@@ -220,7 +221,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
       .filter((k) => !existentes.has(k))
       .map((k) => {
         const d = cifraDef(k);
-        const seccion = secciones.find((s) => d && s.dims?.includes(d.dim));
+        const seccion = PLANTILLAS[inst.plantilla].secciones.find((s) => d && s.dims?.includes(d.dim));
         const tipo = fuentes.data?.find((f) => f.clave === k)?.tipo ?? "auto";
         return { clave: k, datos: { etiqueta: d?.etiqueta ?? k, seccion_clave: seccion?.clave ?? null, fuente_tipo: tipo, unidad: d?.unidad ?? "", incluida: true } as DatosCifra };
       });
@@ -266,6 +267,8 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
   const resolver = resolverDe(m.citables);
   const ctx = m.contexto(def);
   const c = contenido(def.clave);
+  /** Solo lectura (0276): la pantalla bloquea a la unidad (Planeación sí la escribe) y la base también. */
+  const editableSec = editable && (!def.soloLectura || actor === "planeacion");
 
   const irA = (i: number, puntero: boolean) => {
     animar.current = puntero;
@@ -393,7 +396,9 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
           </div>
           {def.tipo !== "anexos" && <span className={`inf-pill${avances[idx] === 2 ? " is-ok" : ""}`}>{ETIQUETA_AVANCE[avances[idx]]}</span>}
         </div>
-        <p className="inf-lead">{def.extension ? `${AYUDA_TIPO[def.tipo]} · ${def.extension}.` : `${AYUDA_TIPO[def.tipo]}.`}</p>
+        <p className="inf-lead">
+          {def.soloLectura ? "Planeación definió esta sección: se muestra lo que ya tiene, sin edición." : def.extension ? `${AYUDA_TIPO[def.tipo]} · ${def.extension}.` : `${AYUDA_TIPO[def.tipo]}.`}
+        </p>
         {nota.porSeccion[def.clave] && inst.estado === "back" && (
           <div className="inf-nota inf-blk" role="note">
             <b>Planeación pide en esta sección</b>
@@ -410,7 +415,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
           esFacultad={esFacultad}
           plan={plan}
           vigente={vigente}
-          editable={editable}
+          editable={editableSec}
           resolver={resolver}
           pilares={pilares.data ?? []}
           cambiar={(x) => cambiar(def, x)}
@@ -424,8 +429,8 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
           quitarAnexo={(a) => quitarAnexo.mutate(a)}
           ocupado={subir.isPending || enlazar.isPending}
         />
-        {def.tipo !== "anexos" && def.tipo !== "evid" && (
-          <ElementosDrive elementos={c.drive ?? []} editable={editable} onChange={(drive) => cambiar(def, { ...c, drive })} />
+        {def.tipo !== "anexos" && def.tipo !== "evid" && def.tipo !== "libre" && (
+          <ElementosDrive elementos={c.drive ?? []} editable={editableSec} onChange={(drive) => cambiar(def, { ...c, drive })} />
         )}
         {guardarCifra.error && (
           <p className="inf-error" role="alert">
@@ -852,6 +857,8 @@ function CuerpoSeccion({
           <TablaAnexos anexos={anexos} />
         </div>
       );
+    case "libre":
+      return <BloquesLibres bloques={c.bloques ?? []} editable={editable} cambiar={(bloques) => cambiar({ ...c, bloques })} cifras={m.citables} resolver={resolver} />;
   }
 }
 

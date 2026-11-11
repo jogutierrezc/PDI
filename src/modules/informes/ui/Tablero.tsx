@@ -18,7 +18,10 @@ import { Aviso, Barra, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "
 import { configDe } from "./modelo";
 import { CriteriosAdmin } from "./CriteriosAdmin";
 import { RequisitosConfig } from "./RequisitosConfig";
+import { EstructuraConfig } from "./EstructuraConfig";
 import { copiarDeCiclo } from "../requeridos";
+import { clavesInactivas, resolverSecciones } from "../secciones-config";
+import { copiarConfigDeCiclo, useConfigSecciones } from "../secciones-datos";
 
 const BASE = "/admin/informes-gestion";
 const CONDICIONES: { id: Condicion; texto: string }[] = [
@@ -50,6 +53,7 @@ function TableroGestion({ ciclo, ciclos, requisitos, elegirAnio }: PropsTablero)
       {ciclo && (
         <div className="inf-two">
           <div className="inf-stack">
+            <EstructuraConfig ciclo={ciclo} />
             <RequisitosConfig ciclo={ciclo} requisitos={requisitos} />
             <Requisitos ciclo={ciclo} requisitos={requisitos} />
           </div>
@@ -158,7 +162,7 @@ function FichaCiclo({ ciclo, ciclos, elegirAnio }: { ciclo: CicloRow | null; cic
               setF({ anio, nombre: `Informe de gestión ${anio}`, fecha_limite: "", corte: "", estado: "preparacion" });
               guardar.mutate(
                 { anio, nombre: `Informe de gestión ${anio}`, fecha_limite: null, corte: null, estado: "preparacion", config: configDe(ciclo) },
-                { onSuccess: (c) => void copiarDeCiclo(ciclo.id, c.id).finally(() => elegirAnio(c.anio)) },
+                { onSuccess: (c) => void Promise.all([copiarDeCiclo(ciclo.id, c.id), copiarConfigDeCiclo(ciclo.id, c.id)]).finally(() => elegirAnio(c.anio)) },
               );
             }}
             disabled={guardar.isPending}
@@ -316,7 +320,9 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
   const instancias = useInstancias(ciclo.id);
   const oferta = useOfertaSedes();
   const ids = (instancias.data ?? []).map((i) => i.id);
-  const listas = useListas(ciclo.id, ids);
+  const estructura = useConfigSecciones(ciclo.id).data?.filas ?? [];
+  const inactivas = new Map((instancias.data ?? []).map((i) => [i.id, clavesInactivas(i.plantilla, estructura)] as const));
+  const listas = useListas(ciclo.id, ids, inactivas);
   const abrir = useAbrirInforme();
   const [elegidas, setElegidas] = useState<Record<string, Plantilla>>({});
   const [error, setError] = useState("");
@@ -381,7 +387,7 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
         {filas.map((f) => {
           const { u, sede, inst } = f;
           const nombre = nombreConSede(u.name, sede);
-          const total = PLANTILLAS[inst?.plantilla ?? plantillaDe(f)].secciones.length;
+          const total = resolverSecciones(inst?.plantilla ?? plantillaDe(f), estructura).length;
           const hechas = inst ? (listas.data?.get(inst.id) ?? 0) : 0;
           return (
             <div key={f.clave} className="inf-u">

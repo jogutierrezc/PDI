@@ -121,6 +121,7 @@ export const AYUDA_TIPO: Record<TipoSeccion, string> = {
   logros: "Máximo tres, cada uno con evidencia",
   evid: "Cargue aquí cada archivo una sola vez",
   anexos: "Se arma sola con los archivos que cargue",
+  libre: "Sección propia de este ciclo: texto y tablas o gráficas de UDrive",
 };
 
 export const cifraDef = (clave: string): CifraDef | undefined => CIFRAS.find((c) => c.clave === clave);

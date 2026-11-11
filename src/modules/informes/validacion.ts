@@ -6,6 +6,7 @@
    ========================================================================== */
 
 import type { CifraVista } from "./cifras-vivas";
+import { driveLibre, tablasLibre, textoLibre } from "./secciones-config";
 import { palabras, validarTexto } from "./tokens";
 import type { ContenidoSeccion, Control, SeccionDef } from "./types";
 
@@ -38,6 +39,8 @@ const pedidasDe = (cifras: CifraVista[]) => cifras.filter((c) => c.condicion ===
 export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | undefined, ctx: ContextoSeccion): Avance {
   const x = c ?? {};
   const grado = (n: number, lista: boolean): Avance => (lista ? 2 : n > 0 ? 1 : 0);
+  // Solo lectura: lo define Planeación y la unidad no tiene nada que completar.
+  if (def.soloLectura) return 2;
   switch (def.tipo) {
     case "narr": {
       const n = palabras(x.texto);
@@ -75,6 +78,11 @@ export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | unde
       return ctx.anexos > 0 ? 2 : 0;
     case "anexos":
       return 2;
+    case "libre": {
+      const n = palabras(textoLibre(x));
+      const d = driveLibre(x).length + tablasLibre(x);
+      return grado(n + d, n + d > 0 && n >= (def.minimo ?? 0));
+    }
   }
 }
 
@@ -82,6 +90,9 @@ export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | unde
 export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | undefined, ctx: ContextoSeccion & { claves: string[]; congelada: boolean; corte: string | null }): Control[] {
   const x = c ?? {};
   const out: Control[] = [];
+  if (def.soloLectura) {
+    return [{ nivel: "ok", texto: "Sección definida por Planeación: solo lectura" }, { nivel: "ok", texto: ctx.congelada ? "Cifras congeladas al enviar: el informe ya no cambia" : "Cuenta como lista" }];
+  }
   if (def.tipo === "dim") {
     const man = ctx.manuales ?? { total: 0, completos: 0 };
     if (man.total) {
@@ -105,6 +116,10 @@ export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | u
   }
   if (def.tipo === "narr" || def.tipo === "dim" || def.tipo === "matriz" || def.tipo === "pdi") {
     out.push(...validarTexto(x.texto ?? "", { claves: ctx.claves, minimo: def.tipo === "narr" ? def.minimo : undefined }));
+  }
+  if (def.tipo === "libre") {
+    out.push(...validarTexto(textoLibre(x), { claves: ctx.claves, minimo: def.minimo }));
+    if (!palabras(textoLibre(x)) && !driveLibre(x).length && !tablasLibre(x)) out.push({ nivel: "warn", texto: "Aún no hay texto, tablas ni gráficas" });
   }
   if (def.tipo === "metas") {
     const delPrograma = ctx.metasPrograma ?? 0;

@@ -17,6 +17,7 @@ import { hayDatosDeSintesis } from "../sintesis";
 import type { Sintesis } from "../sintesis";
 import type { IndicadorManual } from "../indicadores-manual";
 import { cifraDef, DIMS } from "../plantillas";
+import { driveLibre } from "../secciones-config";
 import { resolverTexto } from "../tokens";
 import type { ElementoDrive, Logro, Meta, PilarRef, TipoSeccion } from "../types";
 import { avanceFrenteAMeta, estadoMeta } from "./estados";
@@ -57,6 +58,9 @@ export interface FilaMeta {
   analisis: string;
 }
 
+/** Un bloque de una sección libre, ya resuelto. */
+export type BloqueEntrada = { tipo: "texto"; texto: string } | { tipo: "drive"; drive: ElementoDrive[] } | { tipo: "tabla"; titulo: string; nota: string; encabezados: string[]; filas: string[][] };
+
 export interface SeccionLibro {
   clave: string;
   numero: number;
@@ -76,7 +80,10 @@ export interface SeccionLibro {
   anexos: { n: number; nombre: string; descripcion: string; enlace: string }[];
   /** Todas las cifras incluidas del informe (matriz). */
   matriz: FilaIndicador[];
+  /** Todos los elementos de UDrive de la sección (en las libres, los de sus bloques). */
   drive: ElementoDrive[];
+  /** Solo en las secciones libres: sus bloques en orden. */
+  bloques: BloqueEntrada[];
   /** Síntesis armada con lo reportado (solo en secciones de tipo matriz y si hay datos). */
   sintesis: Sintesis | null;
   /** Fuente al pie: «UDES en Cifras · corte 31 dic 2025». */
@@ -213,7 +220,8 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
               return man ? filaManual(x, man.ind) : filaIndicador(x);
             })
           : [],
-      drive: c.drive ?? [],
+      drive: def.tipo === "libre" ? driveLibre(c) : (c.drive ?? []),
+      bloques: def.tipo === "libre" ? (c.bloques ?? []).map((b): BloqueEntrada => (b.tipo === "texto" ? { tipo: "texto", texto: resolverTexto(b.texto, resolver).trim() } : b.tipo === "drive" ? { tipo: "drive", drive: b.drive } : { tipo: "tabla", titulo: b.titulo, nota: b.nota, encabezados: b.encabezados, filas: b.filas })).filter((b) => b.tipo !== "tabla" || b.filas.some((f) => f.some((x) => x.trim()))) : [],
       sintesis: def.tipo === "matriz" && hayDatosDeSintesis(m.sintesis) ? m.sintesis : null,
       fuente: fuenteDe(cifrasFuente),
     };

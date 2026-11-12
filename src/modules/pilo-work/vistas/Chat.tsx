@@ -21,9 +21,13 @@ import type { Aprobacion } from "../herramientas";
 import { limpiarRespuesta } from "../limpiar";
 import { useMs } from "../ms";
 import { movimientoReducido } from "../../rankings/movimiento";
+import { leerProbado, marcarProbado, useAstra } from "../astra";
+import type { Motor, Razonamiento } from "../astra";
 import { Cara, IC, Md, useWork } from "../ui";
 import type { ModeloUsado } from "../ui";
+import { AstraAviso, AstraBienvenida, AstraOpciones, MotorSwitch } from "./Astra";
 
+const IDEAS_ASTRA = ["Calcule la permanencia por cohorte y explique el cálculo", "Revise esta consulta SQL y corrija el error", "Escriba una macro de Excel para consolidar hojas"];
 const IDEAS = ["Redacta un oficio para Talento Humano", "¿Cuántos correos llegaron hoy?", "Cuenta estudiantes por programa en mi Excel", "Escribe un script para consolidar libros de Excel"];
 /** Sin ninguna señal del servidor durante este tiempo, se avisa y se ofrece reintentar o cancelar. */
 const SILENCIO_MS = 25_000;
@@ -97,7 +101,7 @@ function Resumen({ nombre, salida, abrir }: { nombre: string; salida: unknown; a
 }
 
 export function Chat() {
-  const { nombreMostrar, conCorreo, toast, esquema, setEsquema, pedido, setPedido, setFilas, ir, funciones, setModelo } = useWork();
+  const { perfil, nombreMostrar, conCorreo, toast, esquema, setEsquema, pedido, setPedido, setFilas, ir, funciones, setModelo } = useWork();
   const ms = useMs();
   const [texto, setTexto] = useState("");
   const [aprobs, setAprobs] = useState<(Aprobacion & { listo?: boolean })[]>([]);
@@ -105,6 +109,43 @@ export function Chat() {
   const fin = useRef<HTMLDivElement>(null);
   const enviado = useRef(false);
   const pendientes = aprobs.filter((a) => !a.listo).length;
+
+  /* Pilo Astra 1.0: la persona lo elige a mano; el servidor repite quién puede usarlo. */
+  const astra = useAstra(perfil.rol);
+  const [motor, setMotor] = useState<Motor>("pilo");
+  const [razon, setRazon] = useState<Razonamiento>("auto");
+  const [opciones, setOpciones] = useState(false);
+  const [aviso, setAviso] = useState(false);
+  const [probado, setProbado] = useState(leerProbado);
+  const motorRef = useRef<Motor>("pilo");
+  motorRef.current = motor;
+  const razonRef = useRef<Razonamiento>("auto");
+  razonRef.current = razon;
+  const disparador = useRef<HTMLButtonElement>(null);
+  const motorDe = useRef(new Map<string, Motor>());
+  const elegirMotor = (m: Motor) => {
+    if (m === "astra" && !astra.disponible) return;
+    setMotor(m);
+    if (m === "astra") {
+      marcarProbado();
+      setProbado(true);
+    } else setOpciones(false);
+  };
+  // Si Astra deja de estar disponible (la administración lo apagó), se vuelve a Pilo.
+  useEffect(() => {
+    if (astra.cargado && !astra.disponible && motor === "astra") setMotor("pilo");
+  }, [astra.cargado, astra.disponible, motor]);
+  // El aviso de lanzamiento sale una sola vez, un instante después de abrir el chat.
+  useEffect(() => {
+    if (!astra.mostrarAviso) return;
+    const t = window.setTimeout(() => setAviso(true), 700);
+    return () => window.clearTimeout(t);
+  }, [astra.mostrarAviso]);
+  const cerrarAviso = (probar: boolean) => {
+    setAviso(false);
+    astra.marcarAviso();
+    if (probar) elegirMotor("astra");
+  };
 
   // La persona deja decidir desde la tarjeta: la herramienta espera esta promesa.
   useEffect(() => {
@@ -146,7 +187,7 @@ export function Chat() {
     () =>
       fetchServerSentEvents(functionUrl("pilo-work"), async () => ({
         headers: await authHeaders(),
-        body: { esquema: esquemaPermitido() },
+        body: { esquema: esquemaPermitido(), motor: motorRef.current, razonamiento: razonRef.current },
       })),
     [],
   );
@@ -198,6 +239,12 @@ export function Chat() {
     setColgado(false);
     window.setTimeout(() => void reload(), 0);
   };
+  const continuarConPilo = () => {
+    motorRef.current = "pilo";
+    setMotor("pilo");
+    setOpciones(false);
+    reintentar();
+  };
 
   useEffect(() => {
     if (pedido && !enviado.current) {
@@ -227,13 +274,17 @@ export function Chat() {
     <div className="chat">
       <div className="thread">
         <div className="col">
-          <div className="bubble es-pilo">
-            <Cara mood="feliz" />
-            <div className="t">
-              <p>Hola, {nombreMostrar.split(" ")[0]}. Cuénteme qué necesita: redactar, revisar, resumir o calcular sobre sus archivos.</p>
-              <p className="muted small">Elija una idea para empezar o escriba lo suyo.</p>
+          {motor === "astra" ? (
+            <AstraBienvenida nombre={nombreMostrar.split(" ")[0]} />
+          ) : (
+            <div className="bubble es-pilo">
+              <Cara mood="feliz" />
+              <div className="t">
+                <p>Hola, {nombreMostrar.split(" ")[0]}. Cuénteme qué necesita: redactar, revisar, resumir o calcular sobre sus archivos.</p>
+                <p className="muted small">Elija una idea para empezar o escriba lo suyo.</p>
+              </div>
             </div>
-          </div>
+          )}
           {messages.map((m) => {
             const mio = m.role === "user";
             const partes = m.parts as unknown as { type: string; content?: string; id?: string; name?: string; state?: string; output?: unknown; input?: unknown }[];
@@ -245,9 +296,11 @@ export function Chat() {
               );
             const ultimo = m === ultimoMsg;
             const escribiendo = isLoading && ultimo;
+            if (!motorDe.current.has(m.id)) motorDe.current.set(m.id, motorRef.current);
+            const deAstra = motorDe.current.get(m.id) === "astra";
             return (
               <div className="bubble es-pilo" key={m.id}>
-                <Cara mood={escribiendo && !colgado ? "piensa" : "bien"} />
+                {deAstra ? <Cara mood="astronauta" className="pface pface--astro" /> : <Cara mood={escribiendo && !colgado ? "piensa" : "bien"} />}
                 <div className="t">
                   {partes.map((p, i) => {
                     if (p.type === "text" && p.content) {
@@ -271,16 +324,16 @@ export function Chat() {
                       </div>
                     );
                   })}
-                  {escribiendo && !colgado && !partes.some((p) => p.type === "text" && p.content) && <span className="muted">Pensando…</span>}
+                  {escribiendo && !colgado && !partes.some((p) => p.type === "text" && p.content) && <span className="muted">{deAstra ? "Razonando…" : "Pensando…"}</span>}
                 </div>
               </div>
             );
           })}
           {isLoading && ultimoMsg?.role === "user" && !colgado && (
             <div className="bubble es-pilo">
-              <Cara mood="piensa" />
+              {motor === "astra" ? <Cara mood="astronauta" className="pface pface--astro" /> : <Cara mood="piensa" />}
               <div className="t">
-                <span className="muted">Pensando…</span>
+                <span className="muted">{motor === "astra" ? "Razonando…" : "Pensando…"}</span>
               </div>
             </div>
           )}
@@ -330,6 +383,11 @@ export function Chat() {
                 <button type="button" className="btn sm primary" onClick={reintentar}>
                   Reintentar
                 </button>
+                {motor === "astra" && (
+                  <button type="button" className="btn sm" onClick={continuarConPilo}>
+                    Continuar con Pilo
+                  </button>
+                )}
                 <button type="button" className="btn sm" onClick={cancelar}>
                   Cancelar
                 </button>
@@ -346,6 +404,11 @@ export function Chat() {
                 <button type="button" className="btn sm primary" onClick={reintentar}>
                   Reintentar
                 </button>
+                {motor === "astra" && (
+                  <button type="button" className="btn sm" onClick={continuarConPilo}>
+                    Continuar con Pilo
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -355,18 +418,18 @@ export function Chat() {
       <div className="composer">
         {!messages.length && (
           <div className="sugs">
-            {IDEAS.map((s) => (
+            {(motor === "astra" ? IDEAS_ASTRA : IDEAS).map((s) => (
               <button key={s} type="button" className="sug" onClick={() => void enviar(s)}>
                 {s}
               </button>
             ))}
           </div>
         )}
-        <div className="cbox">
+        <div className="cbox" data-motor={motor}>
           <textarea
             rows={1}
             value={texto}
-            placeholder="Pida lo que necesite: redactar, revisar, resumir, ordenar su correo…"
+            placeholder={motor === "astra" ? "Plantee el problema o pida código, cálculos y documentos…" : "Pida lo que necesite: redactar, revisar, resumir, ordenar su correo…"}
             aria-label="Mensaje"
             onChange={(e) => setTexto(e.target.value)}
             onKeyDown={(e) => {
@@ -376,9 +439,20 @@ export function Chat() {
               }
             }}
           />
+          {astra.disponible && <AstraOpciones abierto={opciones && motor === "astra"} razon={razon} setRazon={setRazon} cerrar={() => setOpciones(false)} disparador={disparador} />}
           <div className="cbar">
+            {astra.disponible && (
+              <>
+                <MotorSwitch motor={motor} onChange={elegirMotor} nuevo={!probado} />
+                {motor === "astra" && (
+                  <button ref={disparador} type="button" className="astra-more" aria-label="Opciones de Pilo Astra 1.0" aria-haspopup="dialog" aria-expanded={opciones} aria-controls="astra-opciones" onClick={() => setOpciones((o) => !o)}>
+                    {IC.up}
+                  </button>
+                )}
+              </>
+            )}
             <span className="tag" aria-label="Memoria">
-              Usa su memoria y la colectiva
+              {motor === "astra" ? "Memoria y reglas siempre activas" : "Usa su memoria y la colectiva"}
             </span>
             <span className="tag" aria-label="Archivos locales" style={{ color: abierto ? "var(--ok)" : undefined }}>
               {abierto ? `Archivo abierto: ${abierto.nombre} (solo esquema)` : "Archivos solo locales"}
@@ -399,6 +473,7 @@ export function Chat() {
           </div>
         </div>
       </div>
+      {aviso && <AstraAviso onProbar={() => cerrarAviso(true)} onCerrar={() => cerrarAviso(false)} />}
     </div>
   );
 }

@@ -31,7 +31,7 @@
    ========================================================================== */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { elegirNivel, leerConfig, leerProveedores, llamar } from "./proveedor.ts";
+import { ASTRA_NOMBRE, destinoAstra, elegirNivel, esfuerzoAstra, leerConfig, leerProveedores, llamar } from "./proveedor.ts";
 import type { Destinos, Mensaje, Nivel, Uso } from "./proveedor.ts";
 
 const cors = {
@@ -397,7 +397,7 @@ Deno.serve(async (request) => {
 
   // Las dos acciones de administración de Planeación (/admin/pilo-work) no piden rol de Pilo at Work: las valida el rol del portal.
   const { data: rol } = await mine.rpc("pw_mi_nivel"); // pw_mi_rol o «invitado» (0261)
-  if (!rol && action !== "ruteo" && action !== "probar_modelos") return json({ error: "Su cuenta no tiene un rol en Pilo at Work.", code: "sin_rol" }, 403);
+  if (!rol && action !== "ruteo" && action !== "probar_modelos" && action !== "probar_astra") return json({ error: "Su cuenta no tiene un rol en Pilo at Work.", code: "sin_rol" }, 403);
 
   // «invitado» (0261): cuenta UDES con perfil completo y sin rol. Solo chat y redacción, sin Microsoft ni memoria colectiva.
   const invitado = rol === "invitado";
@@ -430,9 +430,23 @@ Deno.serve(async (request) => {
     return json({ resultados });
   }
 
+  /* Administración: ¿responde el servidor propio con Pilo Astra 1.0? Una llamada corta, sin guardar contenidos. */
+  if (action === "probar_astra") {
+    const { data: esAdmin } = await mine.rpc("has_role_at_least", { minimum: "admin" });
+    if (!esAdmin) return json({ error: "Solo la administración de Planeación puede ver esto." }, 403);
+    const d = await destinoAstra(admin, cfg);
+    if (!d) return json({ ok: false, servidor: false, error: "Falta la dirección https o la clave del servidor propio (se ponen en Mr. Pilo, voz)." });
+    const solo: Destinos = { principal: d, apoyo: null, orden: { rapido: [d], capacidad: [d] } };
+    const t0 = Date.now();
+    const { response, error } = await llamar(solo, { messages: [{ role: "user", content: "Responde solo: ok" }], max_tokens: 64, temperature: 0, reasoning: "low" }, { nivel: "capacidad", esperaMs: Math.min(cfg.astra_espera_s, 90) * 1000 });
+    let ok = Boolean(response);
+    if (response) ok = String((await response.json().catch(() => null))?.choices?.[0]?.message?.content ?? "").trim().length > 0;
+    return json({ ok, servidor: true, modelo_encontrado: ok, ms: Date.now() - t0, error: ok ? "" : error || "Respuesta vacía." });
+  }
+
   const funcion = action === "resumir_correo" ? "correo" : action === "chat" ? (typeof body?.forwardedProps?.equipo_id === "string" ? "equipos" : "chat") : action === "equipo_responder" ? "equipos" : "cowork";
   if (cfg.funciones[funcion] === false) return json({ error: "La administración apagó esta función por ahora.", code: "funcion_apagada" }, 403);
-  if (!destinos.principal) return json({ error: "Pilo con IA aún no está conectado.", advice: "La administración debe poner la clave del proveedor en Pilo (Conexión).", code: "sin_ia" }, 503);
+  if (!destinos.principal && !(action === "chat" && body?.forwardedProps?.motor === "astra")) return json({ error: "Pilo con IA aún no está conectado.", advice: "La administración debe poner la clave del proveedor en Pilo (Conexión).", code: "sin_ia" }, 503);
 
   // Un tope por hora y persona (cuenta llamadas, no contenidos). pw_config manda; PW_LIMITE_HORA solo si pw_config no existe.
   const limite = invitado ? cfg.limite_hora_invitado : cfg.limite_hora || Number(Deno.env.get("PW_LIMITE_HORA") ?? 60) || 60;
@@ -519,11 +533,47 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
         cfg.umbral_capacidad,
       );
 
+      /* Pilo Astra 1.0 (0278): solo si la persona lo eligió, la administración lo habilitó y su rol lo permite.
+         Nunca se cambia de motor por cuenta propia: si Astra no está, se responde con un código y la persona decide. */
+      const motorAstra = props.motor === "astra";
+      let destinosChat = destinos;
+      let nivelChat: "rapido" | "capacidad" = nivel;
+      let topeTokens = nivel === "capacidad" ? Math.max(cfg.max_tokens, 3000) : cfg.max_tokens;
+      let esperaMs: number | undefined;
+      let razonamiento: string | undefined;
+      if (motorAstra) {
+        if (!cfg.astra_habilitado || invitado || !cfg.astra_roles.includes(String(rol))) {
+          return json({ error: `${ASTRA_NOMBRE} no está habilitado para su cuenta.`, code: "astra_no_disponible" }, 403);
+        }
+        const { count: usosAstra } = await admin
+          .from("pw_bitacora")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .filter("detalle->>nivel", "eq", "astra")
+          .gte("creado_en", new Date(Date.now() - 3600_000).toISOString());
+        if ((usosAstra ?? 0) >= cfg.astra_limite_hora) {
+          return json({ error: `Llegó al límite de mensajes de ${ASTRA_NOMBRE} por hora.`, code: "astra_limite" }, 429);
+        }
+        const d = await destinoAstra(admin, cfg);
+        if (!d) return json({ error: `${ASTRA_NOMBRE} aún no tiene servidor conectado.`, advice: "La administración debe poner la dirección https y la clave del servidor propio.", code: "astra_sin_servidor" }, 503);
+        destinosChat = { principal: d, apoyo: null, orden: { rapido: [d], capacidad: [d] } };
+        nivelChat = "capacidad";
+        topeTokens = cfg.astra_max_tokens;
+        esperaMs = cfg.astra_espera_s * 1000;
+        razonamiento = esfuerzoAstra(["auto", "profundo", "apagado"].includes(String(props.razonamiento)) ? String(props.razonamiento) : cfg.astra_razonamiento);
+      }
+      /** Astra conserva el papel, la memoria y las reglas de Pilo (van en `sistema`); esto solo añade cómo trabajar a fondo. */
+      const extraAstra = motorAstra
+        ? `\nESTÁS RESPONDIENDO COMO ${ASTRA_NOMBRE}, el motor avanzado de Pilo para trabajo complejo. Sigues siendo Pilo: mismo trato, misma memoria y las mismas reglas de arriba, sin excepciones. Razona con cuidado la matemática, la lógica y el código; muestra los pasos clave sin alargarte. El código va completo en bloques de Markdown que digan su lenguaje. Si la persona pide un documento, una hoja de cálculo o un archivo, entrega su contenido ordenado y listo para exportar (tablas en Markdown, texto por secciones) y dile qué formato puede descargar. Si preguntan qué modelo eres, responde que eres ${ASTRA_NOMBRE}.`
+        : "";
+      /** Lo que ve el chip del navegador: el nombre público, nunca el modelo del servidor. */
+      const publico = (u: Uso): Uso => (motorAstra ? { ...u, proveedor: "Pilo", modelo: ASTRA_NOMBRE, nivel: "astra", conmutado: false, motivo: "" } : u);
+
       const enc = new TextEncoder();
       const runId = String(body.runId ?? crypto.randomUUID());
       const threadId = String(body.threadId ?? crypto.randomUUID());
       const MAX_RONDAS = cfg.max_pasos;
-      const TOPE_TURNO_MS = 90_000;
+      const TOPE_TURNO_MS = motorAstra ? cfg.astra_espera_s * 1000 : 90_000;
       const inicio = Date.now();
       const stream = new ReadableStream({
         async start(controller) {
@@ -555,22 +605,23 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
             }
           };
           send({ type: "RUN_STARTED", threadId, runId });
-          const trabajo: Mensaje[] = [{ role: "system", content: sistema }, ...mensajes];
+          const trabajo: Mensaje[] = [{ role: "system", content: sistema + extraAstra }, ...mensajes];
           let rondas = 0;
           try {
             for (let ronda = 0; ronda < MAX_RONDAS; ronda++) {
               rondas = ronda + 1;
               if (Date.now() - inicio > TOPE_TURNO_MS) return terminar("Pilo tardó demasiado en esta consulta. Intente con un pedido más corto.");
               const { response, error, uso } = await llamar(
-                destinos,
-                { messages: trabajo, temperature: 0.3, max_tokens: nivel === "capacidad" ? Math.max(cfg.max_tokens, 3000) : cfg.max_tokens, stream: true, tools: herramientas },
-                { signal: request.signal, nivel, primerMs },
+                destinosChat,
+                { messages: trabajo, temperature: 0.3, max_tokens: topeTokens, stream: true, tools: herramientas, ...(razonamiento ? { reasoning: razonamiento } : {}) },
+                { signal: request.signal, nivel: nivelChat, primerMs, ...(esperaMs ? { esperaMs } : {}) },
               );
               traza(`ronda ${ronda + 1}: ${uso ? `${uso.proveedor}/${uso.modelo} empezó a responder` : `el modelo no respondió (${error})`}`);
               if (!response?.body || !uso) return terminar(error || "El modelo no respondió.");
-              usoUltimo = uso;
+              // En la bitácora queda «astra» como nivel (sirve para el límite por hora); al navegador va el nombre público.
+              usoUltimo = motorAstra ? { ...uso, nivel: "astra" } : uso;
               // Aviso discreto: qué modelo responde (y por qué cambió, si cambió). El chip lo muestra.
-              if (ronda === 0 || uso.conmutado) send({ type: "CUSTOM", name: "pilo_modelo", value: uso });
+              if (ronda === 0 || uso.conmutado) send({ type: "CUSTOM", name: "pilo_modelo", value: publico(uso) });
               const messageId = crypto.randomUUID();
               let abierto = false;
               const llamadas = new Map<number, { id: string; name: string; args: string }>();

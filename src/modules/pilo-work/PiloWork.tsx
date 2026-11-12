@@ -543,8 +543,8 @@ function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string
               <span>Datos locales · {filas} filas enviadas</span>
             </span>
             <span className="chip" title={modelo ? `${modelo.modelo}${modelo.conmutado ? ` · se usó el modelo de apoyo (${modelo.motivo || "el principal no respondió a tiempo"})` : ""} · ${modelo.ms} ms hasta el primer fragmento` : "Aún no hay una respuesta en esta sesión. Pilo usa Mistral y, si hace falta más capacidad o no responde a tiempo, NVIDIA."}>
-              <i style={{ background: modelo?.conmutado ? "var(--warn)" : "var(--blue)" }} />
-              {modelo ? `${modelo.proveedor === "nvidia" ? (modelo.conmutado ? "NVIDIA (apoyo)" : "NVIDIA") : "Mistral"}${modelo.nivel === "capacidad" ? " · capacidad" : ""}` : "Mistral"}
+              <i style={{ background: modelo?.conmutado ? "var(--warn)" : modelo?.nivel === "astra" ? "var(--astra)" : "var(--blue)" }} />
+              {modelo ? (modelo.nivel === "astra" ? "Pilo Astra 1.0" : `${modelo.proveedor === "nvidia" ? (modelo.conmutado ? "NVIDIA (apoyo)" : "NVIDIA") : "Mistral"}${modelo.nivel === "capacidad" ? " · capacidad" : ""}`) : "Mistral"}
             </span>
             <button type="button" className="tbtn top__tema" onClick={onTema} aria-label="Cambiar entre tema claro y oscuro">
               Tema {tema === "dark" ? "oscuro" : "claro"}

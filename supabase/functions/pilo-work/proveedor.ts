@@ -65,6 +65,18 @@ export interface Config {
   subida_max_mb: number;
   retencion_dias: number;
   funciones: Record<string, boolean>;
+  /* Pilo Astra 1.0 (0278): motor más potente en el servidor propio, elegido a mano en el chat. */
+  astra_habilitado: boolean;
+  astra_modelo: string;
+  astra_base_url: string;
+  astra_razonamiento: "auto" | "profundo" | "apagado";
+  astra_max_tokens: number;
+  astra_espera_s: number;
+  astra_limite_hora: number;
+  astra_subida_max_mb: number;
+  astra_roles: string[];
+  astra_formatos: Record<string, boolean>;
+  astra_aviso: boolean;
 }
 /** Los valores que se usan si pw_config no existe o le falta algo (los mismos por defecto de la migración 0247). */
 export const CONFIG_BASE: Config = {
@@ -81,6 +93,17 @@ export const CONFIG_BASE: Config = {
   subida_max_mb: 100,
   retencion_dias: 180,
   funciones: { chat: true, cowork: true, datos: true, correo: true, agenda: true, archivos: true, equipos: true, perfil: true },
+  astra_habilitado: false,
+  astra_modelo: "pilo-astra:1.0",
+  astra_base_url: "",
+  astra_razonamiento: "auto",
+  astra_max_tokens: 4000,
+  astra_espera_s: 120,
+  astra_limite_hora: 20,
+  astra_subida_max_mb: 25,
+  astra_roles: ["colaborador", "colaborador_correo", "coordinacion", "admin"],
+  astra_formatos: { xlsx: true, docx: true, pdf: true, csv: true, codigo: true },
+  astra_aviso: true,
 };
 
 /** pw_config con respaldo: si la tabla no existe (migración sin aplicar) o falla, valores por defecto. */
@@ -103,6 +126,18 @@ export async function leerConfig(admin: Admin): Promise<Config> {
       subida_max_mb: num(data.subida_max_mb, CONFIG_BASE.subida_max_mb),
       retencion_dias: num(data.retencion_dias, CONFIG_BASE.retencion_dias),
       funciones: { ...CONFIG_BASE.funciones, ...((data.funciones && typeof data.funciones === "object" ? data.funciones : {}) as Record<string, boolean>) },
+      // Astra (0278): si la migración aún no se aplicó, estas columnas faltan y Astra queda apagado.
+      astra_habilitado: data.astra_habilitado === true,
+      astra_modelo: String(data.astra_modelo ?? CONFIG_BASE.astra_modelo).trim() || CONFIG_BASE.astra_modelo,
+      astra_base_url: String(data.astra_base_url ?? "").trim(),
+      astra_razonamiento: ["auto", "profundo", "apagado"].includes(String(data.astra_razonamiento)) ? (data.astra_razonamiento as Config["astra_razonamiento"]) : "auto",
+      astra_max_tokens: num(data.astra_max_tokens, CONFIG_BASE.astra_max_tokens),
+      astra_espera_s: num(data.astra_espera_s, CONFIG_BASE.astra_espera_s),
+      astra_limite_hora: num(data.astra_limite_hora, CONFIG_BASE.astra_limite_hora),
+      astra_subida_max_mb: num(data.astra_subida_max_mb, CONFIG_BASE.astra_subida_max_mb),
+      astra_roles: Array.isArray(data.astra_roles) ? data.astra_roles.map(String) : CONFIG_BASE.astra_roles,
+      astra_formatos: { ...CONFIG_BASE.astra_formatos, ...((data.astra_formatos && typeof data.astra_formatos === "object" ? data.astra_formatos : {}) as Record<string, boolean>) },
+      astra_aviso: data.astra_aviso !== false,
     };
   } catch {
     return CONFIG_BASE;
@@ -172,6 +207,34 @@ export async function leerProveedores(admin: Admin, cfg: Config = CONFIG_BASE): 
   };
 }
 
+/* --- Pilo Astra 1.0: el servidor propio ------------------------------------------------------ */
+
+/** Nombre público del motor: las personas nunca ven el modelo que hay debajo. */
+export const ASTRA_NOMBRE = "Pilo Astra 1.0";
+
+/**
+ * El destino de Astra: el servidor propio de la universidad (el de la voz de Pilo), que habla el
+ * formato de OpenAI. Dirección: la de pw_config, o la del servidor de voz, o la del texto de Pilo.
+ * Clave: la del servidor propio (voz u «otro»). null si falta la dirección https, el modelo o la clave.
+ */
+export async function destinoAstra(admin: Admin, cfg: Config): Promise<Destino | null> {
+  const [{ data: settings }, { data: secret }] = await Promise.all([
+    admin.from("pilo_ai_settings").select("*").eq("id", 1).maybeSingle(),
+    admin.from("pilo_ai_secret").select("*").eq("id", 1).maybeSingle(),
+  ]);
+  const base = cfg.astra_base_url || String(settings?.speech_base_url ?? "") || String(settings?.base_url ?? "");
+  const key = String(secret?.speech_key ?? "") || String(secret?.otro_key ?? "");
+  if (!base || !key || !cfg.astra_modelo) return null;
+  const url = endpoint("otro", base, "/chat/completions");
+  if (!url.startsWith("https://")) return null;
+  return { url, model: cfg.astra_modelo, key, provider: "otro" };
+}
+
+/** El razonamiento que se pide al servidor (Ollama: reasoning_effort). El proxy apaga el razonamiento si no se pide. */
+export function esfuerzoAstra(modo: string): "low" | "medium" | "high" | "none" {
+  return modo === "profundo" ? "high" : modo === "apagado" ? "none" : "medium";
+}
+
 /* --- Elegir el nivel por reglas simples ---------------------------------------------------- */
 
 /** Umbral por defecto de «documento largo»: ~12 000 caracteres (≈ 3 000 tokens): lo que un modelo rápido resume mal de una vez. */
@@ -195,7 +258,7 @@ export interface Mensaje {
 export interface Uso {
   proveedor: string;
   modelo: string;
-  nivel: Nivel;
+  nivel: Nivel | "astra";
   conmutado: boolean;
   motivo: string;
   ms: number;
@@ -254,6 +317,7 @@ async function intento(d: Destino, cuerpo: Parameters<typeof llamar>[1], signal:
         temperature: cuerpo.temperature ?? 0.3,
         max_tokens: cuerpo.max_tokens ?? 1500,
         ...(cuerpo.stream ? { stream: true } : {}),
+        ...(cuerpo.reasoning ? { reasoning_effort: cuerpo.reasoning } : {}),
         ...(cuerpo.tools?.length ? { tools: cuerpo.tools, tool_choice: "auto" } : {}),
         ...(cuerpo.json && d.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
       }),
@@ -316,8 +380,8 @@ async function intento(d: Destino, cuerpo: Parameters<typeof llamar>[1], signal:
  */
 export async function llamar(
   destinos: Destinos,
-  cuerpo: { messages: Mensaje[]; temperature?: number; max_tokens?: number; stream?: boolean; json?: boolean; tools?: unknown[] },
-  opciones: { signal?: AbortSignal; nivel?: Nivel; primerMs?: number } = {},
+  cuerpo: { messages: Mensaje[]; temperature?: number; max_tokens?: number; stream?: boolean; json?: boolean; tools?: unknown[]; reasoning?: string },
+  opciones: { signal?: AbortSignal; nivel?: Nivel; primerMs?: number; esperaMs?: number } = {},
 ): Promise<{ response: Response | null; error: string; uso: Uso | null }> {
   const nivel = opciones.nivel ?? "rapido";
   const lista = destinos.orden[nivel].length ? destinos.orden[nivel] : destinos.orden.rapido;
@@ -325,7 +389,7 @@ export async function llamar(
   let primerMotivo = "";
   for (let i = 0; i < lista.length; i++) {
     const d = lista[i];
-    const espera = nivel === "rapido" && i === 0 && lista.length > 1 ? (opciones.primerMs ?? ESPERA_PRIMER_FRAGMENTO_MS.rapidoPrimero) : ESPERA_PRIMER_FRAGMENTO_MS.otros;
+    const espera = opciones.esperaMs ?? (nivel === "rapido" && i === 0 && lista.length > 1 ? (opciones.primerMs ?? ESPERA_PRIMER_FRAGMENTO_MS.rapidoPrimero) : ESPERA_PRIMER_FRAGMENTO_MS.otros);
     const r = await intento(d, cuerpo, opciones.signal, espera);
     console.log(`[pilo-work] ia ${d.provider}/${d.model} nivel=${nivel} ${r.response ? "ok" : `falla: ${r.motivo}`} ${r.ms}ms`);
     if (r.response) return { response: r.response, error: "", uso: { proveedor: d.provider, modelo: d.model, nivel, conmutado: i > 0, motivo: i > 0 ? primerMotivo : "", ms: r.ms } };

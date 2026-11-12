@@ -15,6 +15,8 @@ export const MOOD = {
   idea: "/pilo-moods/idea-160.webp",
   excelente: "/pilo-moods/excelente-160.webp",
   bien: "/pilo-moods/bien-160.webp",
+  /** Pilo con casco de astronauta: el rostro de Pilo Astra 1.0. */
+  astronauta: "/pilo-moods/astronauta-160.webp",
 } as const;
 export type Mood = keyof typeof MOOD;
 

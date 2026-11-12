@@ -163,6 +163,9 @@ export function AppTurn({
   const superMode = isSuperMode(turn.modo) ? turn.modo : null;
   const toneOf = (k: number) => (superMode && a ? voiceTone(superMode, a.text, parsed.sentences[k]?.spoken ?? "") : undefined);
   const saidAt = (k: number) => ({ portal: voice.portal, advanced: voice.advanced, rol: voice.rol, tone: toneOf(k) });
+  // Lo último que se sabe de la respuesta, para que una lectura en marcha lo vea crecer mientras llega.
+  const feed = useRef({ spoken: [] as string[], done: true, saidAt, rate: 1 });
+  feed.current = { spoken, done: !streaming, saidAt, rate: enriched.rate * (superMode ? SUPER[superMode].voice.rate : 1) };
   const prefetch = (from: number, to: number) => {
     for (let k = from; k < to; k++) if (spoken[k]) prefetchOfficial([spoken[k]], saidAt(k));
   };
@@ -183,13 +186,22 @@ export function AppTurn({
       return;
     }
     const mine = ++readRun.current;
-    for (let k = 0; k < parsed.sentences.length; k++) {
+    for (let k = 0; ; k++) {
       if (mine !== readRun.current) return;
-      if (!spoken[k]?.trim()) continue;
+      // Mientras la respuesta aún llega, una frase solo se dice cuando está completa (ya hay otra detrás):
+      // así Pilo empieza a hablar con la primera frase, sin esperar el final del texto.
+      let f = feed.current;
+      while (!f.done && k >= f.spoken.length - 1) {
+        await new Promise((r) => window.setTimeout(r, 100));
+        if (mine !== readRun.current) return;
+        f = feed.current;
+      }
+      if (k >= f.spoken.length) break;
+      if (!f.spoken[k]?.trim()) continue;
       setReading(k);
       // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
-      prefetch(k + 1, k + 3);
-      const result = await sayOfficial(spoken[k], { ...saidAt(k), rate: enriched.rate * (superMode ? SUPER[superMode].voice.rate : 1), onSound: (on) => mine === readRun.current && onSound(on) });
+      for (let n = k + 1; n < k + 3; n++) if (f.spoken[n]) prefetchOfficial([f.spoken[n]], f.saidAt(n));
+      const result = await sayOfficial(f.spoken[k], { ...f.saidAt(k), rate: f.rate, onSound: (on) => mine === readRun.current && onSound(on) });
       if (result === "cancelado") break;
       if (result === "sin voz") {
         // Nunca otra voz: se avisa y queda el texto.
@@ -223,10 +235,20 @@ export function AppTurn({
   // La que se escribió en vivo se lee una sola vez, ya completa.
   const readLive = useRef(read);
   readLive.current = read;
+  // Con la voz encendida, Pilo empieza a hablar en cuanto la primera frase está completa, aún con el texto llegando.
+  const liveStarted = useRef(false);
+  const sentenceCount = parsed.sentences.length;
+  useEffect(() => {
+    if (!streaming || !autoRead || !voice.advanced || liveStarted.current || sentenceCount < 2) return;
+    liveStarted.current = true;
+    void readLive.current();
+  }, [streaming, autoRead, voice.advanced, sentenceCount]);
+
   useEffect(() => {
     if (!a || fresh !== "en vivo") return;
     onTyped();
-    if (autoRead && !incomplete) void readLive.current();
+    // Si la lectura ya empezó en vivo, sigue sola hasta la última frase; no se empieza otra.
+    if (autoRead && !incomplete && !liveStarted.current) void readLive.current();
     // Solo al llegar la respuesta final.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Boolean(a), fresh]);

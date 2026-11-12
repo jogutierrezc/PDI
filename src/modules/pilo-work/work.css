@@ -3,6 +3,7 @@
   color-scheme:light;
   --navy:#0a2d63; --navy-deep:#061e46; --fill:#2166d6; --fill-hover:#1b52ad; --on-ok:#fff; --blue:#2166d6; --blue-strong:#1b52ad; --blue-soft:#eaf1fd; --teal:#0096a5;
   --pilo:#7fe7f0; --pilo-ink:#06142b;
+  --astra:#00717e; --astra-soft:rgba(0,150,165,.1); --astra-line:rgba(0,150,165,.5); --astra-bg:#0a2d63; --astra-ink:#eaf6ff; --scrim:rgba(6,20,43,.55);
   --page:#eef2f8; --surface:#ffffff; --surface-2:#f8fafd; --surface-3:#eef3fa;
   --ink:#0d1c31; --ink-2:#45566d; --ink-3:#5f6f86; --ink-4:#66768c;
   --line:rgba(13,40,84,.11); --line-2:rgba(13,40,84,.2); --line-3:rgba(13,40,84,.06);
@@ -23,6 +24,7 @@
   --line:rgba(148,176,214,.16); --line-2:rgba(148,176,214,.28); --line-3:rgba(148,176,214,.09);
   --ok:#3fb267; --ok-soft:rgba(63,178,103,.16); --warn:#d9a221; --warn-soft:rgba(217,162,33,.16); --risk:#ec6a6a; --risk-soft:rgba(236,106,106,.14);
   --hero:#071a38; --rail-hover:rgba(148,176,214,.1); --on-ok:#06142b;
+  --astra:#7fe7f0; --astra-soft:rgba(127,231,240,.1); --astra-line:rgba(127,231,240,.5); --astra-bg:#0f3a78; --scrim:rgba(0,0,0,.6);
   --sh-1:0 1px 2px rgba(0,0,0,.4); --sh-2:0 2px 4px rgba(0,0,0,.3),0 12px 28px rgba(0,0,0,.45); --sh-3:0 4px 8px rgba(0,0,0,.3),0 24px 56px rgba(0,0,0,.6)}}
 :root[data-theme="dark"] .pwk{
   color-scheme:dark;
@@ -32,6 +34,7 @@
   --line:rgba(148,176,214,.16); --line-2:rgba(148,176,214,.28); --line-3:rgba(148,176,214,.09);
   --ok:#3fb267; --ok-soft:rgba(63,178,103,.16); --warn:#d9a221; --warn-soft:rgba(217,162,33,.16); --risk:#ec6a6a; --risk-soft:rgba(236,106,106,.14);
   --hero:#071a38; --rail-hover:rgba(148,176,214,.1); --on-ok:#06142b;
+  --astra:#7fe7f0; --astra-soft:rgba(127,231,240,.1); --astra-line:rgba(127,231,240,.5); --astra-bg:#0f3a78; --scrim:rgba(0,0,0,.6);
   --sh-1:0 1px 2px rgba(0,0,0,.4); --sh-2:0 2px 4px rgba(0,0,0,.3),0 12px 28px rgba(0,0,0,.45); --sh-3:0 4px 8px rgba(0,0,0,.3),0 24px 56px rgba(0,0,0,.6)}
 .pwk *{box-sizing:border-box}
 .pwk{margin:0;background:var(--page);color:var(--ink);font:400 14px/1.5 var(--font);-webkit-font-smoothing:antialiased;
@@ -893,3 +896,65 @@
 .pwk .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
 .pwk .notifs{top:56px;left:12px;right:12px}
 }
+
+/* =============================================================================
+   Pilo Astra 1.0 (vistas/Astra.tsx). Mismos tokens que el resto de /work; la estrella
+   turquesa y el marino marcan a Astra, y solo a Astra. Movimiento con GSAP en el componente.
+   ========================================================================== */
+.pwk .cbox{position:relative}
+.pwk .cbox[data-motor="astra"]{border-color:var(--astra-line);box-shadow:0 0 0 3px var(--astra-soft)}
+.pwk .cbox[data-motor="astra"] .send{background:var(--astra-bg)}
+.pwk .astra-star{width:1em;height:1em;flex:none;color:var(--pilo)}
+.pwk .astra-eng{position:relative;display:inline-grid;grid-template-columns:1fr 1fr;padding:3px;border-radius:var(--pill);background:var(--surface-3);border:1px solid var(--line);isolation:isolate}
+.pwk .astra-eng__ind{position:absolute;z-index:-1;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:var(--pill);background:var(--surface);box-shadow:var(--sh-1);transition:background-color .24s,box-shadow .24s}
+.pwk .astra-eng[data-motor="astra"] .astra-eng__ind{background:var(--astra-bg);box-shadow:0 0 0 1px var(--astra-line)}
+.pwk .astra-eng button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:84px;min-height:30px;padding:0 12px;border:0;background:none;border-radius:var(--pill);font-size:13px;font-weight:700;color:var(--ink-2);white-space:nowrap;transition:color .2s,transform .16s var(--ease)}
+.pwk .astra-eng button:active{transform:scale(.97)}
+.pwk .astra-eng button[aria-checked="true"]{color:var(--ink)}
+.pwk .astra-eng[data-motor="astra"] button[aria-checked="true"]{color:var(--astra-ink)}
+.pwk .astra-eng button .astra-star{font-size:14px;color:var(--astra)}
+.pwk .astra-eng[data-motor="astra"] button .astra-star{color:var(--pilo)}
+.pwk .astra-new{display:inline-block;padding:1px 6px;border-radius:var(--pill);background:#f6b93f;color:#1d1402;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.pwk .astra-more{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;border:1px solid var(--astra-line);background:var(--astra-soft);color:var(--astra);transition:transform .16s var(--ease)}
+.pwk .astra-more:active{transform:scale(.94)}
+.pwk .astra-more svg{width:14px;height:14px}
+.pwk .astra-pop{position:absolute;left:10px;bottom:calc(100% + 8px);z-index:6;width:min(340px,calc(100% - 20px));padding:14px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--surface);box-shadow:var(--sh-2);display:grid;gap:14px;transform-origin:bottom left;opacity:0;visibility:hidden;transform:scale(.96) translateY(4px);pointer-events:none;transition:opacity .14s,transform .16s var(--ease),visibility 0s .16s}
+.pwk .astra-pop[data-open]{opacity:1;visibility:visible;transform:none;pointer-events:auto;transition-delay:0s}
+.pwk .astra-pop h4{font-size:13px;font-weight:800;margin-bottom:7px}
+.pwk .astra-seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
+.pwk .astra-seg button{padding:5px 11px;border-radius:var(--pill);border:1px solid var(--line-2);background:var(--surface);font-size:12.5px;font-weight:600;color:var(--ink-2);transition:background-color .15s,border-color .15s,transform .16s var(--ease)}
+.pwk .astra-seg button:active{transform:scale(.97)}
+.pwk .astra-seg button[aria-checked="true"]{background:var(--astra-bg);border-color:var(--astra-bg);color:var(--astra-ink)}
+.pwk .astra-lock{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);font-size:12.5px;color:var(--ink-2)}
+.pwk .astra-lock svg{width:15px;height:15px;flex:none;margin-top:1px;color:var(--ok)}
+.pwk .pface--astro{background:var(--astra-bg);border:1px solid var(--astra-line)}
+.pwk .pface--astro img{object-fit:contain;padding:2px}
+.pwk .astra-wel{display:grid;grid-template-columns:auto minmax(0,1fr);gap:20px;align-items:center;padding:8px 4px 4px;max-width:680px}
+.pwk .astra-wel__pilo{width:112px;height:auto;display:block;filter:drop-shadow(0 10px 18px rgba(6,20,43,.28))}
+.pwk .astra-wel__wm{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--astra)}
+.pwk .astra-wel h4{font-size:20px;line-height:1.2;font-weight:800;letter-spacing:-.01em;margin:5px 0 6px;text-wrap:balance}
+.pwk .astra-wel p{font-size:13px;max-width:56ch}
+@media (max-width:560px){.pwk .astra-wel{grid-template-columns:minmax(0,1fr)}.pwk .astra-wel__pilo{width:92px}}
+.pwk .astra-aviso{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px}
+.pwk .astra-aviso__scrim{position:absolute;inset:0;background:var(--scrim)}
+.pwk .astra-aviso__card{position:relative;width:min(480px,100%);max-height:100%;overflow:auto;border-radius:20px;background:var(--surface);border:1px solid var(--line-2);box-shadow:var(--sh-3)}
+.pwk .astra-aviso__art{position:relative;height:148px;background:var(--navy);overflow:hidden;color:var(--pilo)}
+.pwk .astra-aviso__orb{position:absolute;inset:0;width:100%;height:100%}
+.pwk .astra-aviso__badge{position:absolute;left:20px;top:18px}
+.pwk .astra-aviso__wm{position:absolute;left:20px;bottom:18px;display:flex;align-items:center;gap:8px;color:#fff;font-weight:800;font-size:22px;letter-spacing:-.02em}
+.pwk .astra-aviso__wm .astra-star{font-size:19px}
+.pwk .astra-aviso__pilo{position:absolute;right:14px;bottom:-4px;height:140px;width:auto}
+.pwk .astra-aviso__body{padding:20px 24px 22px;display:grid;gap:14px}
+.pwk .astra-aviso h3{font-size:22px;line-height:1.15;font-weight:800;letter-spacing:-.015em}
+.pwk .astra-aviso__lead{color:var(--ink-2);font-size:14px}
+.pwk .astra-aviso__caps{display:grid;gap:10px}
+.pwk .astra-aviso__caps li{display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:start}
+.pwk .astra-aviso__ic{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--astra-soft);color:var(--astra)}
+.pwk .astra-aviso__ic svg{width:16px;height:16px}
+.pwk .astra-aviso__caps b{display:block;font-size:13.5px;font-weight:700;line-height:1.3}
+.pwk .astra-aviso__caps li > div > span{display:block;font-size:12.5px;color:var(--ink-3);line-height:1.4}
+.pwk .astra-aviso__same{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);font-size:12.5px;color:var(--ink-2)}
+.pwk .astra-aviso__same svg{width:15px;height:15px;flex:none;margin-top:1px;color:var(--ok)}
+.pwk .astra-aviso__acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.pwk .astra-aviso__once{margin-left:auto}
+@media (prefers-reduced-motion:reduce){.pwk .astra-pop,.pwk .astra-eng__ind,.pwk .astra-eng button,.pwk .astra-seg button,.pwk .astra-more{transition-duration:.01ms}}

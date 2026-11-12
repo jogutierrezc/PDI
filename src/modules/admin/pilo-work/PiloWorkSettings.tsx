@@ -45,6 +45,18 @@ interface Cfg {
   subida_max_mb: number;
   retencion_dias: number;
   funciones: Record<string, boolean>;
+  /* Pilo Astra 1.0 (migración 0278) */
+  astra_habilitado: boolean;
+  astra_modelo: string;
+  astra_base_url: string;
+  astra_razonamiento: "auto" | "profundo" | "apagado";
+  astra_max_tokens: number;
+  astra_espera_s: number;
+  astra_limite_hora: number;
+  astra_subida_max_mb: number;
+  astra_roles: string[];
+  astra_formatos: Record<string, boolean>;
+  astra_aviso: boolean;
 }
 const PARTIDA: Cfg = {
   rapido_proveedor: "",
@@ -60,7 +72,25 @@ const PARTIDA: Cfg = {
   subida_max_mb: 100,
   retencion_dias: 180,
   funciones: { chat: true, cowork: true, datos: true, correo: true, agenda: true, archivos: true, equipos: true, perfil: true },
+  astra_habilitado: false,
+  astra_modelo: "pilo-astra:1.0",
+  astra_base_url: "",
+  astra_razonamiento: "auto",
+  astra_max_tokens: 4000,
+  astra_espera_s: 120,
+  astra_limite_hora: 20,
+  astra_subida_max_mb: 25,
+  astra_roles: ["colaborador", "colaborador_correo", "coordinacion", "admin"],
+  astra_formatos: { xlsx: true, docx: true, pdf: true, csv: true, codigo: true },
+  astra_aviso: true,
 };
+const FORMATOS_ASTRA: [string, string][] = [
+  ["xlsx", "Excel (.xlsx)"],
+  ["docx", "Word (.docx)"],
+  ["pdf", "PDF"],
+  ["csv", "CSV"],
+  ["codigo", "Código (.py, .sql, .js…)"],
+];
 const FUNCIONES: [string, string, string][] = [
   ["chat", "Chat", "La conversación con Pilo."],
   ["cowork", "Cowork", "Documentos, código y revisión."],
@@ -125,6 +155,8 @@ export function PiloWorkSettings() {
   const [ms, setMs] = useState<MsConf | null>(null);
   const [errMs, setErrMs] = useState("");
   const [uso, setUso] = useState<Uso | null>(null);
+  const [pruebaAstra, setPruebaAstra] = useState<{ ok: boolean; servidor: boolean; ms?: number; error: string } | null>(null);
+  const [probandoAstra, setProbandoAstra] = useState(false);
   const pend = useRef<Partial<Cfg>>({});
   const timer = useRef<number>();
 
@@ -136,7 +168,7 @@ export function PiloWorkSettings() {
       .maybeSingle()
       .then(({ data, error }) => {
         if (error || !data) setFalta(true);
-        else setCfg({ ...PARTIDA, ...(data as Partial<Cfg>), funciones: { ...PARTIDA.funciones, ...((data as Cfg).funciones ?? {}) } });
+        else setCfg({ ...PARTIDA, ...(data as Partial<Cfg>), funciones: { ...PARTIDA.funciones, ...((data as Cfg).funciones ?? {}) }, astra_formatos: { ...PARTIDA.astra_formatos, ...((data as Cfg).astra_formatos ?? {}) } });
         setCargando(false);
       });
     void supabase.rpc("pw_uso_ia_admin").then(({ data }) => setUso((data as Uso | null) ?? null));
@@ -175,6 +207,17 @@ export function PiloWorkSettings() {
       setErrRuteo(e instanceof Error ? e.message : "No se pudo probar.");
     }
     setProbando(false);
+  };
+
+  const probarAstra = async () => {
+    setProbandoAstra(true);
+    setPruebaAstra(null);
+    try {
+      setPruebaAstra(await callFn<{ ok: boolean; servidor: boolean; ms?: number; error: string }>("pilo-work", { action: "probar_astra" }, { timeoutMs: 100_000 }));
+    } catch (e) {
+      setPruebaAstra({ ok: false, servidor: true, error: e instanceof Error ? e.message : "No se pudo probar." });
+    }
+    setProbandoAstra(false);
   };
 
   const off = falta || cargando;
@@ -256,6 +299,79 @@ export function PiloWorkSettings() {
                 </tbody>
               </table>
             )}
+          </Group>
+
+          <Group title="Pilo Astra 1.0" aside={<StatusMark tone={cfg.astra_habilitado ? "ok" : "off"}>{cfg.astra_habilitado ? "Habilitado" : "Apagado"}</StatusMark>}>
+            <p className="pwa-nota">
+              Un motor más potente para trabajo complejo (razonamiento, matemática y código). Corre en el servidor propio de la universidad, el mismo de la voz de Pilo: usa su dirección https y su clave, que se gestionan en Mr. Pilo. La persona lo elige a mano en el chat; conserva la memoria, el rol y las reglas de Pilo. Las personas solo ven «Pilo Astra 1.0», nunca el modelo.
+            </p>
+            <Switch on={cfg.astra_habilitado} label="Habilitar Pilo Astra 1.0" disabled={off} onChange={(v) => guardar({ astra_habilitado: v })} />
+            <div className="pis-grid pis-grid--3">
+              <label>
+                Modelo en el servidor
+                <input value={cfg.astra_modelo} disabled={off} maxLength={120} spellCheck={false} onChange={(e) => guardar({ astra_modelo: e.target.value })} />
+                <small>Un alias creado con <code>ollama create</code>; no se muestra a las personas.</small>
+              </label>
+              <label>
+                Dirección del servidor (opcional)
+                <input type="url" value={cfg.astra_base_url} disabled={off} maxLength={300} spellCheck={false} placeholder="Vacío: la del servidor de voz" onChange={(e) => guardar({ astra_base_url: e.target.value.trim() })} />
+                <small>Debe empezar con https:// y terminar en /v1.</small>
+              </label>
+              <label>
+                Razonamiento por defecto
+                <select value={cfg.astra_razonamiento} disabled={off} onChange={(e) => guardar({ astra_razonamiento: e.target.value as Cfg["astra_razonamiento"] })}>
+                  <option value="auto">Automático</option>
+                  <option value="profundo">Profundo</option>
+                  <option value="apagado">Apagado</option>
+                </select>
+              </label>
+            </div>
+            <div className="pis-grid pis-grid--3 pwa-4">
+              <NumField label="Tope de tokens por respuesta" value={cfg.astra_max_tokens} min={500} max={16000} whole def={4000} disabled={off} onCommit={(v) => guardar({ astra_max_tokens: v })} />
+              <NumField label="Espera máxima (s)" hint="Pasado este tiempo se ofrece continuar con Pilo" value={cfg.astra_espera_s} min={30} max={600} whole def={120} disabled={off} onCommit={(v) => guardar({ astra_espera_s: v })} />
+              <NumField label="Mensajes por hora y persona" value={cfg.astra_limite_hora} min={1} max={200} whole def={20} disabled={off} onCommit={(v) => guardar({ astra_limite_hora: v })} />
+              <NumField label="Tamaño máximo de documento (MB)" value={cfg.astra_subida_max_mb} min={1} max={100} whole def={25} disabled={off} onCommit={(v) => guardar({ astra_subida_max_mb: v })} />
+            </div>
+            <div>
+              <b className="pwa-nota">Quién puede usarlo</b>
+              <ul className="pwa-funcs">
+                {Object.entries(ROLES).map(([id, nombre]) => (
+                  <li key={id}>
+                    <span>
+                      <b>{nombre}</b>
+                    </span>
+                    <Switch
+                      on={cfg.astra_roles.includes(id)}
+                      label={nombre}
+                      disabled={off || id === "admin"}
+                      onChange={(v) => guardar({ astra_roles: v ? [...new Set([...cfg.astra_roles, id])] : cfg.astra_roles.filter((r) => r !== id) })}
+                    />
+                  </li>
+                ))}
+              </ul>
+              <small className="pwa-nota">Los invitados nunca entran a Astra. La administración siempre puede usarlo.</small>
+            </div>
+            <div>
+              <b className="pwa-nota">Archivos que Astra puede entregar</b>
+              <ul className="pwa-funcs">
+                {FORMATOS_ASTRA.map(([id, nombre]) => (
+                  <li key={id}>
+                    <span>
+                      <b>{nombre}</b>
+                    </span>
+                    <Switch on={cfg.astra_formatos[id] !== false} label={nombre} disabled={off} onChange={(v) => guardar({ astra_formatos: { ...cfg.astra_formatos, [id]: v } })} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <Switch on={cfg.astra_aviso} label="Mostrar el aviso de lanzamiento una sola vez a cada persona" disabled={off} onChange={(v) => guardar({ astra_aviso: v })} />
+            <div className="pis-actions">
+              <button type="button" className="button-secondary" onClick={() => void probarAstra()} disabled={probandoAstra}>
+                {probandoAstra ? "Probando…" : "Probar Pilo Astra 1.0"}
+              </button>
+              <small className="pwa-nota">Una llamada corta al servidor propio; mide la latencia y no guarda contenidos. La primera puede tardar mientras el modelo se carga.</small>
+            </div>
+            {pruebaAstra && (pruebaAstra.ok ? <StatusMark tone="ok">Responde{pruebaAstra.ms ? ` · ${pruebaAstra.ms.toLocaleString("es-CO")} ms` : ""}</StatusMark> : <p className="pis-error" role="alert">{pruebaAstra.error || "No respondió."}</p>)}
           </Group>
 
           <Group title="Límites de uso">

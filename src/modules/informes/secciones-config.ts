@@ -30,7 +30,7 @@ export function estructuraDe(plantilla: Plantilla, config: SeccionConfigRow[]): 
   const de = (clave: string) => filas.find((f) => f.clave === clave) ?? null;
   const base = PLANTILLAS[plantilla].secciones.map((d, i) => {
     const fila = de(d.clave);
-    return { e: { def: { ...d, titulo: fila?.titulo?.trim() || d.titulo, ...(fila && !fila.editable_por_unidad ? { soloLectura: true } : {}) }, activa: fila?.activa ?? true, editable: fila?.editable_por_unidad ?? true, tituloBase: d.titulo, fila } as SeccionEstructura, pos: fila?.orden ?? i + 1, i };
+    return { e: { def: { ...d, titulo: fila?.titulo?.trim() || d.titulo, ...(fila && !fila.editable_por_unidad ? { soloLectura: true } : {}) }, activa: d.tipo === "evid" ? true : (fila?.activa ?? true), editable: fila?.editable_por_unidad ?? true, tituloBase: d.titulo, fila } as SeccionEstructura, pos: fila?.orden ?? i + 1, i };
   });
   const libres = filas
     .filter((f) => f.libre)
@@ -55,8 +55,11 @@ export function resolverSecciones(plantilla: Plantilla, config: SeccionConfigRow
 }
 
 /** Claves que Planeación desactivó en la plantilla. */
-export const clavesInactivas = (plantilla: Plantilla, config: SeccionConfigRow[]): Set<string> =>
-  new Set(config.filter((f) => f.plantilla === plantilla && !f.activa).map((f) => f.clave));
+export const clavesInactivas = (plantilla: Plantilla, config: SeccionConfigRow[]): Set<string> => {
+  // Evidencias y fuentes de verificación nunca se desactivan: es obligatoria en toda estructura.
+  const evid = new Set((PLANTILLAS[plantilla]?.secciones ?? []).filter((x) => x.tipo === "evid").map((x) => x.clave));
+  return new Set(config.filter((f) => f.plantilla === plantilla && !f.activa && !evid.has(f.clave)).map((f) => f.clave));
+};
 
 /** La clave libre siguiente («x1», «x2»…) de la plantilla. */
 export function claveLibreNueva(plantilla: Plantilla, config: SeccionConfigRow[]): string {

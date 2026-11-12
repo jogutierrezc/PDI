@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { useInstancias } from "../datos";
+import { useRestablecerEstructura } from "../mejoras-datos";
 import { LETRAS, PLANTILLAS } from "../plantillas";
 import { TITULO_LIBRE, claveLibreNueva, estructuraDe } from "../secciones-config";
 import type { SeccionEstructura } from "../secciones-config";
@@ -35,7 +36,10 @@ export function EstructuraConfig({ ciclo }: { ciclo: CicloRow }) {
   const instancias = useInstancias(ciclo.id);
   const guardar = useGuardarConfigSecciones();
   const borrar = useBorrarSeccionLibre();
+  const restablecer = useRestablecerEstructura();
   const [error, setError] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+  const [hecho, setHecho] = useState("");
   if (lectura.isPending) return <Cargando texto="Cargando la estructura…" />;
 
   const filas = lectura.data?.filas ?? [];
@@ -102,8 +106,18 @@ export function EstructuraConfig({ ciclo }: { ciclo: CicloRow }) {
       )}
       <div className="rk-seg" role="group" aria-label="Plantilla" style={{ marginBottom: "var(--space-4)" }}>
         {LETRAS.map((l) => (
-          <button key={l} type="button" aria-pressed={l === plantilla} onClick={() => setPlantilla(l)} title={PLANTILLAS[l].quien}>
-            {l} · {PLANTILLAS[l].quien}
+          <button
+            key={l}
+            type="button"
+            aria-pressed={l === plantilla}
+            onClick={() => {
+              setPlantilla(l);
+              setConfirmando(false);
+              setHecho("");
+            }}
+            title={PLANTILLAS[l].quien}
+          >
+            {PLANTILLAS[l].propia ? PLANTILLAS[l].nombre : `${l} · ${PLANTILLAS[l].quien}`}
           </button>
         ))}
       </div>
@@ -130,8 +144,9 @@ export function EstructuraConfig({ ciclo }: { ciclo: CicloRow }) {
             />
             <small className="inf-hint">{NOMBRE_TIPO[e.def.tipo]}</small>
             <label className="inf-chk">
-              <input type="checkbox" checked={e.activa} disabled={falta || (e.activa && activas <= 1)} onChange={(x) => void poner(e, { activa: x.target.checked })} /> Activa
+              <input type="checkbox" checked={e.activa} disabled={falta || e.def.tipo === "evid" || (e.activa && activas <= 1)} onChange={(x) => void poner(e, { activa: x.target.checked })} /> Activa
             </label>
+            {e.def.tipo === "evid" && <small className="inf-hint">Obligatoria en todo informe</small>}
             <label className="inf-chk">
               <input type="checkbox" checked={e.editable} disabled={falta} onChange={(x) => void poner(e, { editable_por_unidad: x.target.checked })} /> La unidad edita
             </label>
@@ -173,12 +188,62 @@ export function EstructuraConfig({ ciclo }: { ciclo: CicloRow }) {
           + Agregar una sección libre
         </button>
         {!abierta && <span className="inf-hint">Solo con el ciclo en preparación.</span>}
+        <button
+          type="button"
+          className="inf-btn inf-btn--sm"
+          onClick={() => {
+            setConfirmando(true);
+            setHecho("");
+          }}
+          disabled={falta || confirmando || restablecer.isPending}
+        >
+          Restablecer a la plantilla
+        </button>
         {error && (
           <span className="inf-error" role="alert">
             {error}
           </span>
         )}
       </div>
+      {confirmando && (
+        <div className="inf-est-confirma" role="group" aria-label="Confirmar el restablecimiento de la plantilla">
+          <p>
+            {abierta
+              ? `Se borran los ajustes de ${PLANTILLAS[plantilla].nombre} en este ciclo: títulos, orden, activación, edición por la unidad y las secciones libres, junto con lo que las unidades hayan escrito en ellas. Las secciones vuelven a ser las de la plantilla.`
+              : "Con el ciclo abierto o cerrado no se borra nada: solo se reactivan las secciones desactivadas y se abren de nuevo a la unidad. Títulos, orden y secciones libres se quedan como están."}
+          </p>
+          <div className="inf-row">
+            <button
+              type="button"
+              className="inf-btn inf-btn--sm inf-btn--riesgo"
+              disabled={restablecer.isPending}
+              onClick={() => {
+                setError("");
+                restablecer.mutate(
+                  { ciclo: ciclo.id, plantilla },
+                  {
+                    onSuccess: (n) => {
+                      setConfirmando(false);
+                      setHecho(n ? `Listo: se restablecieron ${n} ${n === 1 ? "ajuste" : "ajustes"}.` : "La plantilla ya estaba como la define Planeación; no hubo nada que cambiar.");
+                    },
+                    onError: (e) => setError(mensajeDe(e)),
+                  },
+                );
+              }}
+            >
+              {restablecer.isPending ? "Restableciendo…" : "Sí, restablecer"}
+            </button>
+            <button type="button" className="inf-btn inf-btn--sm" onClick={() => setConfirmando(false)} disabled={restablecer.isPending}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+      {hecho && (
+        <p className="inf-hint" role="status" style={{ marginTop: "var(--space-3)" }}>
+          {hecho}
+        </p>
+      )}
     </section>
   );
 }

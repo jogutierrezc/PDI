@@ -5,7 +5,7 @@
    y numeradas; su clave es «s1», «s2»… en orden.
    ========================================================================== */
 
-import type { CifraDef, DimDef, DimId, Plantilla, PlantillaDef, SeccionDef, TipoSeccion } from "./types";
+import type { CifraDef, DimDef, DimId, EstructuraRow, Plantilla, PlantillaDef, SeccionDef, SeccionEstructuraJson, TipoSeccion } from "./types";
 
 export const CIFRAS: CifraDef[] = [
   { clave: "matric", etiqueta: "Matrícula total", unidad: "", mayorMejor: true, dim: "acad", fuente: "UDES en Cifras · Matrícula" },
@@ -38,7 +38,21 @@ export const DIMS: Record<DimId, DimDef> = {
 type SinClave = Omit<SeccionDef, "clave">;
 const numerar = (secciones: SinClave[]): SeccionDef[] => secciones.map((s, i) => ({ ...s, clave: `s${i + 1}` }));
 
-export const PLANTILLAS: Record<Plantilla, PlantillaDef> = {
+export const TITULO_EVIDENCIAS = "Evidencias y fuentes de verificación";
+
+/**
+ * Evidencias y fuentes de verificación son esenciales y obligatorias en toda estructura: si la lista no trae
+ * la sección, se agrega antes de los anexos (o al final) con la clave siguiente, sin mover las claves que ya existen.
+ */
+export function conEvidencia(secciones: SeccionDef[]): SeccionDef[] {
+  if (secciones.some((s) => s.tipo === "evid")) return secciones;
+  const siguiente = Math.max(0, ...secciones.map((s) => Number(s.clave.slice(1)) || 0)) + 1;
+  const evid: SeccionDef = { clave: `s${siguiente}`, titulo: TITULO_EVIDENCIAS, tipo: "evid" };
+  const i = secciones.findIndex((s) => s.tipo === "anexos");
+  return i < 0 ? [...secciones, evid] : [...secciones.slice(0, i), evid, ...secciones.slice(i)];
+}
+
+const PLANTILLAS_BASE: Record<Plantilla, PlantillaDef> = {
   A: {
     id: "A",
     nombre: "Plantilla A",
@@ -79,7 +93,7 @@ export const PLANTILLAS: Record<Plantilla, PlantillaDef> = {
     nombre: "Plantilla C",
     quien: "Rectoría de campus",
     destino: "Rectoría General",
-    secciones: numerar([
+    secciones: conEvidencia(numerar([
       { titulo: "Resumen ejecutivo del campus", tipo: "narr", extension: "1 a 3 párrafos del rector", borrador: true, minimo: 25 },
       { titulo: "Alineación estratégica con el PDI", tipo: "pdi" },
       { titulo: "Objetivos y metas del campus", tipo: "metas" },
@@ -88,14 +102,14 @@ export const PLANTILLAS: Record<Plantilla, PlantillaDef> = {
       { titulo: "Análisis de retos y oportunidades", tipo: "filas", columnas: ["Reto", "Aprendizaje", "Oportunidad", "Propuesta"] },
       { titulo: "Conclusiones", tipo: "narr", extension: "1 a 3 párrafos", minimo: 25 },
       { titulo: "Anexos", tipo: "anexos" },
-    ]),
+    ])),
   },
   D: {
     id: "D",
     nombre: "Plantilla D",
     quien: "Rectoría General",
     destino: "Consejo Superior",
-    secciones: numerar([
+    secciones: conEvidencia(numerar([
       { titulo: "Presentación del Rector", tipo: "narr", extension: "una página", borrador: true, minimo: 40 },
       { titulo: "Introducción", tipo: "narr", extension: "2 a 3 párrafos: propósito, periodo y organización", minimo: 30 },
       { titulo: "I. Investigación", tipo: "dim", dims: ["inv"], consolida: true, funcion: "Investigación" },
@@ -104,11 +118,77 @@ export const PLANTILLAS: Record<Plantilla, PlantillaDef> = {
       { titulo: "IV. Gestión administrativa y financiera", tipo: "dim", dims: ["fin"], consolida: true, funcion: "Administrativa y financiera" },
       { titulo: "V. Síntesis y proyecciones 2027", tipo: "matriz" },
       { titulo: "Anexos", tipo: "anexos" },
-    ]),
+    ])),
   },
 };
 
+/**
+ * Las plantillas por id. Una estructura propia (X1…) que aún no se cargó, o que se borró, se lee como la A en
+ * vez de romper la pantalla: `registrarEstructuras` la pone en su sitio apenas llegan los datos.
+ */
+export const PLANTILLAS: Record<Plantilla, PlantillaDef> = new Proxy(PLANTILLAS_BASE, {
+  get: (t, k) => (typeof k === "string" && !(k in t) && /^[A-Z][A-Z0-9]{0,2}$/.test(k) ? t.A : t[k as string]),
+});
+
+/** Las plantillas conocidas, en orden: A–D y luego las propias (X1…). Es una lista viva: `registrarEstructuras` la actualiza. */
 export const LETRAS: Plantilla[] = ["A", "B", "C", "D"];
+const DEL_CODIGO = new Set<Plantilla>(["A", "B", "C", "D"]);
+
+const aSeccionDef = (j: SeccionEstructuraJson, i: number): SeccionDef => ({
+  clave: `s${i + 1}`,
+  titulo: j.titulo,
+  tipo: j.tipo,
+  ...(j.extension ? { extension: j.extension } : {}),
+  ...(j.borrador ? { borrador: true } : {}),
+  ...(j.minimo ? { minimo: j.minimo } : {}),
+  ...(j.dims?.length ? { dims: j.dims } : {}),
+  ...(j.consolida ? { consolida: true } : {}),
+  ...(j.funcion ? { funcion: j.funcion } : {}),
+  ...(j.columnas?.length ? { columnas: j.columnas } : {}),
+});
+
+/**
+ * Pone las estructuras propias (informe_estructuras, 0279) junto a las plantillas A–D: desde aquí todo el módulo
+ * las trata igual (secciones, avance, vista, impresión). Reemplaza las propias anteriores; las del código no se tocan.
+ */
+export function registrarEstructuras(filas: EstructuraRow[]): void {
+  for (const id of Object.keys(PLANTILLAS)) if (!DEL_CODIGO.has(id)) delete PLANTILLAS[id];
+  for (const f of filas) {
+    if (DEL_CODIGO.has(f.plantilla)) continue;
+    PLANTILLAS[f.plantilla] = {
+      id: f.plantilla,
+      nombre: f.nombre,
+      quien: f.quien,
+      destino: f.destino,
+      descripcion: f.descripcion,
+      propia: true,
+      activa: f.activa,
+      secciones: conEvidencia((f.secciones ?? []).map(aSeccionDef)),
+    };
+  }
+  const propias = Object.keys(PLANTILLAS).filter((id) => !DEL_CODIGO.has(id)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  LETRAS.splice(0, LETRAS.length, "A", "B", "C", "D", ...propias);
+}
+
+/** Las plantillas que se pueden ofrecer para un informe nuevo: las del código y las propias activas. */
+export const plantillasAbribles = (): Plantilla[] => LETRAS.filter((id) => PLANTILLAS[id]?.activa !== false);
+
+/** Una plantilla conocida; si no está registrada (estructura borrada o aún sin cargar), la A. */
+export const plantillaDe = (id: Plantilla): PlantillaDef => PLANTILLAS[id] ?? PLANTILLAS.A;
+
+/** La plantilla como la guarda una estructura propia: sirve para copiar una A–D como punto de partida. */
+export const seccionesComoJson = (id: Plantilla): SeccionEstructuraJson[] =>
+  (PLANTILLAS[id]?.secciones ?? []).filter((s) => s.tipo !== "libre").map((s) => ({
+    titulo: s.titulo,
+    tipo: s.tipo as SeccionEstructuraJson["tipo"],
+    ...(s.extension ? { extension: s.extension } : {}),
+    ...(s.borrador ? { borrador: true } : {}),
+    ...(s.minimo ? { minimo: s.minimo } : {}),
+    ...(s.dims?.length ? { dims: s.dims } : {}),
+    ...(s.consolida ? { consolida: true } : {}),
+    ...(s.funcion ? { funcion: s.funcion } : {}),
+    ...(s.columnas?.length ? { columnas: s.columnas } : {}),
+  }));
 
 /** Qué se le pide a la unidad en cada tipo de sección (la línea bajo el título). */
 export const AYUDA_TIPO: Record<TipoSeccion, string> = {

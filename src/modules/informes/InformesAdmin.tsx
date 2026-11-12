@@ -20,9 +20,11 @@ import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../lib/auth";
 import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
 import { useCiclos, useInstancias, useRequisitos } from "./datos";
+import { useEstructuras } from "./mejoras-datos";
 import { Capacitacion } from "./ui/Capacitacion";
 import { Aviso, Cargando, ProximaFase, Vacio } from "./ui/comunes";
 import { MiInforme } from "./ui/MiInforme";
+import { Estructuras } from "./ui/Estructuras";
 import { Revision } from "./ui/Revision";
 import { Tablero } from "./ui/Tablero";
 import { VistaInforme } from "./vista/VistaInforme";
@@ -34,9 +36,9 @@ import "../rankings/layout.css";
 import "./informes.css";
 
 const BASE = "/admin/informes-gestion";
-type Seccion = "tablero" | "mi-informe" | "revision" | "consolidador" | "capacitacion" | "vista";
-const SOLO_GESTION: Seccion[] = ["tablero", "revision", "consolidador", "capacitacion"];
-const SECCIONES: Seccion[] = ["tablero", "mi-informe", "revision", "consolidador", "capacitacion", "vista"];
+type Seccion = "tablero" | "mi-informe" | "revision" | "consolidador" | "capacitacion" | "estructuras" | "vista";
+const SOLO_GESTION: Seccion[] = ["tablero", "revision", "consolidador", "capacitacion", "estructuras"];
+const SECCIONES: Seccion[] = ["tablero", "mi-informe", "revision", "consolidador", "capacitacion", "estructuras", "vista"];
 
 const TITULOS: Record<Seccion, [string, string]> = {
   tablero: ["Tablero del ciclo", "Estado por unidad, fecha límite, plantillas y qué cifras se justifican"],
@@ -44,6 +46,7 @@ const TITULOS: Record<Seccion, [string, string]> = {
   revision: ["Revisión", "Planeación aprueba o devuelve cada informe, con una nota por sección"],
   consolidador: ["Consolidador", "Cada nivel recibe lo aprobado del nivel de abajo y decide qué entra"],
   capacitacion: ["Capacitación de Pilo", "Los informes de 2025 le enseñan a Pilo cómo escribe cada unidad"],
+  estructuras: ["Estructuras", "Las plantillas A–D y las estructuras propias, y qué oficinas puede usar cada una"],
   vista: ["Vista del informe", "El informe como saldrá en papel, en Carta o A4, con su portada y su PDF"],
 };
 
@@ -63,6 +66,8 @@ function Pantalla() {
   const gestiona = puedeGestionarInformes;
   const [params, setParams] = useSearchParams();
   const ciclos = useCiclos();
+  // Las estructuras propias (0279) se registran junto a A–D antes de pintar nada que las lea.
+  const estructuras = useEstructuras();
 
   const seccion = (param ?? (gestiona ? "tablero" : "mi-informe")) as Seccion;
   const anio = Number(params.get("anio")) || null;
@@ -99,6 +104,11 @@ function Pantalla() {
           Capacitación de Pilo
         </AdminRailTab>
       )}
+      {gestiona && (
+        <AdminRailTab current={seccion === "estructuras"} to={`${BASE}/estructuras`}>
+          Estructuras
+        </AdminRailTab>
+      )}
       <AdminRailTab current={seccion === "vista"} to={`${BASE}/vista`}>
         Vista del informe
       </AdminRailTab>
@@ -124,9 +134,11 @@ function Pantalla() {
     );
   } else if (seccion === "capacitacion") {
     cuerpo = <Capacitacion />;
+  } else if (seccion === "estructuras") {
+    cuerpo = <Estructuras />;
   } else if (fallo) {
     cuerpo = <Aviso error={fallo} />;
-  } else if (ciclos.isPending) {
+  } else if (ciclos.isPending || estructuras.isPending) {
     cuerpo = <Cargando texto="Cargando el ciclo…" />;
   } else if (seccion === "tablero") {
     cuerpo = (

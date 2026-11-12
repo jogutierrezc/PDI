@@ -25,7 +25,7 @@ import type { ElementoDrive } from "../types";
 import { EncabezadoSeccion } from "./Hoja";
 import { ETIQUETA_ESTADO_META, contarEstados } from "./estados";
 import type { EstadoMeta } from "./estados";
-import type { EntradaLibro, FilaIndicador, SeccionLibro } from "./entrada";
+import type { EntradaLibro, FilaAccion, FilaIndicador, SeccionLibro } from "./entrada";
 
 /* ---------- Unidad ----------------------------------------------------------------------------------- */
 
@@ -270,6 +270,20 @@ const COLUMNAS_INDICADOR: ColT[] = [
   { etiqueta: "Estado", ancho: "27mm" },
 ];
 
+const COLUMNAS_ACCION: ColT[] = [{ etiqueta: "Acción" }, { etiqueta: "Qué se ha hecho" }, { etiqueta: "Finalización", ancho: "28mm" }, { etiqueta: "Proyección", ancho: "32mm" }];
+
+const filaAccionT = (f: FilaAccion): FilaT => ({
+  celdas: [
+    <>
+      <b>{f.nombre}</b>
+      {f.descripcion ? <small>{f.descripcion}</small> : null}
+    </>,
+    f.hecho,
+    f.finalizacion || "—",
+    f.proyeccion || "—",
+  ],
+});
+
 const filaIndicadorT = (f: FilaIndicador): FilaT => ({
   celdas: [
     <>
@@ -376,7 +390,25 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
       else sinContenido();
       break;
     case "pdi":
-      if (s.pilares.length) {
+      if (s.alineacion) {
+        s.alineacion.forEach((a, n) => {
+          const kp = `p${n}`;
+          u.push(unidadFija(k(`${kp}:h`), i, <div className="vi-u"><div className="vi-sub-h"><h3>{a.pilar}</h3><span>Avance del pilar: {a.avance}</span></div></div>, { pegar: true, nuevaPagina: n > 0 }));
+          if (a.aporte) texto(`${kp}:t`, a.aporte, "Aporte de la unidad");
+          a.acciones.forEach((x, m) => {
+            const ka = `${kp}:a${m}`;
+            u.push(unidadFija(k(`${ka}:h`), i, <div className="vi-u"><span className="vi-eyebrow" style={{ marginBottom: 0 }}>{`Acción ${m + 1}${x.titulo ? ` · ${x.titulo}` : ""}`}</span></div>, { pegar: true }));
+            if (x.descripcion) texto(`${ka}:d`, x.descripcion);
+            x.bloques.forEach((b, q) => {
+              if (b.tipo === "texto") texto(`${ka}:b${q}`, b.texto);
+              else if (b.tipo === "drive") u.push(...unidadesDrive(s, i, r, b.drive, k(`${ka}:b${q}:drive`)));
+              else u.push(unidadTabla(k(`${ka}:b${q}:tabla`), i, { titulo: b.titulo.trim() || undefined, columnas: b.encabezados.map((c) => ({ etiqueta: c })), filas: b.filas.map((f) => ({ celdas: b.encabezados.map((_, y) => f[y] ?? "") })), nota: b.nota.trim() || undefined }));
+            });
+          });
+        });
+        if (!s.alineacion.length) sinContenido("No se redactaron aportes a los pilares del Plan de Desarrollo.");
+        if (s.texto) texto("t", s.texto, "Lectura de la unidad");
+      } else if (s.pilares.length) {
         u.push(unidadTabla(k("pilares"), i, { titulo: "Pilares del Plan de Desarrollo con los que se articula", columnas: [{ etiqueta: "Pilar" }, { etiqueta: "Avance del pilar", num: true, ancho: "34mm" }], filas: s.pilares.map((p) => ({ celdas: [p.nombre, p.avance] })) }));
       } else if (!s.texto) sinContenido("No se marcaron pilares del Plan de Desarrollo.");
       if (s.texto) texto("t", s.texto, "Lectura de la unidad");
@@ -406,7 +438,7 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
       break;
     case "dim": {
       s.dimensiones.forEach((d, n) => {
-        if (!d.filas.length) return;
+        if (!d.filas.length && !d.acciones?.length) return;
         u.push(
           unidadFija(
             k(`d${n}:h`),
@@ -420,7 +452,8 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
             { pegar: true, nuevaPagina: n > 0 && s.dimensiones.length > 1 },
           ),
         );
-        u.push(unidadTabla(k(`d${n}:t`), i, { columnas: COLUMNAS_INDICADOR, filas: d.filas.map(filaIndicadorT) }));
+        if (d.filas.length) u.push(unidadTabla(k(`d${n}:t`), i, { columnas: COLUMNAS_INDICADOR, filas: d.filas.map(filaIndicadorT) }));
+        if (d.acciones?.length) u.push(unidadTabla(k(`d${n}:a`), i, { titulo: "Acciones", columnas: COLUMNAS_ACCION, filas: d.acciones.map(filaAccionT) }));
         if (d.filas.filter((f) => f.avance !== null).length >= 2) {
           u.push(unidadFija(k(`d${n}:g`), i, <div className="vi-u"><GraficaAvance filas={d.filas} titulo="Avance frente a la meta (porcentaje de la meta alcanzado)" /></div>));
         }
@@ -442,8 +475,8 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
         u.push(unidadTabla(k("o:t"), i, { columnas: COLUMNAS_INDICADOR, filas: s.otros.map(filaIndicadorT) }));
         s.otros.filter((f) => f.justificacion).forEach((f, m) => u.push(unidadParrafo(k(`o:j${m}`), i, <><b>{f.etiqueta}.</b> {f.justificacion}</>)));
       }
-      const hayFilas = s.dimensiones.some((d) => d.filas.length) || s.otros.length;
-      if (hayFilas) u.push(unidadFija(k("ley"), i, <div className="vi-u"><Leyenda /></div>));
+      const hayFilas = s.dimensiones.some((d) => d.filas.length || d.acciones?.length) || s.otros.length;
+      if (s.dimensiones.some((d) => d.filas.length) || s.otros.length) u.push(unidadFija(k("ley"), i, <div className="vi-u"><Leyenda /></div>));
       if (s.texto) texto("t", s.texto, "Lectura de la unidad");
       else if (!hayFilas) sinContenido("Todavía no hay cifras conectadas en esta sección.");
       break;

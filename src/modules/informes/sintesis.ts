@@ -30,6 +30,14 @@ export interface GrupoCriterio {
   conteo: Conteo;
 }
 
+/** Acciones que la unidad describió por criterio: se cuentan aparte, no entran a logro ni semáforo. */
+export interface GrupoAcciones {
+  id: string;
+  nombre: string;
+  total: number;
+  completas: number;
+}
+
 export interface Sintesis {
   plan: {
     total: number;
@@ -42,6 +50,8 @@ export interface Sintesis {
   /** Metas con resultado (indicadores del programa y metas adicionales). */
   metas: { total: number; conteo: Conteo } | null;
   criterios: GrupoCriterio[];
+  /** Acciones por criterio (Resultados y evidencias). Ausente si no hay ninguna. */
+  acciones?: { total: number; completas: number; criterios: GrupoAcciones[] };
   indicadores: {
     total: number;
     conteo: Conteo;
@@ -54,7 +64,13 @@ export interface Sintesis {
   };
 }
 
-export function armarSintesis(o: { acciones: PlanAccion[]; metas: (EstadoMeta | null)[]; indicadores: EntradaIndicador[] }): Sintesis {
+export interface EntradaAccionManual {
+  criterio: string;
+  criterioNombre: string;
+  completa: boolean;
+}
+
+export function armarSintesis(o: { acciones: PlanAccion[]; metas: (EstadoMeta | null)[]; indicadores: EntradaIndicador[]; accionesManuales?: EntradaAccionManual[] }): Sintesis {
   const { acciones } = o;
   const avances = acciones.map((a) => a.avance).filter((v): v is number => typeof v === "number");
   const plan = acciones.length
@@ -82,10 +98,20 @@ export function armarSintesis(o: { acciones: PlanAccion[]; metas: (EstadoMeta | 
   const conMeta = evaluados.filter((x) => x.ev.estado).length;
   const conAnterior = evaluados.filter((x) => x.ev.rumbo).length;
 
+  const porCriterio = new Map<string, GrupoAcciones>();
+  for (const a of o.accionesManuales ?? []) {
+    const g = porCriterio.get(a.criterio) ?? { id: a.criterio, nombre: a.criterioNombre, total: 0, completas: 0 };
+    g.total += 1;
+    if (a.completa) g.completas += 1;
+    porCriterio.set(a.criterio, g);
+  }
+  const accionesManuales = [...porCriterio.values()];
+
   return {
     plan,
     metas,
     criterios,
+    ...(accionesManuales.length ? { acciones: { total: accionesManuales.reduce((s, g) => s + g.total, 0), completas: accionesManuales.reduce((s, g) => s + g.completas, 0), criterios: accionesManuales } } : {}),
     indicadores: {
       total: evaluados.length,
       conteo,

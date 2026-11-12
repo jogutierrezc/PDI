@@ -34,7 +34,25 @@ export interface IndicadorManual {
   nota: string;
   /** Clave del dato que Planeación pide (informe_datos_requeridos, 0253) al que responde este indicador. */
   requerido?: string;
+  /** «cifra» (por defecto; sin `tipo` en lo guardado antes es cifra) o «accion»: textos, sin aritmética. */
+  tipo?: TipoIndicador;
+  /** Acción: qué es la acción. */
+  descripcion?: string;
+  /** Acción: qué se ha hecho con ella. */
+  avance_texto?: string;
+  /** Acción: cuándo se plantea su finalización (fecha o periodo, texto libre). */
+  finalizacion?: string;
+  /** Acción: proyecciones en texto… */
+  proyeccion_texto?: string;
+  /** …y en número (su unidad es `unidad`, opcional). */
+  proyeccion_num?: number | null;
 }
+
+export type TipoIndicador = "cifra" | "accion";
+
+/** Una acción son textos: no entra a logro, semáforo ni síntesis numérica. */
+export const esAccion = (i: Pick<IndicadorManual, "tipo">) => i.tipo === "accion";
+export const esCifra = (i: Pick<IndicadorManual, "tipo">) => i.tipo !== "accion";
 
 export interface CriterioPropio {
   id: string;
@@ -56,7 +74,10 @@ export const claveIndicador = (seccion: string, id: string) => `ind_${seccion}_$
 export const esClaveIndicador = (clave: string) => clave.startsWith("ind_");
 export const idNuevo = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
-export function indicadorNuevo(criterio: string, criterioNombre = ""): IndicadorManual {
+export function indicadorNuevo(criterio: string, criterioNombre = "", tipo: TipoIndicador = "cifra"): IndicadorManual {
+  if (tipo === "accion") {
+    return { id: idNuevo(), criterio, criterio_nombre: criterioNombre, nombre: "", unidad: "", mayorMejor: true, actual: null, anterior: null, meta: null, fuente: "", nota: "", tipo: "accion", descripcion: "", avance_texto: "", finalizacion: "", proyeccion_texto: "", proyeccion_num: null };
+  }
   return { id: idNuevo(), criterio, criterio_nombre: criterioNombre, nombre: "", unidad: "", mayorMejor: true, actual: null, anterior: null, meta: null, fuente: "", nota: "" };
 }
 
@@ -135,14 +156,33 @@ export { CORTE_PARCIAL };
 export function faltantes(i: IndicadorManual, exigirFuente: boolean): string[] {
   const f: string[] = [];
   if (!i.nombre.trim()) f.push("el nombre");
+  if (esAccion(i)) {
+    // La finalización y las proyecciones ayudan pero no se exigen.
+    if (!i.descripcion?.trim()) f.push("la descripción de la acción");
+    if (!i.avance_texto?.trim()) f.push("qué se ha hecho con la acción");
+    return f;
+  }
   if (i.actual === null) f.push("la cifra actual");
   if (i.meta === null) f.push("la meta");
   if (exigirFuente && !i.fuente.trim()) f.push("la fuente");
   return f;
 }
 
-/** Un indicador cuenta cuando tiene nombre y cifra actual. */
-export const esCompleto = (i: IndicadorManual) => Boolean(i.nombre.trim()) && i.actual !== null;
+/** Una cifra cuenta cuando tiene nombre y cifra actual; una acción, con nombre, descripción y qué se ha hecho (finalización y proyecciones son opcionales). */
+export const esCompleto = (i: IndicadorManual) =>
+  esAccion(i) ? Boolean(i.nombre.trim() && i.descripcion?.trim() && i.avance_texto?.trim()) : Boolean(i.nombre.trim()) && i.actual !== null;
+
+/** Solo las cifras: lo que entra a la aritmética. */
+export const soloCifras = (l: IndicadorManual[]) => l.filter(esCifra);
+export const soloAcciones = (l: IndicadorManual[]) => l.filter(esAccion);
+
+/** Criterios marcados: los de `criterios_reporta` más los que ya tienen indicadores (guardados antiguos). */
+export function criteriosMarcados(reporta: string[] | undefined, indicadores: IndicadorManual[], pedidos: string[] = []): Set<string> {
+  const s = new Set<string>(reporta ?? []);
+  for (const i of indicadores) if (i.criterio) s.add(i.criterio);
+  for (const p of pedidos) s.add(p);
+  return s;
+}
 
 /* ---------- Puente a la cifra del informe --------------------------------------- */
 
@@ -192,6 +232,16 @@ export function normalizar(crudo: unknown): IndicadorManual[] {
       fuente: typeof o.fuente === "string" ? o.fuente : "",
       nota: typeof o.nota === "string" ? o.nota : "",
       ...(typeof o.requerido === "string" && o.requerido ? { requerido: o.requerido } : {}),
+      ...(o.tipo === "accion"
+        ? {
+            tipo: "accion" as const,
+            descripcion: typeof o.descripcion === "string" ? o.descripcion : "",
+            avance_texto: typeof o.avance_texto === "string" ? o.avance_texto : "",
+            finalizacion: typeof o.finalizacion === "string" ? o.finalizacion : "",
+            proyeccion_texto: typeof o.proyeccion_texto === "string" ? o.proyeccion_texto : "",
+            proyeccion_num: num(o.proyeccion_num),
+          }
+        : {}),
     });
   }
   return salida;
@@ -200,6 +250,11 @@ export function normalizar(crudo: unknown): IndicadorManual[] {
 /* ---------- Excel: plantilla y lectura -------------------------------------------- */
 
 export const COLUMNAS_EXCEL = ["Criterio", "Indicador", "Unidad", "Qué es mejor", "Año anterior", "Cifra actual", "Meta", "Fuente", "Nota"] as const;
+/** Columnas opcionales al final: una fila con «Acción» en Tipo se lee como acción. Un archivo sin ellas se lee como siempre. */
+export const COLUMNAS_ACCION_EXCEL = ["Tipo", "Descripción de la acción", "Qué se ha hecho", "Finalización", "Proyección (texto)", "Proyección (número)"] as const;
+export const COLUMNAS_EXCEL_TODAS = [...COLUMNAS_EXCEL, ...COLUMNAS_ACCION_EXCEL] as const;
+export const TIPO_CIFRA = "Cifra";
+export const TIPO_ACCION = "Acción";
 export const MAS_ES_MEJOR = "Más es mejor";
 export const MENOS_ES_MEJOR = "Menos es mejor";
 
@@ -221,9 +276,10 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[]): 
 
   filas.slice(1).forEach((f, n) => {
     const fila = n + 2;
-    const celdas = COLUMNAS_EXCEL.map((_, k) => String(f[k] ?? "").trim());
+    const celdas = COLUMNAS_EXCEL_TODAS.map((_, k) => String(f[k] ?? "").trim());
     if (celdas.every((c) => !c)) return;
-    const [crit, nombre, unidad, sentido, anterior, actual, meta, fuente, nota] = celdas;
+    const [crit, nombre, unidad, sentido, anterior, actual, meta, fuente, nota, tipoTxt, descripcion, hecho, finalizacion, proyTxt, proyNum] = celdas;
+    const accion = sinTildes(tipoTxt) === "accion";
     if (!nombre) {
       avisos.push(`Fila ${fila}: sin nombre de indicador, se omitió.`);
       return;
@@ -245,7 +301,7 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[]): 
       if (v === null) avisos.push(`Fila ${fila}: «${texto}» no es un número en ${nombreCol}.`);
       return v;
     };
-    indicadores.push({
+    const base = {
       id: idNuevo() + n,
       criterio: id,
       criterio_nombre: criterios.find((c) => c.id === id)?.nombre ?? nuevos.get(sinTildes(crit))?.nombre ?? "",
@@ -257,7 +313,22 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[]): 
       meta: numero(meta, "Meta"),
       fuente,
       nota,
-    });
+    };
+    if (accion) {
+      indicadores.push({
+        ...base,
+        mayorMejor: true,
+        anterior: null,
+        actual: null,
+        meta: null,
+        tipo: "accion",
+        descripcion,
+        avance_texto: hecho,
+        finalizacion,
+        proyeccion_texto: proyTxt,
+        proyeccion_num: numero(proyNum, "Proyección (número)"),
+      });
+    } else indicadores.push(base);
   });
   return { indicadores, criteriosNuevos: [...nuevos.values()], avisos };
 }
@@ -265,5 +336,9 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[]): 
 /** Filas para el libro de Excel (plantilla con ejemplo o exportación de lo escrito). */
 export function filasParaExcel(indicadores: IndicadorManual[], criterios: Criterio[]): (string | number | null)[][] {
   const nombre = new Map(criterios.map((c) => [c.id, c.nombre]));
-  return indicadores.map((i) => [nombre.get(i.criterio) ?? i.criterio, i.nombre, i.unidad.trim(), i.mayorMejor ? MAS_ES_MEJOR : MENOS_ES_MEJOR, i.anterior, i.actual, i.meta, i.fuente, i.nota]);
+  return indicadores.map((i) => {
+    const comun = [nombre.get(i.criterio) ?? i.criterio, i.nombre, i.unidad.trim()];
+    if (esAccion(i)) return [...comun, "", null, null, null, i.fuente, i.nota, TIPO_ACCION, i.descripcion ?? "", i.avance_texto ?? "", i.finalizacion ?? "", i.proyeccion_texto ?? "", i.proyeccion_num ?? null];
+    return [...comun, i.mayorMejor ? MAS_ES_MEJOR : MENOS_ES_MEJOR, i.anterior, i.actual, i.meta, i.fuente, i.nota, TIPO_CIFRA, "", "", "", "", null];
+  });
 }

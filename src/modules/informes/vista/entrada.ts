@@ -17,9 +17,11 @@ import { hayDatosDeSintesis } from "../sintesis";
 import type { Sintesis } from "../sintesis";
 import type { IndicadorManual } from "../indicadores-manual";
 import { cifraDef, DIMS } from "../plantillas";
+import { driveDeAlineacion, normalizarAlineacion, tieneAlineacion } from "../alineacion";
 import { driveLibre } from "../secciones-config";
 import { resolverTexto } from "../tokens";
-import type { ElementoDrive, Logro, Meta, PilarRef, TipoSeccion } from "../types";
+import type { Resolver } from "../tokens";
+import type { BloqueLibre, ContenidoSeccion, ElementoDrive, Logro, Meta, PilarRef, TipoSeccion } from "../types";
 import { avanceFrenteAMeta, estadoMeta } from "./estados";
 import type { EstadoMeta } from "./estados";
 
@@ -42,11 +44,22 @@ export interface FilaIndicador {
   dimNombre?: string;
 }
 
+/** Una acción descrita por la unidad (Resultados y evidencias): texto, sin aritmética. */
+export interface FilaAccion {
+  nombre: string;
+  descripcion: string;
+  hecho: string;
+  finalizacion: string;
+  /** «Texto · 120 estudiantes» ya unido, o vacío. */
+  proyeccion: string;
+}
+
 export interface GrupoDimension {
   id: string;
   titulo: string;
   funcion: string;
   filas: FilaIndicador[];
+  acciones?: FilaAccion[];
 }
 
 export interface FilaMeta {
@@ -60,6 +73,14 @@ export interface FilaMeta {
 
 /** Un bloque de una sección libre, ya resuelto. */
 export type BloqueEntrada = { tipo: "texto"; texto: string } | { tipo: "drive"; drive: ElementoDrive[] } | { tipo: "tabla"; titulo: string; nota: string; encabezados: string[]; filas: string[][] };
+
+/** Alineación estratégica ya resuelta: un aporte por pilar con sus acciones y bloques. */
+export interface AporteEntrada {
+  pilar: string;
+  avance: string;
+  aporte: string;
+  acciones: { titulo: string; descripcion: string; bloques: BloqueEntrada[] }[];
+}
 
 export interface SeccionLibro {
   clave: string;
@@ -82,6 +103,8 @@ export interface SeccionLibro {
   matriz: FilaIndicador[];
   /** Todos los elementos de UDrive de la sección (en las libres, los de sus bloques). */
   drive: ElementoDrive[];
+  /** Solo en la alineación estratégica (pdi) con aportes por pilar. */
+  alineacion?: AporteEntrada[];
   /** Solo en las secciones libres: sus bloques en orden. */
   bloques: BloqueEntrada[];
   /** Síntesis armada con lo reportado (solo en secciones de tipo matriz y si hay datos). */
@@ -100,6 +123,30 @@ const fecha = (iso: string | null): string => {
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
 };
+
+/** Los aportes por pilar de la alineación estratégica, en el orden del Plan y sin pilares vacíos. */
+function alineacionEntrada(c: ContenidoSeccion, resolver: Resolver, pilares: PilarRef[]): AporteEntrada[] {
+  const bloques = (bs: BloqueLibre[]): BloqueEntrada[] =>
+    bs
+      .map((b): BloqueEntrada => (b.tipo === "texto" ? { tipo: "texto", texto: resolverTexto(b.texto, resolver).trim() } : b.tipo === "drive" ? { tipo: "drive", drive: b.drive } : { tipo: "tabla", titulo: b.titulo, nota: b.nota, encabezados: b.encabezados, filas: b.filas }))
+      .filter((b) => (b.tipo === "texto" ? b.texto : b.tipo === "drive" ? b.drive.length : b.filas.some((f) => f.some((x) => x.trim()))));
+  const orden = (id: string) => {
+    const i = pilares.findIndex((p) => p.id === id);
+    return i < 0 ? 999 : i;
+  };
+  return normalizarAlineacion(c)
+    .sort((a, b) => orden(a.pilar) - orden(b.pilar))
+    .map((a) => {
+      const p = pilares.find((x) => x.id === a.pilar);
+      return {
+        pilar: p ? `${p.numeral}. ${p.name}` : "Pilar del Plan de Desarrollo",
+        avance: !p || p.progress === null ? "—" : `${p.progress} %`,
+        aporte: resolverTexto(a.aporte, resolver).trim(),
+        acciones: a.acciones.map((x) => ({ titulo: x.titulo.trim(), descripcion: x.descripcion.trim(), bloques: bloques(x.bloques) })).filter((x) => x.titulo || x.descripcion || x.bloques.length),
+      };
+    })
+    .filter((a) => a.aporte || a.acciones.length);
+}
 
 /** Un indicador escrito a mano, agrupado por su criterio. */
 function filaManual(c: CifraVista, ind: IndicadorManual): FilaIndicador {
@@ -161,6 +208,14 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
         : [];
     // Los indicadores escritos a mano se agrupan por criterio, junto a las dimensiones base.
     if (def.tipo === "dim") {
+      for (const a of m.accionesManuales.filter((x) => x.seccion === def.clave && x.completa)) {
+        const id = a.ind.criterio || "otros";
+        const proy = [a.ind.proyeccion_texto?.trim() ?? "", a.ind.proyeccion_num != null ? formatoCifra(a.ind.proyeccion_num, a.ind.unidad) : ""].filter(Boolean).join(" · ");
+        const fila: FilaAccion = { nombre: a.ind.nombre.trim(), descripcion: (a.ind.descripcion ?? "").trim(), hecho: (a.ind.avance_texto ?? "").trim(), finalizacion: (a.ind.finalizacion ?? "").trim(), proyeccion: proy };
+        const grupo = dimensiones.find((g) => g.id === id);
+        if (grupo) (grupo.acciones ??= []).push(fila);
+        else dimensiones.push({ id, titulo: a.ind.criterio_nombre || "Datos de la unidad", funcion: "Indicadores de la unidad", filas: [], acciones: [fila] });
+      }
       for (const ind of m.manuales.filter((x) => x.seccion === def.clave)) {
         const fila = filaManual(ind.vista, ind.ind);
         const id = fila.dim;
@@ -220,7 +275,8 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
               return man ? filaManual(x, man.ind) : filaIndicador(x);
             })
           : [],
-      drive: def.tipo === "libre" ? driveLibre(c) : (c.drive ?? []),
+      drive: def.tipo === "libre" ? driveLibre(c) : def.tipo === "pdi" ? [...(c.drive ?? []), ...driveDeAlineacion(c)] : (c.drive ?? []),
+      alineacion: def.tipo === "pdi" && tieneAlineacion(c) ? alineacionEntrada(c, resolver, pilares) : undefined,
       bloques: def.tipo === "libre" ? (c.bloques ?? []).map((b): BloqueEntrada => (b.tipo === "texto" ? { tipo: "texto", texto: resolverTexto(b.texto, resolver).trim() } : b.tipo === "drive" ? { tipo: "drive", drive: b.drive } : { tipo: "tabla", titulo: b.titulo, nota: b.nota, encabezados: b.encabezados, filas: b.filas })).filter((b) => b.tipo !== "tabla" || b.filas.some((f) => f.some((x) => x.trim()))) : [],
       sintesis: def.tipo === "matriz" && hayDatosDeSintesis(m.sintesis) ? m.sintesis : null,
       fuente: fuenteDe(cifrasFuente),

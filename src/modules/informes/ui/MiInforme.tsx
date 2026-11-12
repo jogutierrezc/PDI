@@ -36,12 +36,13 @@ import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
 import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
 import { ImportarFilas } from "./ImportarFilas";
+import { Alineacion } from "./Alineacion";
 import { BloquesLibres } from "./BloquesLibres";
 import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, plantillaSugerida } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
 import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, RolActor, SeccionDef, SedeInforme, UnidadRef } from "../types";
 import { EncabezadoObjetivo, enlaceInforme, useObjetivoInforme } from "./objetivo";
-import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas, TablaPilares } from "./Bloques";
+import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
 import { Dimensiones } from "./Dimensiones";
 import { ElementosDrive } from "./ElementosDrive";
 import { TablaMetasPrograma } from "./MetasPrograma";
@@ -52,6 +53,7 @@ import { pedidoDeAccion, pedidoDeCifras } from "../analisis-pilo";
 import { piloAnalizar } from "../datos";
 import type { PedidoAnalisisPilo } from "../datos";
 import { ResultadosManuales } from "./ResultadosManuales";
+import { TodosLosInformes } from "./TodosLosInformes";
 import { PanelSintesis } from "./Sintesis";
 import { aprobadosPara, useCriterios, useSugerirCriterio } from "../criterios";
 import { planVigente } from "../plan-importar";
@@ -77,7 +79,10 @@ export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: 
       <Vacio>
         {o.gestiona ? (
           <>
-            Elija el informe desde el <Link className="inf-link" to={BASE}>Tablero del ciclo</Link>: ahí están todas las unidades y sedes.
+            <TodosLosInformes ciclo={ciclo} />
+            <span className="inf-hint">
+              También puede elegirlo desde el <Link className="inf-link" to={BASE}>Tablero del ciclo</Link>.
+            </span>
           </>
         ) : (
           "Su usuario no tiene ninguna unidad asignada en «Dónde trabaja». Pida a Planeación que se la asigne, con su sede, o que su rol le dé el informe de una."
@@ -90,9 +95,10 @@ export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: 
   const unidad: UnidadRef = { ...o.unidad, name: o.nombre };
   return (
     <>
+      {o.planeacion && <TodosLosInformes ciclo={ciclo} />}
       <EncabezadoObjetivo o={o} base={`${BASE}/mi-informe`} />
       {o.instancia ? (
-        <Editor key={o.instancia.id} inst={o.instancia} ciclo={ciclo} requisitos={requisitos} unidad={unidad} sede={o.sede} actor={o.actor} />
+        <Editor key={o.instancia.id} inst={o.instancia} ciclo={ciclo} requisitos={requisitos} unidad={unidad} sede={o.sede} actor={o.actor} soloVer={o.soloVer} />
       ) : (
         <SinAbrir ciclo={ciclo} unidad={unidad} sede={o.sede} unidadId={o.unidad.id} puedeAbrir={o.planeacion} />
       )}
@@ -132,7 +138,7 @@ function SinAbrir({ ciclo, unidad, sede, unidadId, puedeAbrir }: { ciclo: CicloR
 
 /* ---------- El editor ---------------------------------------------------------- */
 
-function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: UnidadRef; sede: SedeInforme | null; actor: RolActor | null }) {
+function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: UnidadRef; sede: SedeInforme | null; actor: RolActor | null; soloVer?: boolean }) {
   // Facultad: el Plan de Trabajo (API) trae las acciones de las secciones de metas y de dimensiones.
   const esFacultad = unidad.kind === "facultad";
   const plan = usePlanUnidad(unidad.id, esFacultad);
@@ -262,7 +268,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
 
   const avances = secciones.map((d) => m.avance(d, contenido(d.clave)));
   const listas = avances.filter((a) => a === 2).length;
-  const motivos = motivosNoEnviar({ estado: inst.estado, rol: actor, listas, total: secciones.length });
+  const motivos = motivosNoEnviar({ estado: inst.estado, rol: actor, listas, total: secciones.length, anexos: m.anexos.data?.length ?? 0 });
   const nota = leerNota(inst.nota_revision);
   const resolver = resolverDe(m.citables);
   const ctx = m.contexto(def);
@@ -306,7 +312,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
             {unidad.name} <AyudaPilo zona="estado" />
           </b>
           <span>
-            Informe {ciclo.anio} · su papel: {nombreRol(actor)}
+            Informe {ciclo.anio} · {soloVer ? "Administración: solo lectura" : `su papel: ${nombreRol(actor)}`}
           </span>
         </div>
         <div className="inf-row">
@@ -449,6 +455,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor }: { inst: Instan
             items={controlesSeccion(def, c, {
               ...ctx,
               claves: m.citables.map((x) => x.clave),
+              pilares: (pilares.data ?? []).map((p) => ({ id: p.id, numeral: p.numeral })),
               congelada: m.frio,
               corte: ciclo.corte ? fmtFecha(ciclo.corte) : null,
             })}
@@ -624,30 +631,13 @@ function CuerpoSeccion({
       );
     case "pdi":
       return (
-        <>
-          <div className="inf-blk">
-            <div className="inf-blk__lab">
-              <Tag auto />
-              <span className="inf-src">Plan de Desarrollo · avance de cada pilar</span>
-            </div>
-            <TablaPilares pilares={pilares} marcados={c.pilares ?? []} editable={editable} cambiar={(ids) => cambiar({ ...c, pilares: ids })} />
+        <div className="inf-blk">
+          <div className="inf-blk__lab">
+            <Tag />
+            <span className="inf-src">Plan de Desarrollo · elija un pilar y redacte el aporte de su unidad, con sus acciones, tablas y gráficas</span>
           </div>
-          <div className="inf-blk">
-            <div className="inf-blk__lab">
-              <Tag />
-              <span className="inf-src">Media página: cómo contribuye su unidad a los pilares marcados (se recomiendan al menos 3)</span>
-            </div>
-            {texto("Contribución a los pilares", {
-              placeholder: "Cuente cómo se conecta su trabajo con los pilares que marcó…",
-              analisis: () => ({
-                tema: "Contribución de la unidad a los pilares del Plan de Desarrollo que marcó",
-                cifras: [],
-                hechos: pilares.filter((p) => c.pilares?.includes(p.id)).map((p) => `Se articula con el pilar «${p.name.replace(/\d+/g, "").trim()}»`),
-                largo: "medio",
-              }),
-            })}
-          </div>
-        </>
+          <Alineacion pilares={pilares} c={c} cambiar={cambiar} editable={editable} cifras={m.citables} resolver={resolver} />
+        </div>
       );
     case "metas": {
       const delPrograma = recibeMetas || m.metasPrograma.length > 0;
@@ -720,6 +710,7 @@ function CuerpoSeccion({
               cambiar={cambiar}
               puedeSugerir={!criteriosBase.data?.falta}
               requeridos={m.requeridosDe(def)}
+              criteriosPedidos={m.contexto(def).cifras.filter((x) => x.condicion === "justificar").map((x) => cifraDef(x.clave)?.dim ?? "").filter(Boolean)}
               sugerir={(p) => sugerirCriterio.mutateAsync({ nombre: p.nombre, descripcion: "", unidad: inst.unit_id })}
             />
           </div>

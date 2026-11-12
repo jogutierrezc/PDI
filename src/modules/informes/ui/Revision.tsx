@@ -5,6 +5,7 @@
    vivas. ?informe=<id> abre uno.
    ========================================================================== */
 
+import { normalizarAlineacion, tieneAlineacion } from "../alineacion";
 import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
@@ -240,6 +241,41 @@ function LecturaBase({ def, c, m, pilares, resolver }: { def: SeccionDef; c: Con
     case "narr":
       return texto ?? sinNada;
     case "pdi": {
+      // Alineación por pilar (0279): el aporte de cada pilar y sus acciones. Los informes anteriores siguen con pilares + texto.
+      if (tieneAlineacion(c)) {
+        const aportes = normalizarAlineacion(c);
+        if (!aportes.length) return sinNada;
+        return (
+          <>
+            {aportes.map((a) => {
+              const p = pilares.find((x) => x.id === a.pilar);
+              return (
+                <div key={a.pilar} className="inf-ali-lectura">
+                  <b>{p ? `${p.numeral}. ${p.name}` : "Pilar que ya no está en el Plan"}</b>
+                  {a.aporte.trim() ? (
+                    <div className="inf-pv">
+                      <LecturaTexto texto={a.aporte} resolver={resolver} />
+                    </div>
+                  ) : (
+                    <p className="inf-muted">Sin aporte escrito.</p>
+                  )}
+                  {a.acciones.length > 0 && (
+                    <ul>
+                      {a.acciones.map((x) => (
+                        <li key={x.id}>
+                          <b>{x.titulo.trim() || "Acción sin título"}</b>
+                          {x.descripcion.trim() ? ` · ${x.descripcion.trim()}` : ""}
+                          {x.bloques.length > 0 && <span className="inf-muted"> · {x.bloques.length} {x.bloques.length === 1 ? "elemento de apoyo" : "elementos de apoyo"}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        );
+      }
       const marcados = pilares.filter((p) => c.pilares?.includes(p.id));
       return (
         <>

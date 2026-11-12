@@ -32,8 +32,9 @@ describe("plantillas", () => {
   it("numeran las secciones s1… y traen las cifras de sus dimensiones", () => {
     expect(PLANTILLAS.A.secciones).toHaveLength(10);
     expect(PLANTILLAS.B.secciones).toHaveLength(9);
-    expect(PLANTILLAS.C.secciones).toHaveLength(8);
-    expect(PLANTILLAS.D.secciones).toHaveLength(8);
+    // C y D ganaron «Evidencias y fuentes de verificación» (obligatoria en toda estructura): 9 secciones cada una.
+    expect(PLANTILLAS.C.secciones).toHaveLength(9);
+    expect(PLANTILLAS.D.secciones).toHaveLength(9);
     expect(PLANTILLAS.A.secciones.map((s) => s.clave).slice(0, 3)).toEqual(["s1", "s2", "s3"]);
     expect(dimsDe("D")).toEqual(["inv", "ext", "acad", "prof", "cal", "fin"]);
     expect(clavesDe("B")).toContain("con");
@@ -125,6 +126,9 @@ describe("estados", () => {
     expect(motivosNoEnviar({ estado: "draft", rol: "jefe", listas: 10, total: 10 })).toEqual([]);
     expect(motivosNoEnviar({ estado: "draft", rol: "editor", listas: 3, total: 10 })).toHaveLength(2);
     expect(motivosNoEnviar({ estado: "sent", rol: "jefe", listas: 10, total: 10 })[0]).toMatch(/Ya se envió/);
+    // Evidencias y fuentes de verificación: obligatorias para enviar (0279).
+    expect(motivosNoEnviar({ estado: "draft", rol: "jefe", listas: 10, total: 10, anexos: 0 }).join(" ")).toMatch(/evidencias y fuentes de verificación/);
+    expect(motivosNoEnviar({ estado: "draft", rol: "jefe", listas: 10, total: 10, anexos: 2 })).toEqual([]);
   });
 
   it("la nota de devolución guarda y recupera las notas por sección", () => {

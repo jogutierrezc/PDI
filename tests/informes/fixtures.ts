@@ -90,12 +90,18 @@ export async function escenario(): Promise<Escenario> {
 
 /** Abre el informe A de la facultad (destino: la rectoría) como el Gestor. */
 export async function abrirFacultad(t: TestDb, ciclo: string): Promise<string> {
-  return t.asUser(
+  const id = await t.asUser(
     P.gestor,
     async (q) => (await q<{ id: string }>("select public.informe_abrir($1, $2, 'A', $3) as id", [ciclo, U.facultad, U.rectoria]))[0].id,
     { commit: true },
   );
+  await evidencia(t, id);
+  return id;
 }
+
+/** Desde 0279 no se envía un informe sin evidencias: una de prueba (n = 999, para no chocar con las de cada prueba). */
+export const evidencia = (t: TestDb, inst: string) =>
+  t.q("insert into public.informe_anexos (instancia_id, n, nombre, tipo, ruta) values ($1, 999, 'Evidencia de prueba', 'url', 'https://udes.edu.co/evidencia') on conflict do nothing", [inst]);
 
 export const seccion = (q: Query, inst: string, clave: string, listo = true, texto = "Texto de la sección") =>
   q("select public.informe_guardar_seccion($1, $2, $3, $4)", [inst, clave, JSON.stringify({ texto }), listo]);

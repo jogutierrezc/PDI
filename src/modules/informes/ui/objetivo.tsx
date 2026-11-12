@@ -38,6 +38,8 @@ export type Objetivo =
       instancia: InstanciaRow | null;
       actor: ReturnType<typeof actorDe>;
       planeacion: boolean;
+      /** Quien gestiona (administración y Planeación) ve el informe de cualquier unidad, pero solo lo lee: escribir es de quien trabaja en la unidad. */
+      soloVer: boolean;
       /** La unidad y, si tiene, la sede: lo que se muestra. */
       nombre: string;
     };
@@ -102,6 +104,9 @@ export function useObjetivoInforme(ciclo: string | undefined): Objetivo {
   }
   if (!elegido) return { tipo: "sin", gestiona: planeacion };
 
+  // Quien gestiona solo escribe en la unidad donde trabaja; en las demás, solo ve.
+  const miRol = (membresias.data ?? []).find((x) => x.unidad === elegido.unidad.id)?.rol ?? null;
+  const soloVer = planeacion && !miRol;
   const ofrecidas = sedesDe.get(elegido.unidad.id) ?? [];
   const sede = elegido.elegir ? (pedida && ofrecidas.some((o) => o.id === pedida.id) ? pedida : (ofrecidas[0] ?? null)) : elegido.fija;
   const elegirSede = ofrecidas.length > 1 && (planeacion || elegido.elegir);
@@ -114,8 +119,9 @@ export function useObjetivoInforme(ciclo: string | undefined): Objetivo {
     elegirSede,
     otras,
     instancia: buscarInstancia(instancias.data ?? [], elegido.unidad.id, sede?.id ?? null, ofrecidas),
-    actor: actorDe(planeacion, membresias.data ?? [], elegido.unidad.id),
+    actor: soloVer ? "visor" : planeacion ? (miRol ?? "planeacion") : actorDe(false, membresias.data ?? [], elegido.unidad.id),
     planeacion,
+    soloVer,
     nombre: nombreConSede(elegido.unidad.name, sede),
   };
 }

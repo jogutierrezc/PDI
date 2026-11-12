@@ -9,7 +9,8 @@ export type { RolActor } from "../rankings/reporte/tipos";
 import type { PlanLocal } from "./plan-importar";
 import type { CriterioPropio, IndicadorManual } from "./indicadores-manual";
 
-export type Plantilla = "A" | "B" | "C" | "D";
+/** «A»–«D» (las del código) o «X1», «X2»… (estructuras propias que crea Planeación, 0279). */
+export type Plantilla = string;
 export type TipoSeccion = "narr" | "pdi" | "metas" | "dim" | "matriz" | "filas" | "logros" | "evid" | "anexos" | "libre";
 export type EstadoInstancia = "draft" | "sent" | "ok" | "back";
 export type EstadoCiclo = "preparacion" | "abierto" | "cerrado";
@@ -50,6 +51,81 @@ export interface PlantillaDef {
   /** A quién se envía. */
   destino: string;
   secciones: SeccionDef[];
+  /** Estructura creada por Planeación (X1…), no del código. */
+  propia?: boolean;
+  descripcion?: string;
+  /** Una estructura propia desactivada no se ofrece para informes nuevos; los abiertos siguen. */
+  activa?: boolean;
+}
+
+/** Una sección de una estructura propia tal como se guarda en `informe_estructuras.secciones` (la clave s1, s2… sale de la posición). */
+export interface SeccionEstructuraJson {
+  titulo: string;
+  tipo: Exclude<TipoSeccion, "libre">;
+  extension?: string;
+  minimo?: number;
+  columnas?: string[];
+  dims?: DimId[];
+  borrador?: boolean;
+  consolida?: boolean;
+  funcion?: string;
+}
+
+/** Fila de informe_estructuras (0279). */
+export interface EstructuraRow {
+  plantilla: Plantilla;
+  nombre: string;
+  quien: string;
+  destino: string;
+  descripcion: string;
+  /** La plantilla A–D de la que se copió, si se copió. */
+  base: Plantilla | null;
+  secciones: SeccionEstructuraJson[];
+  activa: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** A qué oficinas se limita una plantilla (informe_plantilla_unidades, 0279). Sin filas, la usan todas. */
+export interface PlantillaUnidadRow {
+  plantilla: Plantilla;
+  unit_id: string;
+}
+
+export type PapelResponsable = "jefe" | "editor" | "visor";
+
+/** Quién escribe el informe de una unidad (informe_responsables, 0279). */
+export interface ResponsableRow {
+  profile_id: string;
+  nombre: string;
+  correo: string;
+  rol: PapelResponsable;
+  /** Lo asignó este módulo (se puede restablecer). */
+  asignado: boolean;
+  asignado_en: string | null;
+}
+
+export interface PersonaRef {
+  id: string;
+  nombre: string;
+  correo: string;
+}
+
+/** Un aporte a un pilar del PDI en «Alineación estratégica»: texto libre y las acciones con que se articula, cada una con sus tablas y gráficas. */
+export interface AporteAPilar {
+  /** id del pilar (PilarRef.id). */
+  pilar: string;
+  /** Lo que la oficina aporta a ese pilar. Texto libre, admite [[clave]]. */
+  aporte: string;
+  acciones: AccionDePilar[];
+}
+
+export interface AccionDePilar {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  /** Tablas (pegadas de Excel), gráficas y tablas de UDrive y texto de apoyo de esta acción. */
+  bloques: BloqueLibre[];
 }
 
 export interface CifraDef {
@@ -166,6 +242,10 @@ export interface ContenidoSeccion {
   bloques?: BloqueLibre[];
   /** Pilares del PDI con los que se articula (id del pilar). */
   pilares?: string[];
+  /** Alineación estratégica: un aporte por pilar con sus acciones, tablas y gráficas. Si falta, vale `pilares` + `texto` (informes anteriores). */
+  alineacion?: AporteAPilar[];
+  /** Resultados y evidencias: los criterios a los que esta oficina decidió reportar (ninguno es obligatorio). */
+  criterios_reporta?: string[];
   /** Metas adicionales que escribe la unidad (las de sus indicadores no se guardan aquí). */
   metas?: Meta[];
   /** Análisis por meta de los indicadores del programa, por clave de la cifra. */

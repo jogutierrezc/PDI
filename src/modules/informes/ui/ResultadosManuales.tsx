@@ -12,7 +12,13 @@
 import { useEffect, useRef, useState } from "react";
 import { formatoCifra, numeroDe } from "../cifras-vivas";
 import {
-  COLUMNAS_EXCEL,
+  COLUMNAS_EXCEL_TODAS,
+  TIPO_ACCION,
+  TIPO_CIFRA,
+  criteriosMarcados,
+  esAccion,
+  esCifra,
+  esCompleto,
   MAS_ES_MEJOR,
   MENOS_ES_MEJOR,
   criteriosDe,
@@ -82,9 +88,11 @@ interface Props {
   puedeSugerir: boolean;
   /** Datos que Planeación pide a esta sección (0253): aparecen ya listados y no se pueden quitar. */
   requeridos?: DatoRequerido[];
+  /** Criterios cuyas cifras Planeación pide justificar (condición «justificar»): quedan marcados y bloqueados. */
+  criteriosPedidos?: string[];
 }
 
-export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [] }: Props) {
+export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [] }: Props) {
   const indicadores = normalizar(c.indicadores);
   const propios = c.criterios_propios ?? [];
   const criterios = criteriosDe(def.dims ?? [], aprobados, propios);
@@ -93,7 +101,15 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
   const visibles = indicadores.filter((i) => !(i.requerido && clavesPedidas.has(i.requerido)));
   // Indicadores de un criterio que ya no existe (archivado): se muestran aparte, sin perderlos.
   const huerfanos = visibles.filter((i) => !criterios.some((k) => k.id === i.criterio));
-  const grupos: Criterio[] = [...criterios, ...(huerfanos.length ? [{ id: "__otros", nombre: "Otros indicadores", origen: "propio" as const }] : [])];
+  // Selector: reportar a un criterio es opcional. Lo que Planeación exige y lo que ya tiene indicadores cuenta como marcado.
+  const pedidos = new Set([...criteriosPedidos, ...requeridos.map((r) => r.criterio).filter(Boolean)]);
+  const marcados = criteriosMarcados(c.criterios_reporta, visibles, [...pedidos]);
+  const cuantos = (id: string) => visibles.filter((i) => i.criterio === id).length;
+  const alternar = (id: string) => {
+    const actuales = c.criterios_reporta ?? [];
+    cambiar({ ...c, criterios_reporta: actuales.includes(id) ? actuales.filter((x) => x !== id) : [...actuales, id] });
+  };
+  const grupos: Criterio[] = [...criterios.filter((k) => marcados.has(k.id)), ...(huerfanos.length ? [{ id: "__otros", nombre: "Otros indicadores", origen: "propio" as const }] : [])];
 
   const entrada = useRef<HTMLInputElement>(null);
   const [nuevo, setNuevo] = useState("");
@@ -119,7 +135,8 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
       setAviso("Ya existe un criterio con ese nombre.");
       return;
     }
-    cambiar({ ...c, criterios_propios: [...propios, { id: `l_${idNuevo()}`, nombre }] });
+    const id = `l_${idNuevo()}`;
+    cambiar({ ...c, criterios_propios: [...propios, { id, nombre }], criterios_reporta: [...(c.criterios_reporta ?? []), id] });
     setNuevo("");
     setAviso("");
   };
@@ -138,18 +155,20 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
 
   const plantilla = async () => {
     const ejemplo: IndicadorManual[] = criterios.slice(0, 2).map((k, n) => ({ ...indicadorNuevo(k.id, k.nombre), nombre: n ? "Ejemplo: profesores con doctorado" : "Ejemplo: tasa de graduación", unidad: "%", anterior: n ? 18 : 62, actual: n ? 21 : 66, meta: n ? 25 : 70, fuente: "Oficina de la unidad" }));
+    if (criterios[0]) ejemplo.push({ ...indicadorNuevo(criterios[0].id, criterios[0].nombre, "accion"), nombre: "Ejemplo: tutorías de refuerzo", descripcion: "Acompañamiento a estudiantes de primer semestre", avance_texto: "Se abrieron 12 grupos en el primer periodo", finalizacion: "Segundo periodo de 2026", proyeccion_texto: "Ampliar a todos los programas", proyeccion_num: 20, unidad: "" });
     await descargarLibro("plantilla-resultados-por-dimension.xlsx", [
       {
         nombre: "Indicadores",
-        columnas: COLUMNAS_EXCEL.map((t, n) => ({ titulo: t, ancho: n === 1 || n === 8 ? 40 : n === 0 ? 34 : 16 })),
+        columnas: COLUMNAS_EXCEL_TODAS.map((t, n) => ({ titulo: t, ancho: n === 1 || n === 8 || n === 10 || n === 11 ? 40 : n === 0 ? 34 : 16 })),
         filas: filasParaExcel(ejemplo, criterios),
-        listas: { 0: criterios.map((k) => k.nombre.replace(/,/g, " ")), 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR] },
+        listas: { 0: criterios.map((k) => k.nombre.replace(/,/g, " ")), 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR], 9: [TIPO_CIFRA, TIPO_ACCION] },
         ayuda: [
           "Una fila por indicador. Borre las filas de ejemplo.",
           "Criterio: elija de la lista o escriba uno nuevo; si no existe se crea como criterio propio de su unidad.",
           `Qué es mejor: «${MAS_ES_MEJOR}» (matrícula, graduados) o «${MENOS_ES_MEJOR}» (deserción, tiempos).`,
           "Año anterior, Cifra actual y Meta: solo números (puede usar coma decimal). El estado no se escribe: lo calcula el informe.",
           "Unidad: déjela vacía para conteos, o escriba % o pp.",
+          `Tipo: «${TIPO_CIFRA}» (por defecto) o «${TIPO_ACCION}». Una acción solo usa Indicador (su nombre), Descripción, Qué se ha hecho, Finalización y Proyección (texto y número, con la Unidad si aplica); no lleva cifras ni meta.`,
         ].join("\n"),
       },
       { nombre: "Criterios", columnas: [{ titulo: "Criterios disponibles", ancho: 50 }], filas: criterios.map((k) => [k.nombre]) },
@@ -160,8 +179,8 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
     await descargarLibro("resultados-por-dimension.xlsx", [
       {
         nombre: "Indicadores",
-        columnas: COLUMNAS_EXCEL.map((t, n) => ({ titulo: t, ancho: n === 1 || n === 8 ? 40 : n === 0 ? 34 : 16 })),
-        filas: filasParaExcel(indicadores, [...criterios, ...(huerfanos.length ? [] : [])]),
+        columnas: COLUMNAS_EXCEL_TODAS.map((t, n) => ({ titulo: t, ancho: n === 1 || n === 8 || n === 10 || n === 11 ? 40 : n === 0 ? 34 : 16 })),
+        filas: filasParaExcel(indicadores, criterios),
       },
     ]);
   };
@@ -192,7 +211,61 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
 
   return (
     <div className="inf-rm">
+      <fieldset className="inf-res-sel" disabled={!editable}>
+        <legend className="inf-res-sel__q">¿A qué criterios reporta su oficina?</legend>
+        <p className="inf-hint">Es opcional: marque solo los que aplican. Cada criterio marcado abre su formulario de indicadores y acciones; los demás no le exigen nada.</p>
+        <div className="inf-res-sel__lista">
+          {criterios.map((k) => {
+            const pedido = pedidos.has(k.id);
+            const n = cuantos(k.id);
+            const fijo = pedido || n > 0;
+            const on = marcados.has(k.id);
+            return (
+              <label key={k.id} className={`inf-res-op${on ? " is-on" : ""}${fijo ? " is-fijo" : ""}`}>
+                <input type="checkbox" checked={on} disabled={fijo} onChange={() => alternar(k.id)} />
+                <span className="inf-res-op__txt">
+                  <b>{k.nombre}</b>
+                  <small>
+                    {pedido ? "Lo pide Planeación" : n > 0 ? `Ya tiene ${n} ${n === 1 ? "registro" : "registros"}; quítelos para dejar de reportar` : on ? "Reporta" : k.origen === "propio" ? "Criterio propio" : k.origen === "aprobado" ? "Aprobado por Planeación" : "Criterio base"}
+                  </small>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
       {editable && (
+        <div className="inf-rm__nuevo inf-res-nuevo">
+          <label className="inf-lab">
+            Un criterio propio para su informe
+            <span className="inf-row">
+              <input
+                className="inf-in"
+                value={nuevo}
+                maxLength={80}
+                placeholder="Ej.: Bienestar y permanencia estudiantil"
+                onChange={(e) => setNuevo(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && agregarCriterio()}
+              />
+              <button type="button" className="inf-btn inf-btn--sm" disabled={nuevo.trim().length < 3} onClick={agregarCriterio}>
+                Crear criterio
+              </button>
+            </span>
+          </label>
+          <small className="inf-hint">Lo usa ya en este informe. Si le sirve a otras unidades, sugiéralo a Planeación y se aprueba para el siguiente ciclo.</small>
+        </div>
+      )}
+
+      {marcados.size === 0 && requeridos.length === 0 && (
+        <div className="inf-nota inf-res-vacio" role="status">
+          <b>Aún no hay criterios marcados</b>
+          {editable
+            ? "Marque arriba los criterios a los que su oficina reporta para abrir su formulario. Si no reporta a ninguno, puede dejar esta parte vacía y seguir con los aportes."
+            : "Esta oficina no reportó a ningún criterio en esta sección."}
+        </div>
+      )}
+
+      {editable && marcados.size > 0 && (
         <div className="inf-row inf-plan__barra">
           <input ref={entrada} type="file" hidden accept=".xlsx" onChange={(e) => void leer(e.target.files?.[0])} />
           <button type="button" className="inf-btn inf-btn--sm" disabled={ocupado} onClick={() => entrada.current?.click()}>
@@ -282,6 +355,8 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
 
       {grupos.map((k) => {
         const lista = k.id === "__otros" ? huerfanos : visibles.filter((i) => i.criterio === k.id);
+        const cifras = lista.filter(esCifra);
+        const acciones = lista.filter(esAccion);
         if (!lista.length && !editable) return null;
         return (
           <section key={k.id} className="inf-dim" aria-label={k.nombre}>
@@ -301,7 +376,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
                 </button>
               )}
             </div>
-            {lista.length > 0 && (
+            {cifras.length > 0 && (
               <div className="inf-dimtab-wrap">
                 <table className="inf-dimtab inf-rm__tab">
                   <thead>
@@ -319,46 +394,35 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
                     </tr>
                   </thead>
                   <tbody>
-                    {lista.map((i) => (
+                    {cifras.map((i) => (
                       <Fila key={i.id} i={i} editable={editable} exigirFuente={exigirFuente} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+            {acciones.length > 0 && (
+              <div className="inf-res-acc" role="list" aria-label={`Acciones de ${k.nombre}`}>
+                {acciones.map((i) => (
+                  <FichaAccion key={i.id} i={i} editable={editable} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
+                ))}
+              </div>
+            )}
             {editable && k.id !== "__otros" && (
               <div className="inf-row">
                 <button type="button" className="inf-btn inf-btn--sm inf-btn--pri" onClick={() => poner([...indicadores, indicadorNuevo(k.id, k.nombre)])}>
-                  + Añadir indicador
+                  + Añadir cifra
                 </button>
-                {!lista.length && <span className="inf-hint">Aún no hay indicadores en este criterio.</span>}
+                <button type="button" className="inf-btn inf-btn--sm" onClick={() => poner([...indicadores, indicadorNuevo(k.id, k.nombre, "accion")])}>
+                  + Añadir acción
+                </button>
+                {!lista.length && <span className="inf-hint">Aún no hay nada en este criterio: añada una cifra o una acción.</span>}
               </div>
             )}
           </section>
         );
       })}
 
-      {editable && (
-        <div className="inf-rm__nuevo">
-          <label className="inf-lab">
-            Un criterio propio para su informe
-            <span className="inf-row">
-              <input
-                className="inf-in"
-                value={nuevo}
-                maxLength={80}
-                placeholder="Ej.: Bienestar y permanencia estudiantil"
-                onChange={(e) => setNuevo(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && agregarCriterio()}
-              />
-              <button type="button" className="inf-btn inf-btn--sm" disabled={nuevo.trim().length < 3} onClick={agregarCriterio}>
-                Crear criterio
-              </button>
-            </span>
-          </label>
-          <small className="inf-hint">Lo usa ya en este informe. Si le sirve a otras unidades, sugiéralo a Planeación y se aprueba para el siguiente ciclo.</small>
-        </div>
-      )}
       {aviso && (
         <p className="inf-hint" role="status">
           {aviso}
@@ -490,5 +554,61 @@ function Fila({ i, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManu
         </td>
       </tr>
     </>
+  );
+}
+
+/** Una acción: solo texto. Nombre, descripción, qué se ha hecho, cuándo termina y proyecciones en texto y número. */
+function FichaAccion({ i, editable, cambiar, quitar }: { i: IndicadorManual; editable: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
+  const falta = faltantes(i, false);
+  return (
+    <article className="inf-res-ficha" role="listitem">
+      <div className="inf-res-ficha__top">
+        <span className={`inf-pill ${esCompleto(i) ? "is-ok" : "is-mid"}`}>{esCompleto(i) ? "Completa" : "Incompleta"}</span>
+        <span className="inf-res-ficha__tipo">Acción</span>
+        {editable && (
+          <button type="button" className="inf-link" onClick={quitar} aria-label={`Quitar la acción ${i.nombre || "sin nombre"}`}>
+            Quitar
+          </button>
+        )}
+      </div>
+      <label className="inf-lab">
+        Nombre de la acción
+        <input className="inf-in" readOnly={!editable} value={i.nombre} placeholder="Ej.: Programa de tutorías de refuerzo" onChange={(e) => cambiar({ nombre: e.target.value })} />
+      </label>
+      <label className="inf-lab">
+        Descripción de la acción
+        <textarea className="inf-in" rows={2} readOnly={!editable} value={i.descripcion ?? ""} onChange={(e) => cambiar({ descripcion: e.target.value })} />
+      </label>
+      <label className="inf-lab">
+        Qué se ha hecho con la acción
+        <textarea className="inf-in" rows={2} readOnly={!editable} value={i.avance_texto ?? ""} onChange={(e) => cambiar({ avance_texto: e.target.value })} />
+      </label>
+      <div className="inf-res-ficha__fila">
+        <label className="inf-lab">
+          Cuándo se plantea su finalización
+          <input className="inf-in" readOnly={!editable} value={i.finalizacion ?? ""} placeholder="Una fecha o un periodo, ej.: junio de 2027" onChange={(e) => cambiar({ finalizacion: e.target.value })} />
+        </label>
+      </div>
+      <div className="inf-res-ficha__fila inf-res-ficha__proy">
+        <label className="inf-lab">
+          Proyecciones (texto)
+          <input className="inf-in" readOnly={!editable} value={i.proyeccion_texto ?? ""} placeholder="Qué se espera lograr" onChange={(e) => cambiar({ proyeccion_texto: e.target.value })} />
+        </label>
+        <label className="inf-lab">
+          Proyecciones (número)
+          <CeldaNumero valor={i.proyeccion_num ?? null} etiqueta="Proyecciones, número" editable={editable} onChange={(n) => cambiar({ proyeccion_num: n })} />
+        </label>
+        <label className="inf-lab">
+          Unidad
+          <select className="inf-in" disabled={!editable} value={i.unidad} onChange={(e) => cambiar({ unidad: e.target.value })}>
+            <option value="">Sin unidad</option>
+            <option value=" %">%</option>
+            <option value=" pp">pp</option>
+            <option value=" $">$</option>
+          </select>
+        </label>
+      </div>
+      {falta.length > 0 && <small className="inf-hint">Falta {falta.join(" y ")}.</small>}
+    </article>
   );
 }

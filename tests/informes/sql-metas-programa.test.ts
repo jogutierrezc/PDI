@@ -4,7 +4,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { errorOf, PEOPLE, UNITS, type Query, type TestDb } from "../db/harness";
-import { enviar, escenario, P, seccion, U } from "./fixtures";
+import { enviar, escenario, evidencia, P, seccion, U } from "./fixtures";
 
 let t: TestDb;
 let ciclo = "";
@@ -103,6 +103,7 @@ describe("0165 · metas del programa", () => {
   });
 
   it("enviado, manda la foto: ni el valor posterior ni los cambios del programa mueven el informe", async () => {
+    await evidencia(t, prog);
     await t.asUser(
       PEOPLE.director,
       async (q) => {

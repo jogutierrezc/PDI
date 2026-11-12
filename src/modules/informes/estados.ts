@@ -41,12 +41,13 @@ export function puedeEditar(estado: EstadoInstancia, rol: RolActor | null): bool
 }
 
 /** Lo que falta para enviar, en español. Vacío = se puede enviar. */
-export function motivosNoEnviar(o: { estado: EstadoInstancia; rol: RolActor | null; listas: number; total: number }): string[] {
+export function motivosNoEnviar(o: { estado: EstadoInstancia; rol: RolActor | null; listas: number; total: number; /** Evidencias y fuentes de verificación cargadas (informe_anexos). Sin ninguna no se envía. */ anexos?: number }): string[] {
   if (o.estado === "sent") return ["Ya se envió: Planeación lo revisa."];
   if (o.estado === "ok") return ["Está aprobado y congelado."];
   const m: string[] = [];
   if (!transicionPermitida(o.estado, "sent", o.rol)) m.push("Solo el Gestor de la unidad o Planeación envían el informe.");
   if (o.listas < o.total) m.push(`Se habilita cuando las ${o.total} secciones estén listas (van ${o.listas}).`);
+  if (o.anexos === 0) m.push("Faltan las evidencias y fuentes de verificación: cargue al menos un archivo o enlace. Es obligatorio en todo informe."); 
   return m;
 }
 

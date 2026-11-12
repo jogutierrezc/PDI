@@ -8,7 +8,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import type { EjemploCorpus, FilaEjemplo } from "./corpus.ts";
 import type { CifraInforme } from "./redaccion.ts";
-import type { SeccionConfig } from "./plantillas.ts";
+import type { EstructuraPropia, SeccionConfig } from "./plantillas.ts";
 
 type DB = SupabaseClient<any, any, any>;
 const PAGINA = 1000;
@@ -111,6 +111,13 @@ export async function leerInstancia(admin: DB, id: string): Promise<Instancia | 
 export async function leerConfigSecciones(admin: DB, cicloId: string): Promise<SeccionConfig[]> {
   const { data, error } = await admin.from("informe_secciones_config").select("plantilla, clave, activa, titulo, libre").eq("ciclo_id", cicloId);
   return error ? [] : ((data as SeccionConfig[] | null) ?? []);
+}
+
+/** La estructura propia (0279) de una plantilla X1…; null si la plantilla es del código, no existe o la migración falta. */
+export async function leerEstructuraPropia(admin: DB, plantilla: string): Promise<EstructuraPropia | null> {
+  if (!/^X[0-9]{1,2}$/.test(plantilla)) return null;
+  const { data, error } = await admin.from("informe_estructuras").select("plantilla, secciones").eq("plantilla", plantilla).maybeSingle();
+  return error || !data ? null : (data as EstructuraPropia);
 }
 
 export async function decisionDeSeccion(admin: DB, instanciaId: string, clave: string): Promise<string | null> {

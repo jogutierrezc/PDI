@@ -93,6 +93,28 @@ const TPL: Record<Plantilla, Omit<SeccionPlantilla, "clave">[]> = {
 
 export const esPlantilla = (p: unknown): p is Plantilla => typeof p === "string" && (PLANTILLAS as string[]).includes(p);
 
+/** A–D o una estructura propia (X1…, 0279): el patrón que acepta la base. */
+export const esPlantillaConocida = (p: unknown): p is string => typeof p === "string" && /^[A-Z][A-Z0-9]{0,2}$/.test(p);
+
+/** Una estructura propia de Planeación (informe_estructuras, 0279): sus secciones por posición (s1, s2…). */
+export interface EstructuraPropia {
+  plantilla: string;
+  secciones: { titulo: string; tipo: string }[];
+}
+
+const TIPO_CORPUS: Record<string, SeccionTipo> = { pdi: "alineacion", metas: "metas", dim: "resultados", matriz: "resultados", filas: "retos", logros: "logros" };
+const EXT_PROPIA: Record<string, Extension | null> = { narr: EXT.breve, pdi: EXT.alineacion, metas: EXT.metas, dim: EXT.resultados, matriz: EXT.resultados, filas: EXT.retos, logros: EXT.logros };
+
+/** Las secciones de una plantilla: las del código, o las de la estructura propia que se pasó. */
+function baseDe(plantilla: string, propia?: EstructuraPropia | null): Omit<SeccionPlantilla, "clave">[] {
+  if (plantilla in TPL) return TPL[plantilla as Plantilla];
+  return (propia?.secciones ?? []).map((x) => {
+    const tipo: SeccionTipo =
+      x.tipo === "narr" ? (/conclusi/i.test(x.titulo) ? "conclusiones" : /presenta|introduc/i.test(x.titulo) ? "presentacion" : "resumen") : (TIPO_CORPUS[x.tipo] ?? "otra");
+    return s(x.titulo, x.tipo, tipo, EXT_PROPIA[x.tipo] ?? null);
+  });
+}
+
 /** Una fila de informe_secciones_config (0276): lo que Planeación cambió de la plantilla en el ciclo. */
 export interface SeccionConfig {
   plantilla: string;
@@ -107,9 +129,9 @@ export interface SeccionConfig {
  * sin las desactivadas, con el título propio y sumando las libres (clave x1…, tipo «libre»,
  * texto simple: Pilo no las redacta ni aprende de ellas, solo las lee como contexto).
  */
-export function seccionesDe(plantilla: Plantilla, config: SeccionConfig[] = []): SeccionPlantilla[] {
+export function seccionesDe(plantilla: string, config: SeccionConfig[] = [], propia?: EstructuraPropia | null): SeccionPlantilla[] {
   const filas = config.filter((f) => f.plantilla === plantilla);
-  const base = TPL[plantilla].map((x, i) => {
+  const base = baseDe(plantilla, propia).map((x, i) => {
     const clave = `s${i + 1}`;
     const f = filas.find((y) => y.clave === clave);
     return f && !f.activa ? null : { ...x, clave, titulo: f?.titulo?.trim() || x.titulo };
@@ -118,8 +140,8 @@ export function seccionesDe(plantilla: Plantilla, config: SeccionConfig[] = []):
   return [...base.filter((x): x is SeccionPlantilla => x !== null), ...libres];
 }
 
-export function seccionDe(plantilla: Plantilla, clave: string, config: SeccionConfig[] = []): SeccionPlantilla | null {
-  return seccionesDe(plantilla, config).find((x) => x.clave === clave) ?? null;
+export function seccionDe(plantilla: string, clave: string, config: SeccionConfig[] = [], propia?: EstructuraPropia | null): SeccionPlantilla | null {
+  return seccionesDe(plantilla, config, propia).find((x) => x.clave === clave) ?? null;
 }
 
 /** La plantilla de un informe 2025 por el nombre del archivo o de la unidad (sin IA). */

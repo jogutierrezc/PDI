@@ -8,7 +8,7 @@ import { condicionDe, useAnexos, useCifras, useCifrasVivas, useSecciones } from 
 import { useRequeridos } from "../requeridos";
 import { estadoRequeridos, requeridosDePlantilla, requeridosDeSeccion } from "../requeridos-logica";
 import type { DatoRequerido } from "../requeridos-logica";
-import { aCifraVista, esCompleto, normalizar } from "../indicadores-manual";
+import { aCifraVista, esAccion, esCifra, esCompleto, normalizar } from "../indicadores-manual";
 import type { IndicadorManual } from "../indicadores-manual";
 import { dimDeConsulta } from "../catalogo";
 import { esMetaDelPrograma, filasMetaPrograma } from "../metas-programa";
@@ -60,7 +60,9 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   const manualesDe = (clave: string): IndicadorManual[] => normalizar(secciones.data?.find((s) => s.clave === clave)?.contenido?.indicadores);
   const manuales = plantilla.secciones
     .filter((s) => s.tipo === "dim")
-    .flatMap((s) => manualesDe(s.clave).filter(esCompleto).map((i) => ({ seccion: s.clave, ind: i, vista: aCifraVista(i, s.clave, inst.estado) })));
+    .flatMap((s) => manualesDe(s.clave).filter((i) => esCifra(i) && esCompleto(i)).map((i) => ({ seccion: s.clave, ind: i, vista: aCifraVista(i, s.clave, inst.estado) })));
+  /** Acciones (texto) de Resultados y evidencias: fuera de la aritmética; se cuentan y se imprimen aparte. */
+  const accionesManuales = plantilla.secciones.filter((s) => s.tipo === "dim").flatMap((s) => manualesDe(s.clave).filter((i) => esAccion(i) && i.nombre.trim()).map((i) => ({ seccion: s.clave, ind: i, completa: esCompleto(i) })));
   /** Las que entran al informe: se pueden citar en el texto y van a la matriz. */
   const incluidas = [...delInforme.filter((c) => c.incluida && conectada(c)), ...agregadas.filter((a) => a.vista.incluida).map((a) => a.vista), ...propias.map((p) => p.vista), ...manuales.map((x) => x.vista)];
 
@@ -84,6 +86,7 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
       ...metasAdicionales.filter((x) => x.meta.trim()).map((x) => estadoMeta(x.alcanzado, x.programado, true)),
     ],
     indicadores: entradasSintesis.map((e) => ({ criterio: e.id, criterioNombre: nombreCriterio(e.id, e.propio), vista: e.v })),
+    accionesManuales: accionesManuales.map((a) => ({ criterio: a.ind.criterio || "otros", criterioNombre: nombreCriterio(a.ind.criterio || "otros", a.ind.criterio_nombre), completa: a.completa })),
   });
   /** Todo lo que el texto puede citar con [[clave]]: las cifras incluidas y las de la síntesis. */
   const citables = [...incluidas, ...cifrasDeSintesis(sintesis)];
@@ -105,8 +108,15 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
       def.tipo === "dim"
         ? (() => {
             const pedidas = new Set(requeridosDe(def).map((r) => r.clave));
-            const t = (contenido ? normalizar(contenido.indicadores) : manualesDe(def.clave)).filter((i) => !(i.requerido && pedidas.has(i.requerido)));
+            const t = (contenido ? normalizar(contenido.indicadores) : manualesDe(def.clave)).filter((i) => esCifra(i) && !(i.requerido && pedidas.has(i.requerido)));
             return { total: t.length, completos: t.filter(esCompleto).length };
+          })()
+        : undefined,
+    acciones:
+      def.tipo === "dim"
+        ? (() => {
+            const t = (contenido ? normalizar(contenido.indicadores) : manualesDe(def.clave)).filter(esAccion);
+            return { total: t.length, completas: t.filter(esCompleto).length };
           })()
         : undefined,
     requeridos:
@@ -127,7 +137,7 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   const cargando = secciones.isPending || filas.isPending || anexos.isPending || lecturaEstructura.isPending;
   const error = [secciones.error, filas.error, anexos.error, vivas.error].find((e): e is Error => e instanceof Error) ?? null;
 
-  return { plantilla, inactivas, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, manuales, manualesDe, sintesis, citables, contenidoGuardado, contexto, avance, requeridos, requeridosDe, cargando, error };
+  return { plantilla, inactivas, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, manuales, accionesManuales, manualesDe, sintesis, citables, contenidoGuardado, contexto, avance, requeridos, requeridosDe, cargando, error };
 }
 
 export type ModeloInforme = ReturnType<typeof useModeloInforme>;

@@ -6,6 +6,7 @@
    ========================================================================== */
 
 import type { CifraVista } from "./cifras-vivas";
+import { avanceAlineacion, controlesAlineacion } from "./alineacion";
 import { driveLibre, tablasLibre, textoLibre } from "./secciones-config";
 import { palabras, validarTexto } from "./tokens";
 import type { ContenidoSeccion, Control, SeccionDef } from "./types";
@@ -26,8 +27,12 @@ export interface ContextoSeccion {
   metasPlan?: number;
   /** Indicadores de resultados por dimensión escritos a mano (total y con nombre y cifra actual). */
   manuales?: { total: number; completos: number };
+  /** Acciones (texto) de Resultados y evidencias: aparte de las cifras. Solo cuentan las de criterios marcados. */
+  acciones?: { total: number; completas: number };
   /** Datos que Planeación pide a esta plantilla (0253): cuántos se piden y cuántos «Justificar» aún faltan por llenar. */
   requeridos?: { total: number; faltan: number };
+  /** Pilares del Plan de Desarrollo (para nombrar «Pilar 2 sin aporte» en los controles). */
+  pilares?: { id: string; numeral: string }[];
 }
 
 /** Cifras que Planeación pide justificar y aún no tienen la línea. */
@@ -46,10 +51,8 @@ export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | unde
       const n = palabras(x.texto);
       return grado(n, n >= (def.minimo ?? 1));
     }
-    case "pdi": {
-      const n = x.pilares?.length ?? 0;
-      return grado(n, n >= 3);
-    }
+    case "pdi":
+      return avanceAlineacion(x);
     case "metas": {
       const m = x.metas ?? [];
       const n = m.length + (ctx.metasPrograma ?? 0) + (ctx.metasPlan ?? 0);
@@ -60,7 +63,8 @@ export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | unde
       const hechas = pedidas.length - sinJustificar(pedidas).length;
       const man = ctx.manuales ?? { total: 0, completos: 0 };
       const req = ctx.requeridos ?? { total: 0, faltan: 0 };
-      return grado(hechas + man.total + (req.total - req.faltan), hechas === pedidas.length && man.completos === man.total && req.faltan === 0);
+      const acc = ctx.acciones ?? { total: 0, completas: 0 };
+      return grado(hechas + man.total + acc.total + (req.total - req.faltan), hechas === pedidas.length && man.completos === man.total && acc.completas === acc.total && req.faltan === 0);
     }
     case "matriz": {
       const n = palabras(x.texto);
@@ -99,6 +103,11 @@ export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | u
       const falta = man.total - man.completos;
       out.push(falta ? { nivel: "warn", texto: `${falta} ${falta === 1 ? "indicador sin nombre o sin cifra actual" : "indicadores sin nombre o sin cifra actual"}` } : { nivel: "ok", texto: `${man.total} ${man.total === 1 ? "indicador escrito" : "indicadores escritos"} con su estado calculado` });
     }
+    const acc = ctx.acciones;
+    if (acc && acc.total) {
+      const falta = acc.total - acc.completas;
+      out.push(falta ? { nivel: "warn", texto: `${falta} ${falta === 1 ? "acción sin descripción o sin lo que se ha hecho" : "acciones sin descripción o sin lo que se ha hecho"}` } : { nivel: "ok", texto: `${acc.total} ${acc.total === 1 ? "acción descrita" : "acciones descritas"}` });
+    }
     const req = ctx.requeridos;
     if (req && req.total) {
       out.push(
@@ -114,8 +123,12 @@ export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | u
       out.push(sinFuente ? { nivel: "warn", texto: `${sinFuente} ${sinFuente === 1 ? "cifra con fuente propia" : "cifras con fuente propia"} sin nombre de fuente` } : { nivel: "ok", texto: "Cada cifra tiene su fuente" });
     }
   }
-  if (def.tipo === "narr" || def.tipo === "dim" || def.tipo === "matriz" || def.tipo === "pdi") {
+  if (def.tipo === "narr" || def.tipo === "dim" || def.tipo === "matriz") {
     out.push(...validarTexto(x.texto ?? "", { claves: ctx.claves, minimo: def.tipo === "narr" ? def.minimo : undefined }));
+  }
+  if (def.tipo === "pdi") {
+    out.push(...controlesAlineacion(x, ctx.pilares));
+    for (const a of x.alineacion ?? []) out.push(...validarTexto(a.aporte, { claves: ctx.claves }));
   }
   if (def.tipo === "libre") {
     out.push(...validarTexto(textoLibre(x), { claves: ctx.claves, minimo: def.minimo }));

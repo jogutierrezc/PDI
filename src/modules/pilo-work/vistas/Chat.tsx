@@ -35,6 +35,8 @@ const IDEAS_DOC = ["Resuma el documento y extraiga los compromisos", "Haga una l
 const IDEAS = ["Redacta un oficio para Talento Humano", "¿Cuántos correos llegaron hoy?", "Cuenta estudiantes por programa en mi Excel", "Escribe un script para consolidar libros de Excel"];
 /** Sin ninguna señal del servidor durante este tiempo, se avisa y se ofrece reintentar o cancelar. */
 const SILENCIO_MS = 25_000;
+/** Astra razona en silencio durante más tiempo antes de la primera señal. */
+const SILENCIO_ASTRA_MS = 180_000;
 
 const NOMBRE: Record<string, string> = {
   buscar_memoria: "Memoria · búsqueda de reglas",
@@ -243,7 +245,7 @@ export function Chat() {
     if (!isLoading) return;
     const iv = window.setInterval(() => {
       if (pendientes > 0) ultimaSenal.current = Date.now(); // esperar la aprobación de la persona no cuenta
-      else if (Date.now() - ultimaSenal.current > SILENCIO_MS) setColgado(true);
+      else if (Date.now() - ultimaSenal.current > (motorRef.current === "astra" ? SILENCIO_ASTRA_MS : SILENCIO_MS)) setColgado(true);
     }, 1000);
     return () => window.clearInterval(iv);
   }, [isLoading, pendientes]);

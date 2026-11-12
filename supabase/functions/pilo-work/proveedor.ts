@@ -292,7 +292,7 @@ interface Intento {
   ms: number;
 }
 
-async function intento(d: Destino, cuerpo: Parameters<typeof llamar>[1], signal: AbortSignal | undefined, esperaMs: number): Promise<Intento> {
+async function intento(d: Destino, cuerpo: Parameters<typeof llamar>[1], signal: AbortSignal | undefined, esperaMs: number, silencioMs = SILENCIO_MS): Promise<Intento> {
   const ctl = new AbortController();
   const alAbortar = () => ctl.abort();
   signal?.addEventListener("abort", alAbortar);
@@ -349,7 +349,7 @@ async function intento(d: Destino, cuerpo: Parameters<typeof llamar>[1], signal:
       },
       async pull(c) {
         try {
-          const r = await conTope(lector.read(), SILENCIO_MS, "El modelo dejó de responder.");
+          const r = await conTope(lector.read(), silencioMs, "El modelo dejó de responder.");
           if (r.done) {
             limpiar();
             c.close();
@@ -390,7 +390,8 @@ export async function llamar(
   for (let i = 0; i < lista.length; i++) {
     const d = lista[i];
     const espera = opciones.esperaMs ?? (nivel === "rapido" && i === 0 && lista.length > 1 ? (opciones.primerMs ?? ESPERA_PRIMER_FRAGMENTO_MS.rapidoPrimero) : ESPERA_PRIMER_FRAGMENTO_MS.otros);
-    const r = await intento(d, cuerpo, opciones.signal, espera);
+    // Con espera explícita (Astra razona en silencio), el silencio entre fragmentos usa esa misma espera.
+    const r = await intento(d, cuerpo, opciones.signal, espera, opciones.esperaMs ? Math.max(SILENCIO_MS, opciones.esperaMs) : SILENCIO_MS);
     console.log(`[pilo-work] ia ${d.provider}/${d.model} nivel=${nivel} ${r.response ? "ok" : `falla: ${r.motivo}`} ${r.ms}ms`);
     if (r.response) return { response: r.response, error: "", uso: { proveedor: d.provider, modelo: d.model, nivel, conmutado: i > 0, motivo: i > 0 ? primerMotivo : "", ms: r.ms } };
     if (!primerMotivo) primerMotivo = r.motivo;

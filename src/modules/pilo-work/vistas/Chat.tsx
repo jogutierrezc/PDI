@@ -22,12 +22,16 @@ import { limpiarRespuesta } from "../limpiar";
 import { useMs } from "../ms";
 import { movimientoReducido } from "../../rankings/movimiento";
 import { leerProbado, marcarProbado, useAstra } from "../astra";
+import { tamanoLegible } from "../archivos";
+import { ACCEPT, leerDocumento } from "../documentos-astra";
+import type { DocumentoAstra } from "../documentos-astra";
 import type { Motor, Razonamiento } from "../astra";
 import { Cara, IC, Md, useWork } from "../ui";
 import type { ModeloUsado } from "../ui";
 import { AstraAviso, AstraBienvenida, AstraOpciones, MotorSwitch } from "./Astra";
 
 const IDEAS_ASTRA = ["Calcule la permanencia por cohorte y explique el cálculo", "Revise esta consulta SQL y corrija el error", "Escriba una macro de Excel para consolidar hojas"];
+const IDEAS_DOC = ["Resuma el documento y extraiga los compromisos", "Haga una lista de riesgos y vacíos del documento", "Explique el documento en términos sencillos"];
 const IDEAS = ["Redacta un oficio para Talento Humano", "¿Cuántos correos llegaron hoy?", "Cuenta estudiantes por programa en mi Excel", "Escribe un script para consolidar libros de Excel"];
 /** Sin ninguna señal del servidor durante este tiempo, se avisa y se ofrece reintentar o cancelar. */
 const SILENCIO_MS = 25_000;
@@ -122,6 +126,26 @@ export function Chat() {
   const razonRef = useRef<Razonamiento>("auto");
   razonRef.current = razon;
   const disparador = useRef<HTMLButtonElement>(null);
+  /* El documento que Astra lee: el navegador saca el texto y viaja con cada mensaje; el servidor no lo guarda. */
+  const [doc, setDoc] = useState<DocumentoAstra | null>(null);
+  const [leyendo, setLeyendo] = useState(false);
+  const [errDoc, setErrDoc] = useState("");
+  const docRef = useRef<DocumentoAstra | null>(null);
+  docRef.current = doc;
+  const entrada = useRef<HTMLInputElement>(null);
+  const adjuntar = async (archivo: File | undefined) => {
+    if (!archivo || leyendo) return;
+    setErrDoc("");
+    setLeyendo(true);
+    try {
+      setDoc(await leerDocumento(archivo, astra.publica?.subidaMaxMb ?? 25));
+    } catch (e) {
+      setErrDoc(e instanceof Error ? e.message : "No pude leer ese archivo.");
+    } finally {
+      setLeyendo(false);
+      if (entrada.current) entrada.current.value = "";
+    }
+  };
   const motorDe = useRef(new Map<string, Motor>());
   const elegirMotor = (m: Motor) => {
     if (m === "astra" && !astra.disponible) return;
@@ -187,7 +211,7 @@ export function Chat() {
     () =>
       fetchServerSentEvents(functionUrl("pilo-work"), async () => ({
         headers: await authHeaders(),
-        body: { esquema: esquemaPermitido(), motor: motorRef.current, razonamiento: razonRef.current },
+        body: { esquema: esquemaPermitido(), motor: motorRef.current, razonamiento: razonRef.current, documento: motorRef.current === "astra" && docRef.current ? { nombre: docRef.current.nombre, texto: docRef.current.texto } : undefined },
       })),
     [],
   );
@@ -205,7 +229,7 @@ export function Chat() {
     if (!t || isLoading) return;
     setTexto("");
     setColgado(false);
-    await sendMessage(t);
+    await sendMessage(doc && motor === "astra" ? `${t}\n\nAdjunto: ${doc.nombre}` : t);
   };
 
   /* Vigilante: cada señal del servidor (texto, herramienta, estado) reinicia el reloj. */
@@ -418,14 +442,50 @@ export function Chat() {
       <div className="composer">
         {!messages.length && (
           <div className="sugs">
-            {(motor === "astra" ? IDEAS_ASTRA : IDEAS).map((s) => (
+            {(motor === "astra" ? (doc ? IDEAS_DOC : IDEAS_ASTRA) : IDEAS).map((s) => (
               <button key={s} type="button" className="sug" onClick={() => void enviar(s)}>
                 {s}
               </button>
             ))}
           </div>
         )}
-        <div className="cbox" data-motor={motor}>
+        <div
+          className="cbox"
+          data-motor={motor}
+          onDragOver={(e) => {
+            if (motor === "astra") e.preventDefault();
+          }}
+          onDrop={(e) => {
+            if (motor !== "astra") return;
+            e.preventDefault();
+            void adjuntar(e.dataTransfer.files[0]);
+          }}
+        >
+          {motor === "astra" && (doc || leyendo || errDoc) && (
+            <div className="astra-docs">
+              {leyendo && <span className="astra-doc astra-doc--leyendo">Leyendo el documento…</span>}
+              {doc && !leyendo && (
+                <span className="astra-doc">
+                  {IC.doc}
+                  <span className="astra-doc__t">
+                    <b>{doc.nombre}</b>
+                    <small>
+                      {tamanoLegible(doc.tamano)}
+                      {doc.paginas ? ` · ${doc.paginas} páginas` : ""} · {doc.caracteres.toLocaleString("es-CO")} caracteres leídos{doc.truncado ? " (solo el comienzo)" : ""}
+                    </small>
+                  </span>
+                  <button type="button" className="astra-doc__x" aria-label={`Quitar ${doc.nombre}`} onClick={() => setDoc(null)}>
+                    {IC.close}
+                  </button>
+                </span>
+              )}
+              {errDoc && (
+                <p className="small err" role="alert">
+                  {errDoc}
+                </p>
+              )}
+            </div>
+          )}
           <textarea
             rows={1}
             value={texto}
@@ -449,6 +509,15 @@ export function Chat() {
                     {IC.up}
                   </button>
                 )}
+              </>
+            )}
+            {astra.disponible && motor === "astra" && (
+              <>
+                <input ref={entrada} type="file" accept={ACCEPT} hidden onChange={(e) => void adjuntar(e.target.files?.[0])} />
+                <button type="button" className="tag astra-attach" disabled={leyendo} onClick={() => entrada.current?.click()} title="PDF, Word, Excel, CSV o texto. Se lee en el servidor de la universidad y no se guarda.">
+                  {IC.up}
+                  {doc ? "Cambiar documento" : "Adjuntar documento"}
+                </button>
               </>
             )}
             <span className="tag" aria-label="Memoria">

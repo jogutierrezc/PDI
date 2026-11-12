@@ -958,3 +958,16 @@
 .pwk .astra-aviso__acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .pwk .astra-aviso__once{margin-left:auto}
 @media (prefers-reduced-motion:reduce){.pwk .astra-pop,.pwk .astra-eng__ind,.pwk .astra-eng button,.pwk .astra-seg button,.pwk .astra-more{transition-duration:.01ms}}
+.pwk .astra-docs{display:grid;gap:6px;padding:2px 2px 0}
+.pwk .astra-doc{display:flex;align-items:center;gap:10px;width:fit-content;max-width:100%;padding:6px 8px 6px 10px;border:1px solid var(--astra-line);border-radius:10px;background:var(--astra-soft);font-size:12.5px}
+.pwk .astra-doc > svg{width:16px;height:16px;flex:none;color:var(--astra)}
+.pwk .astra-doc__t{display:grid;min-width:0}
+.pwk .astra-doc__t b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwk .astra-doc__t small{color:var(--ink-3);font-size:11.5px}
+.pwk .astra-doc--leyendo{color:var(--astra);font-weight:600}
+.pwk .astra-doc__x{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:6px;background:none;color:var(--ink-3)}
+.pwk .astra-doc__x svg{width:12px;height:12px}
+@media (hover:hover) and (pointer:fine){.pwk .astra-doc__x:hover{background:var(--surface-3);color:var(--ink)}}
+.pwk .astra-attach{cursor:pointer}
+.pwk .astra-attach svg{width:13px;height:13px}
+.pwk .astra-attach:disabled{opacity:.6;cursor:default}

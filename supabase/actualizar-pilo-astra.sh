@@ -43,6 +43,8 @@ done
 WEB_ARCHIVOS=(
   "src/modules/pilo-work/astra.ts"
   "src/modules/pilo-work/astra.test.ts"
+  "src/modules/pilo-work/documentos-astra.ts"
+  "src/modules/pilo-work/documentos-astra.test.ts"
   "src/modules/pilo-work/vistas/Astra.tsx"
   "src/modules/pilo-work/vistas/Chat.tsx"
   "src/modules/pilo-work/ui.tsx"

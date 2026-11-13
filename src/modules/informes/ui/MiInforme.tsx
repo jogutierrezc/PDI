@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { nombreRol } from "../../rankings/reporte/envio";
-import { useEntrada } from "../../rankings/movimiento";
+import { movimientoReducido, useEntrada } from "../../rankings/movimiento";
 import { esViva } from "../cifras-vivas";
 import {
   piloRedactar,
@@ -24,6 +24,7 @@ import {
   useGuardarCifra,
   useGuardarSeccion,
   usePilares,
+  useEditarAnexo,
   useQuitarAnexo,
   useQuitarCifra,
   useSecciones,
@@ -31,13 +32,13 @@ import {
   useSincronizarMetas,
   useSubirAnexo,
 } from "../datos";
-import type { DatosCifra } from "../datos";
+import type { CambiosAnexo, DatosCifra } from "../datos";
 import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
 import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
 import { ImportarFilas } from "./ImportarFilas";
-import { AYUDA_LOGROS, AYUDA_METAS, COLUMNAS_LOGROS, COLUMNAS_METAS, EJEMPLO_LOGROS, EJEMPLO_METAS, MAX_LOGROS, filasALogros, filasAMetas, logrosAFilas, metasAFilas } from "../excel-secciones";
-import { CRITERIOS_BASE } from "../indicadores-manual";
+import { AYUDA_LOGROS, AYUDA_METAS, COLUMNAS_LOGROS, COLUMNAS_METAS, EJEMPLO_LOGROS, EJEMPLO_METAS, filasALogros, filasAMetas, logrosAFilas, metasAFilas } from "../excel-secciones";
+import { CRITERIOS_BASE, opcionesPilar } from "../indicadores-manual";
 import { Alineacion } from "./Alineacion";
 import { BloquesLibres } from "./BloquesLibres";
 import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, plantillaSugerida } from "../plantillas";
@@ -162,6 +163,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
   const subir = useSubirAnexo();
   const enlazar = useAgregarEnlace();
   const quitarAnexo = useQuitarAnexo();
+  const editarAnexo = useEditarAnexo();
 
   const [params, setParams] = useSearchParams();
   const secciones = m.plantilla.secciones;
@@ -178,6 +180,15 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
   const asegurando = useRef(false);
   const animar = useRef(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  // En pantalla angosta las secciones son una tira que se desliza: la sección abierta queda a la vista.
+  const tiraRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const tira = tiraRef.current;
+    const activa = tira?.querySelector<HTMLElement>('button[aria-current="true"]');
+    if (!tira || !activa || tira.scrollWidth <= tira.clientWidth) return;
+    const destino = activa.offsetLeft - (tira.clientWidth - activa.offsetWidth) / 2;
+    tira.scrollTo({ left: destino, behavior: movimientoReducido() ? "auto" : "smooth" });
+  }, [idx]);
   useEntrada(editorRef, ":scope > .inf-ehd, :scope > .inf-lead, :scope > .inf-blk", idx, animar.current);
 
   const contenido = (clave: string): ContenidoSeccion => borradores[clave] ?? m.contenidoGuardado(clave);
@@ -339,7 +350,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
             {nota.general || "Ejemplo: falta justificar la deserción y completar los puntos críticos."}
           </div>
         )}
-        <nav className="inf-secs" aria-label="Secciones del informe" data-guia="secs">
+        <nav className="inf-secs" ref={tiraRef} aria-label="Secciones del informe" data-guia="secs">
           <AyudaPilo zona="secs" borde />
           {secciones.map((d, i) => (
             <button key={d.clave} type="button" aria-current={i === idx} onClick={(e) => irA(i, e.detail > 0)}>
@@ -435,6 +446,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
           }}
           enlazar={(url, nombre) => enlazar.mutateAsync({ instancia: inst.id, url, nombre, anexos: m.anexos.data ?? [] })}
           quitarAnexo={(a) => quitarAnexo.mutate(a)}
+          editarAnexo={(a, cambios) => editarAnexo.mutateAsync({ instancia: inst, anexo: a, cambios })}
           ocupado={subir.isPending || enlazar.isPending}
         />
         {def.tipo !== "anexos" && def.tipo !== "evid" && def.tipo !== "libre" && (
@@ -573,6 +585,7 @@ function CuerpoSeccion({
   subir,
   enlazar,
   quitarAnexo,
+  editarAnexo,
   ocupado,
 }: {
   def: SeccionDef;
@@ -597,6 +610,7 @@ function CuerpoSeccion({
   subir: (f: File[]) => Promise<void>;
   enlazar: (url: string, nombre: string) => Promise<void>;
   quitarAnexo: (a: AnexoRow) => void;
+  editarAnexo: (a: AnexoRow, cambios: CambiosAnexo) => Promise<void>;
   ocupado: boolean;
 }) {
   const criteriosBase = useCriterios();
@@ -638,7 +652,16 @@ function CuerpoSeccion({
             <Tag />
             <span className="inf-src">Plan de Desarrollo · elija un pilar y redacte el aporte de su unidad, con sus acciones, tablas y gráficas</span>
           </div>
-          <Alineacion pilares={pilares} c={c} cambiar={cambiar} editable={editable} cifras={m.citables} resolver={resolver} />
+          <Alineacion
+            pilares={pilares}
+            c={c}
+            cambiar={cambiar}
+            editable={editable}
+            cifras={m.citables}
+            resolver={resolver}
+            insumos={{ cifras: m.manuales.map((x) => ({ ind: x.ind, vista: x.vista })), acciones: m.accionesManuales.map((x) => x.ind) }}
+            redactar={editable ? async (pedido, actual) => (await piloAnalizar(inst.id, def.clave, { ...pedido, actual })).texto : undefined}
+          />
         </div>
       );
     case "metas": {
@@ -713,6 +736,7 @@ function CuerpoSeccion({
               <span className="inf-src">Indicadores que escribe la unidad: cifra actual, anterior y meta. El estado se calcula solo.</span>
             </div>
             <ResultadosManuales
+              pilares={opcionesPilar(pilares)}
               def={def}
               c={c}
               editable={editable}
@@ -833,7 +857,7 @@ function CuerpoSeccion({
         <div className="inf-blk">
           <div className="inf-blk__lab">
             <Tag />
-            <span className="inf-src">{(c.logros ?? []).length} de 3 logros</span>
+            <span className="inf-src">{(c.logros ?? []).length} {(c.logros ?? []).length === 1 ? "logro" : "logros"} · todos los que haya, cada uno con su evidencia y, si quiere, tablas de UDrive</span>
           </div>
           <ImportarFilas
             columnas={[...COLUMNAS_LOGROS]}
@@ -842,8 +866,7 @@ function CuerpoSeccion({
             archivo="logros-innovadores-o-excepcionales"
             ejemplo={EJEMPLO_LOGROS}
             ayuda={AYUDA_LOGROS}
-            tope={MAX_LOGROS}
-            cambiar={(filas) => cambiar({ ...c, logros: filasALogros(filas) })}
+            cambiar={(filas) => cambiar({ ...c, logros: filasALogros(filas, c.logros ?? []) })}
           />
           <Logros logros={c.logros ?? []} anexos={anexos} editable={editable} cambiar={(logros) => cambiar({ ...c, logros })} />
         </div>
@@ -856,7 +879,7 @@ function CuerpoSeccion({
             <span className="inf-src">Cargue aquí cada archivo una sola vez; se numeran como anexos</span>
           </div>
           {editable && <CargaEvidencias subir={subir} enlazar={enlazar} ocupado={ocupado} />}
-          <TablaAnexos anexos={anexos} quitar={editable ? quitarAnexo : undefined} />
+          <TablaAnexos anexos={anexos} quitar={editable ? quitarAnexo : undefined} editar={editable ? editarAnexo : undefined} />
         </div>
       );
     case "anexos":

@@ -1,13 +1,16 @@
 /* Los bloques del editor que no son texto ni cifras: pilares del PDI, metas,
    filas, logros, evidencias y anexos, y la matriz de indicadores. */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { formatoCifra, numeroDe, resultadoMeta, semaforo } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
 import { MAX_ANEXO, urlAnexo } from "../datos";
+import type { CambiosAnexo } from "../datos";
 import type { AnexoRow, Logro, Meta, PilarRef } from "../types";
+import { entradaUnica } from "../../rankings/movimiento";
 import { SemaforoPill, fmtFecha, mensajeDe } from "./comunes";
+import { ElementosDrive } from "./ElementosDrive";
 
 export const TONO_RESULTADO = { Superada: "is-ok", Cumplida: "is-teal", Parcial: "is-mid" } as const;
 
@@ -57,7 +60,7 @@ export function TablaMetas({ metas, editable, cambiar }: { metas: Meta[]; editab
   return (
     <>
       <div className="inf-tw">
-        <table className="inf-tbl">
+        <table className="inf-tbl inf-tbl--apilable">
           <thead>
             <tr>
               <th>Meta</th>
@@ -76,10 +79,10 @@ export function TablaMetas({ metas, editable, cambiar }: { metas: Meta[]; editab
               const r = resultadoMeta(m.programado, m.alcanzado);
               return (
                 <tr key={`${i}/${metas.length}`}>
-                  <td>
+                  <td data-lab="Meta">
                     <input value={m.meta} readOnly={!editable} onChange={(e) => fijar(i, { meta: e.target.value })} placeholder="Describa la meta" aria-label="Meta" />
                   </td>
-                  <td>
+                  <td data-lab="Programado">
                     <input
                       className="r inf-num"
                       inputMode="decimal"
@@ -89,7 +92,7 @@ export function TablaMetas({ metas, editable, cambiar }: { metas: Meta[]; editab
                       aria-label="Programado"
                     />
                   </td>
-                  <td>
+                  <td data-lab="Alcanzado">
                     <input
                       className="r inf-num"
                       inputMode="decimal"
@@ -99,7 +102,7 @@ export function TablaMetas({ metas, editable, cambiar }: { metas: Meta[]; editab
                       aria-label="Alcanzado"
                     />
                   </td>
-                  <td>{r ? <span className={`inf-pill ${TONO_RESULTADO[r]}`}>{r}</span> : <span className="inf-muted">—</span>}</td>
+                  <td data-lab="Resultado">{r ? <span className={`inf-pill ${TONO_RESULTADO[r]}`}>{r}</span> : <span className="inf-muted">—</span>}</td>
                   {editable && (
                     <td>
                       <button type="button" className="inf-btn inf-btn--ghost inf-btn--sm" onClick={() => cambiar(metas.filter((_, j) => j !== i))} aria-label="Quitar meta">
@@ -171,30 +174,68 @@ export function TablaFilas({ columnas, filas, editable, cambiar }: { columnas: s
 
 export function Logros({ logros, anexos, editable, cambiar }: { logros: Logro[]; anexos: AnexoRow[]; editable: boolean; cambiar: (l: Logro[]) => void }) {
   const fijar = (i: number, l: Partial<Logro>) => cambiar(logros.map((x, j) => (j === i ? { ...x, ...l } : x)));
+  // Un logro recién añadido entra con un respiro (GSAP, como las demás entradas del módulo) y deja el cursor en su título.
+  const lista = useRef<HTMLOListElement>(null);
+  const antes = useRef(logros.length);
+  useEffect(() => {
+    if (logros.length > antes.current) {
+      const nuevo = lista.current?.lastElementChild ?? null;
+      entradaUnica(nuevo);
+      nuevo?.querySelector<HTMLInputElement>("input")?.focus();
+    }
+    antes.current = logros.length;
+  }, [logros.length]);
+  const mover = (i: number, j: number) => {
+    if (j < 0 || j >= logros.length) return;
+    const n = [...logros];
+    [n[i], n[j]] = [n[j], n[i]];
+    cambiar(n);
+  };
   return (
     <>
-      <div className="inf-logros">
+      <ol className="inf-logros" ref={lista}>
         {logros.map((l, i) => (
-          <div key={i} className="inf-logro">
-            <input className="inf-in" value={l.titulo} readOnly={!editable} onChange={(e) => fijar(i, { titulo: e.target.value })} placeholder="Logro" aria-label="Logro" />
-            <textarea className="inf-in" value={l.resultado} readOnly={!editable} onChange={(e) => fijar(i, { resultado: e.target.value })} placeholder="Contexto y resultado" aria-label="Contexto y resultado" />
-            <select className="inf-in" value={l.anexo ?? ""} disabled={!editable} onChange={(e) => fijar(i, { anexo: e.target.value ? Number(e.target.value) : null })} aria-label="Evidencia">
-              <option value="">Evidencia…</option>
-              {anexos.map((a) => (
-                <option key={a.id} value={a.n}>
-                  Anexo {a.n} · {a.nombre}
-                </option>
-              ))}
-            </select>
-            {editable && (
-              <button type="button" className="inf-link" style={{ justifySelf: "start" }} onClick={() => cambiar(logros.filter((_, j) => j !== i))}>
-                Quitar
-              </button>
-            )}
-          </div>
+          <li key={i} className="inf-logro">
+            <span className="inf-logro__n" aria-hidden="true">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <div className="inf-logro__cuerpo">
+              <input className="inf-in" value={l.titulo} readOnly={!editable} onChange={(e) => fijar(i, { titulo: e.target.value })} placeholder="Logro" aria-label={`Logro ${i + 1}`} />
+              <textarea className="inf-in" rows={3} value={l.resultado} readOnly={!editable} onChange={(e) => fijar(i, { resultado: e.target.value })} placeholder="Contexto y resultado" aria-label={`Contexto y resultado del logro ${i + 1}`} />
+              <select className="inf-in" value={l.anexo ?? ""} disabled={!editable} onChange={(e) => fijar(i, { anexo: e.target.value ? Number(e.target.value) : null })} aria-label={`Evidencia del logro ${i + 1}`}>
+                <option value="">Evidencia…</option>
+                {anexos.map((a) => (
+                  <option key={a.id} value={a.n}>
+                    Anexo {a.n} · {a.nombre}
+                  </option>
+                ))}
+              </select>
+              {(editable || (l.drive?.length ?? 0) > 0) && (
+                <details className="inf-logro__drive" open={(l.drive?.length ?? 0) > 0}>
+                  <summary>
+                    Tablas y gráficas de UDrive de este logro{l.drive?.length ? ` (${l.drive.length})` : " (opcional)"}
+                  </summary>
+                  <ElementosDrive elementos={l.drive ?? []} editable={editable} onChange={(drive) => fijar(i, { drive })} />
+                </details>
+              )}
+              {editable && (
+                <div className="inf-row">
+                  <button type="button" className="inf-link" onClick={() => mover(i, i - 1)} disabled={i === 0}>
+                    Subir
+                  </button>
+                  <button type="button" className="inf-link" onClick={() => mover(i, i + 1)} disabled={i === logros.length - 1}>
+                    Bajar
+                  </button>
+                  <button type="button" className="inf-link" onClick={() => cambiar(logros.filter((_, j) => j !== i))}>
+                    Quitar logro
+                  </button>
+                </div>
+              )}
+            </div>
+          </li>
         ))}
-      </div>
-      {editable && logros.length < 3 && (
+      </ol>
+      {editable && (
         <button type="button" className="inf-btn inf-btn--sm" style={{ justifySelf: "start" }} onClick={() => cambiar([...logros, { titulo: "", resultado: "", anexo: null }])}>
           Añadir logro
         </button>
@@ -269,8 +310,73 @@ export function CargaEvidencias({ subir, enlazar, ocupado }: { subir: (f: File[]
   );
 }
 
-export function TablaAnexos({ anexos, quitar }: { anexos: AnexoRow[]; quitar?: (a: AnexoRow) => void }) {
+/** Corrección de un anexo ya cargado: nombre, descripción, y el enlace (si es enlace) o el archivo (si es archivo). */
+function EditarAnexo({ a, guardar, cerrar }: { a: AnexoRow; guardar: (c: CambiosAnexo) => Promise<void>; cerrar: () => void }) {
+  const [nombre, setNombre] = useState(a.nombre);
+  const [descripcion, setDescripcion] = useState(a.descripcion ?? "");
+  const [url, setUrl] = useState(a.tipo === "url" ? a.ruta : "");
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
+  const enviar = async () => {
+    setOcupado(true);
+    setError("");
+    try {
+      await guardar({ nombre, descripcion, ...(a.tipo === "url" ? { url } : {}), ...(archivo ? { archivo } : {}) });
+      cerrar();
+    } catch (e) {
+      setError(mensajeDe(e));
+      setOcupado(false);
+    }
+  };
+  return (
+    <form
+      className="inf-anx-edit"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void enviar();
+      }}
+    >
+      <label className="inf-lab">
+        Nombre en el informe
+        <input className="inf-in" value={nombre} maxLength={200} onChange={(e) => setNombre(e.target.value)} />
+      </label>
+      {a.tipo === "url" ? (
+        <label className="inf-lab">
+          Dirección del enlace
+          <input className="inf-in" type="url" inputMode="url" value={url} placeholder="https://…" onChange={(e) => setUrl(e.target.value)} />
+        </label>
+      ) : (
+        <label className="inf-lab">
+          Cambiar el archivo (opcional, máx. 15 MB)
+          <input className="inf-in" type="file" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
+          <small className="inf-hint">{archivo ? `Reemplaza a «${a.nombre}» por «${archivo.name}».` : "Si no elige otro, se queda el archivo actual."}</small>
+        </label>
+      )}
+      <label className="inf-lab">
+        Descripción (opcional)
+        <input className="inf-in" value={descripcion} maxLength={300} onChange={(e) => setDescripcion(e.target.value)} placeholder="Qué demuestra este anexo" />
+      </label>
+      {error && (
+        <p className="inf-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="inf-row">
+        <button type="submit" className="inf-btn inf-btn--sm inf-btn--pri" disabled={ocupado}>
+          {ocupado ? "Guardando…" : "Guardar cambios"}
+        </button>
+        <button type="button" className="inf-btn inf-btn--sm inf-btn--ghost" disabled={ocupado} onClick={cerrar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function TablaAnexos({ anexos, quitar, editar }: { anexos: AnexoRow[]; quitar?: (a: AnexoRow) => void; editar?: (a: AnexoRow, c: CambiosAnexo) => Promise<void> }) {
+  const [error, setError] = useState("");
+  const [editando, setEditando] = useState<string | null>(null);
   if (!anexos.length) return <p className="inf-muted">Aún no hay archivos ni enlaces.</p>;
   const abrir = async (a: AnexoRow) => {
     try {
@@ -282,35 +388,54 @@ export function TablaAnexos({ anexos, quitar }: { anexos: AnexoRow[]; quitar?: (
   return (
     <>
       <div className="inf-tw">
-        <table className="inf-tbl">
+        <table className="inf-tbl inf-tbl--anx">
           <thead>
             <tr>
               <th style={{ width: 56 }}>N.º</th>
               <th>Archivo o enlace</th>
               <th style={{ width: 130 }}>Fecha</th>
-              <th style={{ width: quitar ? 150 : 90 }} aria-label="Acciones" />
+              <th style={{ width: quitar || editar ? 210 : 90 }} aria-label="Acciones" />
             </tr>
           </thead>
           <tbody>
-            {anexos.map((a) => (
-              <tr key={a.id}>
-                <td className="inf-num">{a.n}</td>
-                <td>{a.nombre}</td>
-                <td className="inf-num">{fmtFecha(a.created_at)}</td>
-                <td>
-                  <div className="inf-row">
-                    <button type="button" className="inf-link" onClick={() => void abrir(a)}>
-                      Abrir
-                    </button>
-                    {quitar && (
-                      <button type="button" className="inf-link" onClick={() => quitar(a)}>
-                        Quitar
+            {anexos.map((a) =>
+              editando === a.id && editar ? (
+                <tr key={a.id} className="inf-anx-fila is-editando">
+                  <td className="inf-num" data-lab="N.º">
+                    {a.n}
+                  </td>
+                  <td colSpan={3}>
+                    <EditarAnexo a={a} guardar={(c) => editar(a, c)} cerrar={() => setEditando(null)} />
+                  </td>
+                </tr>
+              ) : (
+                <tr key={a.id}>
+                  <td className="inf-num" data-lab="N.º">{a.n}</td>
+                  <td data-lab="Archivo o enlace">
+                    {a.nombre}
+                    {a.descripcion ? <small className="inf-anx-desc">{a.descripcion}</small> : null}
+                  </td>
+                  <td className="inf-num" data-lab="Fecha">{fmtFecha(a.created_at)}</td>
+                  <td>
+                    <div className="inf-row">
+                      <button type="button" className="inf-link" onClick={() => void abrir(a)}>
+                        Abrir
                       </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {editar && (
+                        <button type="button" className="inf-link" onClick={() => setEditando(a.id)}>
+                          Editar
+                        </button>
+                      )}
+                      {quitar && (
+                        <button type="button" className="inf-link" onClick={() => quitar(a)}>
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ),
+            )}
           </tbody>
         </table>
       </div>

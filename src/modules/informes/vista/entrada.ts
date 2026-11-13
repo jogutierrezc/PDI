@@ -103,6 +103,8 @@ export interface SeccionLibro {
   matriz: FilaIndicador[];
   /** Todos los elementos de UDrive de la sección (en las libres, los de sus bloques). */
   drive: ElementoDrive[];
+  /** Las tablas y gráficas de UDrive de cada logro: se leen con las demás, pero se dibujan bajo su logro. */
+  driveLogros: ElementoDrive[];
   /** Solo en la alineación estratégica (pdi) con aportes por pilar. */
   alineacion?: AporteEntrada[];
   /** Solo en las secciones libres: sus bloques en orden. */
@@ -275,6 +277,7 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
               return man ? filaManual(x, man.ind) : filaIndicador(x);
             })
           : [],
+      driveLogros: def.tipo === "logros" ? (c.logros ?? []).flatMap((l) => l.drive ?? []) : [],
       drive: def.tipo === "libre" ? driveLibre(c) : def.tipo === "pdi" ? [...(c.drive ?? []), ...driveDeAlineacion(c)] : (c.drive ?? []),
       alineacion: def.tipo === "pdi" && tieneAlineacion(c) ? alineacionEntrada(c, resolver, pilares) : undefined,
       bloques: def.tipo === "libre" ? (c.bloques ?? []).map((b): BloqueEntrada => (b.tipo === "texto" ? { tipo: "texto", texto: resolverTexto(b.texto, resolver).trim() } : b.tipo === "drive" ? { tipo: "drive", drive: b.drive } : { tipo: "tabla", titulo: b.titulo, nota: b.nota, encabezados: b.encabezados, filas: b.filas })).filter((b) => b.tipo !== "tabla" || b.filas.some((f) => f.some((x) => x.trim()))) : [],

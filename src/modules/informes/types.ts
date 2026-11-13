@@ -200,6 +200,8 @@ export interface Logro {
   resultado: string;
   /** Número del anexo que lo respalda. */
   anexo: number | null;
+  /** Tablas y gráficas de UDrive que respaldan este logro (opcional). */
+  drive?: ElementoDrive[];
 }
 
 /** Lo que guarda `informe_secciones.contenido` según el tipo de la sección. */

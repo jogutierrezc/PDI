@@ -474,37 +474,44 @@
 }
 
 /* Logros */
-.vi-logros {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6mm 8mm;
-}
-.vi-logros > div {
+/* Logros: cada uno con su título, su texto, su evidencia y, si la hay, sus tablas de UDrive. */
+.vi-logro {
+  display: flex;
+  align-items: baseline;
+  gap: 3.2mm;
   border-top: 0.3mm solid var(--vi-rule, #d6dee8);
   padding-top: 3mm;
-  display: grid;
-  gap: 1.6mm;
-  align-content: start;
 }
-.vi-logros b.big {
-  font-size: 11mm;
+.vi-logro__n {
+  flex: none;
+  font-size: 9mm;
   font-weight: 800;
   color: var(--vi-navy, #072b58);
   line-height: 1;
   letter-spacing: -0.03em;
 }
-.vi-logros h3 {
-  font-size: 3.6mm;
+.vi-logro h3 {
+  font-size: 3.8mm;
   font-weight: 800;
   line-height: 1.25;
+  text-wrap: balance;
 }
-.vi-logros p {
-  font-size: 3.1mm;
-  line-height: 1.45;
-}
-.vi-logros small {
-  font-size: 2.5mm;
+.vi-logro__ev {
+  font-size: 2.6mm;
+  font-weight: 600;
   color: var(--vi-ink-3, #5d6c80);
+}
+
+/* Todo texto corrido va justificado: párrafos, notas, fuentes, pies y las celdas de texto de las tablas. */
+.vi-p,
+.vi-nota,
+.vi-src,
+.vi-vacio,
+.vi-u li,
+.vi-t td:not([data-num]),
+.vi-t td small {
+  text-align: justify;
+  text-justify: inter-word;
 }
 
 /* Contenido */

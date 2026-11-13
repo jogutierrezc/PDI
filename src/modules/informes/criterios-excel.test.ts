@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { insumosDelPilar, pedidoDeAporte } from "./analisis-pilo";
 import { AYUDA_LOGROS, COLUMNAS_LOGROS, filasALogros, filasAMetas, logrosAFilas, metasAFilas } from "./excel-secciones";
 import {
   CRITERIOS_BASE,
+  aCifraVista,
+  opcionesPilar,
+  pilarDeTexto,
   criteriosDe,
   filasAcciones,
   filasCifras,
@@ -68,8 +72,9 @@ describe("Excel de resultados: hojas Cifras y Acciones", () => {
 
 describe("Excel de logros y de metas anuales", () => {
   it("logros: ida y vuelta, el anexo inválido queda vacío", () => {
-    const filas = [["Logro A", "Resultado A", "2"], ["Logro B", "Resultado B", "x"]];
-    expect(filasALogros(filas)).toEqual([{ titulo: "Logro A", resultado: "Resultado A", anexo: 2 }, { titulo: "Logro B", resultado: "Resultado B", anexo: null }]);
+    const filas = [["Logro A", "Resultado A", "2"], ["Logro B", "Resultado B", "x"], ["C", "", ""], ["D", "", ""]];
+    expect(filasALogros(filas).length).toBe(4);
+    expect(filasALogros(filas.slice(0, 2))).toEqual([{ titulo: "Logro A", resultado: "Resultado A", anexo: 2 }, { titulo: "Logro B", resultado: "Resultado B", anexo: null }]);
     expect(logrosAFilas(filasALogros(filas))[0]).toEqual(filas[0]);
     expect(COLUMNAS_LOGROS).toHaveLength(3);
     expect(AYUDA_LOGROS.length).toBeGreaterThan(1);
@@ -92,5 +97,43 @@ describe("un informe por unidad (multicampus)", () => {
   });
   it("buscarInstancia ya no mira la sede", () => {
     expect(buscarInstancia([inst("1", "fac", "draft", null)], "fac")?.id).toBe("1");
+  });
+});
+
+describe("pilares del PDI en cifras y acciones", () => {
+  const pilares = opcionesPilar([
+    { id: "p1", numeral: "1", name: "Formación integral" },
+    { id: "p2", numeral: "2", name: "Investigación e innovación" },
+  ]);
+  it("el Excel reconoce el pilar por «1. Nombre», por nombre o por número, y avisa del que no existe", () => {
+    expect(pilarDeTexto("1. Formación integral", pilares)).toBe("p1");
+    expect(pilarDeTexto("investigacion e innovacion", pilares)).toBe("p2");
+    expect(pilarDeTexto("2", pilares)).toBe("p2");
+    expect(pilarDeTexto("9", pilares)).toBeNull();
+    const k = criteriosDe([], [], []);
+    const r = leerLibroIndicadores({ cifras: [["h"], ["Extensión", "Cifra", "", "", "", "4", "5", "", "", "2. Investigación e innovación"]], acciones: [["h"], ["Extensión", "Acción", "", "d", "h", "", "", "", "", "", "Pilar inexistente"]] }, k, pilares);
+    expect(r.indicadores[0].pilar).toBe("p2");
+    expect(r.indicadores[1].pilar).toBeUndefined();
+    expect(r.avisos.some((x) => x.includes("no es uno del Plan de Desarrollo"))).toBe(true);
+  });
+  it("lo guardado conserva el pilar y sale de vuelta al Excel", () => {
+    const k = criteriosDe([], [], []);
+    const cifra = { ...indicadorNuevo("ext", "Extensión"), nombre: "C", actual: 1, pilar: "p1" };
+    expect(normalizar([cifra])[0].pilar).toBe("p1");
+    expect(filasCifras([cifra], k, pilares)[0][9]).toBe("1. Formación integral");
+  });
+  it("el pedido a Pilo lleva solo lo conectado con el pilar, con las cifras por su clave", () => {
+    const accion = { ...indicadorNuevo("ext", "Extensión", "accion"), nombre: "Feria", descripcion: "D", avance_texto: "H", pilar: "p1" };
+    const otra = { ...indicadorNuevo("ext", "Extensión", "accion"), nombre: "Otra", pilar: "p2" };
+    const cifra = { ...indicadorNuevo("inv", "Investigación"), nombre: "Grupos", actual: 3, meta: 4, pilar: "p1" };
+    const vista = aCifraVista(cifra, "s5", "draft");
+    const ins = insumosDelPilar({ cifras: [{ ind: cifra, vista }], acciones: [accion, otra] }, "p1");
+    expect(ins.acciones).toHaveLength(1);
+    const p = pedidoDeAporte("1. Formación integral", ins);
+    expect(p.tema).toContain("Formación integral");
+    expect(p.cifras[0].clave).toBe(vista.clave);
+    expect(p.hechos[0]).toContain("Feria");
+    expect(p.hechos[0]).toContain("lo que se hizo: H");
+    expect(JSON.stringify(p)).not.toContain('"valor"');
   });
 });

@@ -94,7 +94,7 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
   /* El contenido, como datos planos: solo cambia cuando cambia de verdad. */
   const firma = JSON.stringify(entradaLibro(m, pilares.data ?? [], String(diseno.portada.anio || ciclo.anio)));
   const entrada = useMemo(() => JSON.parse(firma) as EntradaLibro, [firma]);
-  const elementos = useMemo(() => entrada.secciones.flatMap((s) => s.drive), [entrada]);
+  const elementos = useMemo(() => entrada.secciones.flatMap((s) => [...s.drive, ...s.driveLogros]), [entrada]);
   const recursos = useRecursosDrive(elementos);
   const unidades = useMemo(() => unidadesDelLibro(entrada, recursos), [entrada, recursos]);
   const listo = !m.cargando && !m.error && !pilares.isPending && recursos.listo;

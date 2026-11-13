@@ -549,6 +549,50 @@ export function useQuitarAnexo() {
   });
 }
 
+export interface CambiosAnexo {
+  nombre: string;
+  descripcion: string;
+  /** Enlace nuevo (solo los de tipo enlace). */
+  url?: string;
+  /** Archivo nuevo que reemplaza al anterior (solo los de tipo archivo). */
+  archivo?: File;
+}
+
+/** Corrige el nombre, la descripción, el enlace o el archivo de un anexo; conserva su número, así los logros que lo citan siguen apuntando a él. */
+export function useEditarAnexo() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { instancia: InstanciaRow; anexo: AnexoRow; cambios: CambiosAnexo }) => {
+      const { anexo: a, cambios: c } = p;
+      const campos: Record<string, string> = { descripcion: c.descripcion.trim() };
+      let rutaNueva: string | null = null;
+      if (a.tipo === "url") {
+        const url = (c.url ?? a.ruta).trim();
+        if (!/^https:\/\/\S+$/i.test(url)) throw new Error("Escriba una dirección completa que empiece por https://");
+        campos.ruta = url;
+        campos.nombre = c.nombre.trim() || url;
+      } else {
+        campos.nombre = c.nombre.trim() || c.archivo?.name || a.nombre;
+        if (c.archivo) {
+          if (c.archivo.size > MAX_ANEXO) throw new Error(`«${c.archivo.name}» pesa más de 15 MB.`);
+          rutaNueva = `${p.instancia.unit_id}/${p.instancia.id}/${Date.now()}-${nombreSeguro(c.archivo.name)}`;
+          const subida = await supabase.storage.from(BUCKET).upload(rutaNueva, c.archivo, { contentType: c.archivo.type || undefined, upsert: false });
+          if (subida.error) throw new Error(`No se pudo subir «${c.archivo.name}»: ${subida.error.message}`);
+          campos.ruta = rutaNueva;
+        }
+      }
+      const r = await supabase.from("informe_anexos").update(campos).eq("id", a.id);
+      if (r.error) {
+        if (rutaNueva) await supabase.storage.from(BUCKET).remove([rutaNueva]);
+        throw errorDe(r.error);
+      }
+      // El archivo anterior ya no lo usa nadie.
+      if (rutaNueva && a.tipo === "archivo") await supabase.storage.from(BUCKET).remove([a.ruta]);
+    },
+    onSuccess: (_x, p) => void cliente.invalidateQueries({ queryKey: CLAVES.anexos(p.anexo.instancia_id) }),
+  });
+}
+
 /** Dirección temporal (10 minutos) para abrir un anexo del bucket privado. */
 export async function urlAnexo(a: AnexoRow): Promise<string> {
   if (a.tipo === "url") return a.ruta;

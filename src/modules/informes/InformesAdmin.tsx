@@ -34,6 +34,7 @@ import { GuiaProvider, useGuia } from "./guia/contexto";
 import { GuiaPilo } from "./guia/GuiaPilo";
 import "../rankings/layout.css";
 import "./informes.css";
+import "./responsivo.css";
 
 const BASE = "/admin/informes-gestion";
 type Seccion = "tablero" | "mi-informe" | "revision" | "consolidador" | "capacitacion" | "estructuras" | "vista";

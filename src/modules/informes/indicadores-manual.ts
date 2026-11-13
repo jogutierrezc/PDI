@@ -45,6 +45,8 @@ export interface IndicadorManual {
   proyeccion_texto?: string;
   /** …y en número (su unidad es `unidad`, opcional). */
   proyeccion_num?: number | null;
+  /** Pilar del PDI (id) con el que se conecta esta cifra o acción; alimenta la Alineación estratégica. Vacío: no se conecta. */
+  pilar?: string;
 }
 
 export type TipoIndicador = "cifra" | "accion";
@@ -257,6 +259,7 @@ export function normalizar(crudo: unknown): IndicadorManual[] {
       fuente: typeof o.fuente === "string" ? o.fuente : "",
       nota: typeof o.nota === "string" ? o.nota : "",
       ...(typeof o.requerido === "string" && o.requerido ? { requerido: o.requerido } : {}),
+      ...(typeof o.pilar === "string" && o.pilar ? { pilar: o.pilar } : {}),
       ...(o.tipo === "accion"
         ? {
             tipo: "accion" as const,
@@ -285,6 +288,27 @@ export const MENOS_ES_MEJOR = "Menos es mejor";
 
 const sinTildes = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 
+/** Un pilar del PDI para elegir o leer del Excel: su id y cómo se escribe («1. Nombre»). */
+export interface PilarOpcion {
+  id: string;
+  etiqueta: string;
+}
+
+export const opcionesPilar = (pilares: { id: string; numeral: string; name: string }[]): PilarOpcion[] => pilares.map((p) => ({ id: p.id, etiqueta: `${p.numeral}. ${p.name}` }));
+
+/** El pilar que dice un texto del Excel: «1. Nombre», solo el nombre o solo el número. Nulo si no se reconoce. */
+export function pilarDeTexto(texto: string, pilares: PilarOpcion[]): string | null {
+  const t = sinTildes(texto);
+  if (!t) return null;
+  const hallado = pilares.find((p) => {
+    const e = sinTildes(p.etiqueta);
+    const numero = e.split(".")[0];
+    const nombre = e.slice(e.indexOf(".") + 1).trim();
+    return t === e || t === nombre || t === numero || t.startsWith(`${numero}.`) || t.startsWith(`${numero} `);
+  });
+  return hallado?.id ?? null;
+}
+
 export interface LecturaIndicadores {
   indicadores: IndicadorManual[];
   /** Criterios del archivo que no existían: se crean como propios de la unidad. */
@@ -293,7 +317,7 @@ export interface LecturaIndicadores {
 }
 
 /** Lee las filas de la hoja «Indicadores» (la primera fila es el encabezado). */
-export function leerFilasIndicadores(filas: string[][], criterios: Criterio[], rotulo = ""): LecturaIndicadores {
+export function leerFilasIndicadores(filas: string[][], criterios: Criterio[], rotulo = "", pilares: PilarOpcion[] = []): LecturaIndicadores {
   const f0 = rotulo ? `${rotulo}, fila` : "Fila";
   const porNombre = new Map(criterios.map((c) => [sinTildes(c.nombre), c.id]));
   // Los nombres de antes (un archivo viejo) llegan a su criterio de hoy.
@@ -305,9 +329,11 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[], r
 
   filas.slice(1).forEach((f, n) => {
     const fila = n + 2;
-    const celdas = COLUMNAS_EXCEL_TODAS.map((_, k) => String(f[k] ?? "").trim());
+    const celdas = Array.from({ length: COLUMNAS_EXCEL_TODAS.length + 1 }, (_, k) => String(f[k] ?? "").trim());
     if (celdas.every((c) => !c)) return;
-    const [crit, nombre, unidad, sentido, anterior, actual, meta, fuente, nota, tipoTxt, descripcion, hecho, finalizacion, proyTxt, proyNum] = celdas;
+    const [crit, nombre, unidad, sentido, anterior, actual, meta, fuente, nota, tipoTxt, descripcion, hecho, finalizacion, proyTxt, proyNum, pilarTxt] = celdas;
+    const pilar = pilarDeTexto(pilarTxt, pilares);
+    if (pilarTxt && !pilar) avisos.push(`${f0} ${fila}: el pilar «${pilarTxt}» no es uno del Plan de Desarrollo; quedó sin pilar.`);
     const accion = sinTildes(tipoTxt) === "accion";
     if (!nombre) {
       avisos.push(`${f0} ${fila}: sin nombre de indicador, se omitió.`);
@@ -342,6 +368,7 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[], r
       meta: numero(meta, "Meta"),
       fuente,
       nota,
+      ...(pilar ? { pilar } : {}),
     };
     if (accion) {
       indicadores.push({
@@ -375,33 +402,35 @@ export function filasParaExcel(indicadores: IndicadorManual[], criterios: Criter
 /* ---------- Excel con una hoja para cifras y otra para acciones ---------------------- */
 
 /** Hoja «Cifras»: lo mismo que el bloque de cifras de la hoja «Indicadores», sin las columnas de acción. */
-export const COLUMNAS_CIFRAS = [...COLUMNAS_EXCEL] as const;
+export const COLUMNAS_CIFRAS = [...COLUMNAS_EXCEL, "Pilar del PDI"] as const;
 /** Hoja «Acciones»: una fila por acción. */
-export const COLUMNAS_ACCIONES = ["Criterio", "Acción", "Descripción de la acción", "Qué se ha hecho", "Finalización", "Proyección (texto)", "Proyección (número)", "Unidad de la proyección", "Fuente", "Nota"] as const;
+export const COLUMNAS_ACCIONES = ["Criterio", "Acción", "Descripción de la acción", "Qué se ha hecho", "Finalización", "Proyección (texto)", "Proyección (número)", "Unidad de la proyección", "Fuente", "Nota", "Pilar del PDI"] as const;
 
 export const HOJA_CIFRAS = "Cifras";
 export const HOJA_ACCIONES = "Acciones";
 /** La hoja única de antes (cifras y acciones juntas): se sigue leyendo. */
 export const HOJA_INDICADORES = "Indicadores";
 
-export function filasCifras(indicadores: IndicadorManual[], criterios: Criterio[]): (string | number | null)[][] {
+export function filasCifras(indicadores: IndicadorManual[], criterios: Criterio[], pilares: PilarOpcion[] = []): (string | number | null)[][] {
   const nombre = new Map(criterios.map((c) => [c.id, c.nombre]));
+  const pilar = (id?: string) => pilares.find((p) => p.id === id)?.etiqueta ?? "";
   return indicadores
     .filter(esCifra)
-    .map((i) => [nombre.get(i.criterio) ?? i.criterio_nombre ?? i.criterio, i.nombre, i.unidad.trim(), i.mayorMejor ? MAS_ES_MEJOR : MENOS_ES_MEJOR, i.anterior, i.actual, i.meta, i.fuente, i.nota]);
+    .map((i) => [nombre.get(i.criterio) ?? i.criterio_nombre ?? i.criterio, i.nombre, i.unidad.trim(), i.mayorMejor ? MAS_ES_MEJOR : MENOS_ES_MEJOR, i.anterior, i.actual, i.meta, i.fuente, i.nota, pilar(i.pilar)]);
 }
 
-export function filasAcciones(indicadores: IndicadorManual[], criterios: Criterio[]): (string | number | null)[][] {
+export function filasAcciones(indicadores: IndicadorManual[], criterios: Criterio[], pilares: PilarOpcion[] = []): (string | number | null)[][] {
   const nombre = new Map(criterios.map((c) => [c.id, c.nombre]));
+  const pilar = (id?: string) => pilares.find((p) => p.id === id)?.etiqueta ?? "";
   return indicadores
     .filter(esAccion)
-    .map((i) => [nombre.get(i.criterio) ?? i.criterio_nombre ?? i.criterio, i.nombre, i.descripcion ?? "", i.avance_texto ?? "", i.finalizacion ?? "", i.proyeccion_texto ?? "", i.proyeccion_num ?? null, i.unidad.trim(), i.fuente, i.nota]);
+    .map((i) => [nombre.get(i.criterio) ?? i.criterio_nombre ?? i.criterio, i.nombre, i.descripcion ?? "", i.avance_texto ?? "", i.finalizacion ?? "", i.proyeccion_texto ?? "", i.proyeccion_num ?? null, i.unidad.trim(), i.fuente, i.nota, pilar(i.pilar)]);
 }
 
 /** Una fila de la hoja «Acciones» en el orden de la hoja única, para leerla con el mismo código. */
-const accionALegado = (f: string[]): string[] => [f[0] ?? "", f[1] ?? "", f[7] ?? "", "", "", "", "", f[8] ?? "", f[9] ?? "", TIPO_ACCION, f[2] ?? "", f[3] ?? "", f[4] ?? "", f[5] ?? "", f[6] ?? ""];
+const accionALegado = (f: string[]): string[] => [f[0] ?? "", f[1] ?? "", f[7] ?? "", "", "", "", "", f[8] ?? "", f[9] ?? "", TIPO_ACCION, f[2] ?? "", f[3] ?? "", f[4] ?? "", f[5] ?? "", f[6] ?? "", f[10] ?? ""];
 /** Una fila de la hoja «Cifras» con su tipo, para el mismo código. */
-const cifraALegado = (f: string[]): string[] => [...COLUMNAS_CIFRAS.map((_, k) => f[k] ?? ""), TIPO_CIFRA, "", "", "", "", ""];
+const cifraALegado = (f: string[]): string[] => [...COLUMNAS_EXCEL.map((_, k) => f[k] ?? ""), TIPO_CIFRA, "", "", "", "", "", f[COLUMNAS_EXCEL.length] ?? ""];
 
 export interface HojasIndicadores {
   /** La hoja «Cifras» (con encabezado). */
@@ -416,7 +445,7 @@ export interface HojasIndicadores {
  * Lee el libro de resultados: cifras, acciones, o la hoja única de antes. Un criterio que no existe se crea
  * como propio de la unidad una sola vez, aunque aparezca en varias hojas.
  */
-export function leerLibroIndicadores(hojas: HojasIndicadores, criterios: Criterio[]): LecturaIndicadores {
+export function leerLibroIndicadores(hojas: HojasIndicadores, criterios: Criterio[], pilares: PilarOpcion[] = []): LecturaIndicadores {
   const indicadores: IndicadorManual[] = [];
   const avisos: string[] = [];
   const nuevos: CriterioPropio[] = [];
@@ -424,7 +453,7 @@ export function leerLibroIndicadores(hojas: HojasIndicadores, criterios: Criteri
   const pasar = (filas: string[][] | undefined, rotulo: string, aLegado?: (f: string[]) => string[]) => {
     if (!filas || filas.length < 2) return;
     const adaptadas = aLegado ? [filas[0] ?? [], ...filas.slice(1).map(aLegado)] : filas;
-    const r = leerFilasIndicadores(adaptadas, conocidos, rotulo);
+    const r = leerFilasIndicadores(adaptadas, conocidos, rotulo, pilares);
     indicadores.push(...r.indicadores);
     avisos.push(...r.avisos);
     for (const n of r.criteriosNuevos) {

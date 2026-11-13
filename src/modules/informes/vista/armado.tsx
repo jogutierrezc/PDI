@@ -561,24 +561,25 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
       break;
     case "logros":
       if (s.logros.length) {
-        u.push(
-          unidadFija(
-            k("logros"),
-            i,
-            <div className="vi-u">
-              <div className="vi-logros">
-                {s.logros.map((l, n) => (
-                  <div key={n}>
-                    <b className="big">{String(n + 1).padStart(2, "0")}</b>
-                    <h3>{l.titulo}</h3>
-                    {l.resultado ? <p>{l.resultado}</p> : null}
-                    {l.anexo !== null ? <small>Evidencia: Anexo {l.anexo}</small> : null}
-                  </div>
-                ))}
-              </div>
-            </div>,
-          ),
-        );
+        s.logros.forEach((l, n) => {
+          const kl = `l${n}`;
+          u.push(
+            unidadFija(
+              k(`${kl}:h`),
+              i,
+              <div className="vi-u">
+                <div className="vi-logro">
+                  <b className="vi-logro__n">{String(n + 1).padStart(2, "0")}</b>
+                  <h3>{l.titulo || "Logro sin título"}</h3>
+                </div>
+              </div>,
+              { pegar: true },
+            ),
+          );
+          parrafosDe(l.resultado ?? "").forEach((p, m) => u.push(unidadParrafo(k(`${kl}:p${m}`), i, p)));
+          if (l.anexo !== null) u.push(unidadFija(k(`${kl}:e`), i, <div className="vi-u"><p className="vi-logro__ev">Evidencia: Anexo {l.anexo}</p></div>));
+          u.push(...unidadesDrive(s, i, r, l.drive ?? [], k(`${kl}:drive`)));
+        });
       } else sinContenido();
       break;
     case "libre": {

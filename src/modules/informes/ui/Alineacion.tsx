@@ -5,6 +5,10 @@
 
 import { useEffect, useState } from "react";
 import type { CifraVista } from "../cifras-vivas";
+import { insumosDelPilar, pedidoDeAporte } from "../analisis-pilo";
+import type { InsumosDePilar } from "../analisis-pilo";
+import type { PedidoAnalisisPilo } from "../datos";
+import { mensajeDe } from "./comunes";
 import { ETIQUETA_ESTADO, accionTieneContenido, accionVacia, aporteTieneContenido, aporteVacio, conAlineacion, estadoDePilar, moverAccion, normalizarAlineacion, textoAnterior } from "../alineacion";
 import type { EstadoPilar } from "../alineacion";
 import type { Resolver } from "../tokens";
@@ -22,7 +26,13 @@ export function Alineacion({
   editable,
   cifras,
   resolver,
+  insumos,
+  redactar,
 }: {
+  /** Lo que la oficina conectó con cada pilar en Resultados y evidencias. */
+  insumos?: InsumosDePilar;
+  /** Pilo redacta el aporte desde esos insumos; ausente: sin la opción. */
+  redactar?: (pedido: Omit<PedidoAnalisisPilo, "actual">, actual: string) => Promise<string>;
   pilares: PilarRef[];
   c: ContenidoSeccion;
   cambiar: (c: ContenidoSeccion) => void;
@@ -130,14 +140,54 @@ export function Alineacion({
             )}
           </div>
         ) : (
-          <DetalleAporte key={pilar.id} a={aporte} poner={poner} editable={editable} cifras={cifras} resolver={resolver} numeral={pilar.numeral} />
+          <DetalleAporte key={pilar.id} a={aporte} poner={poner} editable={editable} cifras={cifras} resolver={resolver} numeral={pilar.numeral} nombrePilar={pilar.name} pilarId={pilar.id} insumos={insumos} redactar={redactar} />
         )}
       </section>
     </div>
   );
 }
 
-function DetalleAporte({ a, poner, editable, cifras, resolver, numeral }: { a: AporteAPilar; poner: (a: AporteAPilar) => void; editable: boolean; cifras: CifraVista[]; resolver: Resolver; numeral: string }) {
+function DetalleAporte({
+  a,
+  poner,
+  editable,
+  cifras,
+  resolver,
+  numeral,
+  nombrePilar,
+  pilarId,
+  insumos,
+  redactar,
+}: {
+  a: AporteAPilar;
+  poner: (a: AporteAPilar) => void;
+  editable: boolean;
+  cifras: CifraVista[];
+  resolver: Resolver;
+  numeral: string;
+  nombrePilar: string;
+  pilarId: string;
+  insumos?: InsumosDePilar;
+  redactar?: (pedido: Omit<PedidoAnalisisPilo, "actual">, actual: string) => Promise<string>;
+}) {
+  const [pensando, setPensando] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const conectado = insumos ? insumosDelPilar(insumos, pilarId) : { cifras: [], acciones: [] };
+  const hay = conectado.cifras.length + conectado.acciones.length;
+  const pedirAPilo = async () => {
+    if (!redactar) return;
+    if (a.aporte.trim() && !window.confirm("Pilo va a reescribir el aporte con los resultados conectados. El texto actual se reemplaza. ¿Continuar?")) return;
+    setPensando(true);
+    setAviso("");
+    try {
+      const texto = await redactar(pedidoDeAporte(`${numeral}. ${nombrePilar}`, conectado), a.aporte);
+      if (texto.trim()) poner({ ...a, aporte: texto.trim() });
+      else setAviso("Pilo no devolvió texto. Intente de nuevo.");
+    } catch (e) {
+      setAviso(mensajeDe(e));
+    }
+    setPensando(false);
+  };
   const ponerAccion = (i: number, x: AccionDePilar) => poner({ ...a, acciones: a.acciones.map((y, k) => (k === i ? x : y)) });
   const quitarAccion = (i: number) => {
     if (accionTieneContenido(a.acciones[i]) && !window.confirm("Esta acción tiene contenido y se borrará con sus tablas y gráficas. ¿Continuar?")) return;
@@ -145,6 +195,41 @@ function DetalleAporte({ a, poner, editable, cifras, resolver, numeral }: { a: A
   };
   return (
     <>
+      <div className="inf-blk inf-ali__insumos">
+        <h4 className="inf-ali__sub">Resultados y acciones conectados con este pilar</h4>
+        {hay === 0 ? (
+          <p className="inf-muted">
+            {editable ? "Ninguna cifra ni acción de «Resultados y evidencias» se ha conectado con este pilar. Al crear una, elija el pilar y aparecerá aquí." : "No hay resultados conectados con este pilar."}
+          </p>
+        ) : (
+          <ul className="inf-ali__ins-lista">
+            {conectado.cifras.map((x) => (
+              <li key={x.ind.id}>
+                <span className="inf-pill">Cifra</span> {x.ind.nombre.trim() || "Indicador sin nombre"}
+              </li>
+            ))}
+            {conectado.acciones.map((x) => (
+              <li key={x.id}>
+                <span className="inf-pill is-own">Acción</span> {x.nombre.trim() || "Acción sin nombre"}
+              </li>
+            ))}
+          </ul>
+        )}
+        {editable && redactar && (
+          <div className="inf-row">
+            <button type="button" className="inf-btn inf-btn--sm inf-btn--pri" disabled={pensando || hay === 0} onClick={() => void pedirAPilo()}>
+              {pensando ? "Pilo está redactando…" : a.aporte.trim() ? "Pilo: reescribir el aporte con estos resultados" : "Pilo: redactar el aporte con estos resultados"}
+            </button>
+            {hay === 0 && <span className="inf-hint">Conecte al menos una cifra o acción con este pilar para que Pilo tenga con qué escribir.</span>}
+          </div>
+        )}
+        {aviso && (
+          <p className="inf-error" role="alert">
+            {aviso}
+          </p>
+        )}
+      </div>
+
       <div className="inf-blk">
         <CampoTexto
           etiqueta={`Aporte de la oficina al pilar ${numeral}`}

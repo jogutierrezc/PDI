@@ -40,7 +40,7 @@ const EXT = {
   metas: { texto: "media página: breve explicación de las metas", parrafos: [1, 2], palabras: [50, 250] },
   resultados: { texto: "comentario de los resultados, 1 a 3 párrafos", parrafos: [1, 3], palabras: [80, 450] },
   retos: { texto: "media a una página (3 a 5 párrafos)", parrafos: [3, 5], palabras: [150, 550] },
-  logros: { texto: "2 a 4 párrafos (máximo 3 logros)", parrafos: [2, 4], palabras: [100, 450] },
+  logros: { texto: "2 a 4 párrafos, un logro por párrafo", parrafos: [2, 4], palabras: [100, 450] },
 } satisfies Record<string, Extension>;
 
 const s = (titulo: string, ty: string, tipo: SeccionTipo, extension: Extension | null) => ({ titulo, ty, tipo, extension });

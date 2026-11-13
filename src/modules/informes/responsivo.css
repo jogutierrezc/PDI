@@ -1,0 +1,411 @@
+/* =============================================================================
+   Informes de gestión · Mi informe responsivo.
+
+   Se carga después de informes.css y solo suma. Dos ideas:
+   1. El editor es un contenedor (`.inf-editor`): sus rejillas cambian según el
+      ancho que de verdad tienen, no el de la ventana. Así sirven igual con el
+      panel lateral abierto, en una tablet o en el teléfono.
+   2. En pantalla angosta las tablas de captura se apilan: cada fila es una ficha
+      y cada celda dice qué es (data-lab).
+   Movimiento: solo transform y opacity, curvas de salida fuerte, nada de lo que
+   dispara el teclado; prefers-reduced-motion lo deja en seco.
+   ========================================================================== */
+
+.inf {
+  --inf-ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ---------- El editor mide su propio ancho ---------------------------------------------------------- */
+
+.inf-editor {
+  container: inf-editor / inline-size;
+}
+
+.inf-ehd h2 {
+  font-size: clamp(1.25rem, 1.05rem + 1vw, var(--text-xl));
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.inf-lead,
+.inf-sub {
+  text-wrap: pretty;
+}
+
+/* Las rejillas de captura se pliegan por el ancho del editor. */
+@container inf-editor (max-width: 700px) {
+  .inf-pick__top,
+  .inf-drv__acc,
+  .inf-plan__act-edit,
+  .inf-res-ficha__proy,
+  .inf-anx-edit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inf-ali {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inf-ehd {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inf-blk .inf-row > .inf-btn {
+    flex: 1 1 auto;
+  }
+}
+
+@container inf-editor (min-width: 701px) {
+  .inf-anx-edit {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inf-anx-edit > :first-child,
+  .inf-anx-edit > .inf-row,
+  .inf-anx-edit > .inf-error {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- Tablas de captura que se apilan ----------------------------------------------------------- */
+
+.inf-anx-edit {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.inf-anx-desc {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
+@container inf-editor (max-width: 640px) {
+  .inf-tw:has(.inf-tbl--apilable),
+  .inf-dimtab-wrap:has(.inf-rm__tab) {
+    overflow: visible;
+  }
+
+  .inf-tbl--apilable,
+  .inf-rm__tab,
+  .inf-tbl--anx {
+    min-width: 0;
+    background: transparent;
+  }
+
+  .inf-tbl--apilable thead,
+  .inf-rm__tab thead,
+  .inf-tbl--anx thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .inf-tbl--apilable,
+  .inf-tbl--apilable tbody,
+  .inf-rm__tab,
+  .inf-rm__tab tbody,
+  .inf-tbl--anx,
+  .inf-tbl--anx tbody {
+    display: block;
+  }
+
+  .inf-tbl--apilable tr,
+  .inf-rm__tab tr:not(.inf-dimtab__det),
+  .inf-tbl--anx tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+
+  .inf-rm__tab tr.inf-dimtab__det {
+    display: block;
+    margin: calc(var(--space-2) * -1) 0 var(--space-3);
+    padding: 0 var(--space-3);
+  }
+
+  .inf-tbl--apilable td,
+  .inf-rm__tab tr:not(.inf-dimtab__det) td,
+  .inf-tbl--anx td {
+    display: grid;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  /* El nombre ocupa todo el ancho; el resto va en pares. */
+  .inf-tbl--apilable td:first-child,
+  .inf-rm__tab tr:not(.inf-dimtab__det) td:first-child,
+  .inf-tbl--anx td:nth-child(2),
+  .inf-tbl--anx td:last-child,
+  .inf-rm__tab tr:not(.inf-dimtab__det) td:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .inf-tbl--apilable td[data-lab]::before,
+  .inf-rm__tab td[data-lab]::before,
+  .inf-tbl--anx td[data-lab]::before {
+    content: attr(data-lab);
+    color: var(--ink-muted);
+    font: 700 var(--text-2xs) / 1.2 var(--font-sans);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .inf-tbl--apilable td:first-child[data-lab]::before,
+  .inf-tbl--anx td:first-child[data-lab]::before {
+    display: none;
+  }
+
+  .inf-tbl--apilable td input,
+  .inf-tbl--apilable td select,
+  .inf-rm__tab td input,
+  .inf-rm__tab td select {
+    min-height: 40px;
+    background: var(--surface);
+    border-color: var(--line-strong);
+  }
+}
+
+/* ---------- Secciones: en pantalla angosta, una tira que se desliza -------------------------------- */
+
+@media (max-width: 780px) {
+  .inf-rail {
+    padding: var(--space-3);
+  }
+
+  .inf-secs {
+    display: flex;
+    gap: var(--space-2);
+    margin-inline: calc(var(--space-3) * -1);
+    padding: 2px var(--space-3) var(--space-2);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: var(--space-3);
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--space-3), #000 calc(100% - var(--space-4)), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 var(--space-3), #000 calc(100% - var(--space-4)), transparent 100%);
+  }
+
+  .inf-secs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .inf-secs li,
+  .inf-secs > button {
+    flex: none;
+    scroll-snap-align: center;
+  }
+
+  .inf-secs button {
+    grid-template-columns: auto auto auto;
+    min-height: 44px;
+    max-width: 17rem;
+    padding: 8px 12px;
+    background: var(--surface-3);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .inf-secs button > :nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .inf-secs button[aria-current="true"] {
+    background: var(--brand-blue-soft);
+    box-shadow: inset 0 0 0 1.5px var(--brand-blue);
+  }
+
+  .inf-send ul {
+    max-height: 7.5rem;
+    overflow: auto;
+  }
+
+  .inf-editor {
+    padding: var(--space-4) var(--space-3);
+  }
+}
+
+/* Pantallas muy angostas: el pie de página del editor no se sale. */
+@media (max-width: 420px) {
+  .inf-ed {
+    gap: var(--space-3);
+  }
+
+  .inf-rail .inf-btn,
+  .inf-send .inf-btn {
+    width: 100%;
+  }
+}
+
+/* ---------- Toque: objetivos de 44 px y sin hover fantasma ------------------------------------------ */
+
+@media (pointer: coarse) {
+  .inf .inf-btn,
+  .inf .inf-in,
+  .inf select.inf-in,
+  .inf .inf-tbl td input,
+  .inf .inf-tbl td select {
+    min-height: 44px;
+  }
+
+  .inf .inf-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 4px;
+  }
+
+  .inf .inf-in,
+  .inf .inf-tbl td input,
+  .inf .inf-tbl td select {
+    font-size: max(16px, var(--text-sm));
+  }
+}
+
+/* ---------- Logros libres: cada uno con su evidencia y sus tablas -------------------------------------- */
+
+.inf-logros {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inf-logro {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.inf-logro__n {
+  min-width: 2ch;
+  color: var(--brand-navy);
+  font: 800 var(--text-xl) / 1 var(--font-display);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.inf-logro__cuerpo {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.inf-logro__drive > summary {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  color: var(--brand-blue);
+  font: 700 var(--text-sm) / 1.3 var(--font-sans);
+  cursor: pointer;
+}
+
+.inf-logro__drive[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.inf-logro__drive .inf-blk {
+  margin-top: 0;
+}
+
+@container inf-editor (max-width: 520px) {
+  .inf-logro {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-3);
+  }
+
+  .inf-logro__n {
+    font-size: var(--text-lg, 1.125rem);
+  }
+}
+
+/* ---------- Pilar del PDI y lo conectado en la alineación ----------------------------------------------- */
+
+.inf-pilar-sel {
+  max-width: 34rem;
+  margin-top: var(--space-2);
+}
+
+.inf-ali__ins-lista {
+  display: grid;
+  gap: var(--space-1, 4px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.inf-ali__ins-lista li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+/* ---------- Movimiento: solo lo que ayuda a entender --------------------------------------------------- */
+
+/* El formulario de corrección de un anexo se abre desde 6 px y opacidad 0 (curva de salida fuerte). Un logro nuevo entra con GSAP (Logros). */
+@keyframes inf-aparece {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.inf-anx-edit {
+  animation: inf-aparece 200ms var(--inf-ease);
+}
+
+/* Pulsar se siente: un botón cede un poco. */
+.inf .inf-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.inf .inf-btn {
+  transition:
+    transform 140ms var(--inf-ease),
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.inf-secs button {
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inf-anx-edit {
+    animation: none;
+  }
+
+  .inf .inf-btn:active:not(:disabled) {
+    transform: none;
+  }
+
+  .inf-secs {
+    scroll-behavior: auto;
+  }
+}

@@ -35,7 +35,7 @@ import {
   normalizar,
   idNuevo,
 } from "../indicadores-manual";
-import type { Criterio, CriterioPropio, IndicadorManual, LecturaIndicadores } from "../indicadores-manual";
+import type { Criterio, CriterioPropio, IndicadorManual, LecturaIndicadores, PilarOpcion } from "../indicadores-manual";
 import { ETIQUETA_ESTADO_META } from "../vista/estados";
 import type { EstadoMeta } from "../vista/estados";
 import { faltaRequerido, respuestaNueva, textoFuenteReq } from "../requeridos-logica";
@@ -93,11 +93,13 @@ interface Props {
   puedeSugerir: boolean;
   /** Datos que Planeación pide a esta sección (0253): aparecen ya listados y no se pueden quitar. */
   requeridos?: DatoRequerido[];
+  /** Pilares del PDI a los que se puede conectar cada cifra o acción (alimentan la Alineación estratégica). */
+  pilares?: PilarOpcion[];
   /** Criterios cuyas cifras Planeación pide justificar (condición «justificar»): quedan marcados y bloqueados. */
   criteriosPedidos?: string[];
 }
 
-export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [] }: Props) {
+export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [], pilares = [] }: Props) {
   const indicadores = normalizar(c.indicadores);
   const propios = c.criterios_propios ?? [];
   const criterios = criteriosDe(def.dims ?? [], aprobados, propios, !def.consolida);
@@ -159,9 +161,18 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
   };
 
   const rangoCriterios = `Criterios!$A$2:$A$${Math.max(2, criterios.length + 1)}`;
+  const rangoPilares = `Pilares!$A$2:$A$${Math.max(2, pilares.length + 1)}`;
+  const hojaPilares = { nombre: "Pilares", columnas: [{ titulo: "Pilares del Plan de Desarrollo", ancho: 60 }], filas: pilares.map((p) => [p.etiqueta]) };
   const hojaCriterios = { nombre: "Criterios", columnas: [{ titulo: "Criterios disponibles", ancho: 50 }, { titulo: "Origen", ancho: 28 }], filas: filasCriterios(criterios) };
-  const anchoCifras = (n: number) => (n === 0 ? 34 : n === 1 || n === 7 || n === 8 ? 40 : 16);
-  const anchoAcciones = (n: number) => (n === 0 ? 34 : n === 1 || n === 2 || n === 3 ? 40 : n === 4 || n === 5 ? 28 : 16);
+  const anchoCifras = (n: number) => (n === 0 || n === 9 ? 34 : n === 1 || n === 7 || n === 8 ? 40 : 16);
+  const anchoAcciones = (n: number) => (n === 0 || n === 10 ? 34 : n === 1 || n === 2 || n === 3 ? 40 : n === 4 || n === 5 ? 28 : 16);
+  const listasCifras: Record<number, string[] | { rango: string }> = { 0: { rango: rangoCriterios }, 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR] };
+  const listasAcciones: Record<number, string[] | { rango: string }> = { 0: { rango: rangoCriterios } };
+  if (pilares.length) {
+    listasCifras[9] = { rango: rangoPilares };
+    listasAcciones[10] = { rango: rangoPilares };
+  }
+  const hojasApoyo = pilares.length ? [hojaCriterios, hojaPilares] : [hojaCriterios];
 
   const plantilla = async () => {
     const [k1, k2] = [criterios[0], criterios[1] ?? criterios[0]];
@@ -173,37 +184,39 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
       {
         nombre: HOJA_CIFRAS,
         columnas: COLUMNAS_CIFRAS.map((t, n) => ({ titulo: t, ancho: anchoCifras(n) })),
-        filas: filasCifras(ejemploCifras, criterios),
-        listas: { 0: { rango: rangoCriterios }, 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR] },
+        filas: filasCifras(ejemploCifras, criterios, pilares),
+        listas: listasCifras,
         ayuda: [
           "Una fila por cifra. Borre las filas de ejemplo.",
           "Criterio: elija de la lista (hoja «Criterios») o escriba uno nuevo; si no existe se crea como criterio propio de su unidad.",
           `Qué es mejor: «${MAS_ES_MEJOR}» (matrícula, graduados) o «${MENOS_ES_MEJOR}» (deserción, tiempos).`,
           "Año anterior, Cifra actual y Meta: solo números (puede usar coma decimal). El estado no se escribe: lo calcula el informe.",
           "Unidad: déjela vacía para conteos, o escriba % o pp.",
+          "Pilar del PDI: opcional; elija el pilar del Plan de Desarrollo con el que se conecta la cifra (hoja «Pilares»). Alimenta la Alineación estratégica.",
         ].join("\n"),
       },
       {
         nombre: HOJA_ACCIONES,
         columnas: COLUMNAS_ACCIONES.map((t, n) => ({ titulo: t, ancho: anchoAcciones(n) })),
-        filas: filasAcciones(ejemploAcciones, criterios),
-        listas: { 0: { rango: rangoCriterios } },
+        filas: filasAcciones(ejemploAcciones, criterios, pilares),
+        listas: listasAcciones,
         ayuda: [
           "Una fila por acción. Borre la fila de ejemplo.",
           "Criterio: igual que en la hoja «Cifras»; sirve cualquiera de la hoja «Criterios» o uno nuevo.",
           "Acción: el nombre corto. Descripción y Qué se ha hecho son obligatorios para dar la acción por completa.",
           "Finalización: cuándo se plantea terminarla (fecha o periodo, en texto). Proyección: en texto y, si aplica, en número (con su unidad).",
+          "Pilar del PDI: opcional; el pilar con el que se conecta la acción (hoja «Pilares»).",
         ].join("\n"),
       },
-      hojaCriterios,
+      ...hojasApoyo,
     ]);
   };
 
   const exportar = async () => {
     await descargarLibro("resultados-y-evidencias.xlsx", [
-      { nombre: HOJA_CIFRAS, columnas: COLUMNAS_CIFRAS.map((t, n) => ({ titulo: t, ancho: anchoCifras(n) })), filas: filasCifras(indicadores, criterios), listas: { 0: { rango: rangoCriterios }, 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR] } },
-      { nombre: HOJA_ACCIONES, columnas: COLUMNAS_ACCIONES.map((t, n) => ({ titulo: t, ancho: anchoAcciones(n) })), filas: filasAcciones(indicadores, criterios), listas: { 0: { rango: rangoCriterios } } },
-      hojaCriterios,
+      { nombre: HOJA_CIFRAS, columnas: COLUMNAS_CIFRAS.map((t, n) => ({ titulo: t, ancho: anchoCifras(n) })), filas: filasCifras(indicadores, criterios, pilares), listas: listasCifras },
+      { nombre: HOJA_ACCIONES, columnas: COLUMNAS_ACCIONES.map((t, n) => ({ titulo: t, ancho: anchoAcciones(n) })), filas: filasAcciones(indicadores, criterios, pilares), listas: listasAcciones },
+      ...hojasApoyo,
     ]);
   };
 
@@ -220,7 +233,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
       ]);
       if (!cifras && !acciones && !legado) setPrevia({ error: "El libro no tiene las hojas «Cifras» ni «Acciones». Use la plantilla que se descarga aquí." });
       else {
-        const r = leerLibroIndicadores({ cifras, acciones, indicadores: legado }, criterios);
+        const r = leerLibroIndicadores({ cifras, acciones, indicadores: legado }, criterios, pilares);
         setPrevia(r.indicadores.length ? { ...r, archivo: archivo.name } : { error: r.avisos.join(" ") || "No se encontró ninguna cifra ni acción en el archivo." });
       }
     } catch (e) {
@@ -423,7 +436,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
                   </thead>
                   <tbody>
                     {cifras.map((i) => (
-                      <Fila key={i.id} i={i} editable={editable} exigirFuente={exigirFuente} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
+                      <Fila key={i.id} i={i} pilares={pilares} editable={editable} exigirFuente={exigirFuente} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
                     ))}
                   </tbody>
                 </table>
@@ -432,7 +445,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
             {acciones.length > 0 && (
               <div className="inf-res-acc" role="list" aria-label={`Acciones de ${k.nombre}`}>
                 {acciones.map((i) => (
-                  <FichaAccion key={i.id} i={i} editable={editable} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
+                  <FichaAccion key={i.id} i={i} pilares={pilares} editable={editable} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
                 ))}
               </div>
             )}
@@ -515,17 +528,38 @@ function FilaRequerida({ r, resp, criterio, editable, cambiar }: { r: DatoRequer
   );
 }
 
-function Fila({ i, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManual; editable: boolean; exigirFuente: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
+/** ¿Esta cifra o acción se conecta con un pilar del PDI? Lo que se conecte alimenta la Alineación estratégica. */
+export function SelectorPilar({ valor, pilares, editable, onChange }: { valor: string | undefined; pilares: PilarOpcion[]; editable: boolean; onChange: (id: string) => void }) {
+  if (!pilares.length) return null;
+  if (!editable && !valor) return null;
+  const conocido = pilares.some((p) => p.id === valor);
+  return (
+    <label className="inf-lab inf-pilar-sel">
+      Se conecta con el pilar del PDI
+      <select className="inf-in" disabled={!editable} value={valor ?? ""} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Ninguno (no se conecta)</option>
+        {pilares.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.etiqueta}
+          </option>
+        ))}
+        {valor && !conocido && <option value={valor}>Un pilar que ya no está en el Plan</option>}
+      </select>
+    </label>
+  );
+}
+
+function Fila({ i, pilares, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManual; pilares: PilarOpcion[]; editable: boolean; exigirFuente: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
   const ev = evaluar(i);
   const falta = faltantes(i, exigirFuente);
   const [abierta, setAbierta] = useState(false);
   return (
     <>
       <tr>
-        <td>
+        <td data-lab="Indicador">
           <input className="inf-in" aria-label="Indicador" placeholder="Nombre del indicador" readOnly={!editable} value={i.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} />
         </td>
-        <td>
+        <td data-lab="Unidad">
           <select className="inf-in" aria-label="Unidad" disabled={!editable} value={i.unidad} onChange={(e) => cambiar({ unidad: e.target.value })}>
             <option value="">Conteo</option>
             <option value=" %">%</option>
@@ -533,22 +567,22 @@ function Fila({ i, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManu
             <option value=" $">$</option>
           </select>
         </td>
-        <td>
+        <td data-lab="Mejor">
           <select className="inf-in" aria-label="Qué es mejor" disabled={!editable} value={i.mayorMejor ? "mas" : "menos"} onChange={(e) => cambiar({ mayorMejor: e.target.value === "mas" })}>
             <option value="mas">Más</option>
             <option value="menos">Menos</option>
           </select>
         </td>
-        <td>
+        <td data-lab="Anterior">
           <CeldaNumero valor={i.anterior} etiqueta="Año anterior" editable={editable} onChange={(n) => cambiar({ anterior: n })} />
         </td>
-        <td>
+        <td data-lab="Actual">
           <CeldaNumero valor={i.actual} etiqueta="Cifra actual" editable={editable} onChange={(n) => cambiar({ actual: n })} />
         </td>
-        <td>
+        <td data-lab="Meta">
           <CeldaNumero valor={i.meta} etiqueta="Meta" editable={editable} onChange={(n) => cambiar({ meta: n })} />
         </td>
-        <td>
+        <td data-lab="Estado">
           <EstadoMetaPill estado={ev.estado} />
           {ev.logroMeta !== null && <small className="inf-num"> {formatoCifra(ev.logroMeta, " %")} de la meta</small>}
         </td>
@@ -566,6 +600,7 @@ function Fila({ i, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManu
       <tr className="inf-dimtab__det">
         <td colSpan={8}>
           <p className="inf-rm__lectura">{ev.texto}</p>
+          <SelectorPilar valor={i.pilar} pilares={pilares} editable={editable} onChange={(pilar) => cambiar({ pilar })} />
           {falta.length > 0 && <small className="inf-hint">Falta {falta.join(", ")}.</small>}
           {abierta && (
             <div className="inf-rm__det">
@@ -586,7 +621,7 @@ function Fila({ i, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManu
 }
 
 /** Una acción: solo texto. Nombre, descripción, qué se ha hecho, cuándo termina y proyecciones en texto y número. */
-function FichaAccion({ i, editable, cambiar, quitar }: { i: IndicadorManual; editable: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
+function FichaAccion({ i, pilares, editable, cambiar, quitar }: { i: IndicadorManual; pilares: PilarOpcion[]; editable: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
   const falta = faltantes(i, false);
   return (
     <article className="inf-res-ficha" role="listitem">
@@ -636,6 +671,7 @@ function FichaAccion({ i, editable, cambiar, quitar }: { i: IndicadorManual; edi
           </select>
         </label>
       </div>
+      <SelectorPilar valor={i.pilar} pilares={pilares} editable={editable} onChange={(pilar) => cambiar({ pilar })} />
       {falta.length > 0 && <small className="inf-hint">Falta {falta.join(" y ")}.</small>}
     </article>
   );

@@ -10,9 +10,6 @@
 import { numeroDe } from "./cifras-vivas";
 import type { Logro, Meta } from "./types";
 
-/** Cuántos logros caben en la sección (el editor no deja añadir más). */
-export const MAX_LOGROS = 3;
-
 export const COLUMNAS_LOGROS = ["Logro", "Contexto y resultado", "N.º de anexo"] as const;
 export const COLUMNAS_METAS = ["Objetivo o meta anual", "Programado", "Alcanzado"] as const;
 
@@ -23,7 +20,7 @@ export const EJEMPLO_METAS: string[][] = [
 ];
 
 export const AYUDA_LOGROS = [
-  `Un logro por fila; la sección admite hasta ${MAX_LOGROS}. Son los innovadores o excepcionales del año, no la actividad ordinaria.`,
+  "Un logro por fila, todos los que haya: no hay tope. Son los innovadores o excepcionales del año, no la actividad ordinaria.",
   "Logro: el nombre corto. Contexto y resultado: qué se hizo y qué cambió, con la cifra que lo muestra.",
   "N.º de anexo: el número del anexo de «Evidencias» que lo respalda (déjelo vacío y elíjalo en el informe si aún no lo sube).",
 ];
@@ -39,10 +36,11 @@ const texto = (v: unknown) => String(v ?? "").trim();
 export const logrosAFilas = (logros: Logro[]): string[][] => logros.map((l) => [l.titulo, l.resultado, l.anexo === null ? "" : String(l.anexo)]);
 
 /** Lo que dice la tabla como logros; el anexo que no es un número entero positivo queda vacío. */
-export function filasALogros(filas: string[][]): Logro[] {
-  return filas.map((f) => {
+export function filasALogros(filas: string[][], previos: Logro[] = []): Logro[] {
+  return filas.map((f, i) => {
     const n = numeroDe(texto(f[2]));
-    return { titulo: texto(f[0]), resultado: texto(f[1]), anexo: n !== null && Number.isInteger(n) && n > 0 ? n : null };
+    const drive = previos[i]?.drive;
+    return { titulo: texto(f[0]), resultado: texto(f[1]), anexo: n !== null && Number.isInteger(n) && n > 0 ? n : null, ...(drive?.length ? { drive } : {}) };
   });
 }
 

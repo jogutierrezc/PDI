@@ -9,6 +9,7 @@
 
 import type { CifraVista } from "./cifras-vivas";
 import { evaluar } from "./indicadores-manual";
+import type { IndicadorManual } from "./indicadores-manual";
 import type { PedidoAnalisisPilo } from "./datos";
 import type { PlanAccion, PlanActividad } from "./plan-decanatura";
 import { ETIQUETA_ESTADO_META } from "./vista/estados";
@@ -44,4 +45,35 @@ export function pedidoDeAccion(a: PlanAccion, actividades: PlanActividad[]): Omi
     ...actividades.slice(0, 12).map((x) => `Actividad (${x.estado ?? "pendiente"}): ${x.descripcion}`),
   ].filter(Boolean);
   return { tema: `Acción del plan de trabajo: ${a.accion}`, cifras: [], hechos, largo: "corto" };
+}
+
+/** Lo que se conectó con un pilar: cifras (ya como cifra del informe) y acciones, ambas de Resultados y evidencias. */
+export interface InsumosDePilar {
+  cifras: { ind: IndicadorManual; vista: CifraVista }[];
+  acciones: IndicadorManual[];
+}
+
+/** Lo conectado con un pilar (por su id) de entre todo lo que reportó la oficina. */
+export function insumosDelPilar(todos: InsumosDePilar, pilar: string): InsumosDePilar {
+  return { cifras: todos.cifras.filter((x) => x.ind.pilar === pilar), acciones: todos.acciones.filter((x) => x.pilar === pilar) };
+}
+
+/** El aporte de la oficina a un pilar, a partir de las cifras y acciones que ella misma conectó con él. */
+export function pedidoDeAporte(pilar: string, insumos: InsumosDePilar): Omit<PedidoAnalisisPilo, "actual"> {
+  const hechos = insumos.acciones.flatMap((a) => {
+    const partes = [
+      a.descripcion?.trim() ? `descripción: ${a.descripcion.trim()}` : "",
+      a.avance_texto?.trim() ? `lo que se hizo: ${a.avance_texto.trim()}` : "",
+      a.finalizacion?.trim() ? `finalización: ${a.finalizacion.trim()}` : "",
+      a.proyeccion_texto?.trim() ? `proyección: ${a.proyeccion_texto.trim()}` : "",
+    ].filter(Boolean);
+    return [`Acción «${a.nombre.trim() || "sin nombre"}»${partes.length ? ` — ${partes.join("; ")}` : ""}`];
+  });
+  return {
+    tema: `Aporte de la oficina al pilar ${pilar}`,
+    cifras: insumos.cifras.slice(0, 40).map((x) => citable(x.vista)),
+    hechos,
+    largo: "medio",
+    instruccion: "Redacte el aporte de la oficina a este pilar usando solo estos resultados y acciones. Cite cada cifra con su [[clave]]; no invente datos.",
+  };
 }

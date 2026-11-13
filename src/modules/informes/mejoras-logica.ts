@@ -15,7 +15,7 @@ export const TIPOS_ESTRUCTURA: { tipo: SeccionEstructuraJson["tipo"]; nombre: st
   { tipo: "dim", nombre: "Resultados y evidencias", ayuda: "La oficina elige a qué criterios reporta; indicadores con cifras o acciones." },
   { tipo: "matriz", nombre: "Síntesis", ayuda: "Matriz armada con las cifras de las secciones anteriores." },
   { tipo: "filas", nombre: "Tabla de filas", ayuda: "Una fila por punto, con las columnas que se definan." },
-  { tipo: "logros", nombre: "Logros e innovaciones", ayuda: "Hasta tres logros, cada uno con su evidencia." },
+  { tipo: "logros", nombre: "Logros e innovaciones", ayuda: "Todos los logros que haya, cada uno con su evidencia y, si quiere, tablas o gráficas de UDrive." },
   { tipo: "evid", nombre: "Evidencias y fuentes de verificación", ayuda: "Obligatoria en toda estructura: sin ella no se puede enviar el informe." },
   { tipo: "anexos", nombre: "Anexos", ayuda: "Se arma sola con los archivos cargados." },
 ];

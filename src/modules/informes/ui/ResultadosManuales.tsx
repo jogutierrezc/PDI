@@ -40,9 +40,10 @@ import { ETIQUETA_ESTADO_META } from "../vista/estados";
 import type { EstadoMeta } from "../vista/estados";
 import { faltaRequerido, respuestaNueva, textoFuenteReq } from "../requeridos-logica";
 import type { DatoRequerido } from "../requeridos-logica";
-import type { ContenidoSeccion, SeccionDef } from "../types";
+import type { AnexoRow, ContenidoSeccion, SeccionDef } from "../types";
 import { mensajeDe } from "./comunes";
 import { descargarLibro, leerHoja, nombresDeHojas } from "./excel";
+import { RespaldoIndicador } from "./Respaldo";
 
 const TONO: Record<EstadoMeta, string> = { superada: "is-ok", cumplida: "is-teal", parcial: "is-mid", rezagada: "is-bad" };
 const FORMA: Record<EstadoMeta, string> = { superada: "▲", cumplida: "●", parcial: "◐", rezagada: "▼" };
@@ -97,9 +98,11 @@ interface Props {
   pilares?: PilarOpcion[];
   /** Criterios cuyas cifras Planeación pide justificar (condición «justificar»): quedan marcados y bloqueados. */
   criteriosPedidos?: string[];
+  /** Anexos cargados en «Evidencias»: se pueden marcar como respaldo de cada cifra o acción. */
+  anexos?: AnexoRow[];
 }
 
-export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [], pilares = [] }: Props) {
+export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [], pilares = [], anexos = [] }: Props) {
   const indicadores = normalizar(c.indicadores);
   const propios = c.criterios_propios ?? [];
   const criterios = criteriosDe(def.dims ?? [], aprobados, propios, !def.consolida);
@@ -386,7 +389,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
               </thead>
               <tbody>
                 {requeridos.map((r) => (
-                  <FilaRequerida key={r.clave} r={r} resp={indicadores.find((i) => i.requerido === r.clave)} criterio={criterios.find((k) => k.id === idCriterio(r.criterio))?.nombre ?? ""} editable={editable} cambiar={(x) => cambiarRequerido(r, x)} />
+                  <FilaRequerida key={r.clave} r={r} anexos={anexos} resp={indicadores.find((i) => i.requerido === r.clave)} criterio={criterios.find((k) => k.id === idCriterio(r.criterio))?.nombre ?? ""} editable={editable} cambiar={(x) => cambiarRequerido(r, x)} />
                 ))}
               </tbody>
             </table>
@@ -436,7 +439,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
                   </thead>
                   <tbody>
                     {cifras.map((i) => (
-                      <Fila key={i.id} i={i} pilares={pilares} editable={editable} exigirFuente={exigirFuente} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
+                      <Fila key={i.id} i={i} pilares={pilares} anexos={anexos} editable={editable} exigirFuente={exigirFuente} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
                     ))}
                   </tbody>
                 </table>
@@ -445,7 +448,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
             {acciones.length > 0 && (
               <div className="inf-res-acc" role="list" aria-label={`Acciones de ${k.nombre}`}>
                 {acciones.map((i) => (
-                  <FichaAccion key={i.id} i={i} pilares={pilares} editable={editable} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
+                  <FichaAccion key={i.id} i={i} pilares={pilares} anexos={anexos} editable={editable} cambiar={(x) => cambiarIndicador(i.id, x)} quitar={() => quitar(i.id)} />
                 ))}
               </div>
             )}
@@ -474,7 +477,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
 }
 
 /** Un dato que pide Planeación: nombre, unidad y sentido vienen fijos; la unidad llena sus cifras, su fuente y su nota. */
-function FilaRequerida({ r, resp, criterio, editable, cambiar }: { r: DatoRequerido; resp: IndicadorManual | undefined; criterio: string; editable: boolean; cambiar: (x: Partial<IndicadorManual>) => void }) {
+function FilaRequerida({ r, anexos, resp, criterio, editable, cambiar }: { r: DatoRequerido; anexos: AnexoRow[]; resp: IndicadorManual | undefined; criterio: string; editable: boolean; cambiar: (x: Partial<IndicadorManual>) => void }) {
   const i: IndicadorManual = resp ?? respuestaNueva(r, criterio);
   const ev = evaluar({ actual: i.actual, anterior: i.anterior, meta: i.meta, mayorMejor: r.mayor_mejor, unidad: r.unidad });
   const falta = faltaRequerido(r, resp);
@@ -522,6 +525,7 @@ function FilaRequerida({ r, resp, criterio, editable, cambiar }: { r: DatoRequer
               <textarea className="inf-in" rows={2} readOnly={!editable} value={i.nota} placeholder="¿Qué explica el resultado de esta cifra?" onChange={(e) => cambiar({ nota: e.target.value })} />
             </label>
           </div>
+          <RespaldoIndicador i={i} anexos={anexos} editable={editable} cambiar={cambiar} />
         </td>
       </tr>
     </>
@@ -549,7 +553,7 @@ export function SelectorPilar({ valor, pilares, editable, onChange }: { valor: s
   );
 }
 
-function Fila({ i, pilares, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManual; pilares: PilarOpcion[]; editable: boolean; exigirFuente: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
+function Fila({ i, pilares, anexos, editable, exigirFuente, cambiar, quitar }: { i: IndicadorManual; pilares: PilarOpcion[]; anexos: AnexoRow[]; editable: boolean; exigirFuente: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
   const ev = evaluar(i);
   const falta = faltantes(i, exigirFuente);
   const [abierta, setAbierta] = useState(false);
@@ -601,6 +605,7 @@ function Fila({ i, pilares, editable, exigirFuente, cambiar, quitar }: { i: Indi
         <td colSpan={8}>
           <p className="inf-rm__lectura">{ev.texto}</p>
           <SelectorPilar valor={i.pilar} pilares={pilares} editable={editable} onChange={(pilar) => cambiar({ pilar })} />
+          <RespaldoIndicador i={i} anexos={anexos} editable={editable} cambiar={cambiar} />
           {falta.length > 0 && <small className="inf-hint">Falta {falta.join(", ")}.</small>}
           {abierta && (
             <div className="inf-rm__det">
@@ -621,7 +626,7 @@ function Fila({ i, pilares, editable, exigirFuente, cambiar, quitar }: { i: Indi
 }
 
 /** Una acción: solo texto. Nombre, descripción, qué se ha hecho, cuándo termina y proyecciones en texto y número. */
-function FichaAccion({ i, pilares, editable, cambiar, quitar }: { i: IndicadorManual; pilares: PilarOpcion[]; editable: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
+function FichaAccion({ i, pilares, anexos, editable, cambiar, quitar }: { i: IndicadorManual; pilares: PilarOpcion[]; anexos: AnexoRow[]; editable: boolean; cambiar: (x: Partial<IndicadorManual>) => void; quitar: () => void }) {
   const falta = faltantes(i, false);
   return (
     <article className="inf-res-ficha" role="listitem">
@@ -672,6 +677,7 @@ function FichaAccion({ i, pilares, editable, cambiar, quitar }: { i: IndicadorMa
         </label>
       </div>
       <SelectorPilar valor={i.pilar} pilares={pilares} editable={editable} onChange={(pilar) => cambiar({ pilar })} />
+      <RespaldoIndicador i={i} anexos={anexos} editable={editable} cambiar={cambiar} />
       {falta.length > 0 && <small className="inf-hint">Falta {falta.join(" y ")}.</small>}
     </article>
   );

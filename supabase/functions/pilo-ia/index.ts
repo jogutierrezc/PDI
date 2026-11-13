@@ -6732,6 +6732,9 @@ async function handle(request: Request): Promise<Response> {
           temperature: opts.temperature,
           max_tokens: opts.max_tokens,
           ...(opts.stream ? { stream: true } : {}),
+          // Un servidor propio (Ollama, vLLM…) con un modelo que razona gasta todo el tope pensando y deja
+          // `content` vacío: Pilo creería que la IA no respondió y diría lo publicado «sin IA». Se pide respuesta directa.
+          ...(!TEXT_PRESETS[settings.provider ?? "mistral"] && !/openai\.com/i.test(String(settings.base_url ?? "")) ? { reasoning_effort: "none" } : {}),
           // Mistral (y los compatibles que lo aceptan) devuelven JSON limpio.
           ...(opts.json && settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
         }),

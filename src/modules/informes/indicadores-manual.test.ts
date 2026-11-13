@@ -68,3 +68,22 @@ describe("validación de la sección dim", () => {
     expect(t.some((x) => x.startsWith("1 acción sin descripción"))).toBe(true);
   });
 });
+
+describe("respaldo de una cifra o acción", () => {
+  it("guarda varios anexos y varias tablas o gráficas de UDrive", () => {
+    const [i] = normalizar([
+      { id: "a", criterio: "ext", nombre: "Convenios", evidencias: [2, 5, 2, "x", -1, 1.5], drive: [{ archivoId: "t1", tipo: "tabla" }, { archivoId: "g1", tipo: "grafica", titulo: "Evolución" }, { archivoId: "t1", tipo: "tabla" }, { tipo: "tabla" }, { archivoId: "z", tipo: "otro" }] },
+    ]);
+    expect(i.evidencias).toEqual([2, 5]);
+    expect(i.drive).toEqual([
+      { archivoId: "t1", tipo: "tabla", titulo: "", nota: "" },
+      { archivoId: "g1", tipo: "grafica", titulo: "Evolución", nota: "" },
+    ]);
+  });
+
+  it("sin respaldo no agrega campos y lo guardado antes se lee igual", () => {
+    const [i] = normalizar([{ id: "a", criterio: "ext", nombre: "Convenios" }]);
+    expect(i.evidencias).toBeUndefined();
+    expect(i.drive).toBeUndefined();
+  });
+});

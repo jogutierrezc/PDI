@@ -270,6 +270,10 @@ const COLUMNAS_INDICADOR: ColT[] = [
   { etiqueta: "Estado", ancho: "27mm" },
 ];
 
+/** «Respaldo de «Matrícula»: Anexo 2 (Acta), Anexo 5». */
+const textoRespaldo = (nombre: string, anexos: { n: number; nombre: string }[]) =>
+  `Respaldo de «${nombre || "esta cifra"}»: ${anexos.map((a) => `Anexo ${a.n}${a.nombre ? ` (${a.nombre})` : ""}`).join(", ")}`;
+
 const COLUMNAS_ACCION: ColT[] = [{ etiqueta: "Acción" }, { etiqueta: "Qué se ha hecho" }, { etiqueta: "Finalización", ancho: "28mm" }, { etiqueta: "Proyección", ancho: "32mm" }];
 
 const filaAccionT = (f: FilaAccion): FilaT => ({
@@ -469,6 +473,13 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
             ),
           ),
         );
+        // El respaldo de cada cifra y de cada acción: sus anexos y, debajo, sus tablas y gráficas de UDrive.
+        [...d.filas.map((f) => ({ nombre: f.etiqueta, respaldo: f.respaldo })), ...(d.acciones ?? []).map((a) => ({ nombre: a.nombre, respaldo: a.respaldo }))].forEach((x, m) => {
+          if (!x.respaldo) return;
+          const kr = `d${n}:r${m}`;
+          if (x.respaldo.anexos.length) u.push(unidadFija(k(`${kr}:e`), i, <div className="vi-u"><p className="vi-logro__ev">{textoRespaldo(x.nombre, x.respaldo.anexos)}</p></div>));
+          u.push(...unidadesDrive(s, i, r, x.respaldo.drive, k(`${kr}:drive`)));
+        });
       });
       if (s.otros.length) {
         u.push(unidadFija(k("o:h"), i, <div className="vi-u"><div className="vi-sub-h"><h3>Otros datos de la unidad</h3></div></div>, { pegar: true }));

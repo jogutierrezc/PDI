@@ -13,7 +13,7 @@ import { formatoCifra, numeroDe } from "./cifras-vivas";
 import type { CifraVista } from "./cifras-vivas";
 import { CORTE_PARCIAL, ETIQUETA_ESTADO_META, avanceFrenteAMeta, estadoMeta } from "./vista/estados";
 import type { EstadoMeta } from "./vista/estados";
-import type { EstadoInstancia } from "./types";
+import type { ElementoDrive, EstadoInstancia } from "./types";
 
 export interface IndicadorManual {
   id: string;
@@ -47,6 +47,10 @@ export interface IndicadorManual {
   proyeccion_num?: number | null;
   /** Pilar del PDI (id) con el que se conecta esta cifra o acción; alimenta la Alineación estratégica. Vacío: no se conecta. */
   pilar?: string;
+  /** Números de los anexos (Evidencias) que respaldan esta cifra o acción. Uno o varios. */
+  evidencias?: number[];
+  /** Tablas y gráficas de UDrive que respaldan esta cifra o acción (referencia, no copia). Una o varias. */
+  drive?: ElementoDrive[];
 }
 
 export type TipoIndicador = "cifra" | "accion";
@@ -238,6 +242,31 @@ export function aCifraVista(i: IndicadorManual, seccion: string, estado: EstadoI
 
 /* ---------- Normalizar lo guardado ---------------------------------------------- */
 
+/** Números de anexo válidos y sin repetir, en el orden en que se eligieron. */
+export function evidenciasDe(crudo: unknown): number[] {
+  if (!Array.isArray(crudo)) return [];
+  return [...new Set(crudo.filter((n): n is number => typeof n === "number" && Number.isInteger(n) && n > 0))];
+}
+
+/** Tablas y gráficas de UDrive bien formadas, sin repetir el mismo archivo. */
+export function driveDe(crudo: unknown): ElementoDrive[] {
+  if (!Array.isArray(crudo)) return [];
+  const vistos = new Set<string>();
+  const salida: ElementoDrive[] = [];
+  for (const x of crudo) {
+    if (typeof x !== "object" || x === null) continue;
+    const e = x as Record<string, unknown>;
+    if (typeof e.archivoId !== "string" || !e.archivoId || vistos.has(e.archivoId)) continue;
+    if (e.tipo !== "tabla" && e.tipo !== "grafica") continue;
+    vistos.add(e.archivoId);
+    salida.push({ archivoId: e.archivoId, tipo: e.tipo, titulo: typeof e.titulo === "string" ? e.titulo : "", nota: typeof e.nota === "string" ? e.nota : "" });
+  }
+  return salida;
+}
+
+/** Cuántos respaldos (anexos + tablas/gráficas) tiene una cifra o acción. */
+export const respaldosDe = (i: Pick<IndicadorManual, "evidencias" | "drive">) => (i.evidencias?.length ?? 0) + (i.drive?.length ?? 0);
+
 /** Lo que llega del JSON de la base puede venir incompleto: se deja en forma. */
 export function normalizar(crudo: unknown): IndicadorManual[] {
   if (!Array.isArray(crudo)) return [];
@@ -260,6 +289,8 @@ export function normalizar(crudo: unknown): IndicadorManual[] {
       nota: typeof o.nota === "string" ? o.nota : "",
       ...(typeof o.requerido === "string" && o.requerido ? { requerido: o.requerido } : {}),
       ...(typeof o.pilar === "string" && o.pilar ? { pilar: o.pilar } : {}),
+      ...(evidenciasDe(o.evidencias).length ? { evidencias: evidenciasDe(o.evidencias) } : {}),
+      ...(driveDe(o.drive).length ? { drive: driveDe(o.drive) } : {}),
       ...(o.tipo === "accion"
         ? {
             tipo: "accion" as const,

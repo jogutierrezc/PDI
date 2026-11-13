@@ -21,7 +21,7 @@ import { driveDeAlineacion, normalizarAlineacion, tieneAlineacion } from "../ali
 import { driveLibre } from "../secciones-config";
 import { resolverTexto } from "../tokens";
 import type { Resolver } from "../tokens";
-import type { BloqueLibre, ContenidoSeccion, ElementoDrive, Logro, Meta, PilarRef, TipoSeccion } from "../types";
+import type { AnexoRow, BloqueLibre, ContenidoSeccion, ElementoDrive, Logro, Meta, PilarRef, TipoSeccion } from "../types";
 import { avanceFrenteAMeta, estadoMeta } from "./estados";
 import type { EstadoMeta } from "./estados";
 
@@ -42,6 +42,14 @@ export interface FilaIndicador {
   justificacion: string;
   /** Nombre del criterio o dimensión cuando no es una de las base. */
   dimNombre?: string;
+  /** Anexos y tablas o gráficas de UDrive que la unidad puso como respaldo de esta cifra. */
+  respaldo?: RespaldoEntrada;
+}
+
+/** Lo que respalda una cifra o una acción: los anexos (ya con su nombre) y los elementos de UDrive. */
+export interface RespaldoEntrada {
+  anexos: { n: number; nombre: string }[];
+  drive: ElementoDrive[];
 }
 
 /** Una acción descrita por la unidad (Resultados y evidencias): texto, sin aritmética. */
@@ -52,6 +60,7 @@ export interface FilaAccion {
   finalizacion: string;
   /** «Texto · 120 estudiantes» ya unido, o vacío. */
   proyeccion: string;
+  respaldo?: RespaldoEntrada;
 }
 
 export interface GrupoDimension {
@@ -105,6 +114,8 @@ export interface SeccionLibro {
   drive: ElementoDrive[];
   /** Las tablas y gráficas de UDrive de cada logro: se leen con las demás, pero se dibujan bajo su logro. */
   driveLogros: ElementoDrive[];
+  /** Las tablas y gráficas de UDrive que respaldan cifras y acciones de Resultados y evidencias: se leen con las demás y se dibujan bajo su dimensión. */
+  driveIndicadores: ElementoDrive[];
   /** Solo en la alineación estratégica (pdi) con aportes por pilar. */
   alineacion?: AporteEntrada[];
   /** Solo en las secciones libres: sus bloques en orden. */
@@ -151,9 +162,15 @@ function alineacionEntrada(c: ContenidoSeccion, resolver: Resolver, pilares: Pil
 }
 
 /** Un indicador escrito a mano, agrupado por su criterio. */
-function filaManual(c: CifraVista, ind: IndicadorManual): FilaIndicador {
+function respaldoDe(ind: IndicadorManual, anexos: AnexoRow[]): RespaldoEntrada | undefined {
+  const nombres = (ind.evidencias ?? []).map((n) => ({ n, nombre: anexos.find((a) => a.n === n)?.nombre ?? "" }));
+  const drive = ind.drive ?? [];
+  return nombres.length || drive.length ? { anexos: nombres, drive } : undefined;
+}
+
+function filaManual(c: CifraVista, ind: IndicadorManual, anexos: AnexoRow[] = []): FilaIndicador {
   const id = ind.criterio || "otros";
-  return { ...filaIndicador(c), dim: id, dimNombre: nombreCriterioBase(id) || (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : ind.criterio_nombre) || "Otros indicadores" };
+  return { ...filaIndicador(c), respaldo: respaldoDe(ind, anexos), dim: id, dimNombre: nombreCriterioBase(id) || (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : ind.criterio_nombre) || "Otros indicadores" };
 }
 
 function filaIndicador(c: CifraVista): FilaIndicador {
@@ -213,13 +230,13 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
       for (const a of m.accionesManuales.filter((x) => x.seccion === def.clave && x.completa)) {
         const id = a.ind.criterio || "otros";
         const proy = [a.ind.proyeccion_texto?.trim() ?? "", a.ind.proyeccion_num != null ? formatoCifra(a.ind.proyeccion_num, a.ind.unidad) : ""].filter(Boolean).join(" · ");
-        const fila: FilaAccion = { nombre: a.ind.nombre.trim(), descripcion: (a.ind.descripcion ?? "").trim(), hecho: (a.ind.avance_texto ?? "").trim(), finalizacion: (a.ind.finalizacion ?? "").trim(), proyeccion: proy };
+        const fila: FilaAccion = { nombre: a.ind.nombre.trim(), descripcion: (a.ind.descripcion ?? "").trim(), hecho: (a.ind.avance_texto ?? "").trim(), finalizacion: (a.ind.finalizacion ?? "").trim(), proyeccion: proy, respaldo: respaldoDe(a.ind, m.anexos.data ?? []) };
         const grupo = dimensiones.find((g) => g.id === id);
         if (grupo) (grupo.acciones ??= []).push(fila);
         else dimensiones.push({ id, titulo: nombreCriterioBase(id) || a.ind.criterio_nombre || "Datos de la unidad", funcion: "Indicadores de la unidad", filas: [], acciones: [fila] });
       }
       for (const ind of m.manuales.filter((x) => x.seccion === def.clave)) {
-        const fila = filaManual(ind.vista, ind.ind);
+        const fila = filaManual(ind.vista, ind.ind, m.anexos.data ?? []);
         const id = fila.dim;
         const nombre = fila.dimNombre ?? "";
         const grupo = dimensiones.find((g) => g.id === id);
@@ -274,9 +291,10 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
         def.tipo === "matriz"
           ? m.incluidas.map((x) => {
               const man = m.manuales.find((y) => y.vista.clave === x.clave);
-              return man ? filaManual(x, man.ind) : filaIndicador(x);
+              return man ? filaManual(x, man.ind, m.anexos.data ?? []) : filaIndicador(x);
             })
           : [],
+      driveIndicadores: dimensiones.flatMap((d) => [...d.filas, ...(d.acciones ?? [])]).flatMap((f) => f.respaldo?.drive ?? []),
       driveLogros: def.tipo === "logros" ? (c.logros ?? []).flatMap((l) => l.drive ?? []) : [],
       drive: def.tipo === "libre" ? driveLibre(c) : def.tipo === "pdi" ? [...(c.drive ?? []), ...driveDeAlineacion(c)] : (c.drive ?? []),
       alineacion: def.tipo === "pdi" && tieneAlineacion(c) ? alineacionEntrada(c, resolver, pilares) : undefined,

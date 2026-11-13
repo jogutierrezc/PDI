@@ -745,6 +745,7 @@ function CuerpoSeccion({
               cambiar={cambiar}
               puedeSugerir={!criteriosBase.data?.falta}
               requeridos={m.requeridosDe(def)}
+              anexos={anexos}
               criteriosPedidos={m.contexto(def).cifras.filter((x) => x.condicion === "justificar").map((x) => cifraDef(x.clave)?.dim ?? "").filter(Boolean)}
               sugerir={(p) => sugerirCriterio.mutateAsync({ nombre: p.nombre, descripcion: "", unidad: inst.unit_id })}
             />

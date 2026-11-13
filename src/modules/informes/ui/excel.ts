@@ -9,8 +9,12 @@ export interface HojaExcel {
   filas: (string | number | null)[][];
   /** Texto de ayuda sobre la tabla (no se lee al importar). */
   ayuda?: string;
-  /** Listas desplegables por columna (índice desde 0), solo en las primeras `filasLista` filas. */
-  listas?: Record<number, string[]>;
+  /**
+   * Listas desplegables por columna (índice desde 0). Una lista de textos va escrita en la celda (cabe en 255
+   * caracteres); `{ rango }` apunta a una columna de otra hoja («Criterios!$A$2:$A$9»), sin ese límite, y deja
+   * escribir un valor que no está en la lista.
+   */
+  listas?: Record<number, string[] | { rango: string }>;
 }
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -28,10 +32,11 @@ export async function descargarLibro(archivo: string, hojas: HojaExcel[]): Promi
     for (const f of h.filas) hoja.addRow(f);
     hoja.views = [{ state: "frozen", ySplit: 1 }];
     for (const [col, lista] of Object.entries(h.listas ?? {})) {
-      const texto = `"${lista.join(",")}"`;
-      if (texto.length > 255) continue;
+      const porRango = !Array.isArray(lista);
+      const texto = porRango ? lista.rango : `"${lista.join(",")}"`;
+      if (!porRango && texto.length > 255) continue;
       for (let r = 2; r <= Math.max(60, h.filas.length + 1); r++) {
-        hoja.getCell(r, Number(col) + 1).dataValidation = { type: "list", allowBlank: true, formulae: [texto] };
+        hoja.getCell(r, Number(col) + 1).dataValidation = { type: "list", allowBlank: true, formulae: [texto], ...(porRango ? { showErrorMessage: false } : {}) };
       }
     }
     if (h.ayuda) {

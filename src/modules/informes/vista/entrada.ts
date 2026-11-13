@@ -12,7 +12,7 @@ import { formatoCifra, variacion } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
 import type { ModeloInforme } from "../ui/modelo";
 import { resolverDe } from "../ui/Texto";
-import { esClaveIndicador } from "../indicadores-manual";
+import { esClaveIndicador, nombreCriterioBase } from "../indicadores-manual";
 import { hayDatosDeSintesis } from "../sintesis";
 import type { Sintesis } from "../sintesis";
 import type { IndicadorManual } from "../indicadores-manual";
@@ -151,7 +151,7 @@ function alineacionEntrada(c: ContenidoSeccion, resolver: Resolver, pilares: Pil
 /** Un indicador escrito a mano, agrupado por su criterio. */
 function filaManual(c: CifraVista, ind: IndicadorManual): FilaIndicador {
   const id = ind.criterio || "otros";
-  return { ...filaIndicador(c), dim: id, dimNombre: (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : ind.criterio_nombre) || "Otros indicadores" };
+  return { ...filaIndicador(c), dim: id, dimNombre: nombreCriterioBase(id) || (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : ind.criterio_nombre) || "Otros indicadores" };
 }
 
 function filaIndicador(c: CifraVista): FilaIndicador {
@@ -214,7 +214,7 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
         const fila: FilaAccion = { nombre: a.ind.nombre.trim(), descripcion: (a.ind.descripcion ?? "").trim(), hecho: (a.ind.avance_texto ?? "").trim(), finalizacion: (a.ind.finalizacion ?? "").trim(), proyeccion: proy };
         const grupo = dimensiones.find((g) => g.id === id);
         if (grupo) (grupo.acciones ??= []).push(fila);
-        else dimensiones.push({ id, titulo: a.ind.criterio_nombre || "Datos de la unidad", funcion: "Indicadores de la unidad", filas: [], acciones: [fila] });
+        else dimensiones.push({ id, titulo: nombreCriterioBase(id) || a.ind.criterio_nombre || "Datos de la unidad", funcion: "Indicadores de la unidad", filas: [], acciones: [fila] });
       }
       for (const ind of m.manuales.filter((x) => x.seccion === def.clave)) {
         const fila = filaManual(ind.vista, ind.ind);

@@ -13,7 +13,6 @@ import { formatoCifra, numeroDe } from "./cifras-vivas";
 import type { CifraVista } from "./cifras-vivas";
 import { CORTE_PARCIAL, ETIQUETA_ESTADO_META, avanceFrenteAMeta, estadoMeta } from "./vista/estados";
 import type { EstadoMeta } from "./vista/estados";
-import { DIMS } from "./plantillas";
 import type { EstadoInstancia } from "./types";
 
 export interface IndicadorManual {
@@ -68,6 +67,27 @@ export interface Criterio {
   origen: "base" | "aprobado" | "propio";
 }
 
+/**
+ * Los criterios base de Resultados y evidencias. Los ids «acad», «prof» y «cal» eran los de las cifras
+ * de enseñanza: lo guardado con ellos se lee como «ens» (Enseñanza).
+ */
+export const CRITERIOS_BASE: { id: string; nombre: string }[] = [
+  { id: "ext", nombre: "Extensión" },
+  { id: "int", nombre: "Internacionalización" },
+  { id: "inv", nombre: "Investigación" },
+  { id: "ens", nombre: "Enseñanza" },
+  { id: "fin", nombre: "Gestión administrativa y financiera" },
+  { id: "ae", nombre: "Acciones estratégicas" },
+];
+
+const CRITERIO_ANTERIOR: Record<string, string> = { acad: "ens", prof: "ens", cal: "ens" };
+
+/** El id vigente de un criterio (los de enseñanza de antes pasan a «ens»). */
+export const idCriterio = (id: string): string => CRITERIO_ANTERIOR[id] ?? id;
+
+/** El nombre de un criterio base, o nada si no lo es. */
+export const nombreCriterioBase = (id: string): string => CRITERIOS_BASE.find((c) => c.id === idCriterio(id))?.nombre ?? "";
+
 export const UNIDADES_USUALES = ["", " %", " pp", " $"] as const;
 
 export const claveIndicador = (seccion: string, id: string) => `ind_${seccion}_${id}`;
@@ -81,8 +101,12 @@ export function indicadorNuevo(criterio: string, criterioNombre = "", tipo: Tipo
   return { id: idNuevo(), criterio, criterio_nombre: criterioNombre, nombre: "", unidad: "", mayorMejor: true, actual: null, anterior: null, meta: null, fuente: "", nota: "" };
 }
 
-/** Los criterios de una sección: los base de la plantilla, los aprobados y los que la unidad escribió. */
-export function criteriosDe(dims: string[], aprobados: { id: string; nombre: string }[], propios: CriterioPropio[] = []): Criterio[] {
+/**
+ * Los criterios de una sección: los base, los aprobados y los que la unidad escribió. Una sección que
+ * consolida lo de otras unidades (`dims` acotadas) muestra solo los base de sus dimensiones; las demás,
+ * los seis.
+ */
+export function criteriosDe(dims: string[], aprobados: { id: string; nombre: string }[], propios: CriterioPropio[] = [], todos = true): Criterio[] {
   const vistos = new Set<string>();
   const salida: Criterio[] = [];
   const poner = (c: Criterio) => {
@@ -90,7 +114,8 @@ export function criteriosDe(dims: string[], aprobados: { id: string; nombre: str
     vistos.add(c.id);
     salida.push(c);
   };
-  for (const d of dims) if (d in DIMS) poner({ id: d, nombre: DIMS[d as keyof typeof DIMS].titulo, origen: "base" });
+  const deLaSeccion = new Set(dims.map(idCriterio));
+  for (const b of CRITERIOS_BASE) if (todos || deLaSeccion.has(b.id)) poner({ ...b, origen: "base" });
   for (const a of aprobados) poner({ ...a, origen: "aprobado" });
   for (const p of propios) poner({ ...p, origen: "propio" });
   return salida;
@@ -221,7 +246,7 @@ export function normalizar(crudo: unknown): IndicadorManual[] {
     const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
     salida.push({
       id: typeof o.id === "string" && o.id ? o.id : idNuevo(),
-      criterio: typeof o.criterio === "string" ? o.criterio : "",
+      criterio: typeof o.criterio === "string" ? idCriterio(o.criterio) : "",
       criterio_nombre: typeof o.criterio_nombre === "string" ? o.criterio_nombre : "",
       nombre: typeof o.nombre === "string" ? o.nombre : "",
       unidad: typeof o.unidad === "string" ? o.unidad : "",
@@ -268,8 +293,12 @@ export interface LecturaIndicadores {
 }
 
 /** Lee las filas de la hoja «Indicadores» (la primera fila es el encabezado). */
-export function leerFilasIndicadores(filas: string[][], criterios: Criterio[]): LecturaIndicadores {
+export function leerFilasIndicadores(filas: string[][], criterios: Criterio[], rotulo = ""): LecturaIndicadores {
+  const f0 = rotulo ? `${rotulo}, fila` : "Fila";
   const porNombre = new Map(criterios.map((c) => [sinTildes(c.nombre), c.id]));
+  // Los nombres de antes (un archivo viejo) llegan a su criterio de hoy.
+  const anteriores: [string, string][] = [["gestion academica", "ens"], ["gestion profesoral", "ens"], ["calidad y oferta", "ens"], ["extension e internacionalizacion", "ext"], ["acciones estrategicas", "ae"]];
+  for (const [n, id] of anteriores) if (!porNombre.has(n) && criterios.some((c) => c.id === id)) porNombre.set(n, id);
   const nuevos = new Map<string, CriterioPropio>();
   const indicadores: IndicadorManual[] = [];
   const avisos: string[] = [];
@@ -281,7 +310,7 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[]): 
     const [crit, nombre, unidad, sentido, anterior, actual, meta, fuente, nota, tipoTxt, descripcion, hecho, finalizacion, proyTxt, proyNum] = celdas;
     const accion = sinTildes(tipoTxt) === "accion";
     if (!nombre) {
-      avisos.push(`Fila ${fila}: sin nombre de indicador, se omitió.`);
+      avisos.push(`${f0} ${fila}: sin nombre de indicador, se omitió.`);
       return;
     }
     let id = porNombre.get(sinTildes(crit)) ?? nuevos.get(sinTildes(crit))?.id;
@@ -289,16 +318,16 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[]): 
       if (crit) {
         id = `l_${idNuevo()}`;
         nuevos.set(sinTildes(crit), { id, nombre: crit });
-        avisos.push(`Fila ${fila}: el criterio «${crit}» no existe; se creó como criterio propio de la unidad.`);
+        avisos.push(`${f0} ${fila}: el criterio «${crit}» no existe; se creó como criterio propio de la unidad.`);
       } else {
         id = criterios[0]?.id ?? "";
-        avisos.push(`Fila ${fila}: sin criterio, quedó en «${criterios[0]?.nombre ?? "—"}».`);
+        avisos.push(`${f0} ${fila}: sin criterio, quedó en «${criterios[0]?.nombre ?? "—"}».`);
       }
     }
     const numero = (texto: string, nombreCol: string) => {
       if (!texto) return null;
       const v = numeroDe(texto.replace(/%/g, "").replace(/\$/g, ""));
-      if (v === null) avisos.push(`Fila ${fila}: «${texto}» no es un número en ${nombreCol}.`);
+      if (v === null) avisos.push(`${f0} ${fila}: «${texto}» no es un número en ${nombreCol}.`);
       return v;
     };
     const base = {
@@ -341,4 +370,76 @@ export function filasParaExcel(indicadores: IndicadorManual[], criterios: Criter
     if (esAccion(i)) return [...comun, "", null, null, null, i.fuente, i.nota, TIPO_ACCION, i.descripcion ?? "", i.avance_texto ?? "", i.finalizacion ?? "", i.proyeccion_texto ?? "", i.proyeccion_num ?? null];
     return [...comun, i.mayorMejor ? MAS_ES_MEJOR : MENOS_ES_MEJOR, i.anterior, i.actual, i.meta, i.fuente, i.nota, TIPO_CIFRA, "", "", "", "", null];
   });
+}
+
+/* ---------- Excel con una hoja para cifras y otra para acciones ---------------------- */
+
+/** Hoja «Cifras»: lo mismo que el bloque de cifras de la hoja «Indicadores», sin las columnas de acción. */
+export const COLUMNAS_CIFRAS = [...COLUMNAS_EXCEL] as const;
+/** Hoja «Acciones»: una fila por acción. */
+export const COLUMNAS_ACCIONES = ["Criterio", "Acción", "Descripción de la acción", "Qué se ha hecho", "Finalización", "Proyección (texto)", "Proyección (número)", "Unidad de la proyección", "Fuente", "Nota"] as const;
+
+export const HOJA_CIFRAS = "Cifras";
+export const HOJA_ACCIONES = "Acciones";
+/** La hoja única de antes (cifras y acciones juntas): se sigue leyendo. */
+export const HOJA_INDICADORES = "Indicadores";
+
+export function filasCifras(indicadores: IndicadorManual[], criterios: Criterio[]): (string | number | null)[][] {
+  const nombre = new Map(criterios.map((c) => [c.id, c.nombre]));
+  return indicadores
+    .filter(esCifra)
+    .map((i) => [nombre.get(i.criterio) ?? i.criterio_nombre ?? i.criterio, i.nombre, i.unidad.trim(), i.mayorMejor ? MAS_ES_MEJOR : MENOS_ES_MEJOR, i.anterior, i.actual, i.meta, i.fuente, i.nota]);
+}
+
+export function filasAcciones(indicadores: IndicadorManual[], criterios: Criterio[]): (string | number | null)[][] {
+  const nombre = new Map(criterios.map((c) => [c.id, c.nombre]));
+  return indicadores
+    .filter(esAccion)
+    .map((i) => [nombre.get(i.criterio) ?? i.criterio_nombre ?? i.criterio, i.nombre, i.descripcion ?? "", i.avance_texto ?? "", i.finalizacion ?? "", i.proyeccion_texto ?? "", i.proyeccion_num ?? null, i.unidad.trim(), i.fuente, i.nota]);
+}
+
+/** Una fila de la hoja «Acciones» en el orden de la hoja única, para leerla con el mismo código. */
+const accionALegado = (f: string[]): string[] => [f[0] ?? "", f[1] ?? "", f[7] ?? "", "", "", "", "", f[8] ?? "", f[9] ?? "", TIPO_ACCION, f[2] ?? "", f[3] ?? "", f[4] ?? "", f[5] ?? "", f[6] ?? ""];
+/** Una fila de la hoja «Cifras» con su tipo, para el mismo código. */
+const cifraALegado = (f: string[]): string[] => [...COLUMNAS_CIFRAS.map((_, k) => f[k] ?? ""), TIPO_CIFRA, "", "", "", "", ""];
+
+export interface HojasIndicadores {
+  /** La hoja «Cifras» (con encabezado). */
+  cifras?: string[][];
+  /** La hoja «Acciones» (con encabezado). */
+  acciones?: string[][];
+  /** La hoja única de antes. */
+  indicadores?: string[][];
+}
+
+/**
+ * Lee el libro de resultados: cifras, acciones, o la hoja única de antes. Un criterio que no existe se crea
+ * como propio de la unidad una sola vez, aunque aparezca en varias hojas.
+ */
+export function leerLibroIndicadores(hojas: HojasIndicadores, criterios: Criterio[]): LecturaIndicadores {
+  const indicadores: IndicadorManual[] = [];
+  const avisos: string[] = [];
+  const nuevos: CriterioPropio[] = [];
+  let conocidos = [...criterios];
+  const pasar = (filas: string[][] | undefined, rotulo: string, aLegado?: (f: string[]) => string[]) => {
+    if (!filas || filas.length < 2) return;
+    const adaptadas = aLegado ? [filas[0] ?? [], ...filas.slice(1).map(aLegado)] : filas;
+    const r = leerFilasIndicadores(adaptadas, conocidos, rotulo);
+    indicadores.push(...r.indicadores);
+    avisos.push(...r.avisos);
+    for (const n of r.criteriosNuevos) {
+      nuevos.push(n);
+      conocidos = [...conocidos, { ...n, origen: "propio" }];
+    }
+  };
+  pasar(hojas.cifras, "Cifras", cifraALegado);
+  pasar(hojas.acciones, "Acciones", accionALegado);
+  pasar(hojas.indicadores, "Indicadores");
+  return { indicadores, criteriosNuevos: nuevos, avisos };
+}
+
+/** Las filas de la hoja «Criterios» del libro: todos los que puede usar la unidad, con su origen. */
+export function filasCriterios(criterios: Criterio[]): string[][] {
+  const origen = { base: "Base", aprobado: "Aprobado por Planeación", propio: "Propio de la unidad" } as const;
+  return criterios.map((k) => [k.nombre, origen[k.origen]]);
 }

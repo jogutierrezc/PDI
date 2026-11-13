@@ -9,6 +9,7 @@
 import { useRef, useState } from "react";
 import { useCriterios, aprobadosPara } from "../criterios";
 import { condicionDe, useGuardarRequisito } from "../datos";
+import { CRITERIOS_BASE, idCriterio } from "../indicadores-manual";
 import { DIMS, LETRAS, PLANTILLAS, dimsDe } from "../plantillas";
 import { useBorrarRequerido, useGuardarRequeridos, useRequeridos } from "../requeridos";
 import { COLUMNAS_REQ, FUENTES_REQ, filasDeRequeridos, leerFilasRequeridos, requeridoNuevo } from "../requeridos-logica";
@@ -31,9 +32,9 @@ export function RequisitosConfig({ ciclo, requisitos }: { ciclo: CicloRow; requi
   if (lectura.isPending) return <Cargando texto="Cargando los datos requeridos…" />;
   const filas = lectura.data?.filas ?? [];
   const falta = Boolean(lectura.data?.falta);
-  const base = Object.keys(DIMS).map((id) => ({ id, nombre: DIMS[id as keyof typeof DIMS].titulo }));
+  const base = CRITERIOS_BASE;
   const opcionesCriterio = [...base, ...aprobadosPara(criterios.data?.filas ?? [], plantilla, ciclo.anio)];
-  const nombreCriterio = (id: string) => opcionesCriterio.find((o) => o.id === id)?.nombre ?? "";
+  const nombreCriterio = (id: string) => opcionesCriterio.find((o) => o.id === idCriterio(id))?.nombre ?? "";
   const delaPlantilla = filas.filter((f) => f.plantilla === plantilla).sort((a, b) => a.orden - b.orden);
   const firma = JSON.stringify(delaPlantilla.map((f) => [f.id, f.dato, f.fuente_tipo, f.fuente_nombre, f.criterio, f.unidad, f.mayor_mejor, f.condicion, f.orden]));
 
@@ -213,7 +214,7 @@ function Plantillas({
                     <input className="inf-in" aria-label={`Nombre de la fuente de ${r.dato || `dato ${n + 1}`}`} maxLength={200} placeholder="Dónde se consigue" value={r.fuente_nombre} onChange={(e) => poner(r.id, { fuente_nombre: e.target.value })} />
                   </td>
                   <td>
-                    <select className="inf-in" aria-label={`Criterio de ${r.dato || `dato ${n + 1}`}`} value={r.criterio} onChange={(e) => poner(r.id, { criterio: e.target.value })}>
+                    <select className="inf-in" aria-label={`Criterio de ${r.dato || `dato ${n + 1}`}`} value={idCriterio(r.criterio)} onChange={(e) => poner(r.id, { criterio: e.target.value })}>
                       <option value="">Sin criterio</option>
                       {opcionesCriterio.map((o) => (
                         <option key={o.id} value={o.id}>

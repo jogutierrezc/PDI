@@ -8,7 +8,7 @@ import { condicionDe, useAnexos, useCifras, useCifrasVivas, useSecciones } from 
 import { useRequeridos } from "../requeridos";
 import { estadoRequeridos, requeridosDePlantilla, requeridosDeSeccion } from "../requeridos-logica";
 import type { DatoRequerido } from "../requeridos-logica";
-import { aCifraVista, esAccion, esCifra, esCompleto, normalizar } from "../indicadores-manual";
+import { aCifraVista, esAccion, esCifra, esCompleto, idCriterio, nombreCriterioBase, normalizar } from "../indicadores-manual";
 import type { IndicadorManual } from "../indicadores-manual";
 import { dimDeConsulta } from "../catalogo";
 import { esMetaDelPrograma, filasMetaPrograma } from "../metas-programa";
@@ -72,10 +72,10 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   /** La síntesis: lo reportado en Objetivos y metas y en Resultados por dimensión, junto. */
   const claveMetas = plantilla.secciones.find((s) => s.tipo === "metas")?.clave ?? "";
   const metasAdicionales = secciones.data?.find((s) => s.clave === claveMetas)?.contenido?.metas ?? [];
-  const nombreCriterio = (id: string, propio?: string) => (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : propio || "Otros datos de la unidad");
+  const nombreCriterio = (id: string, propio?: string) => (nombreCriterioBase(id) || (id in DIMS ? DIMS[id as keyof typeof DIMS].titulo : propio || "Otros datos de la unidad"));
   const entradasSintesis = [
-    ...delInforme.filter((c) => c.incluida && conectada(c)).map((v) => ({ v, id: cifraDef(v.clave)?.dim ?? "otros", propio: "" })),
-    ...agregadas.filter((a) => a.vista.incluida).map((a) => ({ v: a.vista, id: dimDeConsulta(a.fila.consulta) ?? "otros", propio: "" })),
+    ...delInforme.filter((c) => c.incluida && conectada(c)).map((v) => ({ v, id: idCriterio(cifraDef(v.clave)?.dim ?? "otros"), propio: "" })),
+    ...agregadas.filter((a) => a.vista.incluida).map((a) => ({ v: a.vista, id: idCriterio(dimDeConsulta(a.fila.consulta) ?? "otros"), propio: "" })),
     ...propias.map((p) => ({ v: p.vista, id: "otros", propio: "" })),
     ...manuales.map((x) => ({ v: x.vista, id: x.ind.criterio || "otros", propio: x.ind.criterio_nombre ?? "" })),
   ];

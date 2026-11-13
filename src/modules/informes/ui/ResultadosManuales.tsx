@@ -12,10 +12,17 @@
 import { useEffect, useRef, useState } from "react";
 import { formatoCifra, numeroDe } from "../cifras-vivas";
 import {
-  COLUMNAS_EXCEL_TODAS,
-  TIPO_ACCION,
-  TIPO_CIFRA,
+  COLUMNAS_ACCIONES,
+  COLUMNAS_CIFRAS,
+  HOJA_ACCIONES,
+  HOJA_CIFRAS,
+  HOJA_INDICADORES,
   criteriosMarcados,
+  filasAcciones,
+  filasCifras,
+  filasCriterios,
+  idCriterio,
+  leerLibroIndicadores,
   esAccion,
   esCifra,
   esCompleto,
@@ -24,9 +31,7 @@ import {
   criteriosDe,
   evaluar,
   faltantes,
-  filasParaExcel,
   indicadorNuevo,
-  leerFilasIndicadores,
   normalizar,
   idNuevo,
 } from "../indicadores-manual";
@@ -37,7 +42,7 @@ import { faltaRequerido, respuestaNueva, textoFuenteReq } from "../requeridos-lo
 import type { DatoRequerido } from "../requeridos-logica";
 import type { ContenidoSeccion, SeccionDef } from "../types";
 import { mensajeDe } from "./comunes";
-import { descargarLibro, leerHoja } from "./excel";
+import { descargarLibro, leerHoja, nombresDeHojas } from "./excel";
 
 const TONO: Record<EstadoMeta, string> = { superada: "is-ok", cumplida: "is-teal", parcial: "is-mid", rezagada: "is-bad" };
 const FORMA: Record<EstadoMeta, string> = { superada: "▲", cumplida: "●", parcial: "◐", rezagada: "▼" };
@@ -95,14 +100,14 @@ interface Props {
 export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [] }: Props) {
   const indicadores = normalizar(c.indicadores);
   const propios = c.criterios_propios ?? [];
-  const criterios = criteriosDe(def.dims ?? [], aprobados, propios);
+  const criterios = criteriosDe(def.dims ?? [], aprobados, propios, !def.consolida);
   // Las respuestas a lo que pide Planeación se muestran en su propio bloque, no entre los criterios.
   const clavesPedidas = new Set(requeridos.map((r) => r.clave));
   const visibles = indicadores.filter((i) => !(i.requerido && clavesPedidas.has(i.requerido)));
   // Indicadores de un criterio que ya no existe (archivado): se muestran aparte, sin perderlos.
   const huerfanos = visibles.filter((i) => !criterios.some((k) => k.id === i.criterio));
   // Selector: reportar a un criterio es opcional. Lo que Planeación exige y lo que ya tiene indicadores cuenta como marcado.
-  const pedidos = new Set([...criteriosPedidos, ...requeridos.map((r) => r.criterio).filter(Boolean)]);
+  const pedidos = new Set([...criteriosPedidos, ...requeridos.map((r) => r.criterio)].filter(Boolean).map(idCriterio));
   const marcados = criteriosMarcados(c.criterios_reporta, visibles, [...pedidos]);
   const cuantos = (id: string) => visibles.filter((i) => i.criterio === id).length;
   const alternar = (id: string) => {
@@ -122,10 +127,10 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
   const quitar = (id: string) => poner(indicadores.filter((i) => i.id !== id));
   /** Escribe en la respuesta a un dato requerido; la crea al primer cambio. Nombre, unidad y sentido los fija Planeación. */
   const cambiarRequerido = (r: DatoRequerido, cambios: Partial<IndicadorManual>) => {
-    const fijos = { nombre: r.dato, unidad: r.unidad, mayorMejor: r.mayor_mejor, criterio: r.criterio, requerido: r.clave };
+    const fijos = { nombre: r.dato, unidad: r.unidad, mayorMejor: r.mayor_mejor, criterio: idCriterio(r.criterio), requerido: r.clave };
     const previa = indicadores.find((i) => i.requerido === r.clave);
     if (previa) poner(indicadores.map((i) => (i === previa ? { ...i, ...cambios, ...fijos } : i)));
-    else poner([...indicadores, { ...respuestaNueva(r, criterios.find((k) => k.id === r.criterio)?.nombre ?? ""), ...cambios }]);
+    else poner([...indicadores, { ...respuestaNueva(r, criterios.find((k) => k.id === idCriterio(r.criterio))?.nombre ?? ""), ...cambios }]);
   };
 
   const agregarCriterio = () => {
@@ -153,35 +158,52 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
     setOcupado(false);
   };
 
+  const rangoCriterios = `Criterios!$A$2:$A$${Math.max(2, criterios.length + 1)}`;
+  const hojaCriterios = { nombre: "Criterios", columnas: [{ titulo: "Criterios disponibles", ancho: 50 }, { titulo: "Origen", ancho: 28 }], filas: filasCriterios(criterios) };
+  const anchoCifras = (n: number) => (n === 0 ? 34 : n === 1 || n === 7 || n === 8 ? 40 : 16);
+  const anchoAcciones = (n: number) => (n === 0 ? 34 : n === 1 || n === 2 || n === 3 ? 40 : n === 4 || n === 5 ? 28 : 16);
+
   const plantilla = async () => {
-    const ejemplo: IndicadorManual[] = criterios.slice(0, 2).map((k, n) => ({ ...indicadorNuevo(k.id, k.nombre), nombre: n ? "Ejemplo: profesores con doctorado" : "Ejemplo: tasa de graduación", unidad: "%", anterior: n ? 18 : 62, actual: n ? 21 : 66, meta: n ? 25 : 70, fuente: "Oficina de la unidad" }));
-    if (criterios[0]) ejemplo.push({ ...indicadorNuevo(criterios[0].id, criterios[0].nombre, "accion"), nombre: "Ejemplo: tutorías de refuerzo", descripcion: "Acompañamiento a estudiantes de primer semestre", avance_texto: "Se abrieron 12 grupos en el primer periodo", finalizacion: "Segundo periodo de 2026", proyeccion_texto: "Ampliar a todos los programas", proyeccion_num: 20, unidad: "" });
-    await descargarLibro("plantilla-resultados-por-dimension.xlsx", [
+    const [k1, k2] = [criterios[0], criterios[1] ?? criterios[0]];
+    const ejemploCifras: IndicadorManual[] = [k1, k2].filter(Boolean).map((k, n) => ({ ...indicadorNuevo(k.id, k.nombre), nombre: n ? "Ejemplo: profesores con doctorado" : "Ejemplo: tasa de graduación", unidad: "%", anterior: n ? 18 : 62, actual: n ? 21 : 66, meta: n ? 25 : 70, fuente: "Oficina de la unidad" }));
+    const ejemploAcciones: IndicadorManual[] = k1
+      ? [{ ...indicadorNuevo(k1.id, k1.nombre, "accion"), nombre: "Ejemplo: tutorías de refuerzo", descripcion: "Acompañamiento a estudiantes de primer semestre", avance_texto: "Se abrieron 12 grupos en el primer periodo", finalizacion: "Segundo periodo de 2026", proyeccion_texto: "Ampliar a todos los programas", proyeccion_num: 20, unidad: "" }]
+      : [];
+    await descargarLibro("plantilla-resultados-y-evidencias.xlsx", [
       {
-        nombre: "Indicadores",
-        columnas: COLUMNAS_EXCEL_TODAS.map((t, n) => ({ titulo: t, ancho: n === 1 || n === 8 || n === 10 || n === 11 ? 40 : n === 0 ? 34 : 16 })),
-        filas: filasParaExcel(ejemplo, criterios),
-        listas: { 0: criterios.map((k) => k.nombre.replace(/,/g, " ")), 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR], 9: [TIPO_CIFRA, TIPO_ACCION] },
+        nombre: HOJA_CIFRAS,
+        columnas: COLUMNAS_CIFRAS.map((t, n) => ({ titulo: t, ancho: anchoCifras(n) })),
+        filas: filasCifras(ejemploCifras, criterios),
+        listas: { 0: { rango: rangoCriterios }, 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR] },
         ayuda: [
-          "Una fila por indicador. Borre las filas de ejemplo.",
-          "Criterio: elija de la lista o escriba uno nuevo; si no existe se crea como criterio propio de su unidad.",
+          "Una fila por cifra. Borre las filas de ejemplo.",
+          "Criterio: elija de la lista (hoja «Criterios») o escriba uno nuevo; si no existe se crea como criterio propio de su unidad.",
           `Qué es mejor: «${MAS_ES_MEJOR}» (matrícula, graduados) o «${MENOS_ES_MEJOR}» (deserción, tiempos).`,
           "Año anterior, Cifra actual y Meta: solo números (puede usar coma decimal). El estado no se escribe: lo calcula el informe.",
           "Unidad: déjela vacía para conteos, o escriba % o pp.",
-          `Tipo: «${TIPO_CIFRA}» (por defecto) o «${TIPO_ACCION}». Una acción solo usa Indicador (su nombre), Descripción, Qué se ha hecho, Finalización y Proyección (texto y número, con la Unidad si aplica); no lleva cifras ni meta.`,
         ].join("\n"),
       },
-      { nombre: "Criterios", columnas: [{ titulo: "Criterios disponibles", ancho: 50 }], filas: criterios.map((k) => [k.nombre]) },
+      {
+        nombre: HOJA_ACCIONES,
+        columnas: COLUMNAS_ACCIONES.map((t, n) => ({ titulo: t, ancho: anchoAcciones(n) })),
+        filas: filasAcciones(ejemploAcciones, criterios),
+        listas: { 0: { rango: rangoCriterios } },
+        ayuda: [
+          "Una fila por acción. Borre la fila de ejemplo.",
+          "Criterio: igual que en la hoja «Cifras»; sirve cualquiera de la hoja «Criterios» o uno nuevo.",
+          "Acción: el nombre corto. Descripción y Qué se ha hecho son obligatorios para dar la acción por completa.",
+          "Finalización: cuándo se plantea terminarla (fecha o periodo, en texto). Proyección: en texto y, si aplica, en número (con su unidad).",
+        ].join("\n"),
+      },
+      hojaCriterios,
     ]);
   };
 
   const exportar = async () => {
-    await descargarLibro("resultados-por-dimension.xlsx", [
-      {
-        nombre: "Indicadores",
-        columnas: COLUMNAS_EXCEL_TODAS.map((t, n) => ({ titulo: t, ancho: n === 1 || n === 8 || n === 10 || n === 11 ? 40 : n === 0 ? 34 : 16 })),
-        filas: filasParaExcel(indicadores, criterios),
-      },
+    await descargarLibro("resultados-y-evidencias.xlsx", [
+      { nombre: HOJA_CIFRAS, columnas: COLUMNAS_CIFRAS.map((t, n) => ({ titulo: t, ancho: anchoCifras(n) })), filas: filasCifras(indicadores, criterios), listas: { 0: { rango: rangoCriterios }, 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR] } },
+      { nombre: HOJA_ACCIONES, columnas: COLUMNAS_ACCIONES.map((t, n) => ({ titulo: t, ancho: anchoAcciones(n) })), filas: filasAcciones(indicadores, criterios), listas: { 0: { rango: rangoCriterios } } },
+      hojaCriterios,
     ]);
   };
 
@@ -189,11 +211,17 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
     if (!archivo) return;
     setOcupado(true);
     try {
-      const filas = await leerHoja(archivo, "Indicadores");
-      if (filas.length < 2) setPrevia({ error: "La hoja «Indicadores» no tiene filas. Use la plantilla que se descarga aquí." });
+      const nombres = await nombresDeHojas(archivo);
+      const tiene = (n: string) => nombres.some((x) => x.trim().toLowerCase() === n.toLowerCase());
+      const [cifras, acciones, legado] = await Promise.all([
+        tiene(HOJA_CIFRAS) ? leerHoja(archivo, HOJA_CIFRAS) : Promise.resolve(undefined),
+        tiene(HOJA_ACCIONES) ? leerHoja(archivo, HOJA_ACCIONES) : Promise.resolve(undefined),
+        tiene(HOJA_INDICADORES) ? leerHoja(archivo, HOJA_INDICADORES) : Promise.resolve(undefined),
+      ]);
+      if (!cifras && !acciones && !legado) setPrevia({ error: "El libro no tiene las hojas «Cifras» ni «Acciones». Use la plantilla que se descarga aquí." });
       else {
-        const r = leerFilasIndicadores(filas, criterios);
-        setPrevia(r.indicadores.length ? { ...r, archivo: archivo.name } : { error: r.avisos.join(" ") || "No se encontró ningún indicador en el archivo." });
+        const r = leerLibroIndicadores({ cifras, acciones, indicadores: legado }, criterios);
+        setPrevia(r.indicadores.length ? { ...r, archivo: archivo.name } : { error: r.avisos.join(" ") || "No se encontró ninguna cifra ni acción en el archivo." });
       }
     } catch (e) {
       setPrevia({ error: `No se pudo abrir el Excel: ${mensajeDe(e)}` });
@@ -345,7 +373,7 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
               </thead>
               <tbody>
                 {requeridos.map((r) => (
-                  <FilaRequerida key={r.clave} r={r} resp={indicadores.find((i) => i.requerido === r.clave)} criterio={criterios.find((k) => k.id === r.criterio)?.nombre ?? ""} editable={editable} cambiar={(x) => cambiarRequerido(r, x)} />
+                  <FilaRequerida key={r.clave} r={r} resp={indicadores.find((i) => i.requerido === r.clave)} criterio={criterios.find((k) => k.id === idCriterio(r.criterio))?.nombre ?? ""} editable={editable} cambiar={(x) => cambiarRequerido(r, x)} />
                 ))}
               </tbody>
             </table>

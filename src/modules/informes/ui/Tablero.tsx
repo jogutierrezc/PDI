@@ -465,7 +465,7 @@ function Entrega({ ciclo }: { ciclo: CicloRow }) {
   return (
     <section className="inf-card inf-pad inf-tab" aria-labelledby="inf-entrega" data-guia="t-tabla">
       <h3 id="inf-entrega" className="inf-t">
-        Entrega por unidad y sede <AyudaPilo zona="t-tabla" />
+        Entrega por unidad <AyudaPilo zona="t-tabla" />
       </h3>
       <p className="inf-sub">
         Fecha límite {fmtFecha(ciclo.fecha_limite)}. {resumen.abiertos} de {resumen.total} informes abiertos.

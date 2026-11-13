@@ -7,7 +7,7 @@
    respondidos y cuáles faltan. Sin acceso a datos, sin lanzar.
    ========================================================================== */
 
-import { idNuevo, normalizar } from "./indicadores-manual";
+import { idCriterio, idNuevo, normalizar } from "./indicadores-manual";
 import type { IndicadorManual } from "./indicadores-manual";
 import type { Condicion, Plantilla } from "./types";
 
@@ -74,7 +74,7 @@ export const requeridosDePlantilla = (todos: DatoRequerido[], plantilla: Plantil
 export function requeridosDeSeccion(requeridos: DatoRequerido[], dimsDeSecciones: { clave: string; dims: string[] }[], seccion: string): DatoRequerido[] {
   const primera = dimsDeSecciones[0]?.clave;
   return requeridos.filter((r) => {
-    const dueña = dimsDeSecciones.find((s) => s.dims.includes(r.criterio))?.clave ?? primera;
+    const dueña = dimsDeSecciones.find((s) => s.dims.map(idCriterio).includes(idCriterio(r.criterio)))?.clave ?? primera;
     return dueña === seccion;
   });
 }
@@ -123,7 +123,7 @@ export function estadoRequeridos(contenidoIndicadores: unknown, requeridos: Dato
 
 /** Un IndicadorManual vacío que responde a un requerido (con sus datos fijos copiados). */
 export function respuestaNueva(r: DatoRequerido, criterioNombre = ""): IndicadorManual {
-  return { id: idNuevo(), criterio: r.criterio, criterio_nombre: criterioNombre, nombre: r.dato, unidad: r.unidad, mayorMejor: r.mayor_mejor, actual: null, anterior: null, meta: null, fuente: r.fuente_nombre, nota: "", requerido: r.clave };
+  return { id: idNuevo(), criterio: idCriterio(r.criterio), criterio_nombre: criterioNombre, nombre: r.dato, unidad: r.unidad, mayorMejor: r.mayor_mejor, actual: null, anterior: null, meta: null, fuente: r.fuente_nombre, nota: "", requerido: r.clave };
 }
 
 /* ---------- Excel de la configuración ------------------------------------------------ */

@@ -16,9 +16,15 @@ interface Props {
   /** Lista desplegable para la primera columna (solo si es «Dimensión»). */
   dimensiones?: string[];
   cambiar: (filas: string[][]) => void;
+  /** Filas de ejemplo de la plantilla; sin ellas, se arman dos con el nombre de cada columna. */
+  ejemplo?: string[][];
+  /** Líneas de ayuda propias de la sección, antes de las generales. */
+  ayuda?: string[];
+  /** Máximo de filas que admite la sección (el resto de un archivo se omite, con aviso). */
+  tope?: number;
 }
 
-export function ImportarFilas({ columnas, filas, editable, archivo, dimensiones, cambiar }: Props) {
+export function ImportarFilas({ columnas, filas, editable, archivo, dimensiones, cambiar, ejemplo: ejemploPropio, ayuda = [], tope }: Props) {
   const entrada = useRef<HTMLInputElement>(null);
   const [previa, setPrevia] = useState<(LecturaFilas & { archivo: string }) | { error: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -32,7 +38,7 @@ export function ImportarFilas({ columnas, filas, editable, archivo, dimensiones,
   const plantilla = async () => {
     setAviso("");
     try {
-      const ejemplo = [0, 1].map((n) => columnas.map((c, i) => (i === 0 && dimensiones ? (dimensiones[n] ?? "") : `Ejemplo: ${c.toLowerCase()} (borre esta fila)`)));
+      const ejemplo = ejemploPropio ?? [0, 1].map((n) => columnas.map((c, i) => (i === 0 && dimensiones ? (dimensiones[n] ?? "") : `Ejemplo: ${c.toLowerCase()} (borre esta fila)`)));
       await descargarLibro(`plantilla-${archivo}.xlsx`, [
         {
           nombre: "Filas",
@@ -40,7 +46,8 @@ export function ImportarFilas({ columnas, filas, editable, archivo, dimensiones,
           filas: ejemplo,
           listas,
           ayuda: [
-            "Una fila por punto. Borre las filas de ejemplo antes de subir el archivo.",
+            ...(ayuda.length ? ayuda : ["Una fila por punto."]),
+            "Borre las filas de ejemplo antes de subir el archivo.",
             `Columnas: ${columnas.join(", ")}. No cambie los encabezados de la primera fila.`,
             ...(dimensiones ? ["Dimensión: elija de la lista; si escribe otra, se importa igual como texto libre."] : []),
             "Una fila con alguna celda vacía se importa, pero la sección no queda lista hasta completarla.",
@@ -78,7 +85,9 @@ export function ImportarFilas({ columnas, filas, editable, archivo, dimensiones,
 
   const usar = (reemplazar: boolean) => {
     if (!previa || "error" in previa) return;
-    cambiar(reemplazar ? previa.filas : [...filas, ...previa.filas]);
+    const todas = reemplazar ? previa.filas : [...filas, ...previa.filas];
+    cambiar(tope ? todas.slice(0, tope) : todas);
+    setAviso(tope && todas.length > tope ? `La sección admite ${tope} filas: se dejaron las primeras ${tope}.` : "");
     setPrevia(null);
   };
 

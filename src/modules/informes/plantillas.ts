@@ -31,7 +31,7 @@ export const DIMS: Record<DimId, DimDef> = {
   prof: { id: "prof", titulo: "Gestión profesoral", funcion: "Enseñanza", cifras: cifrasDe("prof") },
   cal: { id: "cal", titulo: "Calidad y oferta", funcion: "Enseñanza", cifras: cifrasDe("cal") },
   inv: { id: "inv", titulo: "Investigación", funcion: "Investigación", cifras: cifrasDe("inv") },
-  ext: { id: "ext", titulo: "Extensión e internacionalización", funcion: "Extensión", cifras: cifrasDe("ext") },
+  ext: { id: "ext", titulo: "Extensión", funcion: "Extensión", cifras: cifrasDe("ext") },
   fin: { id: "fin", titulo: "Gestión administrativa y financiera", funcion: "Administrativa y financiera", cifras: cifrasDe("fin") },
 };
 

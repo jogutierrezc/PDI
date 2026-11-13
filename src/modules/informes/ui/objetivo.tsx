@@ -10,7 +10,7 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
 import { actorDe } from "../../rankings/reporte/envio";
-import { useInstancias, useMembresiasInforme, useOfertaSedes, useUnidades } from "../datos";
+import { useInstancias, useMembresiasInforme, useUnidades } from "../datos";
 import { buscarInstancia, nombreConSede, SIN_OFERTA, sedesPorUnidad } from "../sedes";
 import type { InstanciaRow, SedeInforme, UnidadRef } from "../types";
 
@@ -55,19 +55,16 @@ export function useObjetivoInforme(ciclo: string | undefined): Objetivo {
   const membresias = useMembresiasInforme(profile?.id);
   const unidades = useUnidades();
   const instancias = useInstancias(ciclo);
-  const oferta = useOfertaSedes();
   const [params] = useSearchParams();
 
   const error = [membresias.error, unidades.error, instancias.error].find((e): e is Error => e instanceof Error);
   if (error) return { tipo: "error", error };
-  if (!profile || membresias.isPending || unidades.isPending || instancias.isPending || oferta.isPending) return { tipo: "cargando" };
+  if (!profile || membresias.isPending || unidades.isPending || instancias.isPending) return { tipo: "cargando" };
 
   const lista = unidades.data ?? [];
   const porId = new Map(lista.map((u) => [u.id, u]));
   const orden = new Map(lista.map((u, i) => [u.id, i]));
-  const sedesDe = sedesPorUnidad(lista, oferta.data ?? SIN_OFERTA);
-  const sedePorId = new Map((oferta.data?.sedes ?? []).map((s) => [s.id, s]));
-  const sedePorSlug = new Map((oferta.data?.sedes ?? []).map((s) => [s.slug, s]));
+  const sedesDe = sedesPorUnidad(lista, SIN_OFERTA);
 
   // Dónde trabaja: primero la función más fuerte, luego el orden del organigrama.
   const mias = [...(membresias.data ?? [])].sort((a, b) => FUERZA[b.rol] - FUERZA[a.rol] || (orden.get(a.unidad) ?? 0) - (orden.get(b.unidad) ?? 0));
@@ -76,7 +73,8 @@ export function useObjetivoInforme(ciclo: string | undefined): Objetivo {
   for (const m of mias) {
     const unidad = porId.get(m.unidad) ?? { id: m.unidad, name: m.nombre, kind: "", code: null, parent_id: null };
     const ofrecidas = sedesDe.get(m.unidad) ?? [];
-    const propia = m.sede ? (sedePorId.get(m.sede) ?? null) : null;
+    // Las facultades son multicampus: la sede de «Dónde trabaja» no parte el informe.
+    const propia: SedeInforme | null = null;
     const c: Candidato = propia ? { unidad, fija: propia, elegir: false } : ofrecidas.length === 1 ? { unidad, fija: ofrecidas[0], elegir: false } : ofrecidas.length > 1 ? { unidad, fija: null, elegir: true } : { unidad, fija: null, elegir: false };
     const clave = `${unidad.id}|${c.elegir ? "*" : (c.fija?.id ?? "")}`;
     if (!vistos.has(clave)) {
@@ -86,17 +84,16 @@ export function useObjetivoInforme(ciclo: string | undefined): Objetivo {
   }
 
   const pidUnidad = params.get("unidad");
-  const pedida = params.get("sede") ? (sedePorSlug.get(params.get("sede") ?? "") ?? null) : null;
   let elegido: Candidato | null = null;
   if (pidUnidad) {
     if (planeacion) {
       const u = porId.get(pidUnidad);
       if (!u) return { tipo: "ajena" };
       const ofr = sedesDe.get(u.id) ?? [];
-      elegido = { unidad: u, fija: pedida ?? (ofr.length === 1 ? ofr[0] : null), elegir: !pedida && ofr.length > 1 };
+      elegido = { unidad: u, fija: ofr.length === 1 ? ofr[0] : null, elegir: ofr.length > 1 };
     } else {
       // Una unidad o sede ajena en la dirección se rechaza: no se carga nada de ella (la base también lo niega).
-      elegido = candidatos.find((c) => c.unidad.id === pidUnidad && (c.elegir || !pedida || c.fija?.id === pedida.id)) ?? null;
+      elegido = candidatos.find((c) => c.unidad.id === pidUnidad) ?? null;
       if (!elegido) return { tipo: "ajena" };
     }
   } else {
@@ -108,7 +105,7 @@ export function useObjetivoInforme(ciclo: string | undefined): Objetivo {
   const miRol = (membresias.data ?? []).find((x) => x.unidad === elegido.unidad.id)?.rol ?? null;
   const soloVer = planeacion && !miRol;
   const ofrecidas = sedesDe.get(elegido.unidad.id) ?? [];
-  const sede = elegido.elegir ? (pedida && ofrecidas.some((o) => o.id === pedida.id) ? pedida : (ofrecidas[0] ?? null)) : elegido.fija;
+  const sede = elegido.elegir ? (ofrecidas[0] ?? null) : elegido.fija;
   const elegirSede = ofrecidas.length > 1 && (planeacion || elegido.elegir);
   const otras: Destino[] = candidatos.filter((c) => c.unidad.id !== elegido.unidad.id || (!c.elegir && c.fija?.id !== sede?.id)).map((c) => ({ unidad: c.unidad, sede: c.fija }));
   return {

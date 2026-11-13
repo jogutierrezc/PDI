@@ -15,7 +15,7 @@ import { nombreSeguro } from "../rankings/reporte/datos";
 import { aNumero } from "./cifras-vivas";
 import type { IndicadorOd, SedeRef } from "./catalogo";
 import type { RespuestaPlan } from "./plan-decanatura";
-import { SIN_OFERTA } from "./sedes";
+import { SIN_OFERTA, unaPorUnidad } from "./sedes";
 import type { OfertaSedes } from "./sedes";
 import type {
   AnexoRow,
@@ -220,7 +220,8 @@ export function useInstancias(ciclo: string | undefined) {
         const sin = revisar<Omit<InstanciaRow, "campus_id">[] | null>(await supabase.from("informe_instancias").select(COLS_INSTANCIA).eq("ciclo_id", ciclo ?? "")) ?? [];
         return sin.map((i) => ({ ...i, campus_id: null }));
       }
-      return revisar<InstanciaRow[] | null>(con) ?? [];
+      // Un informe por unidad (multicampus): los que 0272 partió por sede se ven como uno.
+      return unaPorUnidad(revisar<InstanciaRow[] | null>(con) ?? []);
     },
   });
 }

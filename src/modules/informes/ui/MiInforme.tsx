@@ -36,6 +36,8 @@ import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
 import { claveAgregada, consultaDe, unidadDe } from "../catalogo";
 import { recibeMetasDeImpacto } from "../metas-programa";
 import { ImportarFilas } from "./ImportarFilas";
+import { AYUDA_LOGROS, AYUDA_METAS, COLUMNAS_LOGROS, COLUMNAS_METAS, EJEMPLO_LOGROS, EJEMPLO_METAS, MAX_LOGROS, filasALogros, filasAMetas, logrosAFilas, metasAFilas } from "../excel-secciones";
+import { CRITERIOS_BASE } from "../indicadores-manual";
 import { Alineacion } from "./Alineacion";
 import { BloquesLibres } from "./BloquesLibres";
 import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, plantillaSugerida } from "../plantillas";
@@ -687,6 +689,15 @@ function CuerpoSeccion({
                 {delPrograma ? "Meta adicional: solo lo que no está en los indicadores del programa. El resultado se calcula solo." : "El resultado se calcula solo. Nada de tablas pegadas desde Excel."}
               </span>
             </div>
+            <ImportarFilas
+              columnas={[...COLUMNAS_METAS]}
+              filas={metasAFilas(c.metas ?? [])}
+              editable={editable}
+              archivo="objetivos-y-metas-anuales"
+              ejemplo={EJEMPLO_METAS}
+              ayuda={AYUDA_METAS}
+              cambiar={(filas) => cambiar({ ...c, metas: filasAMetas(filas) })}
+            />
             <TablaMetas metas={c.metas ?? []} editable={editable} cambiar={(metas) => cambiar({ ...c, metas })} />
           </div>
         </>
@@ -811,7 +822,7 @@ function CuerpoSeccion({
             filas={c.filas ?? []}
             editable={editable}
             archivo={def.columnas?.[0] === "Dimensión" ? "puntos-criticos" : "retos-oportunidades"}
-            dimensiones={def.columnas?.[0] === "Dimensión" ? Object.values(DIMS).map((d) => d.titulo) : undefined}
+            dimensiones={def.columnas?.[0] === "Dimensión" ? CRITERIOS_BASE.map((d) => d.nombre) : undefined}
             cambiar={(filas) => cambiar({ ...c, filas })}
           />
           <TablaFilas columnas={def.columnas ?? []} filas={c.filas ?? []} editable={editable} cambiar={(filas) => cambiar({ ...c, filas })} />
@@ -824,6 +835,16 @@ function CuerpoSeccion({
             <Tag />
             <span className="inf-src">{(c.logros ?? []).length} de 3 logros</span>
           </div>
+          <ImportarFilas
+            columnas={[...COLUMNAS_LOGROS]}
+            filas={logrosAFilas(c.logros ?? [])}
+            editable={editable}
+            archivo="logros-innovadores-o-excepcionales"
+            ejemplo={EJEMPLO_LOGROS}
+            ayuda={AYUDA_LOGROS}
+            tope={MAX_LOGROS}
+            cambiar={(filas) => cambiar({ ...c, logros: filasALogros(filas) })}
+          />
           <Logros logros={c.logros ?? []} anexos={anexos} editable={editable} cambiar={(logros) => cambiar({ ...c, logros })} />
         </div>
       );

@@ -11,8 +11,9 @@
 
 import type { CifraVista } from "./cifras-vivas";
 import { evaluar } from "./indicadores-manual";
-import type { PlanAccion, ResumenDimension } from "./plan-decanatura";
-import { resumenPorDimension } from "./plan-decanatura";
+import type { PlanAccion, PlanActividad, ResumenDimension } from "./plan-decanatura";
+import { actividadesDe, resumenPorDimension } from "./plan-decanatura";
+import { estaCumplida } from "./resumen-gestion";
 import { contarEstados } from "./vista/estados";
 import type { Conteo, EstadoMeta } from "./vista/estados";
 
@@ -38,6 +39,36 @@ export interface GrupoAcciones {
   completas: number;
 }
 
+/** Una acción del plan de trabajo tal como la trae la API, lista para la tabla de la síntesis. */
+export interface AccionSintesis {
+  dimension: string;
+  dimensionNombre: string;
+  accion: string;
+  responsable: string;
+  estado: string;
+  /** Último avance informado (0–100) o nulo. */
+  avance: number | null;
+  actividades: number;
+  cumplidas: number;
+  /** Último enlace de evidencia de la acción o de sus actividades. */
+  evidencia: string;
+  nota: string;
+}
+
+/** Una actividad completada del plan, con la acción a la que pertenece. */
+export interface ActividadSintesis {
+  accion: string;
+  descripcion: string;
+  fecha: string;
+  evidencia: string;
+}
+
+export interface DetallePlan {
+  acciones: AccionSintesis[];
+  actividades: { total: number; cumplidas: number; enProceso: number };
+  cumplidas: ActividadSintesis[];
+}
+
 export interface Sintesis {
   plan: {
     total: number;
@@ -46,6 +77,8 @@ export interface Sintesis {
     pendientes: number;
     avance: number | null;
     dimensiones: ResumenDimension[];
+    /** Acciones y actividades de la API; ausente si el plan no trajo detalle. */
+    detalle?: DetallePlan;
   } | null;
   /** Metas con resultado (indicadores del programa y metas adicionales). */
   metas: { total: number; conteo: Conteo } | null;
@@ -70,7 +103,43 @@ export interface EntradaAccionManual {
   completa: boolean;
 }
 
-export function armarSintesis(o: { acciones: PlanAccion[]; metas: (EstadoMeta | null)[]; indicadores: EntradaIndicador[]; accionesManuales?: EntradaAccionManual[] }): Sintesis {
+const esUrl = (t: string | null | undefined) => /^https?:\/\//i.test((t ?? "").trim());
+
+/** El detalle del plan: una fila por acción y las actividades cumplidas. Solo lo que la API entregó. */
+export function detalleDePlan(acciones: PlanAccion[], actividades: PlanActividad[]): DetallePlan {
+  const filas = acciones.map((a): AccionSintesis => {
+    const acts = actividadesDe(actividades, a.id);
+    const evidencia = [a.link_evidencia_accion, ...[...acts].reverse().map((x) => x.link_evidencia)].find(esUrl) ?? "";
+    return {
+      dimension: a.dimension,
+      dimensionNombre: a.dimension_nombre,
+      accion: a.accion.trim(),
+      responsable: (a.responsable ?? "").trim(),
+      estado: a.estado ?? a.estado_inicial ?? "Sin iniciar",
+      avance: typeof a.avance === "number" ? a.avance : null,
+      actividades: acts.length || a.n_actividades || 0,
+      cumplidas: acts.filter((x) => estaCumplida(x.estado ?? "")).length,
+      evidencia: evidencia.trim(),
+      nota: (a.notas ?? "").trim(),
+    };
+  });
+  const porAccion = new Map(acciones.map((a) => [a.id, a.accion.trim()]));
+  const cumplidas = actividades
+    .filter((x) => estaCumplida(x.estado ?? "") && porAccion.has(x.accion_id))
+    .map((x): ActividadSintesis => ({ accion: porAccion.get(x.accion_id) ?? "", descripcion: x.descripcion.trim(), fecha: x.fecha ?? x.corte ?? "", evidencia: esUrl(x.link_evidencia) ? (x.link_evidencia ?? "").trim() : "" }));
+  const delPlan = actividades.filter((x) => porAccion.has(x.accion_id));
+  return {
+    acciones: filas,
+    actividades: {
+      total: delPlan.length,
+      cumplidas: cumplidas.length,
+      enProceso: delPlan.filter((x) => /proceso|avance|ejecuci/i.test(x.estado ?? "") && !estaCumplida(x.estado ?? "")).length,
+    },
+    cumplidas,
+  };
+}
+
+export function armarSintesis(o: { acciones: PlanAccion[]; metas: (EstadoMeta | null)[]; indicadores: EntradaIndicador[]; accionesManuales?: EntradaAccionManual[]; actividades?: PlanActividad[] }): Sintesis {
   const { acciones } = o;
   const avances = acciones.map((a) => a.avance).filter((v): v is number => typeof v === "number");
   const plan = acciones.length
@@ -81,6 +150,7 @@ export function armarSintesis(o: { acciones: PlanAccion[]; metas: (EstadoMeta | 
         pendientes: acciones.filter((a) => a.estado !== "Completado" && a.estado !== "En proceso").length,
         avance: avances.length ? Math.round(avances.reduce((s, v) => s + v, 0) / avances.length) : null,
         dimensiones: resumenPorDimension(acciones),
+        detalle: detalleDePlan(acciones, o.actividades ?? []),
       }
     : null;
 
@@ -162,6 +232,10 @@ export function cifrasDeSintesis(s: Sintesis): CifraVista[] {
     out.push(cifra("sint_acciones", "Acciones del plan de trabajo", s.plan.total));
     out.push(cifra("sint_acciones_completadas", "Acciones completadas", s.plan.completadas));
     out.push(cifra("sint_acciones_proceso", "Acciones en proceso", s.plan.enProceso));
+    if (s.plan.detalle?.actividades.total) {
+      out.push(cifra("sint_actividades", "Actividades del plan de trabajo", s.plan.detalle.actividades.total));
+      out.push(cifra("sint_actividades_cumplidas", "Actividades completadas", s.plan.detalle.actividades.cumplidas));
+    }
     if (s.plan.avance !== null) out.push(cifra("sint_avance_plan", "Avance promedio del plan de trabajo", s.plan.avance, " %"));
   }
   if (s.metas) {

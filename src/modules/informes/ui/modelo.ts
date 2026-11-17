@@ -4,7 +4,8 @@
 import { useMemo } from "react";
 import { congelado, esViva, vistaCifra } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
-import { condicionDe, useAnexos, useCifras, useCifrasVivas, useSecciones } from "../datos";
+import { condicionDe, useAnexos, useCifras, useCifrasVivas, usePlanUnidad, useSecciones } from "../datos";
+import { planVigente } from "../plan-importar";
 import { useRequeridos } from "../requeridos";
 import { estadoRequeridos, requeridosDePlantilla, requeridosDeSeccion } from "../requeridos-logica";
 import type { DatoRequerido } from "../requeridos-logica";
@@ -14,7 +15,7 @@ import { dimDeConsulta } from "../catalogo";
 import { esMetaDelPrograma, filasMetaPrograma } from "../metas-programa";
 import { armarSintesis, cifrasDeSintesis } from "../sintesis";
 import { estadoMeta } from "../vista/estados";
-import type { PlanAccion } from "../plan-decanatura";
+import type { PlanAccion, PlanActividad } from "../plan-decanatura";
 import { PLANTILLAS, cifraDef, clavesDe, DIMS } from "../plantillas";
 import { clavesInactivas, resolverSecciones } from "../secciones-config";
 import { useConfigSecciones } from "../secciones-datos";
@@ -25,8 +26,28 @@ import type { CicloRow, ConfigCiclo, ContenidoSeccion, InstanciaRow, RequisitoRo
 export const CONFIG_BASE: ConfigCiclo = { limite_propios: 3, exigir_fuente: true, exigir_pilar: false };
 export const configDe = (ciclo: CicloRow | null | undefined): ConfigCiclo => ({ ...CONFIG_BASE, ...(ciclo?.config ?? {}) });
 
-/** `acciones`: las del Plan de Trabajo de la facultad (vacío si la unidad no tiene plan). */
-export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos: RequisitoRow[], acciones: PlanAccion[] = []) {
+/**
+ * El plan de trabajo que vale para el informe, igual que en el editor: el que la unidad guardó o importó en
+ * «Objetivos y metas» y, si no hay, el de la API. La vista, la revisión y el editor deben leer el mismo.
+ */
+export function usePlanDelInforme(inst: Pick<InstanciaRow, "id" | "plantilla">, unidad: { id: string; kind: string }) {
+  const api = usePlanUnidad(unidad.id, unidad.kind === "facultad");
+  const secciones = useSecciones(inst.id);
+  const claveMetas = PLANTILLAS[inst.plantilla].secciones.find((x) => x.tipo === "metas")?.clave ?? "";
+  const local = secciones.data?.find((x) => x.clave === claveMetas)?.contenido?.plan;
+  const vigente = planVigente(api.data, local);
+  return {
+    acciones: vigente?.acciones ?? [],
+    actividades: vigente?.actividades ?? [],
+    origen: vigente?.origen ?? null,
+    /** Falta lo que la API todavía no entregó y no hay plan guardado que lo reemplace. */
+    cargando: (api.isLoading && !local) || secciones.isPending,
+    error: api.error instanceof Error ? api.error : null,
+  };
+}
+
+/** `acciones` y `actividades`: las del Plan de Trabajo de la facultad (vacío si la unidad no tiene plan). */
+export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos: RequisitoRow[], acciones: PlanAccion[] = [], actividades: PlanActividad[] = []) {
   const secciones = useSecciones(inst.id);
   const lecturaRequeridos = useRequeridos(ciclo.id);
   const requeridos = requeridosDePlantilla(lecturaRequeridos.data?.filas ?? [], inst.plantilla);
@@ -81,6 +102,7 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   ];
   const sintesis = armarSintesis({
     acciones,
+    actividades,
     metas: [
       ...metasPrograma.map((f) => estadoMeta(f.alcanzado, f.meta, !f.baja)),
       ...metasAdicionales.filter((x) => x.meta.trim()).map((x) => estadoMeta(x.alcanzado, x.programado, true)),
@@ -137,7 +159,7 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
   const cargando = secciones.isPending || filas.isPending || anexos.isPending || lecturaEstructura.isPending;
   const error = [secciones.error, filas.error, anexos.error, vivas.error].find((e): e is Error => e instanceof Error) ?? null;
 
-  return { plantilla, inactivas, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, manuales, accionesManuales, manualesDe, sintesis, citables, contenidoGuardado, contexto, avance, requeridos, requeridosDe, cargando, error };
+  return { planAcciones: acciones, planActividades: actividades, plantilla, inactivas, config, secciones, filas, vivas, anexos, frio, vista, propias, agregadas, conectada, delInforme, incluidas, metasPrograma, manuales, accionesManuales, manualesDe, sintesis, citables, contenidoGuardado, contexto, avance, requeridos, requeridosDe, cargando, error };
 }
 
 export type ModeloInforme = ReturnType<typeof useModeloInforme>;

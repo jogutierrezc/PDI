@@ -10,7 +10,7 @@ import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
 import { useFundido } from "../../rankings/movimiento";
-import { useInstancias, useMisDestinos, useOfertaSedes, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
+import { useInstancias, useMisDestinos, useOfertaSedes, usePilares, useRevisar, useUnidades } from "../datos";
 import { componerNota, leerNota } from "../estados";
 import { nombreConSede } from "../sedes";
 import type { CicloRow, ContenidoSeccion, EstadoInstancia, InstanciaRow, PilarRef, RequisitoRow, SeccionDef } from "../types";
@@ -19,7 +19,7 @@ import { Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
 import { AyudaPilo } from "../guia/AyudaPilo";
 import { Aviso, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { TablaMetasPrograma } from "./MetasPrograma";
-import { useModeloInforme } from "./modelo";
+import { useModeloInforme, usePlanDelInforme } from "./modelo";
 import type { ModeloInforme } from "./modelo";
 import { PanelSintesis } from "./Sintesis";
 import { LecturaTexto, resolverDe } from "./Texto";
@@ -125,8 +125,8 @@ function RevisionGestion({ ciclo, requisitos, destinos }: { ciclo: CicloRow; req
 }
 
 function Detalle({ inst, ciclo, requisitos, unidad, sede, esFacultad }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: string; sede: { id: string; slug: string; name: string } | null | undefined; esFacultad: boolean }) {
-  const plan = usePlanUnidad(inst.unit_id, esFacultad);
-  const m = useModeloInforme(inst, ciclo, requisitos, plan.data?.acciones ?? []);
+  const plan = usePlanDelInforme(inst, { id: inst.unit_id, kind: esFacultad ? "facultad" : "otra" });
+  const m = useModeloInforme(inst, ciclo, requisitos, plan.acciones, plan.actividades);
   const pilares = usePilares();
   const revisar = useRevisar();
   const previa = leerNota(inst.nota_revision);

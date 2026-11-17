@@ -19,12 +19,12 @@ import { useCallback, useMemo, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { actorDe, nombreRol } from "../../rankings/reporte/envio";
 import { congelado } from "../cifras-vivas";
-import { useDisenoInforme, useGuardarDiseno, useGuardarPerfil, usePerfilUnidad, usePilares, usePlanUnidad, useUrlImagen } from "../datos";
+import { useDisenoInforme, useGuardarDiseno, useGuardarPerfil, usePerfilUnidad, usePilares, useUrlImagen } from "../datos";
 import { puedeEditar } from "../estados";
 import type { CicloRow, InstanciaRow, RequisitoRow, UnidadRef } from "../types";
 import { Aviso as AvisoError, Cargando, Vacio, fmtFecha, mensajeDe } from "../ui/comunes";
 import { EncabezadoObjetivo, useObjetivoInforme } from "../ui/objetivo";
-import { useModeloInforme } from "../ui/modelo";
+import { useModeloInforme, usePlanDelInforme } from "../ui/modelo";
 import { unidadesDelLibro, useRecursosDrive } from "./armado";
 import { EditorCierre } from "./EditorCierre";
 import { EditorPortada } from "./EditorPortada";
@@ -66,8 +66,9 @@ export function VistaInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisito
 type Modo = "libro" | "portada" | "cierre";
 
 function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: UnidadRef; actor: ReturnType<typeof actorDe> }) {
-  const plan = usePlanUnidad(unidad.id, unidad.kind === "facultad");
-  const m = useModeloInforme(inst, ciclo, requisitos, plan.data?.acciones ?? []);
+  // El mismo plan que ve el editor: el guardado o importado en Objetivos y metas, o el de la API.
+  const plan = usePlanDelInforme(inst, unidad);
+  const m = useModeloInforme(inst, ciclo, requisitos, plan.acciones, plan.actividades);
   const pilares = usePilares();
   const perfilQ = usePerfilUnidad(unidad.id);
   const disenoQ = useDisenoInforme(inst.id);
@@ -97,7 +98,8 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
   const elementos = useMemo(() => entrada.secciones.flatMap((s) => [...s.drive, ...s.driveLogros, ...s.driveIndicadores]), [entrada]);
   const recursos = useRecursosDrive(elementos);
   const unidades = useMemo(() => unidadesDelLibro(entrada, recursos), [entrada, recursos]);
-  const listo = !m.cargando && !m.error && !pilares.isPending && recursos.listo;
+  // El plan de la API tarda más que lo guardado: no se mide con datos a medias (si falla, se sigue con lo escrito).
+  const listo = !m.cargando && !m.error && !pilares.isPending && recursos.listo && !plan.cargando;
   const { medida, resultado, midiendo } = useLibro(unidades, diseno.papel, listo);
 
   const escudo = useUrlImagen(perfil.logoRuta);

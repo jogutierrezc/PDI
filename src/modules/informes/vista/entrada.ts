@@ -13,8 +13,8 @@ import type { CifraVista } from "../cifras-vivas";
 import type { ModeloInforme } from "../ui/modelo";
 import { resolverDe } from "../ui/Texto";
 import { esClaveIndicador, nombreCriterioBase } from "../indicadores-manual";
-import { hayDatosDeSintesis } from "../sintesis";
-import type { Sintesis } from "../sintesis";
+import { detalleDePlan, hayDatosDeSintesis } from "../sintesis";
+import type { AccionSintesis, Sintesis } from "../sintesis";
 import type { IndicadorManual } from "../indicadores-manual";
 import { cifraDef, DIMS } from "../plantillas";
 import { driveDeAlineacion, normalizarAlineacion, tieneAlineacion } from "../alineacion";
@@ -91,6 +91,23 @@ export interface AporteEntrada {
   acciones: { titulo: string; descripcion: string; bloques: BloqueEntrada[] }[];
 }
 
+/** Un objetivo y meta del plan de trabajo (Objetivos y metas), tal como está en el plan vigente. */
+export interface FilaPlan {
+  dimension: string;
+  accion: string;
+  meta: string;
+  pilar: string;
+  responsable: string;
+  fecha: string;
+  recursos: string;
+}
+
+/** Una evidencia del plan (de una acción o una actividad) que no es anexo del informe. */
+export interface EvidenciaPlan {
+  origen: string;
+  url: string;
+}
+
 export interface SeccionLibro {
   clave: string;
   numero: number;
@@ -120,6 +137,12 @@ export interface SeccionLibro {
   alineacion?: AporteEntrada[];
   /** Solo en las secciones libres: sus bloques en orden. */
   bloques: BloqueEntrada[];
+  /** Solo en Objetivos y metas: las acciones del plan de trabajo con su meta, pilar y recursos. */
+  plan: FilaPlan[];
+  /** Solo en la primera sección de Resultados: avances de las acciones del plan que la unidad aún no describió. */
+  avancesPlan: AccionSintesis[];
+  /** Solo en Evidencias: enlaces de evidencia de las acciones y actividades del plan, sin repetir los anexos. */
+  evidenciasPlan: EvidenciaPlan[];
   /** Síntesis armada con lo reportado (solo en secciones de tipo matriz y si hay datos). */
   sintesis: Sintesis | null;
   /** Fuente al pie: «UDES en Cifras · corte 31 dic 2025». */
@@ -270,6 +293,32 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
     ];
 
     const anexos = def.tipo === "anexos" || def.tipo === "evid" ? (m.anexos.data ?? []) : [];
+    const planFilas: FilaPlan[] =
+      def.tipo === "metas"
+        ? m.planAcciones.map((a) => ({ dimension: a.dimension_nombre || a.dimension, accion: a.accion.trim(), meta: (a.meta ?? "").trim(), pilar: (a.pilar ?? "").trim(), responsable: (a.responsable ?? "").trim(), fecha: a.fecha_limite ?? "", recursos: (a.recursos ?? "").trim() }))
+        : [];
+    // La primera sección de Resultados recoge los avances del plan; lo que la unidad describió a mano no se repite.
+    const primeraDim = m.plantilla.secciones.find((x) => x.tipo === "dim")?.clave === def.clave;
+    const avancesPlan: AccionSintesis[] =
+      def.tipo === "dim" && primeraDim && !m.accionesManuales.some((x) => x.seccion === def.clave)
+        ? detalleDePlan(m.planAcciones, m.planActividades).acciones.filter((a) => a.avance !== null || a.nota)
+        : [];
+    const urlsAnexo = new Set((m.anexos.data ?? []).filter((a) => a.tipo === "url").map((a) => a.ruta.trim()));
+    const esUrl = (t: string | null | undefined) => /^https?:\/\//i.test((t ?? "").trim());
+    const evidenciasPlan: EvidenciaPlan[] = [];
+    if (def.tipo === "evid") {
+      const vistas = new Set<string>();
+      const poner = (url: string | null | undefined, origen: string) => {
+        const u = (url ?? "").trim();
+        if (!esUrl(u) || vistas.has(u) || urlsAnexo.has(u)) return;
+        vistas.add(u);
+        evidenciasPlan.push({ origen, url: u });
+      };
+      for (const a of m.planAcciones) {
+        poner(a.link_evidencia_accion, `Acción: ${a.accion.trim()}`);
+        for (const x of m.planActividades.filter((y) => y.accion_id === a.id)) poner(x.link_evidencia, `Actividad: ${x.descripcion.trim()} · ${a.accion.trim()}`);
+      }
+    }
     const cifrasFuente = def.tipo === "matriz" ? m.incluidas : enSeccion;
 
     return {
@@ -299,6 +348,9 @@ export function entradaLibro(m: ModeloInforme, pilares: PilarRef[], anio: string
       drive: def.tipo === "libre" ? driveLibre(c) : def.tipo === "pdi" ? [...(c.drive ?? []), ...driveDeAlineacion(c)] : (c.drive ?? []),
       alineacion: def.tipo === "pdi" && tieneAlineacion(c) ? alineacionEntrada(c, resolver, pilares) : undefined,
       bloques: def.tipo === "libre" ? (c.bloques ?? []).map((b): BloqueEntrada => (b.tipo === "texto" ? { tipo: "texto", texto: resolverTexto(b.texto, resolver).trim() } : b.tipo === "drive" ? { tipo: "drive", drive: b.drive } : { tipo: "tabla", titulo: b.titulo, nota: b.nota, encabezados: b.encabezados, filas: b.filas })).filter((b) => b.tipo !== "tabla" || b.filas.some((f) => f.some((x) => x.trim()))) : [],
+      plan: planFilas,
+      avancesPlan,
+      evidenciasPlan,
       sintesis: def.tipo === "matriz" && hayDatosDeSintesis(m.sintesis) ? m.sintesis : null,
       fuente: fuenteDe(cifrasFuente),
     };

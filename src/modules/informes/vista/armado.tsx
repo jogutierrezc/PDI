@@ -261,6 +261,75 @@ function GraficaAvance({ filas, titulo }: { filas: FilaIndicador[]; titulo: stri
   );
 }
 
+/** Cumplimiento del plan por dimensión: barras apiladas al 100 % (completadas, en proceso, pendientes). */
+function GraficaCumplimiento({ filas, titulo }: { filas: { nombre: string; completadas: number; enProceso: number; pendientes: number }[]; titulo: string }) {
+  const x0 = 62;
+  const x1 = 150;
+  const alto = 6.4;
+  const H = filas.length * alto + 11;
+  const COL = { c: "#12833a", p: "#f0cf7a", n: "#d6dee8" };
+  const resumen = filas.map((f) => `${f.nombre}: ${f.completadas} completadas, ${f.enProceso} en proceso, ${f.pendientes} pendientes`).join("; ");
+  return (
+    <figure className="vi-fig">
+      <p className="vi-cap">{titulo}</p>
+      <svg className="vi-svg" viewBox={`0 0 180 ${H}`} role="img" aria-label={`${titulo}. ${resumen}`}>
+        {filas.map((f, i) => {
+          const y = 2 + i * alto;
+          const total = f.completadas + f.enProceso + f.pendientes;
+          const W = x1 - x0;
+          const wc = total ? (W * f.completadas) / total : 0;
+          const wp = total ? (W * f.enProceso) / total : 0;
+          const wn = total ? W - wc - wp : W;
+          const etiqueta = f.nombre.length > 34 ? `${f.nombre.slice(0, 33)}…` : f.nombre;
+          const pct = total ? Math.round((f.completadas / total) * 100) : 0;
+          return (
+            <g key={f.nombre}>
+              <text x={0} y={y + 3.9} fontSize="2.8" fill="#16243a" fontWeight={f.nombre === "Total" ? 800 : 600}>
+                {etiqueta}
+              </text>
+              <rect x={x0} y={y + 0.8} width={wc} height={3.6} fill={COL.c} />
+              <rect x={x0 + wc} y={y + 0.8} width={wp} height={3.6} fill={COL.p} />
+              <rect x={x0 + wc + wp} y={y + 0.8} width={Math.max(0, wn)} height={3.6} fill={COL.n} />
+              <text x={x1 + 2} y={y + 3.9} fontSize="2.8" fill="#072b58" fontWeight="800">
+                {pct} %
+              </text>
+              <text x={x1 + 12} y={y + 3.9} fontSize="2.4" fill="#4a5a70">
+                {f.completadas}/{total}
+              </text>
+            </g>
+          );
+        })}
+        {([["c", "Completadas"], ["p", "En proceso"], ["n", "Pendientes"]] as const).map(([k, t], i) => (
+          <g key={k}>
+            <rect x={x0 + i * 30} y={H - 4.2} width={2.4} height={2.4} fill={COL[k]} />
+            <text x={x0 + i * 30 + 3.6} y={H - 2.2} fontSize="2.5" fill="#16243a" fontWeight="600">
+              {t}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </figure>
+  );
+}
+
+const hostDe = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "Enlace";
+  }
+};
+
+const fechaCorta = (iso: string) => {
+  if (!iso) return "—";
+  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
+};
+
+const enlaceEvidencia = (url: string) => (url ? <a href={url}>{hostDe(url)}</a> : "—");
+
+const COLUMNAS_ACCION_PLAN: ColT[] = [{ etiqueta: "Acción" }, { etiqueta: "Estado", ancho: "22mm" }, { etiqueta: "Avance", num: true, ancho: "15mm" }, { etiqueta: "Actividades", num: true, ancho: "21mm" }, { etiqueta: "Evidencia", ancho: "26mm" }];
+
 const COLUMNAS_INDICADOR: ColT[] = [
   { etiqueta: "Indicador" },
   { etiqueta: "Valor", num: true, ancho: "19mm" },
@@ -370,7 +439,8 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
   u.push({
     clave: `sec:${i}`,
     seccion: i,
-    nuevaPagina: true,
+    // El informe corre continuo: la sección siguiente empieza donde termina la anterior. `pegar` evita
+    // que el título quede solo al final de una hoja.
     pegar: true,
     dibujar: () => (
       <div className="vi-u">
@@ -397,7 +467,7 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
       if (s.alineacion) {
         s.alineacion.forEach((a, n) => {
           const kp = `p${n}`;
-          u.push(unidadFija(k(`${kp}:h`), i, <div className="vi-u"><div className="vi-sub-h"><h3>{a.pilar}</h3><span>Avance del pilar: {a.avance}</span></div></div>, { pegar: true, nuevaPagina: n > 0 }));
+          u.push(unidadFija(k(`${kp}:h`), i, <div className="vi-u"><div className="vi-sub-h"><h3>{a.pilar}</h3><span>Avance del pilar: {a.avance}</span></div></div>, { pegar: true }));
           if (a.aporte) texto(`${kp}:t`, a.aporte, "Aporte de la unidad");
           a.acciones.forEach((x, m) => {
             const ka = `${kp}:a${m}`;
@@ -418,6 +488,25 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
       if (s.texto) texto("t", s.texto, "Lectura de la unidad");
       break;
     case "metas":
+      if (s.plan.length) {
+        u.push(
+          unidadTabla(k("plan"), i, {
+            titulo: "Objetivos y metas del plan de trabajo",
+            columnas: [{ etiqueta: "Acción" }, { etiqueta: "Meta", ancho: "42mm" }, { etiqueta: "Responsable", ancho: "30mm" }, { etiqueta: "Fecha límite", ancho: "30mm" }],
+            filas: s.plan.map((a) => ({
+              celdas: [
+                <>
+                  <b>{a.accion}</b>
+                  <small>{[a.dimension, a.pilar ? `Pilar ${a.pilar}` : "", a.recursos ? `Recursos: ${a.recursos}` : ""].filter(Boolean).join(" · ")}</small>
+                </>,
+                a.meta || "—",
+                a.responsable || "—",
+                fechaCorta(a.fecha),
+              ],
+            })),
+          }),
+        );
+      }
       if (s.metas.length) {
         const conAnalisis = s.metas.some((m) => m.analisis);
         u.push(
@@ -438,7 +527,7 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
           }),
         );
         u.push(unidadFija(k("ley"), i, <div className="vi-u"><Leyenda /></div>));
-      } else sinContenido("No se registraron metas.");
+      } else if (!s.plan.length) sinContenido("No se registraron metas.");
       break;
     case "dim": {
       s.dimensiones.forEach((d, n) => {
@@ -453,7 +542,7 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
                 <span>{d.funcion}</span>
               </div>
             </div>,
-            { pegar: true, nuevaPagina: n > 0 && s.dimensiones.length > 1 },
+            { pegar: true },
           ),
         );
         if (d.filas.length) u.push(unidadTabla(k(`d${n}:t`), i, { columnas: COLUMNAS_INDICADOR, filas: d.filas.map(filaIndicadorT) }));
@@ -481,6 +570,25 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
           u.push(...unidadesDrive(s, i, r, x.respaldo.drive, k(`${kr}:drive`)));
         });
       });
+      if (s.avancesPlan.length) {
+        u.push(unidadFija(k("ap:h"), i, <div className="vi-u"><div className="vi-sub-h"><h3>Avances del plan de trabajo</h3><span>Dato del plan, por dimensión del plan</span></div></div>, { pegar: true }));
+        u.push(
+          unidadTabla(k("ap:t"), i, {
+            columnas: [{ etiqueta: "Acción", ancho: "62mm" }, { etiqueta: "Avance", num: true, ancho: "15mm" }, { etiqueta: "Último seguimiento" }, { etiqueta: "Evidencia", ancho: "26mm" }],
+            filas: s.avancesPlan.map((a) => ({
+              celdas: [
+                <>
+                  <b>{a.accion}</b>
+                  <small>{a.dimensionNombre}</small>
+                </>,
+                a.avance === null ? "—" : `${a.avance} %`,
+                a.nota || "—",
+                enlaceEvidencia(a.evidencia),
+              ],
+            })),
+          }),
+        );
+      }
       if (s.otros.length) {
         u.push(unidadFija(k("o:h"), i, <div className="vi-u"><div className="vi-sub-h"><h3>Otros datos de la unidad</h3></div></div>, { pegar: true }));
         u.push(unidadTabla(k("o:t"), i, { columnas: COLUMNAS_INDICADOR, filas: s.otros.map(filaIndicadorT) }));
@@ -507,6 +615,60 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
             ],
           }),
         );
+      }
+      const det = sin?.plan?.detalle;
+      if (sin?.plan && det?.acciones.length) {
+        const p = sin.plan;
+        const tonoEst = (e: string) => (e === "Completado" ? "vi-st vi-st-cumplida" : e === "En proceso" ? "vi-st vi-st-parcial" : "vi-st vi-st-sin");
+        u.push(
+          unidadFija(
+            k("plan:g"),
+            i,
+            <div className="vi-u">
+              <GraficaCumplimiento
+                titulo="Cumplimiento del plan de trabajo por dimensión (acciones)"
+                filas={[...p.dimensiones.map((d) => ({ nombre: d.nombre, completadas: d.completadas, enProceso: d.enProceso, pendientes: d.pendientes })), { nombre: "Total", completadas: p.completadas, enProceso: p.enProceso, pendientes: p.pendientes }]}
+              />
+            </div>,
+          ),
+        );
+        u.push(
+          unidadTabla(k("plan:acc"), i, {
+            titulo: "Acciones del plan de trabajo",
+            columnas: COLUMNAS_ACCION_PLAN,
+            filas: det.acciones.map((a) => ({
+              celdas: [
+                <>
+                  <b>{a.accion}</b>
+                  <small>{a.dimensionNombre}{a.responsable ? ` · ${a.responsable}` : ""}</small>
+                </>,
+                <span key="e" className={tonoEst(a.estado)}><i aria-hidden="true" />{a.estado}</span>,
+                a.avance === null ? "—" : `${a.avance} %`,
+                a.actividades ? `${a.cumplidas}/${a.actividades}` : "—",
+                enlaceEvidencia(a.evidencia),
+              ],
+            })),
+          }),
+        );
+        const enAvance = det.acciones.filter((a) => a.estado === "En proceso");
+        if (enAvance.length) {
+          u.push(
+            unidadTabla(k("plan:proc"), i, {
+              titulo: "Procesos en avance",
+              columnas: [{ etiqueta: "Acción", ancho: "62mm" }, { etiqueta: "Avance", num: true, ancho: "15mm" }, { etiqueta: "Último seguimiento" }],
+              filas: enAvance.map((a) => ({ celdas: [a.accion, a.avance === null ? "—" : `${a.avance} %`, a.nota || "Sin nota de seguimiento"] })),
+            }),
+          );
+        }
+        if (det.cumplidas.length) {
+          u.push(
+            unidadTabla(k("plan:cum"), i, {
+              titulo: `Actividades completadas (${det.actividades.cumplidas} de ${det.actividades.total})`,
+              columnas: [{ etiqueta: "Actividad" }, { etiqueta: "Acción" }, { etiqueta: "Fecha", ancho: "22mm" }, { etiqueta: "Evidencia", ancho: "26mm" }],
+              filas: det.cumplidas.map((x) => ({ celdas: [x.descripcion, x.accion, fechaCorta(x.fecha), enlaceEvidencia(x.evidencia)] })),
+            }),
+          );
+        }
       }
       if (sin?.metas) {
         const c = sin.metas.conteo;
@@ -629,7 +791,16 @@ function unidadesSeccion(s: SeccionLibro, i: number, r: RecursosDrive): Unidad[]
             nota: "Los archivos se entregan aparte, en la carpeta del informe.",
           }),
         );
-      } else sinContenido("No se cargaron anexos.");
+      } else if (!s.evidenciasPlan.length) sinContenido("No se cargaron anexos.");
+      if (s.evidenciasPlan.length) {
+        u.push(
+          unidadTabla(k("evp"), i, {
+            titulo: "Evidencias de las acciones y actividades del plan",
+            columnas: [{ etiqueta: "Origen" }, { etiqueta: "Enlace", ancho: "46mm" }],
+            filas: s.evidenciasPlan.map((e) => ({ celdas: [e.origen, <a key="l" href={e.url}>{hostDe(e.url)}</a>] })),
+          }),
+        );
+      }
       break;
   }
 

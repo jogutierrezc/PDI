@@ -154,7 +154,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
   const claveMetas = PLANTILLAS[inst.plantilla].secciones.find((x) => x.tipo === "metas")?.clave ?? "";
   const planLocal = (borradores[claveMetas] ?? filasSecciones.data?.find((x) => x.clave === claveMetas)?.contenido)?.plan;
   const vigente = planVigente(plan.data, planLocal);
-  const m = useModeloInforme(inst, ciclo, requisitos, vigente?.acciones ?? []);
+  const m = useModeloInforme(inst, ciclo, requisitos, vigente?.acciones ?? [], vigente?.actividades ?? []);
   const editable = puedeEditar(inst.estado, actor);
   const pilares = usePilares();
   const fuentes = useFuentes();

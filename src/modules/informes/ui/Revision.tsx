@@ -20,6 +20,8 @@ import { AyudaPilo } from "../guia/AyudaPilo";
 import { Aviso, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { TablaMetasPrograma } from "./MetasPrograma";
 import { useModeloInforme, usePlanDelInforme } from "./modelo";
+import { entradaLibro } from "../vista/entrada";
+import { PresentacionConPilo } from "../presentacion/PresentacionConPilo";
 import type { ModeloInforme } from "./modelo";
 import { PanelSintesis } from "./Sintesis";
 import { LecturaTexto, resolverDe } from "./Texto";
@@ -173,6 +175,9 @@ function Detalle({ inst, ciclo, requisitos, unidad, sede, esFacultad }: { inst: 
         {m.frio ? "Las cifras son la foto tomada al enviar." : "Las cifras se leen en vivo: el informe no está enviado."}
         {inst.enviado_en ? ` Enviado el ${fmtFecha(inst.enviado_en)}.` : ""}
       </p>
+      <div className="inf-row" style={{ flexWrap: "wrap" }}>
+        <PresentacionConPilo instanciaId={inst.id} obtenerEntrada={() => ({ unidad, ...entradaLibro(m, pilares.data ?? [], String(ciclo.anio)) })} listo={!pilares.isPending} />
+      </div>
       <p className="inf-hint">
         <Link className="inf-link" to={enlaceInforme("/admin/informes-gestion/vista", inst.unit_id, sede)}>
           Ver el informe como saldrá en papel (Carta, A4 y PDF)

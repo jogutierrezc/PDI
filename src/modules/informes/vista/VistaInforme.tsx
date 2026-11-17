@@ -37,6 +37,7 @@ import { entradaLibro } from "./entrada";
 import type { EntradaLibro } from "./entrada";
 import { PAPELES, disenoParaGuardar, evaluarAcento, nombreArchivo, normalizarDiseno, normalizarPerfil, perfilParaGuardar } from "./perfil";
 import type { DisenoInforme, Papel, PerfilOficina } from "./perfil";
+import { PresentacionConPilo } from "../presentacion/PresentacionConPilo";
 import { Segmentado } from "./controles";
 import "./vista.css";
 
@@ -174,6 +175,7 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
             <button type="button" className="inf-btn" onClick={() => { setAviso(null); setModo("cierre"); }}>
               Personalizar cierre
             </button>
+            <PresentacionConPilo instanciaId={inst.id} obtenerEntrada={() => ({ unidad: unidad.name, ...entrada })} listo={!midiendo} />
             <button type="button" className="inf-btn inf-btn--pri" disabled={!resultado || midiendo} onClick={() => setPrevia(true)}>
               <Icon name="download" size={16} /> Descargar PDF
             </button>

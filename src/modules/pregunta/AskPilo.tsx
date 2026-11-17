@@ -35,6 +35,8 @@ import type { SpaceConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
 import { askQuestionStream, buildHistory, PiloError, prefetchPilo, rateAnswer, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
+import { TextoPensamiento } from "../../components/pilo/ai/PensamientoPilo";
+import { SelectorModelo, useModelos } from "../../components/pilo/ai/SelectorModelo";
 import type { AskHandlers, AskKind, AskMeta, AskOptions, AskPortal, AskSource, AskStep } from "../../components/pilo/ai/client";
 import { Pilo as PiloMoji } from "./Pilo";
 import type { MojiMood, PiloMojiHandle } from "./Pilo";
@@ -292,6 +294,9 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     const base: AskOptions | null = usual ? null : { portal: space.portal, rol: sent };
     return base || modo ? { ...(base ?? {}), ...(modo ? { modo } : {}) } : undefined;
   }, [usual, space.portal, sent, modo]);
+  // «Pilo» o «Astra» (solo con sesión y si el servidor lo ofrece): sin selector, el pedido es el de siempre.
+  const models = useModelos(space.portal);
+  const chosen: AskOptions | null = models.catalogo.modelos.length > 1 ? { modelo: models.modelo } : null;
   const voice = useMemo(() => {
     const own = usual ? baseVoice : { ...baseVoice, rol: sent, mood: view.mood };
     // En un modo, la voz no antepone muletillas: el personaje ya trae las suyas.
@@ -519,7 +524,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
         },
       };
       // Con un archivo adjunto viajan, además, los pasajes que tienen que ver con esta pregunta: el archivo no se sube.
-      const answer = wire || doc ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}) }) : await askQuestionStream(q, history, handlers);
+      const answer = wire || doc || chosen ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}), ...(chosen ?? {}) }) : await askQuestionStream(q, history, handlers);
       if (run.current !== mine) return;
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
       // Los pasos que guarda el turno son los que trae `done`; sin ellos (función anterior), los vistos en vivo.
@@ -774,6 +779,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
 
         <div className="ap-dock">
           <AttachTray state={attach} />
+          {chosen && <SelectorModelo catalogo={models.catalogo} modelo={models.modelo} onChange={models.elegir} disabled={busy} className="pp-modelo--dock" />}
           <form className="ap-composer" onSubmit={submit}>
             {extras.files && <AttachButton onPick={attach.pick} disabled={Boolean(attach.reading)} />}
             <label htmlFor="ap-q" className="ap-sr">
@@ -997,7 +1003,7 @@ function ThinkBody({ id, open, steps, thinking, trail, working }: { id: string; 
             })}
           </ol>
         )}
-        {thinking && <p className="ap-think__text">{thinking}</p>}
+        {thinking && <TextoPensamiento text={thinking} live={working} />}
         {trail.some(spoken) && (
           <ol className="ap-trail">
             {trail.filter(spoken).map((s, i) => (

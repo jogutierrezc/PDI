@@ -1,0 +1,119 @@
+/* «Cómo pensó Pilo»: panel plegable con el razonamiento en texto plano. */
+.pp-think {
+  margin: 6px 0 8px;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+.pp-think__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 12px;
+}
+.pp-think__head:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.pp-think__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  flex: none;
+}
+.pp-think[data-fase="pensando"] .pp-think__dot {
+  opacity: 0.9;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pp-think[data-fase="pensando"] .pp-think__dot {
+    animation: pp-pulse 1.2s ease-in-out infinite;
+  }
+  .pp-think__body {
+    transition: grid-template-rows 0.22s ease;
+  }
+}
+@keyframes pp-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+.pp-think__chev {
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.6;
+}
+.pp-think__head[aria-expanded="true"] .pp-think__chev {
+  transform: rotate(225deg);
+}
+.pp-think__body {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+.pp-think__body[data-open] {
+  grid-template-rows: 1fr;
+}
+.pp-think__in {
+  overflow: hidden;
+  min-height: 0;
+}
+.pp-think__text {
+  margin: 0;
+  padding: 0 12px 10px;
+  max-height: 14rem;
+  overflow-y: auto;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  opacity: 0.85;
+}
+.pp-think__wait {
+  font-style: italic;
+}
+
+/* Selector «Pilo · Astra» */
+.pp-modelo {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 999px;
+  font-size: 0.78rem;
+}
+.pp-modelo button {
+  min-height: 32px;
+  min-width: 44px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pp-modelo button[aria-checked="true"] {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  font-weight: 600;
+}
+.pp-modelo button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+.pp-modelo button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

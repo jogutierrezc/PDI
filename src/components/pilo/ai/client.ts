@@ -31,6 +31,20 @@ export interface AskOptions {
   modo?: string | null;
   /** El idioma en que la persona usa a Pilo; sin él, el que eligió en la pantalla (español si no eligió). */
   lang?: "es" | "en" | "pt";
+  /** El modelo que la persona eligió («pilo» o «astra»). Sin él, el cuerpo es el de siempre. */
+  modelo?: ModeloId | null;
+}
+
+/** Los modelos que ofrece el servidor (acción `modelos`). */
+export type ModeloId = "pilo" | "astra";
+export interface ModeloInfo {
+  id: ModeloId;
+  label: string;
+  razona: boolean;
+}
+export interface CatalogoModelos {
+  modelos: ModeloInfo[];
+  defecto: ModeloId;
 }
 
 /** Los modos secretos que entiende el servidor (logic.ts, `parseModo`). */
@@ -160,6 +174,8 @@ export interface AskResult {
   /** Solo en el flujo: los pasos terminados y los segundos totales, para guardar «cómo respondí». */
   steps?: { id: string; label: string; detail?: string; ms?: number }[];
   seconds?: number;
+  /** Segundos que el modelo estuvo pensando antes de responder (solo si el pedido eligió modelo). */
+  pensamiento_s?: number;
 }
 
 export type AskIntent = "saludo" | "charla" | "institucional" | "general" | "vetado" | "capciosa";
@@ -174,6 +190,10 @@ export interface AskMeta {
   mood?: string;
   rol?: string;
   expression?: string;
+  /** El modelo que respondió (solo si el pedido eligió uno); `caido`: pidió otro y se usó «Pilo». */
+  modelo?: { id: ModeloId; label: string; caido?: boolean };
+  /** Ese modelo razona: el flujo trae `thinking`. */
+  razona?: boolean;
   /** Todas las fuentes que se le dieron al modelo, con el número con que las cita mientras escribe. */
   sources: AskSource[];
   trail: AskStep[];
@@ -475,7 +495,33 @@ export function askBody(question: string, history: { q: string; a: string }[], o
     ...(modo ? { modo } : {}),
     // Solo si la persona eligió inglés o portugués: sin él, el cuerpo es el de siempre.
     ...(lang !== "es" ? { lang } : {}),
+    // Solo si la persona eligió: sin él, el cuerpo es el de siempre.
+    ...(opts.modelo === "pilo" || opts.modelo === "astra" ? { modelo: opts.modelo } : {}),
   };
+}
+
+/** El catálogo como lo entiende la página; ante cualquier duda, solo «Pilo». */
+export function toCatalogo(raw: unknown): CatalogoModelos {
+  const base: CatalogoModelos = { modelos: [{ id: "pilo", label: "Pilo", razona: false }], defecto: "pilo" };
+  const o = raw as { modelos?: unknown; defecto?: unknown } | null;
+  if (!o || !Array.isArray(o.modelos)) return base;
+  const modelos: ModeloInfo[] = [];
+  for (const m of o.modelos as Record<string, unknown>[]) {
+    if (!m || (m.id !== "pilo" && m.id !== "astra") || modelos.some((x) => x.id === m.id)) continue;
+    modelos.push({ id: m.id, label: typeof m.label === "string" && m.label ? m.label : m.id === "astra" ? "Pilo Astra 1.0" : "Pilo", razona: m.razona === true });
+  }
+  if (!modelos.length) return base;
+  return { modelos, defecto: modelos.some((m) => m.id === o.defecto) ? (o.defecto as ModeloId) : modelos[0].id };
+}
+
+/** Qué modelos puede elegir esta persona (acción `modelos`, sin cupo). Si falla, solo «Pilo». */
+export async function fetchModelos(portal: AskPortal = "pregunta"): Promise<CatalogoModelos> {
+  try {
+    const { data, error } = await supabase.functions.invoke<unknown>("pilo-ia", { body: { action: "modelos", portal } });
+    return error ? toCatalogo(null) : toCatalogo(data);
+  } catch {
+    return toCatalogo(null);
+  }
 }
 
 /**
@@ -599,10 +645,10 @@ export async function analyzePart(
   return data as AnalysisResult;
 }
 
-export async function testPilo(): Promise<{ ok: boolean; ms?: number; error?: string }> {
-  const { data, error } = await supabase.functions.invoke<{ ok: boolean; ms?: number; error?: string }>("pilo-ia", { body: { action: "probar" } });
+export async function testPilo(modelo?: "astra"): Promise<{ ok: boolean; ms?: number; error?: string; reasoning?: boolean; model?: string }> {
+  const { data, error } = await supabase.functions.invoke<{ ok: boolean; ms?: number; error?: string; reasoning?: boolean; model?: string }>("pilo-ia", { body: { action: "probar", ...(modelo ? { modelo } : {}) } });
   if (error) throw await failure(error);
-  return data as { ok: boolean; ms?: number; error?: string };
+  return data as { ok: boolean; ms?: number; error?: string; reasoning?: boolean; model?: string };
 }
 
 /* --- Voz ------------------------------------------------------------------------ */

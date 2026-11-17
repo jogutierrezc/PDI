@@ -17,7 +17,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { SpeakerIcon } from "../../../components/pilo/VoiceToggle";
 import { speak } from "../../../components/pilo/voice";
-import { sayWithPilo } from "../../../components/pilo/ai/client";
+import { sayWithPilo, testPilo } from "../../../components/pilo/ai/client";
 import { PORTAL_LABEL } from "../../../components/pilo/ai/config";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
 import type { ReportKind } from "../../../components/pilo/ai/logic";
@@ -335,7 +335,66 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
           </div>
         )}
       </Group>
+
+      <AstraChatGroup ed={ed} />
     </>
+  );
+}
+
+/** Pilo Astra 1.0 en el chat de Pilo (0283): interruptor, modelo de partida y prueba de su conexión. */
+function AstraChatGroup({ ed }: { ed: EditorApi }) {
+  const { s, set } = ed;
+  const [prueba, setPrueba] = useState<{ state: "idle" | "busy" | "ok" | "fail"; text: string }>({ state: "idle", text: "" });
+  const probar = async () => {
+    setPrueba({ state: "busy", text: "" });
+    try {
+      const r = await testPilo("astra");
+      setPrueba(
+        r.ok
+          ? { state: "ok", text: `Astra responde en ${Math.round((r.ms ?? 0) / 100) / 10} s${r.reasoning ? " y manda su razonamiento aparte." : "; no mandó razonamiento aparte (revise que el puente lo reenvíe)."}` }
+          : { state: "fail", text: r.error ?? "Astra no respondió." },
+      );
+    } catch (e) {
+      setPrueba({ state: "fail", text: (e as Error).message || "No se pudo probar Astra." });
+    }
+  };
+  return (
+    <Group title="Pilo Astra 1.0 en el chat" aside={<small>Quién tiene sesión elige entre Pilo y Astra</small>}>
+      <p className="pis-lead">
+        Astra razona antes de responder y muestra su pensamiento en el panel «Cómo pensó Pilo». Solo lo ven las personas con sesión (intranet o cuenta de Pilo); los visitantes siguen con Pilo. Su límite por hora es el de Administración → Pilo Work.
+      </p>
+      <dl className="pis-opts">
+        <div>
+          <dt>Ofrecer Astra en el chat de Pilo</dt>
+          <dd>
+            <Switch on={s.astra_chat} disabled={s.needs0283} onChange={(v) => set("astra_chat", v)} label="Ofrecer Pilo Astra 1.0 en el chat de Pilo" />
+          </dd>
+        </div>
+        <div>
+          <dt>Modelo que viene marcado</dt>
+          <dd>
+            <select value={s.modelo_defecto} disabled={s.needs0283 || !s.astra_chat} onChange={(e) => set("modelo_defecto", e.target.value === "astra" ? "astra" : "pilo")} aria-label="Modelo que viene marcado">
+              <option value="pilo">Pilo (rápido)</option>
+              <option value="astra">Pilo Astra 1.0 (razona)</option>
+            </select>
+          </dd>
+        </div>
+      </dl>
+      <div className="pis-row">
+        <p className="pis-note">
+          Astra se configura en Administración → Pilo Work (dirección, modelo y razonamiento). El modelo debe llamarse exactamente como lo publica el puente: el ajuste de texto de Pilo y el de Astra son distintos, y un nombre mal escrito da 404.
+        </p>
+        <button type="button" className="button-secondary" onClick={probar} disabled={prueba.state === "busy" || s.needs0283}>
+          {prueba.state === "busy" ? "Probando…" : "Probar Astra"}
+        </button>
+      </div>
+      {s.needs0283 && <p className="pis-warn">Falta aplicar la migración 0283 en la base para elegir modelo.</p>}
+      {(prueba.state === "ok" || prueba.state === "fail") && (
+        <div role="status" className="pis-result">
+          <StatusMark tone={prueba.state === "ok" ? "ok" : "fail"}>{prueba.text}</StatusMark>
+        </div>
+      )}
+    </Group>
   );
 }
 

@@ -44,7 +44,7 @@ export function parseSection(value: string | null | undefined): SectionId {
 
 /** Qué campos de la configuración vive en cada sección (los que se guardan con «Guardar cambios»). */
 const SECTION_FIELDS: Partial<Record<SectionId, (keyof PiloSettings)[]>> = {
-  conexion: ["provider", "base_url", "chat_path", "text_model"],
+  conexion: ["provider", "base_url", "chat_path", "text_model", "astra_chat", "modelo_defecto"],
   voz: [
     "voice_engine",
     "speech_provider",

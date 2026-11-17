@@ -81,3 +81,22 @@ describe("la configuración de Mr. Pilo, venga como venga de la base", () => {
     expect(reasonHint("nuevo")).toBe("");
   });
 });
+
+describe("Astra en el chat (0283)", () => {
+  it("sin la migración, lo marca y queda apagado", () => {
+    const s = normalizeSettings({});
+    expect(s.astra_chat).toBe(false);
+    expect(s.modelo_defecto).toBe("pilo");
+    expect(s.needs0283).toBe(true);
+  });
+  it("con la migración, lee el interruptor y el modelo de partida", () => {
+    const s = normalizeSettings({ astra_chat: true, modelo_defecto: "astra" });
+    expect(s.astra_chat).toBe(true);
+    expect(s.modelo_defecto).toBe("astra");
+    expect(s.needs0283).toBe(false);
+  });
+  it("un cambio del interruptor ensucia la sección de conexión", () => {
+    const base = normalizeSettings({ astra_chat: false });
+    expect(dirtySections({ ...base, astra_chat: true }, base)).toContain("conexion");
+  });
+});

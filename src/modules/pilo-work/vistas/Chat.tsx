@@ -23,6 +23,7 @@ import { useMs } from "../ms";
 import { movimientoReducido } from "../../rankings/movimiento";
 import { leerProbado, marcarProbado, useAstra } from "../astra";
 import { tamanoLegible } from "../archivos";
+import { PanelPensamiento } from "../../../components/pilo/ai/PensamientoPilo";
 import { ACCEPT, leerDocumento } from "../documentos-astra";
 import type { DocumentoAstra } from "../documentos-astra";
 import type { Motor, Razonamiento } from "../astra";
@@ -112,6 +113,10 @@ export function Chat() {
   const [texto, setTexto] = useState("");
   const [aprobs, setAprobs] = useState<(Aprobacion & { listo?: boolean })[]>([]);
   const [colgado, setColgado] = useState(false);
+  /* «Cómo pensó Pilo»: el razonamiento de Astra (evento pilo_pensando), en vivo; segPens = lo que tardó antes de escribir. */
+  const [pensando, setPensando] = useState("");
+  const [segPens, setSegPens] = useState<number | null>(null);
+  const inicioPens = useRef(Date.now());
   const fin = useRef<HTMLDivElement>(null);
   const enviado = useRef(false);
   const pendientes = aprobs.filter((a) => !a.listo).length;
@@ -223,6 +228,10 @@ export function Chat() {
     threadId,
     onCustomEvent: (tipo, datos) => {
       if (tipo === "pilo_modelo" && datos && typeof datos === "object") setModelo(datos as ModeloUsado);
+      if (tipo === "pilo_pensando" && datos && typeof datos === "object" && typeof (datos as { text?: unknown }).text === "string") {
+        const t = (datos as { text: string }).text;
+        setPensando((p) => (p + t).slice(-6000));
+      }
     },
   });
 
@@ -231,6 +240,9 @@ export function Chat() {
     if (!t || isLoading) return;
     setTexto("");
     setColgado(false);
+    setPensando("");
+    setSegPens(null);
+    inicioPens.current = Date.now();
     await sendMessage(doc && motor === "astra" ? `${t}\n\nAdjunto: ${doc.nombre}` : t);
   };
 
@@ -240,7 +252,7 @@ export function Chat() {
   useEffect(() => {
     ultimaSenal.current = Date.now();
     setColgado(false);
-  }, [firma, pendientes, isLoading]);
+  }, [firma, pendientes, isLoading, pensando.length]);
   useEffect(() => {
     if (!isLoading) return;
     const iv = window.setInterval(() => {
@@ -296,6 +308,10 @@ export function Chat() {
 
   const abierto = datosAbiertos();
   const ultimoMsg = messages[messages.length - 1];
+  const hayTexto = ultimoMsg?.role === "assistant" && ultimoMsg.parts.some((p) => p.type === "text" && p.content);
+  useEffect(() => {
+    if (hayTexto && segPens === null && pensando) setSegPens((Date.now() - inicioPens.current) / 1000);
+  }, [hayTexto, segPens, pensando]);
   return (
     <div className="chat">
       <div className="thread">
@@ -350,6 +366,7 @@ export function Chat() {
                       </div>
                     );
                   })}
+                  {deAstra && ultimo && pensando && <PanelPensamiento thinking={pensando} fase={escribiendo ? (hayTexto ? "redactando" : "pensando") : "listo"} startedAt={inicioPens.current} seconds={segPens} />}
                   {escribiendo && !colgado && !partes.some((p) => p.type === "text" && p.content) && <span className="muted">{deAstra ? "Razonando…" : "Pensando…"}</span>}
                 </div>
               </div>
@@ -359,6 +376,7 @@ export function Chat() {
             <div className="bubble es-pilo">
               {motor === "astra" ? <Cara mood="astronauta" className="pface pface--astro" /> : <Cara mood="piensa" />}
               <div className="t">
+                {motor === "astra" && <PanelPensamiento thinking={pensando} fase="pensando" startedAt={inicioPens.current} seconds={null} />}
                 <span className="muted">{motor === "astra" ? "Razonando…" : "Pensando…"}</span>
               </div>
             </div>

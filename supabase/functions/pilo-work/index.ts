@@ -656,6 +656,11 @@ Hoy es ${HOY()}. Hablas con ${nombre || "una persona de la universidad"}${depend
                   }
                   const delta = ch?.choices?.[0]?.delta;
                   if (!delta) continue;
+                  // Pilo Astra 1.0 razona: su pensamiento (en inglés, tal cual) va aparte del texto, para el panel «Cómo pensó Pilo».
+                  if (motorAstra) {
+                    const pensando = typeof delta.reasoning_content === "string" ? delta.reasoning_content : typeof delta.reasoning === "string" ? delta.reasoning : "";
+                    if (pensando) send({ type: "CUSTOM", name: "pilo_pensando", value: { text: pensando } });
+                  }
                   const t = sinEmojis(typeof delta.content === "string" ? delta.content : Array.isArray(delta.content) ? delta.content.map((p: Any) => p?.text ?? "").join("") : "");
                   if (t) {
                     if (!abierto) {

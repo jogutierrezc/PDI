@@ -116,6 +116,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 // La voz de ElevenLabs y «cantar» (0172) viven en sus propios archivos.
 import { makeEleven } from "./elevenlabs-voz.ts";
+import { destinoAstra, leerConfig } from "../pilo-work/proveedor.ts";
+import { elegirModelo, metaModelo, modelosDisponibles, opcionesAstra, segundosPensando, type Eleccion } from "./modelos.ts";
 import { makeVoiceDesign } from "./voz-diseno.ts";
 // La capa profunda (0173): los lectores directos de los portales, que arman pasajes desde las tablas.
 import { contexto, ErrorFilas, ErrorTiempo, FUENTES, type Fuente, type Lector } from "./lectores/comun.ts";
@@ -6424,6 +6426,8 @@ async function handle(request: Request): Promise<Response> {
     history?: unknown;
     /** Preguntar: responder por partes (text/event-stream) cuando escribe el modelo. */
     stream?: boolean;
+    /** Preguntar (0283): el modelo que se elige, «pilo» o «astra». Sin él, el de siempre. */
+    modelo?: unknown;
     answerId?: number;
     vote?: string;
     /** Al calificar una respuesta sin id: qué tipo de respuesta era. */
@@ -6483,12 +6487,12 @@ async function handle(request: Request): Promise<Response> {
   // La lectura de una página (0127) trae su texto entero: tiene su propio tope.
   if (body.action === "captura" && bodySize > CAPTURE_BODY_MAX) return json({ status: "no" });
   const requested = body.action;
-  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "recoger", "entender", "analizar", "indexar", "comprender", "moodle", "puentes", "web", "premisas", "evolucion", "cantar", "sugerir"].includes(requested)) {
+  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "recoger", "entender", "analizar", "indexar", "comprender", "moodle", "puentes", "web", "premisas", "evolucion", "cantar", "sugerir", "modelos"].includes(requested)) {
     return json({ error: "Acción desconocida." }, 400);
   }
   // Calificar una respuesta, mandar la lectura de una página (0127) y recoger una respuesta (0128) piden los mismos permisos que preguntar.
   // «cantar» (0172) pide y gasta como la voz: mismos permisos de canUse y mismo cupo; su propio permiso lo revisa makeEleven.
-  const action: Action = requested === "calificar" || requested === "captura" || requested === "recoger" ? "preguntar" : requested === "cantar" ? "voz" : requested;
+  const action: Action = requested === "calificar" || requested === "captura" || requested === "recoger" || requested === "modelos" ? "preguntar" : requested === "cantar" ? "voz" : requested;
   const asking = action === "preguntar";
   /** El mapa y Moodle (0115, 0116): mantenimiento de un espacio. Sirven con o sin IA y no gastan cupo. */
   // Las premisas de las capciosas (0130) también: son del catálogo de un espacio, que la administración nombra.
@@ -6680,7 +6684,7 @@ async function handle(request: Request): Promise<Response> {
    * una misma dirección. De la dirección solo se guarda una huella con sal que
    * cambia cada día. La administración no tiene límite. Sin 0110, no limita.
    */
-  const visitorCheck = async (scope: "p" | "c" | "f" | "l" | "e", limit?: number, windowSeconds?: number): Promise<{ ok: true } | { ok: false; retry: number }> => {
+  const visitorCheck = async (scope: "p" | "c" | "f" | "l" | "e" | "a", limit?: number, windowSeconds?: number): Promise<{ ok: true } | { ok: false; retry: number }> => {
     // Cada espacio tiene su límite y su ventana; el de partida, los de siempre.
     // «f» es el tope diario de archivos analizados (0119), con su propio límite y ventana.
     // «e» es el tope diario de recomendaciones de Mis notas (0131), por cuenta.
@@ -6719,27 +6723,31 @@ async function handle(request: Request): Promise<Response> {
    */
   const chat = async (
     messages: { role: string; content: string }[],
-    opts: { temperature: number; max_tokens: number; json?: boolean; stream?: boolean; signal?: AbortSignal },
+    opts: { temperature: number; max_tokens: number; json?: boolean; stream?: boolean; signal?: AbortSignal; astra?: { dest: { url: string; model: string; key: string }; effort: string } },
   ): Promise<{ response: Response; folded: boolean }> => {
+    // Pilo Astra 1.0 (0283): otro destino, su clave y su razonamiento; sin `astra`, todo como siempre.
+    const dest = opts.astra?.dest ?? target;
     const send = (fold: boolean) =>
-      callProvider(target.url, {
+      callProvider(dest.url, {
         method: "POST",
-        headers,
+        headers: opts.astra ? { Authorization: `Bearer ${opts.astra.dest.key}`, "Content-Type": "application/json" } : headers,
         signal: opts.signal,
         body: JSON.stringify({
-          model: target.model,
+          model: dest.model,
           messages: fold ? foldSystem(messages) : messages,
           temperature: opts.temperature,
           max_tokens: opts.max_tokens,
           ...(opts.stream ? { stream: true } : {}),
           // Un servidor propio (Ollama, vLLM…) con un modelo que razona gasta todo el tope pensando y deja
           // `content` vacío: Pilo creería que la IA no respondió y diría lo publicado «sin IA». Se pide respuesta directa.
-          ...(!TEXT_PRESETS[settings.provider ?? "mistral"] && !/openai\.com/i.test(String(settings.base_url ?? "")) ? { reasoning_effort: "none" } : {}),
+          ...(opts.astra
+            ? { reasoning_effort: opts.astra.effort }
+            : !TEXT_PRESETS[settings.provider ?? "mistral"] && !/openai\.com/i.test(String(settings.base_url ?? "")) ? { reasoning_effort: "none" } : {}),
           // Mistral (y los compatibles que lo aceptan) devuelven JSON limpio.
           ...(opts.json && settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
         }),
       });
-    const known = foldCache?.model === target.model ? foldCache.fold : null;
+    const known = foldCache?.model === dest.model ? foldCache.fold : null;
     const fold = ask.systemRole === "user" || (ask.systemRole === "auto" && known === true);
     const response = await send(fold);
     const hasSystem = messages.some((m) => m.role === "system");
@@ -6748,7 +6756,7 @@ async function handle(request: Request): Promise<Response> {
     const detail = await providerDetail(response.clone());
     if (!roleRejected(response.status, detail) && known !== null) return { response, folded: false };
     const retry = await send(true);
-    foldCache = { model: target.model, fold: retry.ok };
+    foldCache = { model: dest.model, fold: retry.ok };
     if (!retry.ok) {
       await retry.body?.cancel();
       return { response, folded: false };
@@ -8257,6 +8265,23 @@ async function handle(request: Request): Promise<Response> {
     };
     const history = cleanHistory(body.history);
     const wantStream = body.stream === true && ask.stream;
+    // Elegir modelo (0283). Sin `modelo` en el pedido, nada cambia: ni el modelo, ni `meta`, ni `done`.
+    const modeloPedido = body.modelo !== undefined && body.modelo !== null;
+    let eleccion: Eleccion | null = null;
+    let astraRun: { dest: { url: string; model: string; key: string }; effort: string; maxTokens: number; waitMs: number } | null = null;
+    if (modeloPedido) {
+      const pw = await leerConfig(admin);
+      const dest = await destinoAstra(admin, pw);
+      eleccion = elegirModelo(body.modelo, modelosDisponibles({ astraChat: settings.astra_chat === true, hayDestino: Boolean(dest), sesion: Boolean(profileId || memberId), defecto: settings.modelo_defecto }));
+      if (eleccion.modelo.id === "astra" && dest) {
+        if (!(await visitorCheck("a", pw.astra_limite_hora, 3600)).ok) {
+          return json({ error: "Llegó al límite de preguntas a Pilo Astra 1.0 por esta hora.", advice: "Puede seguir con Pilo, que responde más rápido, o volver a Astra más tarde.", code: "astra_limite", retry_after: 3600 }, 429, { "Retry-After": "3600" });
+        }
+        const o = opcionesAstra(pw, 0, DRAFT_TOTAL_MS);
+        astraRun = { dest, effort: o.reasoning_effort, maxTokens: o.max_tokens, waitMs: o.esperaMs };
+      }
+    }
+    let thinkMs = 0;
     type Step = { step: string; status: "ok" | "skip" | "ai"; detail: string; ms: number };
     const trail: Step[] = [];
     let t0 = Date.now();
@@ -8973,8 +8998,10 @@ async function handle(request: Request): Promise<Response> {
         abort.abort();
       };
       // Sin streaming, la primera señal es la respuesta entera: solo vale el tope total.
-      let first: ReturnType<typeof setTimeout> | undefined = onDelta ? setTimeout(stop, DRAFT_FIRST_TOKEN_MS) : undefined;
-      const total = setTimeout(stop, DRAFT_TOTAL_MS);
+      const draftT0 = Date.now();
+      const waitMs = astraRun ? astraRun.waitMs : DRAFT_TOTAL_MS;
+      let first: ReturnType<typeof setTimeout> | undefined = onDelta ? setTimeout(stop, astraRun ? waitMs : DRAFT_FIRST_TOKEN_MS) : undefined;
+      const total = setTimeout(stop, waitMs);
       const reader = createChatReader();
       let raw = "";
       let shown = "";
@@ -8984,7 +9011,10 @@ async function handle(request: Request): Promise<Response> {
       let thinkingOver = false;
       const think = (final: boolean) => {
         if (!onThinking || thinkingOver) return;
-        if (final) thinkingOver = true;
+        if (final) {
+          thinkingOver = true;
+          thinkMs = Date.now() - draftT0;
+        }
         const all = [reader.thinking(), thinkingOf(raw, final)].filter(Boolean).join("\n");
         const visible = thinkingVisible(all, final, { institutional: true, known: ctx.known });
         if (visible.length <= thought.length || !visible.startsWith(thought)) return;
@@ -9002,8 +9032,10 @@ async function handle(request: Request): Promise<Response> {
       };
       try {
         // Con análisis pedido, sus tres frases no le quitan sitio a la respuesta.
-        const maxTokens = (longAnswer ? Math.max(ask.maxTokens, extras.codeMaxTokens) : member ? Math.max(ask.maxTokens, extras.memberMaxTokens) : ask.maxTokens) + (analysed ? ANALYSIS_TOKENS : 0);
-        const { response } = await chat(sent, { temperature: ask.temperature, max_tokens: maxTokens, stream: Boolean(onDelta), signal: abort.signal });
+        const wanted = (longAnswer ? Math.max(ask.maxTokens, extras.codeMaxTokens) : member ? Math.max(ask.maxTokens, extras.memberMaxTokens) : ask.maxTokens) + (analysed ? ANALYSIS_TOKENS : 0);
+        // Con Astra, el razonamiento gasta tope: nunca menos que `astra_max_tokens`.
+        const maxTokens = astraRun ? Math.max(wanted, astraRun.maxTokens) : wanted;
+        const { response } = await chat(sent, { temperature: ask.temperature, max_tokens: maxTokens, stream: Boolean(onDelta), signal: abort.signal, ...(astraRun ? { astra: { dest: astraRun.dest, effort: astraRun.effort } } : {}) });
         if (!response.ok) {
           const detail = await providerDetail(response);
           return { ok: false, why: response.status === 429 ? "limite_proveedor" : "proveedor", status: response.status, detail };
@@ -9209,7 +9241,7 @@ async function handle(request: Request): Promise<Response> {
     };
     const drafting = stepDetail({ id: "redactar", intent, official: plan.official, saved: Boolean(plan.saved), facts: plan.facts, passages: plan.passages });
     if (live) {
-      live.send("meta", dress({ asked, intent, sources: plan.sources.map(sourceShape), trail: [...trail], official: plan.official > 0, model: target.model, ...(mood ? { mood } : {}) }));
+      live.send("meta", dress({ asked, intent, sources: plan.sources.map(sourceShape), trail: [...trail], official: plan.official > 0, model: target.model, ...(eleccion ? metaModelo(eleccion) : {}), ...(mood ? { mood } : {}) }));
       stepStart("redactar", drafting);
       const end = await conclude(
         await write(
@@ -9220,7 +9252,7 @@ async function handle(request: Request): Promise<Response> {
       // Ningún paso queda abierto: lo que no alcanzó a terminar se cierra antes del final.
       session.closeSteps();
       // `steps` y `seconds`: el resumen de los pasos, para que la página guarde «cómo respondí».
-      if ("payload" in end) live.send("done", { ...end.payload, ...steps.summary() });
+      if ("payload" in end) live.send("done", { ...end.payload, ...steps.summary(), ...(eleccion ? { pensamiento_s: segundosPensando(thinkMs) } : {}) });
       else live.send("error", { message: end.failure.message, code: end.failure.code });
       live.close();
       return live.response;
@@ -9283,6 +9315,12 @@ async function handle(request: Request): Promise<Response> {
       return json({ status: error ? "no" : String(data ?? "no") });
     }
     if (requested === "recoger") return await collectAnswer();
+    // Qué modelos puede elegir quien pregunta (0283): lectura, sin cupo ni IA.
+    if (requested === "modelos") {
+      const pw = await leerConfig(admin);
+      const dest = await destinoAstra(admin, pw);
+      return json(modelosDisponibles({ astraChat: settings.astra_chat === true, hayDestino: Boolean(dest), sesion: Boolean(profileId || memberId), defecto: settings.modelo_defecto }));
+    }
     if (asking) return await answerQuestion();
     if (action === "indexar") return await indexMemory();
     if (action === "comprender") return await comprehendMap();
@@ -9365,6 +9403,21 @@ async function handle(request: Request): Promise<Response> {
     }
 
     // --- Probar la conexión -------------------------------------------------------
+    // La prueba de Pilo Astra 1.0 (0283): el mismo servidor y modelo de Pilo Work, con su razonamiento; solo administración.
+    if (action === "probar" && body.modelo === "astra") {
+      const pw = await leerConfig(admin);
+      const dest = await destinoAstra(admin, pw);
+      if (!dest) return json({ ok: false, error: "Astra no tiene a dónde llamar: falta la dirección https, el modelo (Administración → Pilo Work) o la clave del servidor propio." });
+      const o = opcionesAstra(pw, 16, 90_000);
+      try {
+        const { response } = await chat([{ role: "user", content: "Responda solo con la palabra: OK" }], { temperature: 0, max_tokens: o.max_tokens, signal: AbortSignal.timeout(o.esperaMs), astra: { dest, effort: o.reasoning_effort } });
+        if (!response.ok) return json({ ok: false, status: response.status, error: `El servidor de Astra respondió ${response.status}: ${(await providerDetail(response)).slice(0, 200)}. Se llamó a ${dest.url} con el modelo «${dest.model}»; debe llamarse exactamente como lo publica el puente.` });
+        const whole = readChatChunk(await response.text());
+        return json({ ok: true, ms: Date.now() - started, url: dest.url, model: dest.model, reasoning: Boolean(whole?.reasoning), sample: cleanDraft(whole?.text ?? "").slice(0, 80), finish: whole?.finish ?? "" });
+      } catch (error) {
+        return json({ ok: false, error: `Astra no respondió a tiempo o la conexión falló: ${String(error).slice(0, 160)}` });
+      }
+    }
     if (action === "probar") {
       // La misma forma de mensajes de una pregunta real: persona y reglas en el rol
       // `system` (o dobladas en el primer mensaje, si el modelo no lo acepta), un

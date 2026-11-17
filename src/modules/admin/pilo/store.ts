@@ -123,6 +123,11 @@ export interface PiloSettings {
   widget_origins: string[];
   /** La base aún no tiene la migración 0111 (Pilo en otros portales). */
   needs0111?: boolean;
+  /** Pilo Astra 1.0 en el chat (0283): interruptor y modelo que viene marcado. */
+  astra_chat: boolean;
+  modelo_defecto: "pilo" | "astra";
+  /** La base aún no tiene la migración 0283 (elegir modelo). */
+  needs0283?: boolean;
   /** La base aún no tiene la migración 0100 (informes de Impacto). */
   needs0100?: boolean;
   /** La base aún no tiene la migración 0101 (voz de NVIDIA). */
@@ -228,6 +233,9 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     widget_on: raw.widget_on === true,
     widget_origins: Array.isArray(raw.widget_origins) ? raw.widget_origins.filter((o): o is string => typeof o === "string") : [],
     needs0111: !("widget_on" in raw),
+    astra_chat: raw.astra_chat === true,
+    modelo_defecto: raw.modelo_defecto === "astra" ? "astra" : "pilo",
+    needs0283: !("astra_chat" in raw),
     needs0100: !("impacto_report" in raw),
     needs0101: !("voice_styles" in raw),
     needs0102: !("fish_model" in raw),
@@ -345,7 +353,7 @@ export function useSavePiloSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: PiloSettings) => {
-      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, needs0172, needs0106, needs0109, needs0110, needs0111, memory_indexed_at: _indexed, ...all } = settings;
+      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, needs0172, needs0106, needs0109, needs0110, needs0111, needs0283, memory_indexed_at: _indexed, ...all } = settings;
       // Sin 0090 no existen las columnas nuevas: no se mandan.
       const rest: Record<string, unknown> = { ...all };
       if (needs0090) for (const k of ["provider", "speech_provider", "speech_base_url"]) delete rest[k];
@@ -372,6 +380,8 @@ export function useSavePiloSettings() {
       if (needs0109) delete rest.embed_model;
       // Sin 0110, tampoco los ajustes de «preguntar», el cupo de la voz ni el límite por visitante.
       if (needs0110) for (const k of [...Object.keys(ASK_LIMITS), "system_role", "ask_stream"]) delete rest[k];
+      // Sin 0283, tampoco el interruptor de Astra en el chat.
+      if (needs0283) for (const k of ["astra_chat", "modelo_defecto"]) delete rest[k];
       // Sin 0111, tampoco el chat emergente en otros portales.
       if (needs0111) for (const k of ["widget_on", "widget_origins"]) delete rest[k];
       // Sin 0106, tampoco las expresiones de voz.

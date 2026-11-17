@@ -34,7 +34,8 @@ import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
 import { RolePicker } from "../pregunta/RolePicker";
 import { parseAnswer } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
-import { interruptedTurn, reduceSteps } from "../pregunta/answer-state";
+import { compactThink, interruptedTurn, reduceSteps } from "../pregunta/answer-state";
+import { SelectorModelo, useModelos } from "../../components/pilo/ai/SelectorModelo";
 import { askSong, rememberSong, singRequestOf } from "../pregunta/sing";
 import type { SongRequest } from "../pregunta/sing";
 import type { ThinkStep } from "../pregunta/answer-state";
@@ -167,6 +168,9 @@ export function AppShell({ account, space, door, waking, online, person, member,
 
   const open = door.state === "abierto";
   const can = open && online && !waking;
+  // «Pilo» o «Astra» (solo con sesión y si el servidor lo ofrece): sin selector, el pedido es el de siempre.
+  const models = useModelos(usual ? "pregunta" : space.portal, can);
+  const chosen: AskOptions | null = models.catalogo.modelos.length > 1 ? { modelo: models.modelo } : null;
   const autoRead = voiceOn && voice.advanced;
 
   /* --- La llamada ------------------------------------------------------------------------------- */
@@ -215,7 +219,7 @@ export function AppShell({ account, space, door, waking, online, person, member,
   const [quick, setQuick] = useState(false);
   const [shownSources, setShownSources] = useState<{ sources: AskSource[]; focus: number | null }>({ sources: [], focus: null });
   const [others, setOthers] = useState<Partial<Record<SpaceId, Conversation[]>>>({});
-  const run = useRef<{ ctl: AbortController; convId: string; turnId: string; text: string; meta: AskMeta | null; steps: ThinkStep[]; startedAt: number } | null>(null);
+  const run = useRef<{ ctl: AbortController; convId: string; turnId: string; text: string; meta: AskMeta | null; steps: ThinkStep[]; thinking: string; thoughtMs: number | null; startedAt: number } | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const face = useRef<PiloMojiHandle>(null);
@@ -410,9 +414,9 @@ export function AppShell({ account, space, door, waking, online, person, member,
     setConvs((list) => [{ ...conv, at: Date.now(), turns: [...before, turn] }, ...list.filter((c) => c.id !== conv.id).map((c) => (cut && c.id === cut.convId ? { ...c, turns: patched(c.turns) } : c))]);
     setCurrentId(conv.id);
     const ctl = new AbortController();
-    const mine = { ctl, convId: conv.id, turnId: turn.id, text: "", meta: null as AskMeta | null, steps: [] as ThinkStep[], startedAt: Date.now() };
+    const mine = { ctl, convId: conv.id, turnId: turn.id, text: "", meta: null as AskMeta | null, steps: [] as ThinkStep[], thinking: "", thoughtMs: null as number | null, startedAt: Date.now() };
     run.current = mine;
-    const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, startedAt: mine.startedAt });
+    const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, thinking: mine.thinking, thoughtMs: mine.thoughtMs, startedAt: mine.startedAt });
     show();
     setBusy(true);
     setStatus(tr("Pilo está pensando."));
@@ -430,8 +434,15 @@ export function AppShell({ account, space, door, waking, online, person, member,
           mine.steps = reduceSteps(mine.steps, step);
           show();
         },
+        // El razonamiento del modelo (Astra), tal cual llega y con tope.
+        onThinking: (text) => {
+          if (run.current !== mine) return;
+          mine.thinking = (mine.thinking + text).slice(-6000);
+          show();
+        },
         onDelta: (text) => {
           if (run.current !== mine) return;
+          if (mine.thoughtMs === null) mine.thoughtMs = Date.now() - mine.startedAt;
           mine.text += text;
           show();
         },
@@ -440,8 +451,8 @@ export function AppShell({ account, space, door, waking, online, person, member,
       // Sin cuenta viaja, además, cómo pidió que Pilo le diga y en qué tono. Con cuenta, nada: el servidor la reconoce por su sesión.
       const visitor = visitorWire(readVisitor(), member);
       const answer =
-        wire || doc || visitor
-          ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}), ...(visitor ? { visitor } : {}) })
+        wire || doc || visitor || chosen
+          ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}), ...(visitor ? { visitor } : {}), ...(chosen ?? {}) })
           : await askQuestionStream(q, history, handlers);
       if (run.current !== mine) return;
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
@@ -449,7 +460,9 @@ export function AppShell({ account, space, door, waking, online, person, member,
       const rest = { ...answer };
       delete rest.steps;
       delete rest.seconds;
-      patchTurn(conv.id, turn.id, { answer: rest });
+      // «Cómo pensó Pilo»: solo si el modelo razonó. Los segundos son los que dice el servidor (`pensamiento_s`).
+      const thoughtFor = typeof answer.pensamiento_s === "number" ? answer.pensamiento_s : (mine.thoughtMs ?? Date.now() - mine.startedAt) / 1000;
+      patchTurn(conv.id, turn.id, { answer: rest, ...(mine.thinking.trim() ? { think: compactThink([], mine.thinking, thoughtFor) } : {}) });
       setStatus(tr("Pilo respondió: {v0}", { v0: toPlain(parseAnswer(answer.text)) }));
     } catch (e) {
       // Cortado por «Detener» o por otra pregunta: ya quedó resuelto.
@@ -831,6 +844,7 @@ export function AppShell({ account, space, door, waking, online, person, member,
           )}
 
           <AttachTray state={attach} />
+          {chosen && can && <SelectorModelo catalogo={models.catalogo} modelo={models.modelo} onChange={models.elegir} disabled={busy} className="pp-modelo--dock" />}
           <form className="pa-compose" data-clip={extras.files && can ? "" : undefined} onSubmit={submit}>
             {extras.files && can && <AttachButton onPick={attach.pick} disabled={Boolean(attach.reading)} />}
             <label htmlFor="pa-q" className="pa-sr">

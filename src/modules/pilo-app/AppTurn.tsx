@@ -31,6 +31,7 @@ import { reducedMotion } from "./pwa";
 import { Icon } from "./icons";
 import { FileChip, FileFoot, FileLog } from "../pregunta/Extras";
 import { tr, trn, useLang } from "../../components/pilo/i18n";
+import { PanelPensamiento } from "../../components/pilo/ai/PensamientoPilo";
 
 /** Lo que se ve de una respuesta mientras el servidor la escribe. No se guarda. */
 export interface Live {
@@ -38,6 +39,10 @@ export interface Live {
   text: string;
   meta: AskMeta | null;
   steps: ThinkStep[];
+  /** El razonamiento del modelo (Astra), tal cual llega. */
+  thinking?: string;
+  /** Cuándo dejó de pensar y empezó a escribir (ms desde que empezó), o null si aún piensa. */
+  thoughtMs?: number | null;
   startedAt: number;
 }
 
@@ -128,6 +133,12 @@ export function AppTurn({
   const elapsed = useElapsed(stream?.startedAt, working);
   const step = working ? waitingLine({ steps: stream?.steps ?? [], meta: stream?.meta ?? null, seconds: elapsed }) : "";
   const tip = working ? waitingTip(elapsed, seedOf(turn.id)) : null;
+
+  // «Cómo pensó Pilo»: el razonamiento de Astra, en vivo mientras piensa y plegado al responder.
+  const thinking = stream ? (stream.thinking ?? "") : (turn.think?.thinking ?? "");
+  const razona = Boolean(stream?.meta?.razona);
+  const fase = pending ? (streaming ? "redactando" : "pensando") : "listo";
+  const pensado = stream ? (stream.thoughtMs != null ? stream.thoughtMs / 1000 : null) : (a?.pensamiento_s ?? turn.think?.seconds ?? null);
 
   const question = useRef<HTMLDivElement>(null);
   const answer = useRef<HTMLDivElement>(null);
@@ -297,6 +308,7 @@ export function AppTurn({
               </span>
             </div>
           )}
+          <PanelPensamiento thinking={thinking} fase={fase} startedAt={stream?.startedAt} seconds={pensado} razona={razona} />
           {tip && (
             <p className="ap-tip" key={tip}>
               {tip}

@@ -57,6 +57,9 @@ interface World {
   extras: Record<string, Row>;
   /** Usuarios de Pilo (0120): las filas de pilo_users por id. La sesión «sesion-pilo» es la de «pilo-1». */
   members: Record<string, Row>;
+  /** Pilo Astra 1.0 (0283): la fila de pw_config y la clave del servidor propio. Sin `pw`, esa tabla no existe. */
+  pw?: Row;
+  astraKey?: string;
   /** Pedidos de «preguntar» ya gastados hoy en cada espacio nuevo. */
   spaceUsed: Record<string, number>;
   /** Las respuestas guardadas que devuelve pilo_answer_candidates y que se leen por id. */
@@ -228,7 +231,8 @@ function fakeClient(w: World) {
         return found ? { data: found, error: null } : { data: null, error: { message: "Could not find the table public.pilo_extras in the schema cache" } };
       }
       if (table === "pilo_ai_settings") return { data: w.settings, error: null };
-      if (table === "pilo_ai_secret") return { data: { id: 1, nvidia_key: "clave-de-prueba" }, error: null };
+      if (table === "pilo_ai_secret") return { data: { id: 1, nvidia_key: "clave-de-prueba", ...(w.astraKey ? { otro_key: w.astraKey } : {}) }, error: null };
+      if (table === "pw_config") return w.pw ? { data: w.pw, error: null } : { data: null, error: { message: "Could not find the table public.pw_config in the schema cache" } };
       if (table === "pilo_ai_log") {
         if (op === "insert") {
           w.logs.push(row);
@@ -474,6 +478,7 @@ function fakeClient(w: World) {
 }
 
 let dir = "";
+let root = "";
 let code = "";
 let version = 0;
 let current: World = world();
@@ -484,15 +489,20 @@ beforeAll(async () => {
   expect(source).toMatch(importLine);
   const patched = source.replace(importLine, "const createClient = (globalThis as any).__piloCreateClient;");
   code = (await transform(patched, { loader: "ts", format: "esm", target: "es2022" })).code;
-  dir = mkdtempSync(join(tmpdir(), "pilo-ia-"));
-  // index.ts importa los archivos de la voz de ElevenLabs (0172) y los lectores de la capa profunda (0173): se copian junto a cada instancia.
-  for (const name of ["elevenlabs.ts", "elevenlabs-voz.ts"]) writeFileSync(join(dir, name), readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia", name), "utf8"));
+  // La carpeta de prueba imita supabase/functions: pilo-ia/ junto a pilo-work/ (index.ts importa ../pilo-work/proveedor.ts, 0283).
+  root = mkdtempSync(join(tmpdir(), "funciones-"));
+  dir = join(root, "pilo-ia");
+  mkdirSync(dir);
+  mkdirSync(join(root, "pilo-work"));
+  writeFileSync(join(root, "pilo-work", "proveedor.ts"), readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-work/proveedor.ts"), "utf8"));
+  // index.ts importa los archivos de la voz (0172, voz-diseno), modelos.ts (0283) y los lectores de la capa profunda (0173): se copian junto a cada instancia.
+  for (const name of readdirSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia")).filter((n) => n.endsWith(".ts") && n !== "index.ts")) writeFileSync(join(dir, name), readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia", name), "utf8"));
   mkdirSync(join(dir, "lectores"), { recursive: true });
   for (const name of readdirSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia/lectores"))) writeFileSync(join(dir, "lectores", name), readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia/lectores", name), "utf8"));
 });
 
 afterAll(() => {
-  if (dir) rmSync(dir, { recursive: true, force: true });
+  if (root) rmSync(root, { recursive: true, force: true });
 });
 
 afterEach(() => {
@@ -3989,5 +3999,106 @@ describe("la memoria unificada (0173)", () => {
     await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hubo?", stream: true }));
     expect(argsOf(w, "pilo_memory_find")).toHaveLength(1);
     expect(argsOf(w, "pilo_memory_search")).toHaveLength(2);
+  });
+});
+
+
+describe("elegir modelo: «Pilo» o «Pilo Astra 1.0» (0283)", () => {
+  const pilo = { Authorization: "Bearer sesion-pilo" };
+  const laura = { status: "activa", rol: "estudiante", campus: "bucaramanga", nick: "Laura", tone: "directo", length: "corta", about: "", program: "" };
+  const PW = { astra_habilitado: true, astra_modelo: "pilo-astra:1.0", astra_base_url: "https://astra.example/v1", astra_razonamiento: "profundo", astra_max_tokens: 6000, astra_espera_s: 90, astra_limite_hora: 5 };
+  const astraWorld = (extra: Row = {}): World => {
+    const w = world();
+    w.settings = { ...w.settings, astra_chat: true, ...extra };
+    w.members = { "pilo-1": laura };
+    w.pw = PW;
+    w.astraKey = "clave-astra";
+    return w;
+  };
+  const models = (handler: Handler, headers: Record<string, string> = {}) =>
+    handler(new Request("https://proyecto.supabase.co/functions/v1/pilo-ia", { method: "POST", headers: { "Content-Type": "application/json", Origin: "http://localhost:5173", ...headers }, body: JSON.stringify({ action: "modelos", portal: "pregunta" }) }));
+  const BOTH = { modelos: [{ id: "pilo", label: "Pilo", razona: false }, { id: "astra", label: "Pilo Astra 1.0", razona: true }], defecto: "pilo" };
+  const ONLY_PILO = { modelos: [{ id: "pilo", label: "Pilo", razona: false }], defecto: "pilo" };
+  const Q = { question: "¿Cuántos estudiantes matriculados hay?", stream: true };
+
+  it("modelos: con sesión y Astra encendido, los dos; visitante, solo Pilo", async () => {
+    const handler = await boot(astraWorld());
+    expect(await (await models(handler, pilo)).json()).toEqual(BOTH);
+    expect(await (await models(handler, { Authorization: "Bearer sesion-admin" })).json()).toEqual(BOTH);
+    expect(await (await models(handler)).json()).toEqual(ONLY_PILO);
+    // Clave anónima (el visitante de la web manda la clave del proyecto, no una sesión).
+    expect(await (await models(handler, { Authorization: "Bearer clave-anonima" })).json()).toEqual(ONLY_PILO);
+  });
+
+  it("modelos: Astra apagado, sin destino o sin migración, solo Pilo", async () => {
+    expect(await (await models(await boot(astraWorld({ astra_chat: false })), pilo)).json()).toEqual(ONLY_PILO);
+    const sinDestino = astraWorld();
+    sinDestino.astraKey = undefined;
+    expect(await (await models(await boot(sinDestino), pilo)).json()).toEqual(ONLY_PILO);
+    const sinTabla = astraWorld();
+    sinTabla.pw = undefined;
+    sinTabla.settings = { ...sinTabla.settings, speech_base_url: "", base_url: "" };
+    expect(await (await models(await boot(sinTabla), pilo)).json()).toEqual(ONLY_PILO);
+  });
+
+  it("sin `modelo` en el pedido nada cambia: ni meta ni done traen campos nuevos, y el 'none' sigue", async () => {
+    const calls = provider(deltas({ content: "En 2024 hubo 20.500 estudiantes matriculados [1]." }));
+    const all = await allEvents(await ask(await boot(astraWorld()), Q, pilo));
+    expect(all[all.findIndex((e) => e.event === "meta")].data).not.toHaveProperty("modelo");
+    expect(all[all.length - 1].data).not.toHaveProperty("pensamiento_s");
+    expect(calls[0].url).not.toContain("astra.example");
+  });
+
+  it("modelo «astra»: otro destino y clave, reasoning_effort del ajuste, max_tokens mayor, thinking y pensamiento_s", async () => {
+    const calls = provider(deltas({ reasoning_content: "Let me check the sources. " }, { content: "En 2024 hubo 20.500 estudiantes matriculados [1]. " }, { content: "Es la cifra de toda la UDES [1]." }));
+    const all = await allEvents(await ask(await boot(astraWorld()), { ...Q, modelo: "astra" }, pilo));
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://astra.example/v1/chat/completions");
+    expect(calls[0].body).toMatchObject({ model: "pilo-astra:1.0", reasoning_effort: "high", stream: true });
+    expect(Number(calls[0].body.max_tokens)).toBeGreaterThanOrEqual(6000);
+    const meta = all.find((e) => e.event === "meta")!.data;
+    expect(meta).toMatchObject({ modelo: { id: "astra", label: "Pilo Astra 1.0" }, razona: true });
+    expect(all.filter((e) => e.event === "thinking").map((e) => e.data.text).join("")).toContain("Let me check the sources");
+    const done = all[all.length - 1];
+    expect(done.event).toBe("done");
+    expect(typeof done.data.pensamiento_s).toBe("number");
+  });
+
+  it("modelo «pilo» explícito: el modelo de siempre, con meta.modelo y razona falso", async () => {
+    const calls = provider(deltas({ content: "En 2024 hubo 20.500 estudiantes matriculados [1]. Es la cifra de toda la UDES [1]." }));
+    const all = await allEvents(await ask(await boot(astraWorld()), { ...Q, modelo: "pilo" }, pilo));
+    expect(calls[0].url).not.toContain("astra.example");
+    expect(calls[0].body.reasoning_effort).not.toBe("high");
+    expect(all.find((e) => e.event === "meta")!.data).toMatchObject({ modelo: { id: "pilo", label: "Pilo" }, razona: false });
+  });
+
+  it("pide astra sin permiso (visitante) o apagado: cae a «pilo» y lo dice en meta.modelo", async () => {
+    for (const [w, headers] of [[astraWorld(), {}], [astraWorld({ astra_chat: false }), pilo]] as [World, Record<string, string>][]) {
+      const calls = provider(deltas({ content: "En 2024 hubo 20.500 estudiantes matriculados [1]. Es la cifra de toda la UDES [1]." }));
+      const all = await allEvents(await ask(await boot(w), { ...Q, modelo: "astra" }, headers));
+      expect(calls[0].url).not.toContain("astra.example");
+      expect(all.find((e) => e.event === "meta")!.data).toMatchObject({ modelo: { id: "pilo", label: "Pilo", caido: true }, razona: false });
+    }
+  });
+
+  it("el límite por persona y hora de Astra responde 429 con un código claro", async () => {
+    const w = astraWorld();
+    w.hits = 99;
+    const calls = provider(deltas({ content: "Hola." }));
+    const response = await ask(await boot(w), { ...Q, modelo: "astra" }, pilo);
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ code: "astra_limite" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("probar con modelo astra: solo administración y usa el destino de Astra", async () => {
+    const handler = await boot(astraWorld());
+    const calls = provider(() => new Response(JSON.stringify({ choices: [{ message: { content: "OK", reasoning: "thinking..." }, finish_reason: "stop" }] }), { headers: { "Content-Type": "application/json" } }));
+    const probe = (headers: Record<string, string>) => handler(new Request("https://proyecto.supabase.co/functions/v1/pilo-ia", { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify({ action: "probar", modelo: "astra" }) }));
+    expect((await probe(pilo)).status).toBe(403);
+    const ok = (await (await probe({ Authorization: "Bearer sesion-admin" })).json()) as Row;
+    expect(ok.ok).toBe(true);
+    expect(calls[0].url).toBe("https://astra.example/v1/chat/completions");
+    expect(calls[0].body.reasoning_effort).toBe("high");
   });
 });

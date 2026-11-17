@@ -115,6 +115,27 @@ describe("estados", () => {
     expect(transicionPermitida("draft", "sent", "visor")).toBe(false);
   });
 
+  it("enviar deja el informe aprobado y devuelven Planeación y la unidad destino", () => {
+    // El paso a aprobado lo hace informe_enviar (0281); a mano sigue siendo de Planeación.
+    expect(transicionPermitida("sent", "ok", "destino")).toBe(false);
+    expect(transicionPermitida("ok", "back", "destino")).toBe(true);
+    expect(transicionPermitida("sent", "back", "destino")).toBe(true);
+    expect(transicionPermitida("ok", "back", "jefe")).toBe(false);
+    expect(transicionPermitida("ok", "back", "editor")).toBe(false);
+    expect(transicionPermitida("ok", "back", "visor")).toBe(false);
+  });
+
+  it("el destino solo devuelve: ni envía, ni reabre, ni edita", () => {
+    expect(transicionPermitida("draft", "sent", "destino")).toBe(false);
+    expect(transicionPermitida("back", "draft", "destino")).toBe(false);
+    expect(puedeEditar("draft", "destino")).toBe(false);
+    expect(puedeEditar("back", "destino")).toBe(false);
+  });
+
+  it("un informe enviado queda aprobado: no se reenvía", () => {
+    expect(motivosNoEnviar({ estado: "ok", rol: "jefe", listas: 10, total: 10 })[0]).toMatch(/quedó aprobado/);
+  });
+
   it("se escribe en borrador o devuelto, nunca enviado; Consulta solo lee", () => {
     expect(puedeEditar("draft", "editor")).toBe(true);
     expect(puedeEditar("back", "jefe")).toBe(true);

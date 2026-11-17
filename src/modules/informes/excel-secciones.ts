@@ -1,5 +1,5 @@
 /* =============================================================================
-   Excel de «Logros innovadores o excepcionales» y de «Objetivos y metas anuales».
+   Excel de «Logros» y de «Objetivos y metas anuales».
 
    Las dos secciones se llenan en tablas cortas; aquí van sus columnas, el paso de
    la tabla del Excel a lo que guarda la sección (y de vuelta) y los ejemplos de la

@@ -63,7 +63,7 @@ const TPL: Record<Plantilla, Omit<SeccionPlantilla, "clave">[]> = {
     s("Alineación estratégica", "pdi", "alineacion", EXT.alineacion),
     s("Objetivos y metas anuales de la unidad", "metas", "metas", EXT.metas),
     s("Resultados y evidencias", "dim", "resultados", EXT.resultados),
-    s("Logros innovadores o excepcionales", "logros", "logros", EXT.logros),
+    s("Logros", "logros", "logros", EXT.logros),
     s("Análisis de retos y oportunidades", "filas", "retos", EXT.retos),
     s("Evidencia y fuentes de verificación", "evid", "otra", null),
     s("Conclusiones", "narr", "conclusiones", EXT.propositivo),

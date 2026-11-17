@@ -17,7 +17,7 @@ vi.mock("../admin/components/AdminShell", () => ({
 const sesion = vi.hoisted(() => ({ planeacion: true }));
 vi.mock("../../lib/auth", async (orig) => ({
   ...(await orig<typeof import("../../lib/auth")>()),
-  useAuth: () => ({ loading: false, profile: { id: "u1", role: sesion.planeacion ? "planeacion" : "consulta" }, hasRole: () => sesion.planeacion }),
+  useAuth: () => ({ loading: false, profile: { id: "u1", role: sesion.planeacion ? "planeacion" : "consulta" }, hasRole: () => sesion.planeacion, puedeGestionarInformes: sesion.planeacion }),
 }));
 
 /* Sin red: las consultas y mutaciones son falsas; la lógica, real. */
@@ -61,11 +61,26 @@ vi.mock("./datos", async (orig) => {
     useQuitarCifra: m,
     useSincronizarMetas: m,
     useEnviar: m,
+    useMisDestinos: () => q([]),
+    useOfertaSedes: () => q({ sedes: [], programas: [] }),
+    usePlanUnidad: () => q(undefined),
+    useCatalogoIndicadores: () => q([]),
+    useSedesCifras: () => q([]),
+    usePerfilUnidad: () => q(null),
+    useDisenoInforme: () => q(null),
+    useEditarAnexo: m,
+    useGuardarPerfil: m,
+    useGuardarDiseno: m,
     useRevisar: m,
     useSubirAnexo: m,
     useAgregarEnlace: m,
     useQuitarAnexo: m,
   };
+});
+
+vi.mock("./mejoras-datos", async (orig) => {
+  const real = await orig<typeof import("./mejoras-datos")>();
+  return { ...real, useEstructuras: () => ({ data: { filas: [], falta: true }, error: null, isPending: false }) };
 });
 
 import { InformesAdmin } from "./InformesAdmin";
@@ -149,7 +164,8 @@ describe("Informes Institucionales", () => {
     expect(html).toContain("Sección 1 de 10");
     expect(html).toContain("Insertar una cifra viva");
     expect(html).toContain('class="inf-chip" title="UDES en Cifras · matriculados · 2026">2.851<');
-    expect(html).toContain("Enviar a Rectoría de Campus");
+    expect(html).toContain("Enviar");
+    expect(html).not.toContain("Enviar a Rectoría");
     expect(html).toMatch(/Se habilita cuando las 10 secciones estén listas/);
     expect(html).toContain("Pilo redacta un borrador");
     expect(html).toContain("Las cifras del texto están enlazadas a su fuente");
@@ -174,12 +190,12 @@ describe("Informes Institucionales", () => {
     expect(html).not.toContain("Añadir un dato propio");
   });
 
-  it("revisión: Planeación lee el informe y decide", () => {
-    preparar({ instancias: [inst({ estado: "sent" })] });
+  it("revisión: Planeación lee el informe enviado y lo devuelve si hace falta", () => {
+    preparar({ instancias: [inst({ estado: "ok", aprobado_en: "2026-10-14T10:00:00Z" })] });
     const html = page("/admin/informes-gestion/revision?informe=i1");
-    expect(html).toContain("Por revisar");
-    expect(html).toContain("Aprobar");
-    expect(html).toContain("Devolver con nota");
+    expect(html).toContain("Enviados");
+    expect(html).not.toContain("Por revisar");
+    expect(html).toContain("Reabrir y devolver con nota");
     expect(html).toContain("Nota para esta sección");
   });
 

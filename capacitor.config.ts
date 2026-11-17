@@ -27,6 +27,11 @@ const config: CapacitorConfig = {
     backgroundColor: "#0a2d63",
     allowMixedContent: false,
   },
+  ios: {
+    path: "pilo-ios",
+    backgroundColor: "#0a2d63",
+    contentInset: "always",
+  },
   server: {
     // La app se sirve con el MISMO origen que el portal (https://<dominio>), no con https://localhost.
     // Así las funciones del servidor, que solo aceptan el origen del portal (ALLOWED_ORIGIN), responden

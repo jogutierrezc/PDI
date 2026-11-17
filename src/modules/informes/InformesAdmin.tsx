@@ -4,7 +4,7 @@
    Una sola ruta: /admin/informes-gestion/:seccion?
      (sin sección)   quien gestiona (0192): el tablero del ciclo; el resto: su informe
      mi-informe      el editor (?unidad=<id>&s=<n>)
-     revision        Planeación aprueba o devuelve (?informe=<id>)
+     revision        los informes enviados; Planeación y el destino los devuelven (?informe=<id>)
      consolidador    próxima fase
      capacitacion    Planeación capacita a Pilo con los informes de 2025
    Tablero, revisión, consolidador y capacitación son solo de quien gestiona (puedeGestionarInformes,
@@ -19,7 +19,7 @@ import type { ReactNode } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../lib/auth";
 import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
-import { useCiclos, useInstancias, useRequisitos } from "./datos";
+import { useCiclos, useInstancias, useMisDestinos, useRequisitos } from "./datos";
 import { useEstructuras } from "./mejoras-datos";
 import { Capacitacion } from "./ui/Capacitacion";
 import { Aviso, Cargando, ProximaFase, Vacio } from "./ui/comunes";
@@ -44,7 +44,7 @@ const SECCIONES: Seccion[] = ["tablero", "mi-informe", "revision", "consolidador
 const TITULOS: Record<Seccion, [string, string]> = {
   tablero: ["Tablero del ciclo", "Estado por unidad, fecha límite, plantillas y qué cifras se justifican"],
   "mi-informe": ["Mi informe", "Las cifras de UDES en Cifras y del Plan de Desarrollo ya cargadas; usted escribe lo que solo su unidad puede decir"],
-  revision: ["Revisión", "Planeación aprueba o devuelve cada informe, con una nota por sección"],
+  revision: ["Revisión", "Los informes enviados quedan aprobados; Planeación y la unidad destino pueden devolverlos, con una nota por sección"],
   consolidador: ["Consolidador", "Cada nivel recibe lo aprobado del nivel de abajo y decide qué entra"],
   capacitacion: ["Capacitación de Pilo", "Los informes de 2025 le enseñan a Pilo cómo escribe cada unidad"],
   estructuras: ["Estructuras", "Las plantillas A–D y las estructuras propias, y qué oficinas puede usar cada una"],
@@ -65,6 +65,9 @@ function Pantalla() {
   const { seccion: param } = useParams();
   const { puedeGestionarInformes } = useAuth();
   const gestiona = puedeGestionarInformes;
+  // Quien recibe informes de otras unidades (jefe de la unidad destino) ve la Revisión para devolverlos (0281).
+  const destinos = useMisDestinos();
+  const recibe = !gestiona && (destinos.data?.length ?? 0) > 0;
   const [params, setParams] = useSearchParams();
   const ciclos = useCiclos();
   // Las estructuras propias (0279) se registran junto a A–D antes de pintar nada que las lea.
@@ -77,7 +80,8 @@ function Pantalla() {
   const requisitos = useRequisitos(ciclo?.id);
   const instancias = useInstancias(gestiona ? ciclo?.id : undefined);
 
-  if (!SECCIONES.includes(seccion) || (SOLO_GESTION.includes(seccion) && !gestiona)) return <Navigate to={`${BASE}/mi-informe`} replace />;
+  const sinAcceso = SOLO_GESTION.includes(seccion) && !gestiona && !(seccion === "revision" && (recibe || destinos.isPending));
+  if (!SECCIONES.includes(seccion) || sinAcceso) return <Navigate to={`${BASE}/mi-informe`} replace />;
 
   const porRevisar = instancias.data?.filter((i) => i.estado === "sent").length;
   const rail = (
@@ -90,8 +94,8 @@ function Pantalla() {
       <AdminRailTab current={seccion === "mi-informe"} to={`${BASE}/mi-informe`}>
         Mi informe
       </AdminRailTab>
-      {gestiona && (
-        <AdminRailTab current={seccion === "revision"} to={`${BASE}/revision`} count={porRevisar}>
+      {(gestiona || recibe) && (
+        <AdminRailTab current={seccion === "revision"} to={`${BASE}/revision`} count={gestiona ? porRevisar : undefined}>
           Revisión
         </AdminRailTab>
       )}

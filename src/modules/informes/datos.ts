@@ -30,6 +30,7 @@ import type {
   PilarRef,
   Plantilla,
   RequisitoRow,
+  ResumenGestion,
   SedeInforme,
   SeccionRow,
   UnidadRef,
@@ -538,6 +539,24 @@ export function useAgregarEnlace() {
   });
 }
 
+/** Anexa varios enlaces de una vez, con numeración correlativa (las evidencias que el sistema ya tiene, 0282). */
+export function useAgregarEnlaces() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { instancia: string; enlaces: { url: string; nombre: string; descripcion: string }[]; anexos: AnexoRow[] }) => {
+      const validos = p.enlaces.filter((e) => /^https:\/\/\S+$/i.test(e.url) && !p.anexos.some((a) => a.tipo === "url" && a.ruta === e.url));
+      if (!validos.length) return;
+      const n0 = siguienteN(p.anexos);
+      revisar(
+        await supabase.from("informe_anexos").insert(
+          validos.map((e, k) => ({ instancia_id: p.instancia, n: n0 + k, nombre: (e.nombre.trim() || e.url).slice(0, 200), tipo: "url", ruta: e.url, descripcion: e.descripcion.slice(0, 300) })),
+        ),
+      );
+    },
+    onSuccess: (_x, p) => void cliente.invalidateQueries({ queryKey: CLAVES.anexos(p.instancia) }),
+  });
+}
+
 export function useQuitarAnexo() {
   const cliente = useQueryClient();
   return useMutation({
@@ -603,14 +622,65 @@ export async function urlAnexo(a: AnexoRow): Promise<string> {
 
 /* ---------- Estados ------------------------------------------------------------- */
 
+/**
+ * Enviar deja el informe aprobado (0281). Pilo aprende de él en el acto; si la
+ * función falla, el informe queda enviado y se avisa (`avisoPilo`).
+ */
 export function useEnviar() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async (i: InstanciaRow): Promise<InstanciaRow> => revisar<InstanciaRow>(await supabase.rpc("informe_enviar", { p_instancia: i.id })),
-    onSuccess: (fila) => {
+    mutationFn: async (i: InstanciaRow): Promise<ResultadoRevision> => {
+      const fila = revisar<InstanciaRow>(await supabase.rpc("informe_enviar", { p_instancia: i.id }));
+      let avisoPilo: string | null = null;
+      try {
+        await piloAprender(i.id);
+      } catch (e) {
+        avisoPilo = e instanceof Error ? e.message : "Pilo no pudo aprender de este informe.";
+      }
+      return { fila, avisoPilo };
+    },
+    onSuccess: ({ fila }) => {
       invalidarCiclo(cliente, fila.ciclo_id);
       void cliente.invalidateQueries({ queryKey: CLAVES.cifras(fila.id) });
+      void cliente.invalidateQueries({ queryKey: CLAVES.corpus });
     },
+  });
+}
+
+/**
+ * Lo que el sistema ya sabe de la unidad del informe: indicadores de Impacto con
+ * sus cifras y evidencias, plan de trabajo (facultades), pilares, revisiones y
+ * anexos (0282). En vivo mientras es borrador; después, la foto del envío.
+ * Sin la migración devuelve `falta` para no romper la pantalla.
+ */
+export function useResumenGestion(instancia: string | undefined, estado?: EstadoInstancia) {
+  return useQuery({
+    queryKey: ["informes", "resumen", instancia, estado ?? null],
+    enabled: Boolean(instancia),
+    retry: false,
+    staleTime: 60_000,
+    queryFn: async (): Promise<{ resumen: ResumenGestion | null; falta: boolean }> => {
+      const r = await supabase.rpc("informe_resumen_gestion", { p_instancia: instancia });
+      if (r.error) {
+        if (["42883", "PGRST202", "42P01", "42703"].includes(r.error.code ?? "")) return { resumen: null, falta: true };
+        throw new Error(r.error.message);
+      }
+      return { resumen: (r.data as ResumenGestion | null) ?? null, falta: false };
+    },
+  });
+}
+
+/** Unidades a las que el usuario es destino de informes (su jefe). Vacío para quien no recibe informes. */
+export function useMisDestinos() {
+  return useQuery({
+    queryKey: ["informes", "mis-destinos"],
+    queryFn: async (): Promise<string[]> => {
+      const r = await supabase.rpc("informe_mis_destinos");
+      // Sin la migración 0281 no hay destinos: no es un fallo del usuario.
+      if (r.error) return [];
+      return (r.data as string[] | null) ?? [];
+    },
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -638,7 +708,9 @@ export function useRevisar() {
       const fila = revisar<InstanciaRow>(await supabase.rpc("informe_cambiar_estado", { p_instancia: p.instancia.id, p_a: p.a, p_nota: p.nota?.trim().slice(0, 4000) || null }));
       const secciones = (p.porSeccion ?? []).filter((s) => s.nota.trim());
       if (p.a === "back" && secciones.length) {
-        revisar(await supabase.from("informe_revisiones").insert(secciones.map((s) => ({ instancia_id: p.instancia.id, seccion_clave: s.clave, decision: "devuelto", nota: s.nota.trim() }))));
+        // Las notas por sección ya van dentro de la nota general (§sN · …); estas filas son un apoyo.
+        // Las escribe Planeación; la unidad destino devuelve sin ellas.
+        await supabase.from("informe_revisiones").insert(secciones.map((s) => ({ instancia_id: p.instancia.id, seccion_clave: s.clave, decision: "devuelto", nota: s.nota.trim() })));
       }
       let avisoPilo: string | null = null;
       if (p.a === "ok") {

@@ -1,0 +1,12 @@
+import { chromium } from "/private/tmp/claude-501/-Users-coordinadorinteligenciadenegocios-Documents-PDI/519be8fa-3f90-41c1-9488-e21afcaa3e74/scratchpad/cap/node_modules/playwright-core/index.mjs";
+import path from "node:path"; import { fileURLToPath } from "node:url"; import fs from "node:fs";
+const here = path.dirname(fileURLToPath(import.meta.url));
+const out = process.argv[2]; const pages = process.argv.slice(3).map(Number);
+fs.mkdirSync(out, { recursive: true });
+const b = await chromium.launch({ executablePath: "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", headless: true });
+const p = await b.newPage({ viewport: { width: 816, height: 1056 }, deviceScaleFactor: 1.4 });
+await p.goto("file://" + path.join(here, "manual-aluna-planeacion.html"), { waitUntil: "networkidle" });
+await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(600);
+const els = await p.$$(".pg");
+for (const n of pages) await els[n - 1].screenshot({ path: path.join(out, `p${String(n).padStart(2, "0")}.png`) });
+await b.close();

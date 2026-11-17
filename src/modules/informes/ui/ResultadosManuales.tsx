@@ -100,9 +100,11 @@ interface Props {
   criteriosPedidos?: string[];
   /** Anexos cargados en «Evidencias»: se pueden marcar como respaldo de cada cifra o acción. */
   anexos?: AnexoRow[];
+  /** Ya hay objetivos y metas (plan o Impacto): no se pregunta por criterios. */
+  ocultarCriterios?: boolean;
 }
 
-export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [], pilares = [], anexos = [] }: Props) {
+export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, cambiar, sugerir, puedeSugerir, requeridos = [], criteriosPedidos = [], pilares = [], anexos = [], ocultarCriterios = false }: Props) {
   const indicadores = normalizar(c.indicadores);
   const propios = c.criterios_propios ?? [];
   const criterios = criteriosDe(def.dims ?? [], aprobados, propios, !def.consolida);
@@ -255,6 +257,9 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
 
   return (
     <div className="inf-rm">
+      {ocultarCriterios ? (
+        <p className="inf-hint">Esta unidad ya tiene objetivos y metas: no hace falta elegir criterios. Los avances del plan de trabajo por dimensión aparecen más abajo como sugeridos.</p>
+      ) : (
       <fieldset className="inf-res-sel" disabled={!editable}>
         <legend className="inf-res-sel__q">¿A qué criterios reporta su oficina?</legend>
         <p className="inf-hint">Es opcional: marque solo los que aplican. Cada criterio marcado abre su formulario de indicadores y acciones; los demás no le exigen nada.</p>
@@ -278,7 +283,8 @@ export function ResultadosManuales({ def, c, editable, aprobados, exigirFuente, 
           })}
         </div>
       </fieldset>
-      {editable && (
+      )}
+      {editable && !ocultarCriterios && (
         <div className="inf-rm__nuevo inf-res-nuevo">
           <label className="inf-lab">
             Un criterio propio para su informe

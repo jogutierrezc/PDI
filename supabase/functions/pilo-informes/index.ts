@@ -132,7 +132,7 @@ Deno.serve(async (request: Request) => {
     try {
       instancia = await datos.leerInstancia(admin, id);
       if (!instancia) return json({ error: "No existe ese informe." }, 404);
-      if ((accion === "redactar" || accion === "analizar") && !gestiona) {
+      if ((accion === "redactar" || accion === "analizar" || accion === "aprender") && !gestiona) {
         rolEnUnidad = await datos.rolEnUnidad(comoUsuario, instancia.unit_id);
       }
     } catch (e) {

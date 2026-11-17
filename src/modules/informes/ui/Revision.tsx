@@ -1,8 +1,8 @@
 /* =============================================================================
-   Revisión (Planeación): los informes enviados, leídos como quedarán, con una
-   nota por sección. Aprobar los congela y Pilo aprende de ellos
-   (pilo-informes → aprender); devolver exige nota y las cifras vuelven a ser
-   vivas. ?informe=<id> abre uno.
+   Revisión (Planeación y la unidad destino): los informes enviados, leídos
+   como quedaron. Enviar ya los aprueba (0281); aquí se leen y, si hace falta,
+   se devuelven con una nota por sección: las cifras vuelven a ser vivas y la
+   unidad corrige y reenvía. ?informe=<id> abre uno.
    ========================================================================== */
 
 import { normalizarAlineacion, tieneAlineacion } from "../alineacion";
@@ -10,7 +10,7 @@ import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../lib/auth";
 import { useFundido } from "../../rankings/movimiento";
-import { useInstancias, useOfertaSedes, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
+import { useInstancias, useMisDestinos, useOfertaSedes, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
 import { componerNota, leerNota } from "../estados";
 import { nombreConSede } from "../sedes";
 import type { CicloRow, ContenidoSeccion, EstadoInstancia, InstanciaRow, PilarRef, RequisitoRow, SeccionDef } from "../types";
@@ -27,27 +27,33 @@ import { ElementosDriveLectura } from "./ElementosDrive";
 import { TablaLibreVista } from "./BloquesLibres";
 import { tablaConDatos } from "../tabla-libre";
 
-type Filtro = "sent" | "back" | "ok" | "todos";
+type Filtro = "ok" | "back" | "sent" | "todos";
 const FILTROS: { id: Filtro; texto: string }[] = [
-  { id: "sent", texto: "Por revisar" },
+  { id: "ok", texto: "Enviados" },
   { id: "back", texto: "Devueltos" },
-  { id: "ok", texto: "Aprobados" },
   { id: "todos", texto: "Todos" },
 ];
 
-/** Defensa en profundidad (0192): quien no gestiona los informes no ve la revisión ni consulta nada; la base también lo niega. */
+/**
+ * Defensa en profundidad (0192): ve la revisión quien gestiona los informes o
+ * quien es destino de alguno (jefe de la unidad a la que se entrega); la base
+ * también lo comprueba. El destino solo ve los informes que le llegan.
+ */
 export function Revision(props: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
   const { puedeGestionarInformes } = useAuth();
-  if (!puedeGestionarInformes) return <Vacio>La revisión es de quien gestiona los informes.</Vacio>;
-  return <RevisionGestion {...props} />;
+  const destinos = useMisDestinos();
+  if (puedeGestionarInformes) return <RevisionGestion {...props} destinos={null} />;
+  if (destinos.isPending) return <Cargando texto="Cargando los informes…" />;
+  if (!destinos.data?.length) return <Vacio>La revisión es de quien gestiona los informes o recibe los de otras unidades.</Vacio>;
+  return <RevisionGestion {...props} destinos={destinos.data} />;
 }
 
-function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
+function RevisionGestion({ ciclo, requisitos, destinos }: { ciclo: CicloRow; requisitos: RequisitoRow[]; /** Nulo: gestión, ve todos. Con ids: solo los informes cuyo destino es uno de ellos. */ destinos: string[] | null }) {
   const instancias = useInstancias(ciclo.id);
   const unidades = useUnidades();
   const oferta = useOfertaSedes();
   const [params, setParams] = useSearchParams();
-  const [filtro, setFiltro] = useState<Filtro>("sent");
+  const [filtro, setFiltro] = useState<Filtro>("ok");
   const detalle = useRef<HTMLDivElement>(null);
   const elegido = params.get("informe");
   useFundido(detalle, elegido);
@@ -61,8 +67,10 @@ function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
   // La unidad con su sede: cada informe es de una unidad en una sede.
   const nombreDe = (i: InstanciaRow) => nombreConSede(nombre.get(i.unit_id) ?? "Unidad", i.campus_id ? sedes.get(i.campus_id) : null);
   const kindDe = new Map((unidades.data ?? []).map((u) => [u.id, u.kind]));
-  const lista = (instancias.data ?? []).filter((i) => filtro === "todos" || i.estado === filtro);
-  const inst = (instancias.data ?? []).find((i) => i.id === elegido) ?? null;
+  const visibles = (instancias.data ?? []).filter((i) => !destinos || (i.destino != null && destinos.includes(i.destino)));
+  // «Enviados»: lo que quedó aprobado al enviar (y lo anterior a 0281 que aún espera: «sent»).
+  const lista = visibles.filter((i) => filtro === "todos" || (filtro === "ok" ? i.estado === "ok" || i.estado === "sent" : i.estado === filtro));
+  const inst = visibles.find((i) => i.id === elegido) ?? null;
   const elegir = (id: string) => {
     const p = new URLSearchParams(params);
     p.set("informe", id);
@@ -101,7 +109,7 @@ function RevisionGestion({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
           </ul>
         ) : (
           <p className="inf-muted" style={{ padding: "var(--space-4)" }}>
-            {filtro === "sent" ? "No hay informes esperando revisión." : "No hay informes en este estado."}
+            {filtro === "ok" ? "No hay informes enviados." : "No hay informes en este estado."}
           </p>
         )}
       </div>

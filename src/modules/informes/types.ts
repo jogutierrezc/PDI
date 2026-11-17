@@ -6,6 +6,10 @@
    ========================================================================== */
 
 export type { RolActor } from "../rankings/reporte/tipos";
+import type { RolActor as RolActorBase } from "../rankings/reporte/tipos";
+
+/** Quien actúa sobre un informe: su rol en la unidad o «destino» (jefe de la unidad a la que se entrega), que solo devuelve. */
+export type RolInforme = RolActorBase | "destino";
 import type { PlanLocal } from "./plan-importar";
 import type { CriterioPropio, IndicadorManual } from "./indicadores-manual";
 
@@ -362,4 +366,96 @@ export type Nivel = "ok" | "warn";
 export interface Control {
   nivel: Nivel;
   texto: string;
+}
+
+/* ---------- Resumen de gestión (0282): lo que el sistema ya sabe de la unidad ------- */
+
+export interface ResumenAlineacion {
+  tipo: "pilar" | "ods";
+  pilar: string | null;
+  ods: number | null;
+  confirmada: boolean;
+  origen: "motor" | "matriz" | "manual";
+}
+
+export interface ResumenCifraAnual {
+  anio: number;
+  valor: number | null;
+  texto: string;
+  no_aplica: boolean;
+  evidencia: string;
+  nota: string;
+  actualizado: string;
+}
+
+export interface ResumenMeta {
+  texto: string;
+  num: number | null;
+}
+
+/** Un indicador de Impacto que sigue (o creó) la unidad o uno de sus programas, en una sede. */
+export interface ResumenIndicador {
+  codigo: string;
+  nombre: string;
+  fn: "investigacion" | "ensenanza" | "extension";
+  etapa: "insumos" | "procesos" | "productos" | "impacto";
+  programa: string;
+  sede: string;
+  sede_slug: string;
+  origen: "adopcion" | "propio";
+  baja: boolean;
+  medida: string;
+  unidad: string;
+  linea_base: { anio: number | null; texto: string; num: number | null };
+  meta_2026: ResumenMeta;
+  meta_2028: ResumenMeta;
+  serie: ResumenCifraAnual[];
+  alineaciones: ResumenAlineacion[];
+}
+
+export interface ResumenActividad {
+  descripcion: string;
+  responsable: string | null;
+  fecha: string | null;
+  estado: string;
+  evidencia: string;
+}
+
+export interface ResumenSeguimiento {
+  corte: string;
+  avance: number | null;
+  estado: string;
+  nota: string;
+  evidencia: string;
+  reportado: string | null;
+}
+
+/** Una acción del plan de trabajo de la facultad, con sus actividades y seguimientos. */
+export interface ResumenAccion {
+  id: string;
+  dimension: string;
+  dimension_nombre: string;
+  pilar: string | null;
+  pilar_declarado: string | null;
+  titulo: string;
+  responsable: string | null;
+  meta: string;
+  recursos: string;
+  fecha_limite: string | null;
+  estado_inicial: string | null;
+  actividades: ResumenActividad[];
+  seguimientos: ResumenSeguimiento[];
+}
+
+export interface ResumenGestion {
+  version: number;
+  generado: string;
+  unidad: { id: string; nombre: string; tipo: string };
+  ciclo: { anio: number; nombre: string; fecha_limite: string | null; corte: string | null; estado: string };
+  instancia: { estado: EstadoInstancia; enviado_en: string | null; aprobado_en: string | null };
+  indicadores: ResumenIndicador[];
+  plan: { facultad: string | null; acciones: ResumenAccion[] };
+  pilares: { id: string; numeral: string; nombre: string }[];
+  revisiones: { decision: "aprobado" | "devuelto"; nota: string; seccion: string | null; en: string }[];
+  anexos: { n: number; tipo: "archivo" | "url"; nombre: string; descripcion: string; url: string | null }[];
 }

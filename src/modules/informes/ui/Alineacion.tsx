@@ -4,6 +4,7 @@
    Maestro-detalle: la lista de pilares a un lado, el pilar elegido al otro. */
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import type { CifraVista } from "../cifras-vivas";
 import { insumosDelPilar, pedidoDeAporte } from "../analisis-pilo";
 import type { InsumosDePilar } from "../analisis-pilo";
@@ -28,9 +29,12 @@ export function Alineacion({
   resolver,
   insumos,
   redactar,
+  conexiones,
 }: {
   /** Lo que la oficina conectó con cada pilar en Resultados y evidencias. */
   insumos?: InsumosDePilar;
+  /** Lo que el sistema ya conecta con un pilar (indicadores, acciones del plan); ausente: nada. */
+  conexiones?: (pilarId: string) => ReactNode;
   /** Pilo redacta el aporte desde esos insumos; ausente: sin la opción. */
   redactar?: (pedido: Omit<PedidoAnalisisPilo, "actual">, actual: string) => Promise<string>;
   pilares: PilarRef[];
@@ -111,6 +115,8 @@ export function Alineacion({
             </button>
           )}
         </header>
+
+        {conexiones?.(pilar.id)}
 
         {anterior && (
           <div className="inf-ali__ant">

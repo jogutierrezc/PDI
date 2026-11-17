@@ -63,7 +63,7 @@ export function TodosLosInformes({ ciclo }: { ciclo: CicloRow }) {
         </select>
       </label>
       <span className="inf-hint">
-        Administración ve los {opciones.length} informes del ciclo, solo para leerlos. Escribe quien trabaja en la unidad; Planeación aprueba o devuelve en Revisión.
+        Administración ve los {opciones.length} informes del ciclo, solo para leerlos. Escribe quien trabaja en la unidad; Al enviar, el informe queda aprobado; Planeación lo puede devolver en Revisión.
       </span>
     </div>
   );

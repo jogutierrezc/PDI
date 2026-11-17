@@ -653,8 +653,8 @@ const FilaUnidad = memo(function FilaUnidad({
       <div className="inf-u__acts">
         {inst ? (
           <>
-            <Link className="inf-link inf-tab-enlace" to={inst.estado === "sent" ? `${BASE}/revision?informe=${inst.id}` : enlaceInforme(`${BASE}/mi-informe`, u.id, sede)}>
-              {inst.estado === "sent" ? "Revisar" : "Ver"}
+            <Link className="inf-link inf-tab-enlace" to={inst.estado === "sent" || inst.estado === "ok" ? `${BASE}/revision?informe=${inst.id}` : enlaceInforme(`${BASE}/mi-informe`, u.id, sede)}>
+              {inst.estado === "sent" || inst.estado === "ok" ? "Revisar" : "Ver"}
             </Link>
             <Link className="inf-link inf-tab-enlace" to={enlaceInforme(`${BASE}/vista`, u.id, sede)}>
               Vista del informe

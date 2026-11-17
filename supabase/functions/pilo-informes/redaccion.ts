@@ -40,7 +40,7 @@ export const ACCIONES: Accion[] = ["estado", "redactar", "analizar", "mejorar", 
  * Quien gestiona los informes (informe_gestiona(), 0192: la administración, o
  * Planeación cuyo rol de acceso concede la gestión), todo. La capacidad sola
  * (profiles.role) ya no basta. «aprender», «ingerir», «corpus» y «estado»,
- * solo la gestión. «redactar»: Gestor (jefe) o Contribuyente (editor) de la
+ * solo la gestión («aprender» también el Gestor de la unidad, al enviar). «redactar»: Gestor (jefe) o Contribuyente (editor) de la
  * unidad de la instancia. «mejorar»: quien sea Gestor o Contribuyente de alguna
  * unidad. Todo lo que no es gestión exige además que el rol de acceso marque la
  * pantalla «informes» (pantalla, has_screen).
@@ -51,9 +51,11 @@ export function puedeUsar(
 ): boolean {
   if (!p.perfil?.is_active) return false;
   if (p.gestiona) return true;
-  if (accion === "aprender" || accion === "ingerir" || accion === "corpus" || accion === "estado") return false;
+  if (accion === "ingerir" || accion === "corpus" || accion === "estado") return false;
   if (!p.pantalla) return false;
   const diligencia = (r: string | null | undefined) => r === "jefe" || r === "editor";
+  // Al enviar, el informe queda aprobado y el Gestor de la unidad dispara el aprendizaje de Pilo (0281).
+  if (accion === "aprender") return p.rolEnUnidad === "jefe";
   if (accion === "redactar" || accion === "analizar") return diligencia(p.rolEnUnidad);
   return p.rolesUnidad.some(diligencia);
 }

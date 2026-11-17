@@ -1,17 +1,18 @@
 /* =============================================================================
    Informes Institucionales · estados de un informe y quién puede moverlos.
 
-     draft → sent → ok
+     draft → sent → ok      (enviar: pasa de una vez a aprobado, 0281)
              sent → back → draft   (la unidad corrige y reenvía)
-             ok   → back           (Planeación reabre uno aprobado)
+             ok   → back           (se devuelve para modificaciones, con nota)
 
-   Espejo de informe_enviar / informe_cambiar_estado (0153): el Gestor (jefe)
-   o Planeación envían; solo Planeación aprueba o devuelve. Gestor y
+   Espejo de informe_enviar / informe_cambiar_estado (0281): el Gestor (jefe)
+   o Planeación envían y el informe queda aprobado. Devuelven Planeación y la
+   unidad destino (el jefe de la unidad a la que se entrega). Gestor y
    Contribuyente escriben en borrador o devuelto; Consulta solo lee. La base
    lo vuelve a comprobar con su disparador.
    ========================================================================== */
 
-import type { EstadoInstancia, RolActor } from "./types";
+import type { EstadoInstancia, RolInforme } from "./types";
 
 export const ETIQUETA_ESTADO: Record<EstadoInstancia, string> = {
   draft: "Borrador",
@@ -20,30 +21,30 @@ export const ETIQUETA_ESTADO: Record<EstadoInstancia, string> = {
   back: "Devuelto",
 };
 
-const TRANSICIONES: Record<string, readonly RolActor[]> = {
+const TRANSICIONES: Record<string, readonly RolInforme[]> = {
   "draft→sent": ["planeacion", "jefe"],
   "back→sent": ["planeacion", "jefe"],
   "back→draft": ["planeacion", "jefe", "editor"],
   "sent→ok": ["planeacion"],
-  "sent→back": ["planeacion"],
-  "ok→back": ["planeacion"],
+  "sent→back": ["planeacion", "destino"],
+  "ok→back": ["planeacion", "destino"],
 };
 
-export function transicionPermitida(de: EstadoInstancia, a: EstadoInstancia, rol: RolActor | null): boolean {
+export function transicionPermitida(de: EstadoInstancia, a: EstadoInstancia, rol: RolInforme | null): boolean {
   if (!rol || rol === "visor") return false;
   return TRANSICIONES[`${de}→${a}`]?.includes(rol) ?? false;
 }
 
 /** ¿Puede escribir en el informe? Solo en borrador o devuelto, y no Consulta. */
-export function puedeEditar(estado: EstadoInstancia, rol: RolActor | null): boolean {
+export function puedeEditar(estado: EstadoInstancia, rol: RolInforme | null): boolean {
   if (rol !== "planeacion" && rol !== "jefe" && rol !== "editor") return false;
   return estado === "draft" || estado === "back";
 }
 
 /** Lo que falta para enviar, en español. Vacío = se puede enviar. */
-export function motivosNoEnviar(o: { estado: EstadoInstancia; rol: RolActor | null; listas: number; total: number; /** Evidencias y fuentes de verificación cargadas (informe_anexos). Sin ninguna no se envía. */ anexos?: number }): string[] {
-  if (o.estado === "sent") return ["Ya se envió: Planeación lo revisa."];
-  if (o.estado === "ok") return ["Está aprobado y congelado."];
+export function motivosNoEnviar(o: { estado: EstadoInstancia; rol: RolInforme | null; listas: number; total: number; /** Evidencias y fuentes de verificación cargadas (informe_anexos). Sin ninguna no se envía. */ anexos?: number }): string[] {
+  if (o.estado === "sent") return ["Ya se envió."];
+  if (o.estado === "ok") return ["Ya se envió y quedó aprobado."];
   const m: string[] = [];
   if (!transicionPermitida(o.estado, "sent", o.rol)) m.push("Solo el Gestor de la unidad o Planeación envían el informe.");
   if (o.listas < o.total) m.push(`Se habilita cuando las ${o.total} secciones estén listas (van ${o.listas}).`);

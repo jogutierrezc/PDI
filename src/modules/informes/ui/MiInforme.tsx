@@ -17,6 +17,7 @@ import {
   usePlanUnidad,
   useAbrirInforme,
   useAgregarEnlace,
+  useAgregarEnlaces,
   useAsegurarCifras,
   useCatalogoIndicadores,
   useEnviar,
@@ -27,6 +28,7 @@ import {
   useEditarAnexo,
   useQuitarAnexo,
   useQuitarCifra,
+  useResumenGestion,
   useSecciones,
   useSedesCifras,
   useSincronizarMetas,
@@ -40,10 +42,12 @@ import { ImportarFilas } from "./ImportarFilas";
 import { AYUDA_LOGROS, AYUDA_METAS, COLUMNAS_LOGROS, COLUMNAS_METAS, EJEMPLO_LOGROS, EJEMPLO_METAS, filasALogros, filasAMetas, logrosAFilas, metasAFilas } from "../excel-secciones";
 import { CRITERIOS_BASE, opcionesPilar } from "../indicadores-manual";
 import { Alineacion } from "./Alineacion";
+import { hayObjetivosYMetas } from "../resumen-gestion";
+import { ConexionesPilar, EvidenciasDelSistema, LoCargadoPorDimension, LogrosDelSistema } from "./ResumenSistema";
 import { BloquesLibres } from "./BloquesLibres";
 import { AYUDA_TIPO, DIMS, LETRAS, PLANTILLAS, cifraDef, clavesDe, plantillaSugerida } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
-import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, RolActor, SeccionDef, SedeInforme, UnidadRef } from "../types";
+import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plantilla, RequisitoRow, ResumenGestion, RolActor, SeccionDef, SedeInforme, UnidadRef } from "../types";
 import { EncabezadoObjetivo, enlaceInforme, useObjetivoInforme } from "./objetivo";
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
 import { Dimensiones } from "./Dimensiones";
@@ -162,6 +166,11 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
   const enviar = useEnviar();
   const subir = useSubirAnexo();
   const enlazar = useAgregarEnlace();
+  const enlazarVarios = useAgregarEnlaces();
+  // Lo que el sistema ya sabe de la unidad (0282): en vivo en borrador, la foto del envío después.
+  const resumen = useResumenGestion(inst.id, inst.estado).data?.resumen ?? null;
+  // Con objetivos y metas ya dados, no se piden criterios: los avances del plan por dimensión quedan sugeridos.
+  const hayMetas = hayObjetivosYMetas(resumen) || (vigente?.acciones.length ?? 0) > 0 || m.metasPrograma.length > 0;
   const quitarAnexo = useQuitarAnexo();
   const editarAnexo = useEditarAnexo();
 
@@ -367,16 +376,16 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
           {estadoVista === "sent" || estadoVista === "ok" ? (
             <>
               <button type="button" className="inf-btn inf-btn--pri" disabled>
-                {estadoVista === "ok" ? "Aprobado" : `Enviado a ${m.plantilla.destino}`}
+                Enviado
               </button>
               <small>
-                {estadoVista === "ok" ? `Aprobado${inst.aprobado_en ? ` el ${fmtFecha(inst.aprobado_en)}` : ""}. Queda congelado.` : `Enviado${inst.enviado_en ? ` el ${fmtFecha(inst.enviado_en)}` : ""}. Esperando la revisión de Planeación.`}
+                {estadoVista === "ok" ? `Enviado y aprobado${inst.aprobado_en ? ` el ${fmtFecha(inst.aprobado_en)}` : ""}. Queda congelado; Planeación o su destino pueden devolverlo para modificaciones.` : `Enviado${inst.enviado_en ? ` el ${fmtFecha(inst.enviado_en)}` : ""}.`}
               </small>
             </>
           ) : (
             <>
               <button type="button" className="inf-btn inf-btn--pri" disabled={motivos.length > 0 || enviar.isPending} onClick={enviarInforme}>
-                {enviar.isPending ? "Enviando…" : `Enviar a ${m.plantilla.destino}`}
+                {enviar.isPending ? "Enviando…" : "Enviar"}
               </button>
               {motivos.length ? (
                 <ul>
@@ -385,7 +394,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
                   ))}
                 </ul>
               ) : (
-                <small>Todo listo. Al enviar queda la foto de las cifras y el informe se bloquea.</small>
+                <small>Todo listo. Al enviar, el informe queda aprobado, con la foto de las cifras, y se bloquea.</small>
               )}
             </>
           )}
@@ -393,6 +402,9 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
             <p className="inf-error" role="alert">
               {mensajeDe(enviar.error)}
             </p>
+          )}
+          {enviar.data?.avisoPilo && (
+            <small role="status">El informe quedó enviado y aprobado. Pilo no pudo aprender de él esta vez: {enviar.data.avisoPilo}</small>
           )}
           {estadoGuardado && (
             <small role="status" aria-live="polite">
@@ -447,7 +459,10 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
           enlazar={(url, nombre) => enlazar.mutateAsync({ instancia: inst.id, url, nombre, anexos: m.anexos.data ?? [] })}
           quitarAnexo={(a) => quitarAnexo.mutate(a)}
           editarAnexo={(a, cambios) => editarAnexo.mutateAsync({ instancia: inst, anexo: a, cambios })}
-          ocupado={subir.isPending || enlazar.isPending}
+          ocupado={subir.isPending || enlazar.isPending || enlazarVarios.isPending}
+          resumen={resumen}
+          hayMetas={hayMetas}
+          anexarEvidencias={(enlaces) => enlazarVarios.mutateAsync({ instancia: inst.id, enlaces, anexos: m.anexos.data ?? [] })}
         />
         {def.tipo !== "anexos" && def.tipo !== "evid" && def.tipo !== "libre" && (
           <ElementosDrive elementos={c.drive ?? []} editable={editableSec} onChange={(drive) => cambiar(def, { ...c, drive })} />
@@ -587,6 +602,9 @@ function CuerpoSeccion({
   quitarAnexo,
   editarAnexo,
   ocupado,
+  resumen,
+  hayMetas,
+  anexarEvidencias,
 }: {
   def: SeccionDef;
   c: ContenidoSeccion;
@@ -612,6 +630,11 @@ function CuerpoSeccion({
   quitarAnexo: (a: AnexoRow) => void;
   editarAnexo: (a: AnexoRow, cambios: CambiosAnexo) => Promise<void>;
   ocupado: boolean;
+  /** Lo que el sistema ya sabe de la unidad (0282); nulo si no hay migración o datos. */
+  resumen: ResumenGestion | null;
+  /** Ya hay objetivos y metas: no se piden criterios y el plan por dimensión queda sugerido. */
+  hayMetas: boolean;
+  anexarEvidencias: (enlaces: { url: string; nombre: string; descripcion: string }[]) => Promise<void>;
 }) {
   const criteriosBase = useCriterios();
   const sugerirCriterio = useSugerirCriterio();
@@ -660,6 +683,7 @@ function CuerpoSeccion({
             cifras={m.citables}
             resolver={resolver}
             insumos={{ cifras: m.manuales.map((x) => ({ ind: x.ind, vista: x.vista })), acciones: m.accionesManuales.map((x) => x.ind) }}
+            conexiones={(pilarId) => <ConexionesPilar resumen={resumen} pilarId={pilarId} />}
             redactar={editable ? async (pedido, actual) => (await piloAnalizar(inst.id, def.clave, { ...pedido, actual })).texto : undefined}
           />
         </div>
@@ -747,6 +771,7 @@ function CuerpoSeccion({
               requeridos={m.requeridosDe(def)}
               anexos={anexos}
               criteriosPedidos={m.contexto(def).cifras.filter((x) => x.condicion === "justificar").map((x) => cifraDef(x.clave)?.dim ?? "").filter(Boolean)}
+              ocultarCriterios={hayMetas}
               sugerir={(p) => sugerirCriterio.mutateAsync({ nombre: p.nombre, descripcion: "", unidad: inst.unit_id })}
             />
           </div>
@@ -758,11 +783,12 @@ function CuerpoSeccion({
             </div>
             <DimensionesConectadas def={def} m={m} propias={propias} editable={editable} pilares={pilares} guardar={guardar} agregarPropio={agregarPropio} quitarPropio={quitarPropio} />
           </details>
+          <LoCargadoPorDimension resumen={resumen} editable={editable} usarEnTexto={(p) => cambiar({ ...c, texto: [c.texto?.trim(), p].filter(Boolean).join("\n\n") })} />
           {vigente && vigente.acciones.length > 0 && (
             <div className="inf-blk">
               <div className="inf-blk__lab">
                 <Tag auto />
-                <span className="inf-src">Avance del Plan de Trabajo por dimensión</span>
+                <span className="inf-src">Avance del Plan de Trabajo por dimensión · sugerido</span>
               </div>
               <ResumenPlan
                 plan={{ facultad: "", decano: vigente.decano, plan: null, acciones: vigente.acciones, actividades: vigente.actividades, seguimientos: [], traido_en: vigente.traido_en ?? "" }}
@@ -864,12 +890,18 @@ function CuerpoSeccion({
             columnas={[...COLUMNAS_LOGROS]}
             filas={logrosAFilas(c.logros ?? [])}
             editable={editable}
-            archivo="logros-innovadores-o-excepcionales"
+            archivo="logros"
             ejemplo={EJEMPLO_LOGROS}
             ayuda={AYUDA_LOGROS}
             cambiar={(filas) => cambiar({ ...c, logros: filasALogros(filas, c.logros ?? []) })}
           />
           <Logros logros={c.logros ?? []} anexos={anexos} editable={editable} cambiar={(logros) => cambiar({ ...c, logros })} />
+          <LogrosDelSistema
+            resumen={resumen}
+            editable={editable}
+            yaEstan={(c.logros ?? []).map((x) => x.titulo)}
+            agregar={(l) => cambiar({ ...c, logros: [...(c.logros ?? []), { titulo: l.titulo, resultado: l.resultado, anexo: anexos.find((a) => a.tipo === "url" && a.ruta === l.evidencia)?.n ?? null }] })}
+          />
         </div>
       );
     case "evid":
@@ -881,6 +913,7 @@ function CuerpoSeccion({
           </div>
           {editable && <CargaEvidencias subir={subir} enlazar={enlazar} ocupado={ocupado} />}
           <TablaAnexos anexos={anexos} quitar={editable ? quitarAnexo : undefined} editar={editable ? editarAnexo : undefined} />
+          <EvidenciasDelSistema resumen={resumen} editable={editable} enlazarTodas={anexarEvidencias} />
         </div>
       );
     case "anexos":

@@ -13,7 +13,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef } from "r
 import type { CSSProperties, ElementType, ReactNode } from "react";
 import { bandaCorta, fondoDe } from "../../../../supabase/functions/pilo-presentaciones/esquema";
 import type { Diapositiva } from "../../../../supabase/functions/pilo-presentaciones/esquema";
-import { IMAGEN_ANIMO, TEXTO_ANIMO, claseEstado, cuerpoCifra, cuerpoTitulo, filaTotal, fondoUrl, lineasDe, medidasTabla, partesBarra } from "./modelo";
+import { COLORES_GRAFICA, IMAGEN_ANIMO, TEXTO_ANIMO, arcosDona, claseEstado, cuerpoCifra, cuerpoTitulo, descripcionGrafica, filaTotal, fondoUrl, fraccionProgreso, lineasDe, medidasTabla, partesBarra, partirEtiqueta, textoValor, topeEscala } from "./modelo";
 import type { Ruta } from "./modelo";
 import "./presentacion.css";
 
@@ -124,6 +124,7 @@ function Marco({ d, fondo, children, fijos, clase }: { d: Diapositiva; fondo: nu
       <img className="pr-bg" src={fondoUrl(fondo)} alt="" draggable={false} />
       {fijos}
       {alto ? <Flujo alto={alto} d={d}>{children}</Flujo> : children}
+      {d.parte && d.tipo !== "tabla" && <p className="pr-parte" data-a={9}>Parte {d.parte.n} de {d.parte.de}</p>}
     </section>
   );
 }
@@ -326,6 +327,158 @@ function Cumplimiento({ d }: { d: Extract<Diapositiva, { tipo: "cumplimiento" }>
   );
 }
 
+/* ---------- Gráfica: SVG propio, con el valor escrito en cada barra y una tabla de datos para lectores de pantalla ---------- */
+
+const ANCHO_GRAFICA = 1630;
+const TINTA = "#072b63";
+const PISTA = "#e6eef9";
+const AZUL = "#0a47a1";
+const VERDE = "#12833a";
+
+type SerieG = Extract<Diapositiva, { tipo: "grafica" }>["series"][number];
+
+/** Barras horizontales (y barras de progreso frente a su meta): etiqueta a la izquierda, valor escrito al final de la barra. */
+function BarrasSvg({ d, progreso }: { d: Extract<Diapositiva, { tipo: "grafica" }>; progreso: boolean }) {
+  const n = d.series.length;
+  const fila = Math.max(46, Math.min(72, Math.floor(500 / Math.max(n, 1))));
+  const etiqueta = 480;
+  const pista = ANCHO_GRAFICA - etiqueta - 360;
+  const alto = n * fila;
+  const tope = topeEscala(d.series);
+  const barra = Math.round(fila * 0.52);
+  return (
+    <svg className="pr-svg" viewBox={`0 0 ${ANCHO_GRAFICA} ${alto}`} width={ANCHO_GRAFICA} height={alto} aria-hidden="true" focusable="false">
+      {d.series.map((s: SerieG, i: number) => {
+        const y = i * fila;
+        const u = s.unidad ?? d.unidad;
+        const frac = progreso ? fraccionProgreso(s, d.unidad, tope) : s.valor / tope;
+        const largo = Math.max(s.valor > 0 ? 6 : 0, frac * pista);
+        const lineas = partirEtiqueta(s.etiqueta, 30);
+        const cy = y + fila / 2;
+        const texto = progreso && s.meta !== undefined ? `${textoValor(s.valor, u)} de ${textoValor(s.meta, u)}` : `${textoValor(s.valor, u)}${!progreso && s.meta !== undefined ? ` · meta ${textoValor(s.meta, u)}` : ""}`;
+        return (
+          <g key={i} data-a={2 + i}>
+            {lineas.map((l, k) => (
+              <text key={k} x={0} y={cy + (k - (lineas.length - 1) / 2) * 30 + 9} fontSize={27} fontWeight={700} fill={TINTA}>{l}</text>
+            ))}
+            <rect x={etiqueta} y={cy - barra / 2} width={pista} height={barra} rx={barra / 2} fill={PISTA} />
+            <rect x={etiqueta} y={cy - barra / 2} width={largo} height={barra} rx={barra / 2} fill={progreso && frac >= 1 ? VERDE : AZUL} />
+            {!progreso && s.meta !== undefined && <rect x={etiqueta + Math.min(1, s.meta / tope) * pista - 2} y={cy - barra / 2 - 8} width={4} height={barra + 16} rx={2} fill={TINTA} />}
+            <text x={etiqueta + (progreso ? pista : Math.max(largo, 0)) + 18} y={cy + 10} fontSize={28} fontWeight={800} fill={TINTA}>{texto}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Columnas verticales: el valor sobre cada columna y la etiqueta debajo. */
+function ColumnasSvg({ d }: { d: Extract<Diapositiva, { tipo: "grafica" }> }) {
+  const n = d.series.length;
+  const alto = 500;
+  const arriba = 56;
+  const plano = 330;
+  const base = arriba + plano;
+  const ancho = ANCHO_GRAFICA / n;
+  const columna = Math.min(150, ancho * 0.56);
+  const tope = topeEscala(d.series);
+  return (
+    <svg className="pr-svg" viewBox={`0 0 ${ANCHO_GRAFICA} ${alto}`} width={ANCHO_GRAFICA} height={alto} aria-hidden="true" focusable="false">
+      <line x1={0} y1={base} x2={ANCHO_GRAFICA} y2={base} stroke="#c9d6ea" strokeWidth={3} />
+      {d.series.map((s: SerieG, i: number) => {
+        const u = s.unidad ?? d.unidad;
+        const cx = ancho * i + ancho / 2;
+        const h = Math.max(s.valor > 0 ? 6 : 0, (s.valor / tope) * plano);
+        const lineas = partirEtiqueta(s.etiqueta, Math.max(10, Math.floor(ancho / 14.5)), 3);
+        return (
+          <g key={i} data-a={2 + i}>
+            <rect x={cx - columna / 2} y={base - h} width={columna} height={h} rx={10} fill={AZUL} />
+            <text x={cx} y={base - h - 14} textAnchor="middle" fontSize={28} fontWeight={800} fill={TINTA}>{textoValor(s.valor, u)}</text>
+            {s.meta !== undefined && <rect x={cx - columna / 2 - 12} y={base - (s.meta / tope) * plano - 2} width={columna + 24} height={4} rx={2} fill={TINTA} />}
+            {lineas.map((l, k) => (
+              <text key={k} x={cx} y={base + 34 + k * 28} textAnchor="middle" fontSize={24} fontWeight={600} fill={TINTA}>{l}</text>
+            ))}
+            {s.meta !== undefined && <text x={cx} y={base + 34 + lineas.length * 28} textAnchor="middle" fontSize={22} fontWeight={600} fill="#44556d">{`meta ${textoValor(s.meta, u)}`}</text>}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Dona: las partes sobre un todo; la leyenda escribe cada parte con su valor (el color no es la única pista). */
+function DonaSvg({ d }: { d: Extract<Diapositiva, { tipo: "grafica" }> }) {
+  const n = d.series.length;
+  const alto = 480;
+  const r = 170;
+  const grosor = 74;
+  const cx = 250;
+  const cy = alto / 2;
+  const c = 2 * Math.PI * r;
+  const arcos = arcosDona(d.series);
+  const fila = Math.min(72, Math.floor(420 / n));
+  const y0 = (alto - n * fila) / 2;
+  return (
+    <svg className="pr-svg" viewBox={`0 0 ${ANCHO_GRAFICA} ${alto}`} width={ANCHO_GRAFICA} height={alto} aria-hidden="true" focusable="false">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={PISTA} strokeWidth={grosor} />
+      <g transform={`rotate(-90 ${cx} ${cy})`} data-a={2}>
+        {arcos.map((a, i) => {
+          if (a.fraccion <= 0) return null;
+          const largo = a.fraccion * c;
+          const hueco = arcos.filter((x) => x.fraccion > 0).length > 1 ? Math.min(5, largo * 0.2) : 0;
+          return <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={COLORES_GRAFICA[i % COLORES_GRAFICA.length]} strokeWidth={grosor} strokeDasharray={`${Math.max(0.5, largo - hueco)} ${c}`} strokeDashoffset={-a.inicio * c} />;
+        })}
+      </g>
+      {d.series.map((s: SerieG, i: number) => {
+        const y = y0 + i * fila + fila / 2;
+        const lineas = partirEtiqueta(s.etiqueta, 34);
+        return (
+          <g key={i} data-a={3 + i}>
+            <rect x={560} y={y - 16} width={32} height={32} rx={8} fill={COLORES_GRAFICA[i % COLORES_GRAFICA.length]} />
+            {lineas.map((l, k) => (
+              <text key={k} x={614} y={y + (k - (lineas.length - 1) / 2) * 30 + 9} fontSize={28} fontWeight={600} fill={TINTA}>{l}</text>
+            ))}
+            <text x={1250} y={y + 10} fontSize={30} fontWeight={800} fill={TINTA}>{textoValor(s.valor, s.unidad ?? d.unidad)}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function Grafica({ d }: { d: Extract<Diapositiva, { tipo: "grafica" }> }) {
+  const corta = bandaCorta(d.titulo);
+  const conMeta = d.series.some((s) => s.meta !== undefined);
+  return (
+    <Marco d={d} fondo={corta ? 4 : 3} clase="pr-l3" fijos={<><Banda titulo={d.titulo} corta={corta} /><Pilo d={d} x={1560} y={64} w={150} /></>}>
+      {d.intro && <Ed r={["intro"]} v={d.intro} as="p" className="pr-lead" a={1} />}
+      <figure className="pr-fig" role="group" aria-label={descripcionGrafica(d)} data-forma={d.forma}>
+        {d.forma === "columnas" ? <ColumnasSvg d={d} /> : d.forma === "dona" ? <DonaSvg d={d} /> : <BarrasSvg d={d} progreso={d.forma === "progreso"} />}
+        <table className="pr-sr">
+          <caption>{d.titulo}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Dato</th>
+              <th scope="col">Valor</th>
+              {conMeta && <th scope="col">Meta</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {d.series.map((s, i) => (
+              <tr key={i}>
+                <th scope="row">{s.etiqueta}</th>
+                <td>{textoValor(s.valor, s.unidad ?? d.unidad)}</td>
+                {conMeta && <td>{s.meta === undefined ? "" : textoValor(s.meta, s.unidad ?? d.unidad)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </figure>
+      {d.nota && <Ed r={["nota"]} v={d.nota} as="p" className="pr-note" a={3 + d.series.length} />}
+    </Marco>
+  );
+}
+
 function Logros({ d }: { d: Extract<Diapositiva, { tipo: "logros" }> }) {
   const corta = bandaCorta(d.titulo);
   return (
@@ -443,6 +596,7 @@ export function Lamina({ d, editable = false, onEditar }: { d: Diapositiva; edit
       case "tarjetas": return <Tarjetas d={d} />;
       case "cifras": return <Cifras d={d} />;
       case "cumplimiento": return <Cumplimiento d={d} />;
+      case "grafica": return <Grafica d={d} />;
       case "logros": return <Logros d={d} />;
       case "evidencias": return <Evidencias d={d} />;
       case "texto": return <Texto d={d} />;

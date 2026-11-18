@@ -155,6 +155,20 @@ export function verificarPresentacion(p: Presentacion, informe: unknown): { pres
         return; // sin filas respaldadas la diapositiva no tiene gráfica: se quita
       }
     }
+    if (d.tipo === "grafica") {
+      // Cada valor (y su meta) debe estar en el informe: una barra sin respaldo se quita, no se redondea ni se corrige.
+      const series = d.series.filter((x) => {
+        const ok = [x.valor, ...(x.meta === undefined ? [] : [x.meta])].every((n) => n === 0 || respaldado(String(n), r));
+        if (!ok) avisos.push({ campo: `series(${x.etiqueta})`, valor: `${x.valor}${x.meta === undefined ? "" : ` / meta ${x.meta}`}`, motivo: "cifra" });
+        return ok;
+      });
+      const minimo = d.forma === "dona" ? 2 : 1;
+      if (series.length < minimo) {
+        for (const a of avisos) no.push({ diapositiva: idx + 1, ...a });
+        return; // sin valores respaldados no hay gráfica: se quita
+      }
+      d = { ...d, series };
+    }
     d = mapearTextos(d, (t, campo) => (campo === "numero" ? t : limpiar(t, r, campo, avisos, extra)));
     for (const a of avisos) no.push({ diapositiva: idx + 1, ...a });
     diapositivas.push(d);

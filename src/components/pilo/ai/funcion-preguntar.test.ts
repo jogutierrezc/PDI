@@ -4121,3 +4121,55 @@ describe("elegir modelo: «Pilo» o «Pilo Astra 1.0» (0283)", () => {
     expect(calls[0].body.reasoning_effort).toBe("high");
   });
 });
+
+describe("respuestas concretas y tutor que sí responde", () => {
+  it("siempre pide la respuesta directa y limita los bloques de datos a lo de la UDES", async () => {
+    const { ASK_DIRECT_RULE, memberInstruction } = await import("./logic");
+    expect(ASK_DIRECT_RULE).toMatch(/respuesta directa/);
+    expect(ASK_DIRECT_RULE).toMatch(/2, 3 y 4\) valen solo para lo que es de la UDES/);
+    const tutor = memberInstruction({ nick: "", tone: "cercano", length: "normal", rol: "estudiante", about: "", campus: "", program: "" } as never);
+    expect(tutor).toMatch(/concreta y directa/);
+    expect(tutor).not.toMatch(/No resuelvas por ella/);
+  });
+});
+
+describe("Pilo Astra", () => {
+  it("su regla (pensar lo justo, sin respuestas recortadas) solo va cuando responde Astra", async () => {
+    const { ASTRA_RULE, buildAskMessages, planAsk } = await import("./logic");
+    const { ASK_CASES } = await import("./rol-casos");
+    const c = ASK_CASES[0];
+    const sys = (astra: boolean) => String(buildAskMessages(planAsk(c.plan), { ...c.prompt, ...(astra ? { astra: true } : {}) })[0].content);
+    expect(sys(true)).toContain(ASTRA_RULE);
+    expect(sys(false)).not.toContain(ASTRA_RULE);
+  });
+});
+
+describe("Astra · Investigaciones", () => {
+  it("su regla solo va con Astra y el nivel de investigación", async () => {
+    const { ASTRA_RESEARCH_RULE, buildAskMessages, planAsk } = await import("./logic");
+    const { ASK_CASES } = await import("./rol-casos");
+    const c = ASK_CASES[0];
+    const sys = (p: Record<string, unknown>) => String(buildAskMessages(planAsk(c.plan), { ...c.prompt, ...p })[0].content);
+    expect(sys({ astra: true, research: true })).toContain(ASTRA_RESEARCH_RULE);
+    expect(sys({ astra: true })).not.toContain(ASTRA_RESEARCH_RULE);
+    expect(sys({ research: true })).not.toContain(ASTRA_RESEARCH_RULE);
+  });
+});
+
+describe("modificar el archivo adjunto", () => {
+  it("wantsEdit distingue pedir cambios de pedir un análisis", async () => {
+    const { wantsEdit } = await import("./logic");
+    for (const q of ["Corrige la ortografía", "traduce esto al inglés", "Agrega una columna de totales", "reescribe el segundo párrafo", "Mejora la redacción"]) expect(wantsEdit(q), q).toBe(true);
+    for (const q of ["¿Cuál es el promedio?", "Resume el archivo", "¿Qué dice la página 3?"]) expect(wantsEdit(q), q).toBe(false);
+  });
+  it("la regla del archivo completo solo va con archivo y pedido de cambios", async () => {
+    const { DOC_EDIT_RULE, buildAskMessages, planAsk } = await import("./logic");
+    const { ASK_CASES } = await import("./rol-casos");
+    const c = ASK_CASES[0];
+    const doc = { name: "a.docx", passages: ["Texto del archivo."], omitted: 0 };
+    const sys = (p: Record<string, unknown>) => String(buildAskMessages(planAsk(c.plan), { ...c.prompt, ...p })[0].content);
+    expect(sys({ doc, edit: true })).toContain(DOC_EDIT_RULE);
+    expect(sys({ doc })).not.toContain(DOC_EDIT_RULE);
+    expect(sys({ edit: true })).not.toContain(DOC_EDIT_RULE);
+  });
+});

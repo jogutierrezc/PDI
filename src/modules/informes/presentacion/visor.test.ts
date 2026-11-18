@@ -10,7 +10,7 @@ import { ALTO, ANCHO, Lamina } from "./Laminas";
 const html = (d: Diapositiva, editable = false) => renderToStaticMarkup(createElement(Lamina, { d, editable, onEditar: () => {} }));
 
 describe("Lamina · cada tipo de diapositiva dibuja sin errores con los datos de ejemplo", () => {
-  it("el ejemplo cubre los 11 tipos", () => {
+  it("el ejemplo cubre los 12 tipos", () => {
     expect(new Set(presentacionEjemplo.diapositivas.map((d) => d.tipo))).toEqual(new Set(TIPOS));
   });
 

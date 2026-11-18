@@ -34,9 +34,9 @@ describe("tonos", () => {
 });
 
 describe("prompt", () => {
-  it("lista los 11 tipos y el catálogo cerrado de ánimos", () => {
+  it("lista los 12 tipos y el catálogo cerrado de ánimos", () => {
     const s = mensajeSistema("institucional");
-    for (const t of ["portada", "agenda", "seccion", "tabla", "tarjetas", "cifras", "cumplimiento", "logros", "evidencias", "texto", "cierre"]) expect(s).toContain(`${t}:`);
+    for (const t of ["portada", "agenda", "seccion", "tabla", "tarjetas", "cifras", "cumplimiento", "grafica", "logros", "evidencias", "texto", "cierre"]) expect(s).toContain(`${t}:`);
     expect(s).toContain("feliz, piensa, idea, excelente");
   });
   it("el mensaje del usuario lleva el informe, el enfoque (≤300) y la duración", () => {
@@ -44,7 +44,7 @@ describe("prompt", () => {
     expect(m[0].role).toBe("system");
     expect(m[1].content).toContain("Facultad de Ingenierías");
     expect(m[1].content).toContain("15 minutos");
-    expect(m[1].content.match(/x+/)![0].length).toBe(300);
+    expect(m[1].content.match(/x{20,}/)![0].length).toBe(300);
   });
   it("compacta: quita lo vacío y respeta el presupuesto", () => {
     const grande = { filas: Array.from({ length: 500 }, (_, i) => ({ a: `texto ${i} `.repeat(30), vacio: "", n: null })) };
@@ -54,9 +54,12 @@ describe("prompt", () => {
     expect(c.texto).not.toContain('"vacio"');
   });
   it("duración → diapositivas", () => {
-    expect(diapositivasObjetivo()).toEqual({ min: 9, max: 14 });
-    expect(diapositivasObjetivo(15)).toEqual({ min: 8, max: 12 });
+    expect(diapositivasObjetivo()).toEqual({ min: 16, max: 24 });
+    expect(diapositivasObjetivo(15)).toEqual({ min: 11, max: 17 });
     expect(diapositivasObjetivo(1).min).toBeGreaterThanOrEqual(4);
+    // sin duración, un informe más largo pide más láminas (de 14 a 32 según su tamaño)
+    expect(diapositivasObjetivo(undefined, 20_000).max).toBeLessThan(diapositivasObjetivo(undefined, 60_000).max);
+    expect(diapositivasObjetivo(undefined, 1_000_000).max).toBeLessThanOrEqual(40);
   });
   it("el reintento añade la respuesta rota y los errores", () => {
     const m = mensajesReintento(mensajesPresentacion("cercano", { informe: {} }), "{roto", ["a falla", "b falla"]);

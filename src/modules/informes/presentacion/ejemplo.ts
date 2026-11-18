@@ -1,5 +1,5 @@
 /* Datos de ejemplo (ficticios) para pruebas, capturas y la demostración del visor: un informe con la forma
-   de `entradaLibro` (solo lo que Pilo lee) y una presentación con los 11 tipos de diapositiva, cuyas cifras
+   de `entradaLibro` (solo lo que Pilo lee) y una presentación con los 12 tipos de diapositiva, cuyas cifras
    y enlaces están todas en ese informe. */
 
 import type { Presentacion } from "../../../../supabase/functions/pilo-presentaciones/esquema";
@@ -152,6 +152,42 @@ export const presentacionEjemplo: Presentacion = {
         { valor: "63 %", etiqueta: "avance promedio del plan" },
       ],
       nota: "Cumplimiento por dimensión según el plan de trabajo.",
+    },
+    {
+      tipo: "grafica",
+      forma: "dona",
+      titulo: "Estado del plan",
+      intro: "Cómo se reparten las 12 acciones del plan de trabajo.",
+      series: [
+        { etiqueta: "Completadas", valor: 5 },
+        { etiqueta: "En proceso", valor: 5 },
+        { etiqueta: "Pendientes", valor: 2 },
+      ],
+      nota: "Fuente: síntesis del plan de trabajo.",
+    },
+    {
+      tipo: "grafica",
+      forma: "barras",
+      animo: "feliz",
+      titulo: "Avance por pilar",
+      intro: "Avance de cada pilar del Plan de Desarrollo al que aporta la facultad.",
+      unidad: "%",
+      series: [
+        { etiqueta: "Excelencia académica", valor: 68 },
+        { etiqueta: "Investigación e innovación", valor: 55 },
+        { etiqueta: "Proyección social", valor: 61 },
+      ],
+    },
+    {
+      tipo: "grafica",
+      forma: "progreso",
+      titulo: "Metas frente a lo logrado",
+      series: [
+        { etiqueta: "Artículos publicados", valor: 9, meta: 12 },
+        { etiqueta: "Proyectos de proyección social", valor: 5, meta: 8 },
+        { etiqueta: "Tasa de permanencia", valor: 84.2, meta: 85, unidad: "%" },
+      ],
+      nota: "Cada barra muestra lo reportado frente a su meta.",
     },
     {
       tipo: "logros",

@@ -6,11 +6,11 @@ import { presentacionEjemplo } from "../../src/modules/informes/presentacion/eje
 const base = () => JSON.parse(JSON.stringify(presentacionEjemplo));
 
 describe("validarPresentacion", () => {
-  it("acepta la presentación de ejemplo (los 11 tipos)", () => {
+  it("acepta la presentación de ejemplo (los 12 tipos)", () => {
     const v = validarPresentacion(base(), "institucional");
     expect(v.ok).toBe(true);
     if (v.ok) {
-      expect(new Set(v.presentacion.diapositivas.map((d) => d.tipo)).size).toBe(11);
+      expect(new Set(v.presentacion.diapositivas.map((d) => d.tipo)).size).toBe(12);
       expect(v.ajustes).toEqual([]);
     }
   });
@@ -25,13 +25,11 @@ describe("validarPresentacion", () => {
   it("rechaza lo roto con mensajes que sirven de reintento", () => {
     const p = base();
     p.diapositivas[3].tipo = "grafico";
-    p.diapositivas[4].filas[0] = ["solo una celda"];
     p.diapositivas[6].filas[0].completadas = -1;
     const v = validarPresentacion(p, "institucional");
     expect(v.ok).toBe(false);
     if (!v.ok) {
       expect(v.errores.join("\n")).toMatch(/«grafico» no existe/);
-      expect(v.errores.join("\n")).toMatch(/1 celdas y la tabla 4 columnas/);
       expect(v.errores.join("\n")).toMatch(/entero no negativo/);
     }
   });
@@ -44,20 +42,24 @@ describe("validarPresentacion", () => {
     if (!v.ok) expect(v.errores.join(" ")).toMatch(/portada/);
   });
 
-  it("repara: recorta un texto pasado hasta un 50 % y lo anota; más allá, error", () => {
+  it("repara: recorta un texto pasado de su límite y lo anota (no pide de nuevo)", () => {
     const p = base();
-    p.diapositivas[3].intro = "Avance de cada pilar al que aporta la facultad, con las acciones que lo mueven en el año y el resultado de cada una. ".repeat(1); // ~118 > 150? no
-    p.diapositivas[3].intro = "x".repeat(10) + " palabra".repeat(22); // ~186 caracteres (> 150, < 225)
+        p.diapositivas[3].intro = "x".repeat(10) + " palabra".repeat(40); // ~330 caracteres (> 240, < 480)
     const v = validarPresentacion(p, "institucional");
     expect(v.ok).toBe(true);
     if (v.ok) {
       const t = v.presentacion.diapositivas[3] as { intro?: string };
-      expect(t.intro!.length).toBeLessThanOrEqual(150);
+      expect(t.intro!.length).toBeLessThanOrEqual(240);
       expect(t.intro!.endsWith("…")).toBe(true);
       expect(v.ajustes.join(" ")).toMatch(/recortado/);
     }
-    p.diapositivas[3].intro = "palabra ".repeat(60);
-    expect(validarPresentacion(p, "institucional").ok).toBe(false);
+    p.diapositivas[3].intro = "palabra ".repeat(80);
+    const largo = validarPresentacion(p, "institucional");
+    expect(largo.ok).toBe(true);
+    if (largo.ok) {
+      expect((largo.presentacion.diapositivas[3] as { intro?: string }).intro!.length).toBeLessThanOrEqual(240);
+      expect(largo.ajustes.join(" ")).toMatch(/muy por encima/);
+    }
   });
 
   it("un ánimo fuera del catálogo se omite, no rompe", () => {
@@ -68,12 +70,13 @@ describe("validarPresentacion", () => {
     expect(v.ok && v.ajustes.join(" ")).toMatch(/catálogo/);
   });
 
-  it("las notas pasan hasta 600 caracteres", () => {
+  it("las notas pasan hasta 900 caracteres", () => {
     const p = base();
-    p.diapositivas[0].notas = "a ".repeat(290).trim();
+    p.diapositivas[0].notas = "a ".repeat(440).trim();
     expect(validarPresentacion(p, "institucional").ok).toBe(true);
-    p.diapositivas[0].notas = "palabra ".repeat(120);
-    expect(validarPresentacion(p, "institucional").ok).toBe(false);
+    p.diapositivas[0].notas = "palabra ".repeat(260);
+    const largo = validarPresentacion(p, "institucional");
+    expect(largo.ok && largo.presentacion.diapositivas[0].notas!.length).toBeLessThanOrEqual(900);
   });
 
   it("tarjetas: de 2 a 4", () => {
@@ -148,5 +151,43 @@ describe("fondoDe", () => {
     expect(f("cierre")).toBe(6);
     expect(f("tabla")).toBe(3); // «Objetivos y metas»
     expect(f("logros")).toBe(4); // «Logros»
+  });
+});
+
+describe("tablas: filas con celdas de más o de menos se ajustan sin pedir de nuevo", () => {
+  it("celdas de más se juntan en la última; de menos se completan con «[por completar]»", () => {
+    const p = base();
+    p.diapositivas[4].filas[0] = ["A", "B", "C", "D", "E", "F"]; // 4 columnas
+    p.diapositivas[4].filas[1] = ["solo una celda"];
+    const v = validarPresentacion(p, "institucional");
+    expect(v.ok).toBe(true);
+    if (v.ok) {
+      const t = v.presentacion.diapositivas[4] as DTabla;
+      expect(t.filas[0]).toEqual(["A", "B", "C", "D · E · F"]);
+      expect(t.filas[1]).toEqual(["solo una celda", "[por completar]", "[por completar]", "[por completar]"]);
+      expect(v.ajustes.join(" ")).toMatch(/se ajustó/);
+    }
+  });
+  it("conserva «parte n de m» al abrir una tabla guardada partida", () => {
+    const p = base();
+    p.diapositivas[4].parte = { n: 2, de: 3 };
+    const v = validarPresentacion(p, "institucional");
+    expect(v.ok && (v.presentacion.diapositivas[4] as DTabla).parte).toEqual({ n: 2, de: 3 });
+  });
+});
+
+describe("tablas: una fila escrita como objeto se lee por el nombre de la columna", () => {
+  it("por nombre, o en el orden de sus valores", () => {
+    const p = base();
+    const cols = p.diapositivas[4].columnas as string[];
+    p.diapositivas[4].filas[0] = { [cols[0]]: "Uno", [cols[2]]: "Tres" };
+    p.diapositivas[4].filas[1] = { a: "w", b: "x", c: "y", d: "z" };
+    const v = validarPresentacion(p, "institucional");
+    expect(v.ok).toBe(true);
+    if (v.ok) {
+      const t = v.presentacion.diapositivas[4] as DTabla;
+      expect(t.filas[0]).toEqual(["Uno", "[por completar]", "Tres", "[por completar]"]);
+      expect(t.filas[1]).toEqual(["w", "x", "y", "z"]);
+    }
   });
 });

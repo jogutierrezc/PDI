@@ -14,6 +14,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { misEnvios, quitarEnvio, sesionVencida } from "../api";
+import { descargarEnviosExcel } from "./excel-envios";
 import type { AporteEnvio, CifraHist, EnvioHist, TipoEnvio } from "../tipos";
 import { sinMovimiento } from "./habla";
 import type { DecirGuia } from "./tipos-pub";
@@ -199,6 +200,20 @@ export function MisEnvios({ slug, pase, correo, onVolver, onSesionVencida, onCop
     if (q.error && sesionVencida(q.error)) onSesionVencida();
   }, [q.error]); // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando llega el error
 
+  const [bajando, setBajando] = useState(false);
+  const bajarExcel = async () => {
+    setBajando(true);
+    try {
+      // Siempre lo que hay en el alcance elegido, sin el filtro de tipo: es su historial de logros y retos.
+      const n = await descargarEnviosExcel(todos, { slug, alcance });
+      setAviso(n === 0 ? "Todavía no tiene logros ni retos para descargar." : `Descargué ${plural(n, "logro o reto", "logros y retos")} en Excel.`);
+    } catch {
+      setAviso("No se pudo armar el Excel. Intente de nuevo.");
+    } finally {
+      setBajando(false);
+    }
+  };
+
   const quitar = useMutation({
     mutationFn: (e: EnvioHist) => quitarEnvio(slug, pase, e.origen, e.id),
     onMutate: (e) => setQuitandoId(e.id),
@@ -302,6 +317,9 @@ export function MisEnvios({ slug, pase, correo, onVolver, onSesionVencida, onCop
                 </button>
               ))}
             </div>
+            <button type="button" className="ep-btn ep-btn--suave" disabled={bajando || !todos.some((e) => e.items.length > 0)} onClick={() => void bajarExcel()}>
+              {bajando ? "Preparando…" : "Descargar en Excel"}
+            </button>
             <div className="ep-mis-seg" role="group" aria-label="Alcance">
               <button type="button" aria-pressed={alcance === "esta"} onClick={() => setAlcance("esta")}>
                 Esta encuesta

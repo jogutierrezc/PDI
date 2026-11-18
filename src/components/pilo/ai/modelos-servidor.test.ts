@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { elegirModelo, metaModelo, modelosDisponibles, opcionesAstra, segundosPensando } from "../../../../supabase/functions/pilo-ia/modelos";
+import { elegirModelo, esfuerzoPorNivel, metaModelo, modelosDisponibles, opcionesAstra, parseNivel, segundosPensando } from "../../../../supabase/functions/pilo-ia/modelos";
 
 const con = { astraChat: true, hayDestino: true, sesion: true };
 
@@ -89,5 +89,23 @@ describe("cableado en pilo-ia/index.ts", () => {
   });
   it("el 'none' de los servidores propios solo se manda sin Astra", () => {
     expect(index).toMatch(/opts\.astra\s*\?\s*\{ reasoning_effort: opts\.astra\.effort \}/);
+  });
+});
+
+describe("nivel de razonamiento de Astra", () => {
+  it("solo conoce los tres niveles", () => {
+    expect(["rapida", "compleja", "investigacion"].map(parseNivel)).toEqual(["rapida", "compleja", "investigacion"]);
+    for (const v of ["alto", "", null, undefined, 3, "RAPIDA", { x: 1 }]) expect(parseNivel(v)).toBeNull();
+  });
+
+  it("cada nivel pide su esfuerzo, y sin nivel queda el de la administración", () => {
+    expect(esfuerzoPorNivel("medium", "rapida")).toBe("low");
+    expect(esfuerzoPorNivel("low", "compleja")).toBe("medium");
+    expect(esfuerzoPorNivel("low", "investigacion")).toBe("high");
+    expect(esfuerzoPorNivel("high", null)).toBe("high");
+  });
+
+  it("si la administración apagó el razonamiento, ningún nivel lo enciende", () => {
+    for (const n of ["rapida", "compleja", "investigacion", null] as const) expect(esfuerzoPorNivel("none", n)).toBe("none");
   });
 });

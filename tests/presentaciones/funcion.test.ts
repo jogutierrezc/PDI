@@ -191,7 +191,7 @@ describe("pilo-presentaciones · de punta a punta con un Astra falso", () => {
     expect((await manejar(pedido({ enfoque: "x".repeat(301) }))).status).toBe(400);
     expect((await manejar(pedido({ instancia_id: "no" }))).status).toBe(400);
     expect((await manejar(pedido({ duracion_min: 999 }))).status).toBe(400);
-    const grande = await manejar(pedido({ informe: { texto: "a".repeat(210_000) } }));
+    const grande = await manejar(pedido({ informe: { texto: "a".repeat(320_000) } }));
     expect(grande.status).toBe(413);
   });
 

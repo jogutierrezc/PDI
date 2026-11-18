@@ -115,6 +115,14 @@
 .pr-sl .pr-lg i { display: block; width: 28px; height: 28px; border-radius: 8px; }
 .pr-sl .pr-lg p { font-size: 26px; line-height: 1.2; font-weight: 600; color: #12233d; }
 
+/* Gráfica (tipo «grafica»): SVG propio; el texto está en el SVG y en una tabla de datos solo para lectores de pantalla */
+.pr-sl .pr-fig { position: relative; margin: 0; }
+.pr-sl .pr-svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+
+/* «Parte n de m» de las diapositivas de continuación (las tablas lo llevan en su nota) */
+.pr-sl > p.pr-parte { position: absolute; left: 150px; top: 944px; font-size: 24px; line-height: 1.2; font-weight: 700; color: #44556d; }
+.pr-sl.pr-l2 > p.pr-parte { left: 300px; }
+
 /* Texto (fondo 2) */
 .pr-sl .pr-texto { display: flex; flex-direction: column; gap: 22px; width: 1300px; }
 .pr-sl .pr-texto--pilo { width: 1130px; }

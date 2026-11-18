@@ -26,7 +26,7 @@ export const TEXTO_ANIMO: Record<Animo, string> = {
 
 export const fondoUrl = (n: number) => `/presentaciones/fondo${n}.jpg`;
 
-/** Un informe plano para el servidor: el JSON de `entradaLibro`, aligerado si pasa del tope (primero lo que no se dibuja). */
+/** Un informe plano para el servidor: el JSON de `entradaLibro` completo (todas las secciones y narraciones), aligerado solo si pasa del tope y perdiendo lo menos posible. */
 export function informeParaPresentacion(entrada: unknown, tope = MAX_INFORME_BYTES): { informe: Record<string, unknown>; aligerado: boolean } {
   const tam = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
   let informe = JSON.parse(JSON.stringify(entrada ?? {})) as Record<string, unknown>;
@@ -39,14 +39,27 @@ export function informeParaPresentacion(entrada: unknown, tope = MAX_INFORME_BYT
     };
     informe = rec(informe) as Record<string, unknown>;
   };
-  // 1. lo que no se dibuja ni aporta cifras nuevas; 2. el detalle largo.
-  for (const paso of [["matriz", "drive", "driveLogros", "driveIndicadores"], ["bloques", "avancesPlan"], ["filas", "alineacion"]]) {
-    quitar(paso);
+  const cortar = (largo: number) => {
+    const rec = (v: unknown): unknown => (typeof v === "string" ? (v.length > largo ? `${v.slice(0, largo)}…` : v) : Array.isArray(v) ? v.map(rec) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, rec(x)])) : v);
+    informe = rec(informe) as Record<string, unknown>;
+  };
+  // Se pierde lo menos posible, en este orden: 1. lo que no se dibuja y repite lo demás (matriz, UDrive);
+  // 2. el detalle redundante de cada indicador; 3. los textos larguísimos, poco a poco (las narraciones se conservan casi enteras);
+  // 4. solo si aún no cabe, el contenido de las secciones libres y de la alineación.
+  const pasos: (() => void)[] = [
+    () => quitar(["matriz", "drive", "driveLogros", "driveIndicadores"]),
+    () => quitar(["anterior", "variacion", "origen", "dim", "dimNombre", "respaldo", "clave"]),
+    () => cortar(6000),
+    () => cortar(3000),
+    () => quitar(["avancesPlan"]),
+    () => cortar(1500),
+    () => quitar(["bloques", "alineacion"]),
+    () => cortar(400),
+  ];
+  for (const paso of pasos) {
+    paso();
     if (tam(informe) <= tope) return { informe, aligerado: true };
   }
-  // Último recurso: recorta los textos largos.
-  const corto = (v: unknown): unknown => (typeof v === "string" ? (v.length > 400 ? `${v.slice(0, 400)}…` : v) : Array.isArray(v) ? v.map(corto) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, corto(x)])) : v);
-  informe = corto(informe) as Record<string, unknown>;
   return { informe, aligerado: true };
 }
 
@@ -138,4 +151,63 @@ export const cuerpoCifra = (texto: string, ancho: number, max = 104, min = 22) =
 export function cuerpoTitulo(n: number, niveles: [number, number][], min: number): number {
   for (const [hasta, cuerpo] of niveles) if (n <= hasta) return cuerpo;
   return min;
+}
+
+/* ---------- Gráficas (tipo «grafica»): medidas puras, el SVG las dibuja ---------- */
+
+export const COLORES_GRAFICA = ["#0a47a1", "#1b9ae1", "#12833a", "#d99a00", "#7b61c4", "#c4452d", "#44556d", "#6fa8dc"];
+
+/** Un número como lo escribe el informe en Colombia: «2840», «84,2». */
+export const formatoNumero = (n: number): string => new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(n);
+
+/** El valor con su unidad: «84,2 %», «12 artículos»; sin unidad, solo el número. */
+export function textoValor(n: number, unidad?: string): string {
+  const u = (unidad ?? "").trim();
+  return u ? `${formatoNumero(n)} ${u}` : formatoNumero(n);
+}
+
+/** La etiqueta partida en hasta `lineas` renglones de `max` caracteres (la última con «…» si no cabe). */
+export function partirEtiqueta(t: string, max: number, lineas = 2): string[] {
+  const out: string[] = [];
+  let resto = t.trim();
+  while (resto && out.length < lineas) {
+    if (resto.length <= max) {
+      out.push(resto);
+      resto = "";
+      break;
+    }
+    const sp = resto.lastIndexOf(" ", max);
+    const corte = sp > max * 0.4 ? sp : max;
+    out.push(resto.slice(0, corte).trim());
+    resto = resto.slice(corte).trim();
+  }
+  if (resto && out.length) out[out.length - 1] = `${out[out.length - 1].slice(0, Math.max(1, max - 1)).replace(/[\s,;:.]+$/, "")}…`;
+  return out;
+}
+
+/** El tope de la escala común de barras y columnas: el mayor valor o meta (nunca 0). */
+export const topeEscala = (series: { valor: number; meta?: number }[]): number => Math.max(1e-9, ...series.flatMap((s) => [s.valor, s.meta ?? 0]));
+
+/** La fracción (0 a 1) de una barra de progreso: frente a su meta; sin meta, frente a 100 si la unidad es «%» o al mayor valor. */
+export function fraccionProgreso(s: { valor: number; meta?: number; unidad?: string }, unidadGeneral: string | undefined, maximo: number): number {
+  const base = s.meta && s.meta > 0 ? s.meta : (s.unidad ?? unidadGeneral ?? "").trim() === "%" ? 100 : maximo;
+  return base > 0 ? Math.max(0, Math.min(1, s.valor / base)) : 0;
+}
+
+/** Los arcos de una dona: cada parte con su inicio y su fracción del total (0 a 1). Valores en cero no dibujan arco. */
+export function arcosDona(series: { valor: number }[]): { inicio: number; fraccion: number }[] {
+  const total = series.reduce((a, s) => a + s.valor, 0);
+  let acumulado = 0;
+  return series.map((s) => {
+    const fraccion = total > 0 ? s.valor / total : 0;
+    const arco = { inicio: acumulado, fraccion };
+    acumulado += fraccion;
+    return arco;
+  });
+}
+
+/** Lo que lee una persona que no ve la gráfica: título y cada dato con su valor (y meta). */
+export function descripcionGrafica(d: { titulo: string; forma: string; unidad?: string; series: { etiqueta: string; valor: number; meta?: number; unidad?: string }[] }): string {
+  const datos = d.series.map((s) => `${s.etiqueta}: ${textoValor(s.valor, s.unidad ?? d.unidad)}${s.meta !== undefined ? ` (meta ${textoValor(s.meta, s.unidad ?? d.unidad)})` : ""}`).join("; ");
+  return `Gráfica de ${d.forma}. ${d.titulo}. ${datos}.`;
 }

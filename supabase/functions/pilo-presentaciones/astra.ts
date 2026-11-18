@@ -89,14 +89,26 @@ export function separarPensamiento(crudo: string): { texto: string; pensamiento:
   return abierto >= 0 ? { texto: texto.slice(0, abierto), pensamiento: pensamiento + texto.slice(abierto).replace(/<\/?(think|thinking)>/gi, "") } : { texto, pensamiento };
 }
 
+/** Techo total de una llamada, llegue lo que llegue (la función de borde no vive más). */
+const TECHO_TOTAL_MS = 540_000;
+
 export async function llamarAstra(o: OpcionesLlamada): Promise<RespuestaAstra> {
   const f = o.fetchFn ?? fetch;
   const control = new AbortController();
   let venció = false;
-  const reloj = setTimeout(() => {
+  // La espera es de SILENCIO: se reinicia con cada fragmento (razonamiento o texto) que llega.
+  // Un techo total evita que una generación sin fin ocupe la función para siempre.
+  const silencioMs = Math.max(1000, o.esperaMs);
+  const venceYa = () => {
     venció = true;
     control.abort();
-  }, Math.max(1000, o.esperaMs));
+  };
+  let reloj = setTimeout(venceYa, silencioMs);
+  const techo = setTimeout(venceYa, TECHO_TOTAL_MS);
+  const reiniciar = () => {
+    clearTimeout(reloj);
+    reloj = setTimeout(venceYa, silencioMs);
+  };
   const cancelar = () => control.abort();
   if (o.signal?.aborted) cancelar();
   o.signal?.addEventListener("abort", cancelar, { once: true });
@@ -159,6 +171,7 @@ export async function llamarAstra(o: OpcionesLlamada): Promise<RespuestaAstra> {
     while (lector) {
       const { value, done } = await lector.read();
       if (done) break;
+      reiniciar();
       const s = decoder.decode(value, { stream: true });
       if (crudo.length < 600_000) crudo += s;
       resto += s;
@@ -205,6 +218,7 @@ export async function llamarAstra(o: OpcionesLlamada): Promise<RespuestaAstra> {
     throw new ErrorAstra(`No se pudo llegar a Astra (${causa.slice(0, 160)}). Revise que el servidor de Astra esté encendido y que la dirección de Pilo Work sea alcanzable desde el servidor.`, "proveedor", 502);
   } finally {
     clearTimeout(reloj);
+    clearTimeout(techo);
     o.signal?.removeEventListener("abort", cancelar);
   }
 }

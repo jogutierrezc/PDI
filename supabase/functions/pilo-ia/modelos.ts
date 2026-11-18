@@ -69,3 +69,17 @@ export function opcionesAstra(pw: AjustesAstra, maxPedido: number, topeEspera: n
 
 /** Segundos pensando, con un decimal. */
 export const segundosPensando = (ms: number): number => Math.round(Math.max(0, ms) / 100) / 10;
+
+/** Cuánto razona Astra, según lo que la persona elige en la app: Respuestas rápidas, Trabajo complejo o Investigaciones. */
+export type NivelAstra = "rapida" | "compleja" | "investigacion";
+
+export const parseNivel = (v: unknown): NivelAstra | null => (v === "rapida" || v === "compleja" || v === "investigacion" ? v : null);
+
+/**
+ * El esfuerzo de razonamiento para ese nivel. Sin nivel, el que fijó la administración; y si la administración
+ * lo apagó («none»), sigue apagado: el nivel no lo enciende.
+ */
+export function esfuerzoPorNivel(base: "low" | "medium" | "high" | "none", nivel: NivelAstra | null): "low" | "medium" | "high" | "none" {
+  if (base === "none" || !nivel) return base;
+  return nivel === "rapida" ? "low" : nivel === "compleja" ? "medium" : "high";
+}

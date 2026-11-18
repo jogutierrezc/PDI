@@ -5,7 +5,7 @@
 import { esTono } from "./tonos.ts";
 import type { Tono } from "./tonos.ts";
 
-export const MAX_INFORME_BYTES = 200_000;
+export const MAX_INFORME_BYTES = 300_000;
 export const MAX_ENFOQUE = 300;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

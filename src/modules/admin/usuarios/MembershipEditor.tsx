@@ -1,6 +1,7 @@
 /* =============================================================================
-   Dónde trabaja una persona: unidad, función, cargo y, en un programa que se
-   ofrece en varias sedes, la sede (vacía: todas).
+   Dónde trabaja una persona: unidad, función, cargo y la sede (vacía: todas).
+   En un programa, las sedes son las donde se ofrece; en cualquier otra unidad
+   (vicerrectorías, rectorías de campus, oficinas) se puede elegir cualquier sede.
 
    La función dice qué hace con los datos de la unidad (Gestor, Contribuyente
    o Consulta: el papel de Mis Tableros); el cargo es texto libre para
@@ -62,6 +63,11 @@ export function MembershipEditor({
     if (!unit || unit.kind !== "programa") return [];
     return offer?.byProgram.get(unit.id) ?? [];
   };
+  /** Las sedes que se pueden elegir: las del programa, o todas en cualquier otra unidad (un vicerrector o rector de campus). */
+  const sedesDe = (unit: UnitOption | undefined) => {
+    if (!unit) return [];
+    return unit.kind === "programa" ? campusesOf(unit) : (offer?.campuses ?? []).map((c) => c.id);
+  };
   /** «Medicina · MED — Bucaramanga, Cúcuta»: un programa se reconoce por las sedes donde se ofrece. */
   const optionLabel = (item: UnitOption) => {
     const sedes = campusesOf(item).map((id) => campusName.get(id) ?? "Sede");
@@ -89,6 +95,7 @@ export function MembershipEditor({
         const unit = byId.get(row.unitId);
         const duplicated = row.unitId && value.findIndex((other) => other.unitId === row.unitId) !== index;
         const campuses = campusesOf(unit);
+        const sedes = sedesDe(unit);
         return (
           <div key={row.key} className="us-member">
             <label className="admin-field">
@@ -137,7 +144,7 @@ export function MembershipEditor({
                 onChange={(event) => patch(row.key, { title: event.target.value })}
               />
             </label>
-            {campuses.length > 0 && (
+            {sedes.length > 0 && (
               <label className="admin-field">
                 <span>Sede</span>
                 <select
@@ -145,8 +152,8 @@ export function MembershipEditor({
                   disabled={disabled}
                   onChange={(event) => patch(row.key, { campusId: event.target.value || null })}
                 >
-                  <option value="">{campuses.length > 1 ? "Todas las sedes" : "Su única sede"}</option>
-                  {campuses.map((id) => (
+                  <option value="">{sedes.length > 1 ? "Todas las sedes" : "Su única sede"}</option>
+                  {sedes.map((id) => (
                     <option key={id} value={id}>
                       {campusName.get(id) ?? "Sede"}
                     </option>

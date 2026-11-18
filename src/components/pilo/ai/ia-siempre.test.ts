@@ -137,7 +137,7 @@ describe("la conversación", () => {
     expect(h).toHaveLength(12);
     expect(h[11]).toEqual({ q: "pregunta 19", a: "respuesta 19" });
     expect(cleanHistory("no es una lista")).toEqual([]);
-    expect(cleanHistory([{ q: "x".repeat(900), a: "y".repeat(5000) }])[0]).toMatchObject({ q: "x".repeat(500), a: "y".repeat(2000) });
+    expect(cleanHistory([{ q: "x".repeat(2500), a: "y".repeat(5000) }])[0]).toMatchObject({ q: "x".repeat(2000), a: "y".repeat(2000) });
   });
 
   it("une la pregunta de seguimiento con su ancla, sin IA", () => {

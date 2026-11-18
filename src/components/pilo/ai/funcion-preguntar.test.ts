@@ -881,9 +881,9 @@ describe("límite por visitante y tamaño", () => {
     const handler = await boot(w);
     const huge = await ask(handler, { question: "¿hola?", history: [{ q: "x", a: "y".repeat(60_000) }] });
     expect(huge.status).toBe(413);
-    await ask(handler, { question: `¿Cuántos estudiantes hay? ${"relleno ".repeat(200)}` });
+    await ask(handler, { question: `¿Cuántos estudiantes hay? ${"relleno ".repeat(500)}` });
     const sent = calls[0].body.messages as { content: string }[];
-    expect(sent[sent.length - 1].content.length).toBeLessThanOrEqual(500);
+    expect(sent[sent.length - 1].content.length).toBeLessThanOrEqual(2000);
   });
 });
 
@@ -2353,7 +2353,26 @@ describe("funciones ampliadas (0119): analizar un archivo y generar código", ()
     await events(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
     const system = systemOf(calls[0]);
     expect(system).not.toContain("ARCHIVO");
-    expect(system).not.toContain("código");
+    expect(system).not.toContain("bloque de código");
+    expect(system).not.toContain("toda tu capacidad");
+  });
+
+  it("las tres reglas (jamás lastimar, no enseñar a lastimar, buen ejemplo ciudadano) van siempre; la capacidad, solo con matemática o razonamiento", async () => {
+    const w = world();
+    const calls = provider(stream("Hubo 20.500 estudiantes [1]. "), stream("x = 4. "));
+    const handler = await boot(w);
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    await events(await ask(handler, { question: "Resuelve la ecuación 2x + 3 = 11 paso a paso", stream: true }));
+    const normal = systemOf(calls[0]);
+    const mate = systemOf(calls[1]);
+    for (const s of [normal, mate]) {
+      expect(s).toContain("Jamás lastimes");
+      expect(s).toContain("No enseñes a lastimar");
+      expect(s).toContain("buen ejemplo ciudadano");
+    }
+    expect(normal).not.toContain("toda tu capacidad");
+    expect(mate).toContain("toda tu capacidad");
+    expect(Number(calls[1].body.max_tokens)).toBeGreaterThanOrEqual(2000);
   });
 });
 

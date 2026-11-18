@@ -61,7 +61,8 @@ export interface AjustesAstra {
 export function opcionesAstra(pw: AjustesAstra, maxPedido: number, topeEspera: number): { reasoning_effort: "low" | "medium" | "high" | "none"; max_tokens: number; esperaMs: number } {
   return {
     reasoning_effort: esfuerzoAstra(pw.astra_razonamiento),
-    max_tokens: Math.max(maxPedido, pw.astra_max_tokens),
+    // 0 = sin tope: no se manda `max_tokens` y el servidor deja pensar y responder hasta donde necesite.
+    max_tokens: pw.astra_max_tokens === 0 ? 0 : Math.max(maxPedido, pw.astra_max_tokens),
     esperaMs: Math.min(topeEspera, Math.max(1, pw.astra_espera_s) * 1000),
   };
 }

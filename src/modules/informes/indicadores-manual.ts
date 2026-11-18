@@ -360,9 +360,11 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[], r
 
   filas.slice(1).forEach((f, n) => {
     const fila = n + 2;
-    const celdas = Array.from({ length: COLUMNAS_EXCEL_TODAS.length + 1 }, (_, k) => String(f[k] ?? "").trim());
+    const celdas = Array.from({ length: COLUMNAS_EXCEL_TODAS.length + 2 }, (_, k) => String(f[k] ?? "").trim());
     if (celdas.every((c) => !c)) return;
-    const [crit, nombre, unidad, sentido, anterior, actual, meta, fuente, nota, tipoTxt, descripcion, hecho, finalizacion, proyTxt, proyNum, pilarTxt] = celdas;
+    const [crit, nombre, unidad, sentido, anterior, actual, meta, fuente, nota, tipoTxt, descripcion, hecho, finalizacion, proyTxt, proyNum, pilarTxt, anexosTxt] = celdas;
+    // «N.º de anexos» (libro del informe): números separados por coma, punto y coma o espacio; lo demás se ignora.
+    const evidencias = evidenciasDe((anexosTxt.match(/\d+/g) ?? []).map(Number));
     const pilar = pilarDeTexto(pilarTxt, pilares);
     if (pilarTxt && !pilar) avisos.push(`${f0} ${fila}: el pilar «${pilarTxt}» no es uno del Plan de Desarrollo; quedó sin pilar.`);
     const accion = sinTildes(tipoTxt) === "accion";
@@ -400,6 +402,7 @@ export function leerFilasIndicadores(filas: string[][], criterios: Criterio[], r
       fuente,
       nota,
       ...(pilar ? { pilar } : {}),
+      ...(evidencias.length ? { evidencias } : {}),
     };
     if (accion) {
       indicadores.push({
@@ -496,6 +499,30 @@ export function leerLibroIndicadores(hojas: HojasIndicadores, criterios: Criteri
   pasar(hojas.acciones, "Acciones", accionALegado);
   pasar(hojas.indicadores, "Indicadores");
   return { indicadores, criteriosNuevos: nuevos, avisos };
+}
+
+/**
+ * Columnas de la hoja de resultados del libro del informe: las de la hoja única «Indicadores» (`COLUMNAS_EXCEL_TODAS`),
+ * más el pilar del PDI y los anexos que respaldan. `leerFilasIndicadores` las lee tal cual. La última, el estado, la
+ * calcula el sistema y no se lee.
+ */
+export const COLUMNA_PILAR = "Pilar del PDI";
+export const COLUMNA_ANEXOS = "N.º de anexos";
+export const COLUMNA_ESTADO = "Estado (lo calcula el sistema)";
+export const COLUMNAS_LIBRO_RESULTADOS = [...COLUMNAS_EXCEL_TODAS, COLUMNA_PILAR, COLUMNA_ANEXOS, COLUMNA_ESTADO] as const;
+
+/** Filas de la hoja de resultados del libro del informe, una por cifra o acción, en el orden de `COLUMNAS_LIBRO_RESULTADOS`. */
+export function filasResultadosLibro(indicadores: IndicadorManual[], criterios: Criterio[], pilares: PilarOpcion[] = []): (string | number | null)[][] {
+  const nombre = new Map(criterios.map((c) => [c.id, c.nombre]));
+  const pilar = (id?: string) => pilares.find((p) => p.id === id)?.etiqueta ?? "";
+  return indicadores.map((i) => {
+    const criterio = nombre.get(i.criterio) ?? i.criterio_nombre ?? i.criterio;
+    const comun = [criterio, i.nombre, i.unidad.trim()];
+    const cola = [pilar(i.pilar), (i.evidencias ?? []).join(", ")];
+    if (esAccion(i)) return [...comun, "", null, null, null, i.fuente, i.nota, TIPO_ACCION, i.descripcion ?? "", i.avance_texto ?? "", i.finalizacion ?? "", i.proyeccion_texto ?? "", i.proyeccion_num ?? null, ...cola, ""];
+    const ev = evaluar(i);
+    return [...comun, i.mayorMejor ? MAS_ES_MEJOR : MENOS_ES_MEJOR, i.anterior, i.actual, i.meta, i.fuente, i.nota, TIPO_CIFRA, "", "", "", "", null, ...cola, ev.estado ? ETIQUETA_ESTADO_META[ev.estado] : ""];
+  });
 }
 
 /** Las filas de la hoja «Criterios» del libro: todos los que puede usar la unidad, con su origen. */

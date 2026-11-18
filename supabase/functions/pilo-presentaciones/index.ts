@@ -63,7 +63,7 @@ Deno.serve(
         habilitado: pw.astra_habilitado,
         destino: pw.astra_habilitado ? await destinoAstra(admin, pw) : null,
         effort: esfuerzoAstra(pw.astra_razonamiento),
-        maxTokens: Math.max(TOKENS_PRESENTACION, pw.astra_max_tokens),
+        maxTokens: pw.astra_max_tokens === 0 ? 0 : Math.max(TOKENS_PRESENTACION, pw.astra_max_tokens),
         esperaMs: Math.min(TOPE_ESPERA_MS, Math.max(1, pw.astra_espera_s) * 1000),
         limiteHora: pw.astra_limite_hora,
       };

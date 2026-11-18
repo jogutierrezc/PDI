@@ -18,7 +18,7 @@ const PAPELES: PapelResponsable[] = ["jefe", "editor", "visor"];
 const FOCALIZABLES = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Cajón lateral accesible: rol de diálogo, foco atrapado, Escape y regreso del foco a quien lo abrió. */
-export function Cajon({ titulo, subtitulo, onCerrar, children }: { titulo: string; subtitulo?: string; onCerrar: () => void; children: ReactNode }) {
+export function Cajon({ titulo, subtitulo, onCerrar, children, ancho = false }: { titulo: string; subtitulo?: string; onCerrar: () => void; children: ReactNode; /** Cajón más ancho, para tablas. */ ancho?: boolean }) {
   const caja = useRef<HTMLDivElement>(null);
   const idTitulo = useId();
   const cierre = useRef(onCerrar);
@@ -57,7 +57,7 @@ export function Cajon({ titulo, subtitulo, onCerrar, children }: { titulo: strin
 
   return (
     <div className="inf-resp-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
-      <div ref={caja} className="inf-resp" role="dialog" aria-modal="true" aria-labelledby={idTitulo} onKeyDown={teclado}>
+      <div ref={caja} className={`inf-resp${ancho ? " inf-resp--ancho" : ""}`} role="dialog" aria-modal="true" aria-labelledby={idTitulo} onKeyDown={teclado}>
         <header className="inf-resp__cab">
           <div>
             <span className="inf-eyebrow">{subtitulo}</span>

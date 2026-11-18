@@ -457,3 +457,24 @@
     scroll-behavior: auto;
   }
 }
+
+/* ---------- Libro de Excel: en pantalla angosta la clasificación se apila ---------- */
+
+@media (max-width: 720px) {
+  .inf-lx-fila {
+    grid-template-columns: 1fr;
+  }
+
+  .inf-lx-cuentas {
+    grid-template-columns: 1fr;
+  }
+
+  .inf-lx-opcion,
+  .inf-lx-hoja__marca {
+    min-height: 44px;
+  }
+
+  .inf-lx-pasos button {
+    min-height: 44px;
+  }
+}

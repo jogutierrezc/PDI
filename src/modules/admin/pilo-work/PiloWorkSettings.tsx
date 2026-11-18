@@ -76,7 +76,7 @@ const PARTIDA: Cfg = {
   astra_modelo: "pilo-astra:1.0",
   astra_base_url: "",
   astra_razonamiento: "auto",
-  astra_max_tokens: 4000,
+  astra_max_tokens: 0,
   astra_espera_s: 120,
   astra_limite_hora: 20,
   astra_subida_max_mb: 25,
@@ -327,7 +327,7 @@ export function PiloWorkSettings() {
               </label>
             </div>
             <div className="pis-grid pis-grid--3 pwa-4">
-              <NumField label="Tope de tokens por respuesta" value={cfg.astra_max_tokens} min={500} max={16000} whole def={4000} disabled={off} onCommit={(v) => guardar({ astra_max_tokens: v })} />
+              <NumField label="Tope de tokens por respuesta" hint="0 = sin tope: Astra piensa y responde sin cortarse" value={cfg.astra_max_tokens} min={0} max={64000} whole def={0} disabled={off} onCommit={(v) => guardar({ astra_max_tokens: v })} />
               <NumField label="Espera máxima (s)" hint="Pasado este tiempo se ofrece continuar con Pilo" value={cfg.astra_espera_s} min={30} max={600} whole def={120} disabled={off} onCommit={(v) => guardar({ astra_espera_s: v })} />
               <NumField label="Mensajes por hora y persona" value={cfg.astra_limite_hora} min={1} max={200} whole def={20} disabled={off} onCommit={(v) => guardar({ astra_limite_hora: v })} />
               <NumField label="Tamaño máximo de documento (MB)" value={cfg.astra_subida_max_mb} min={1} max={100} whole def={25} disabled={off} onCommit={(v) => guardar({ astra_subida_max_mb: v })} />

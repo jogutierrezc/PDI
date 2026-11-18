@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Informes de gestión · «Crear presentación con Pilo» en producción (pila exc75yz…):
+#   - migración 0285: Astra sin tope de tokens (astra_max_tokens = 0 manda la llamada sin max_tokens).
 #   - migración 0284: tabla informe_presentaciones (RLS: quien ve el informe la lee; quien la crea la edita).
 #   - función de borde NUEVA `pilo-presentaciones` (siempre Pilo Astra 1.0; sin Astra responde astra_apagado).
 #     Importa ../pilo-work/proveedor.ts (destinoAstra, esfuerzoAstra, leerConfig): se copia junto, con respaldo.
@@ -18,13 +19,13 @@ TMPR="$(mktemp)"
 STAMP="$(date +%Y%m%d-%H%M)"
 FUNCION=1; [ "${1:-}" = "--solo-sql" ] && FUNCION=0
 
-for f in migrations/0284_informe_presentaciones.sql functions/pilo-presentaciones/index.ts functions/pilo-presentaciones/handler.ts functions/pilo-presentaciones/esquema.ts functions/pilo-presentaciones/verificar.ts functions/pilo-presentaciones/prompt.ts functions/pilo-presentaciones/tonos.ts functions/pilo-presentaciones/astra.ts functions/pilo-presentaciones/nucleo.ts functions/pilo-presentaciones/pedido.ts functions/pilo-presentaciones/limite.ts functions/pilo-work/proveedor.ts; do
+for f in migrations/0284_informe_presentaciones.sql migrations/0285_astra_sin_tope.sql functions/pilo-presentaciones/index.ts functions/pilo-presentaciones/handler.ts functions/pilo-presentaciones/esquema.ts functions/pilo-presentaciones/verificar.ts functions/pilo-presentaciones/prompt.ts functions/pilo-presentaciones/tonos.ts functions/pilo-presentaciones/astra.ts functions/pilo-presentaciones/nucleo.ts functions/pilo-presentaciones/pedido.ts functions/pilo-presentaciones/limite.ts functions/pilo-work/proveedor.ts; do
   [ -f "$AQUI/$f" ] || { echo "Falta $AQUI/$f"; exit 1; }
 done
 
 echo "1/3 Copiando archivos al servidor (carpeta temporal)…"
 ssh "$SRV" "rm -rf /tmp/pilopres-nuevo && mkdir -p /tmp/pilopres-nuevo/pilo-presentaciones /tmp/pilopres-nuevo/pilo-work"
-scp "$AQUI/migrations/0284_informe_presentaciones.sql" "$SRV:/tmp/pilopres-nuevo/"
+scp "$AQUI/migrations/0284_informe_presentaciones.sql" "$AQUI/migrations/0285_astra_sin_tope.sql" "$SRV:/tmp/pilopres-nuevo/"
 if [ "$FUNCION" = 1 ]; then
   scp "$AQUI"/functions/pilo-presentaciones/*.ts "$SRV:/tmp/pilopres-nuevo/pilo-presentaciones/"
   scp "$AQUI/functions/pilo-work/proveedor.ts" "$SRV:/tmp/pilopres-nuevo/pilo-work/"
@@ -54,6 +55,9 @@ echo "  dueño de informe_instancias: $DUENO"
 OK1=$(psqlq -c "select to_regclass('public.informe_presentaciones') is not null and (select count(*) from pg_policies where tablename = 'informe_presentaciones') = 4")
 [ "$OK1" = "t" ] || { echo "  La migración 0284 no quedó aplicada (tabla y 4 políticas): revise los mensajes de arriba."; exit 1; }
 echo "  informe_presentaciones lista: $(psqlq -c "select count(*) from pg_policies where tablename = 'informe_presentaciones'") políticas, RLS $(psqlq -c "select relrowsecurity from pg_class where oid = 'public.informe_presentaciones'::regclass")"
+echo "  Aplicando 0285 (Astra sin tope de tokens: 0 = sin tope)…"
+{ echo "set role \"$DUENO\";"; cat "$NUEVO/0285_astra_sin_tope.sql"; } | psqlsu -1 2>&1 | grep -v '^$' | sed 's/^/    /' || true
+echo "  Tope de tokens de Astra ahora (0 = sin tope): $(psqlq -c "select astra_max_tokens from public.pw_config where id = 1" 2>/dev/null || echo 'sin leer')"
 echo "  Astra encendido en Pilo Work (debe ser t para poder crear presentaciones): $(psqlq -c "select coalesce(astra_habilitado, false) from public.pw_config where id = 1" 2>/dev/null || echo 'sin leer')"
 
 if [ "$FUNCION" = 1 ]; then

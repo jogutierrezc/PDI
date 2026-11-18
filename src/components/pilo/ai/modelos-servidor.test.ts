@@ -71,6 +71,7 @@ describe("opcionesAstra", () => {
   it("max_tokens es el mayor y la espera no pasa del tope de la plataforma", () => {
     expect(opcionesAstra(pw, 700, 300_000).max_tokens).toBe(4000);
     expect(opcionesAstra(pw, 9000, 300_000).max_tokens).toBe(9000);
+    expect(opcionesAstra({ ...pw, astra_max_tokens: 0 }, 9000, 300_000).max_tokens).toBe(0);
     expect(opcionesAstra(pw, 700, 300_000).esperaMs).toBe(120_000);
     expect(opcionesAstra(pw, 700, 60_000).esperaMs).toBe(60_000);
   });

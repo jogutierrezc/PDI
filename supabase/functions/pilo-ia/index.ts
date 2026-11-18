@@ -6757,7 +6757,7 @@ async function handle(request: Request): Promise<Response> {
           model: dest.model,
           messages: fold ? foldSystem(messages) : messages,
           temperature: opts.temperature,
-          max_tokens: opts.max_tokens,
+          max_tokens: opts.max_tokens > 0 ? opts.max_tokens : undefined,
           ...(opts.stream ? { stream: true } : {}),
           // Un servidor propio (Ollama, vLLM…) con un modelo que razona gasta todo el tope pensando y deja
           // `content` vacío: Pilo creería que la IA no respondió y diría lo publicado «sin IA». Se pide respuesta directa.
@@ -9057,7 +9057,7 @@ async function handle(request: Request): Promise<Response> {
         // Con análisis pedido, sus tres frases no le quitan sitio a la respuesta.
         const wanted = (longAnswer ? Math.max(ask.maxTokens, extras.codeMaxTokens) : member ? Math.max(ask.maxTokens, extras.memberMaxTokens) : ask.maxTokens) + (analysed ? ANALYSIS_TOKENS : 0);
         // Con Astra, el razonamiento gasta tope: nunca menos que `astra_max_tokens`.
-        const maxTokens = astraRun ? Math.max(wanted, astraRun.maxTokens) : wanted;
+        const maxTokens = astraRun ? (astraRun.maxTokens === 0 ? 0 : Math.max(wanted, astraRun.maxTokens)) : wanted;
         const { response } = await chat(sent, { temperature: ask.temperature, max_tokens: maxTokens, stream: Boolean(onDelta), signal: abort.signal, ...(astraRun ? { astra: { dest: astraRun.dest, effort: astraRun.effort } } : {}) });
         if (!response.ok) {
           const detail = await providerDetail(response);

@@ -51,6 +51,7 @@ import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Plan
 import { EncabezadoObjetivo, enlaceInforme, useObjetivoInforme } from "./objetivo";
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
 import { Dimensiones } from "./Dimensiones";
+import { LibroExcel } from "./LibroExcel";
 import { ElementosDrive } from "./ElementosDrive";
 import { TablaMetasPrograma } from "./MetasPrograma";
 import { ResumenPlan } from "./PlanFacultad";
@@ -159,6 +160,8 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
   const pilares = usePilares();
   const fuentes = useFuentes();
   const guardarSeccion = useGuardarSeccion(ciclo.id);
+  const criteriosLibro = useCriterios();
+  const [libroAbierto, setLibroAbierto] = useState(false);
   const guardarCifra = useGuardarCifra(ciclo.id);
   const asegurar = useAsegurarCifras();
   const quitarCifra = useQuitarCifra();
@@ -227,6 +230,14 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
     const previo = pendientes.current.get(d.clave);
     if (previo) window.clearTimeout(previo.reloj);
     pendientes.current.set(d.clave, { def: d, c, reloj: window.setTimeout(() => persistir(d, c), 800) });
+  };
+
+  /** Escribe ya una sección (el libro de Excel): lo que esperaba su turno se descarta y se guarda esto. */
+  const escribirYa = (d: SeccionDef, c: ContenidoSeccion) => {
+    const previo = pendientes.current.get(d.clave);
+    if (previo) window.clearTimeout(previo.reloj);
+    setBorradores((b) => ({ ...b, [d.clave]: c }));
+    persistir(d, c);
   };
 
   // Al salir, lo que esperaba su turno se guarda ya.
@@ -348,6 +359,9 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
         <Link className="inf-link" to={enlaceInforme(`${BASE}/vista`, unidad.id, sede)}>
           Vista del informe en papel
         </Link>
+        <button type="button" className="inf-link inf-lx-abrir" onClick={() => setLibroAbierto(true)} aria-haspopup="dialog">
+          Libro de Excel
+        </button>
         {demo && (
           <small className="inf-muted" role="status">
             Demostración de la guía: su informe no cambió.
@@ -519,6 +533,22 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
           </ul>
         </div>
       </aside>
+      {libroAbierto && (
+        <LibroExcel
+          inst={inst}
+          ciclo={ciclo}
+          unidad={unidad.name}
+          secciones={secciones}
+          contenido={contenido}
+          aprobados={aprobadosPara(criteriosLibro.data?.filas ?? [], inst.plantilla, ciclo.anio)}
+          pilares={pilares.data ?? []}
+          anexos={m.anexos.data ?? []}
+          actor={actor}
+          escribir={escribirYa}
+          agregarEvidencias={(enlaces) => enlazarVarios.mutateAsync({ instancia: inst.id, enlaces, anexos: m.anexos.data ?? [] })}
+          onCerrar={() => setLibroAbierto(false)}
+        />
+      )}
     </div>
   );
 }

@@ -106,7 +106,7 @@ export async function llamarAstra(o: OpcionesLlamada): Promise<RespuestaAstra> {
       method: "POST",
       headers: { Authorization: `Bearer ${o.dest.key}`, "Content-Type": "application/json" },
       signal: control.signal,
-      body: JSON.stringify({ model: o.dest.model, messages: mensajes, temperature: 0.3, max_tokens: o.maxTokens, stream: true, reasoning_effort: o.effort }),
+      body: JSON.stringify({ model: o.dest.model, messages: mensajes, temperature: 0.3, max_tokens: o.maxTokens > 0 ? o.maxTokens : undefined, stream: true, reasoning_effort: o.effort }),
     });
 
   try {
@@ -197,7 +197,12 @@ export async function llamarAstra(o: OpcionesLlamada): Promise<RespuestaAstra> {
     if (e instanceof ErrorAstra) throw e;
     if (venció) throw new ErrorAstra("Astra tardó más de lo que se puede esperar. Pruebe con menos duración o inténtelo de nuevo.", "tiempo", 504);
     if (o.signal?.aborted || control.signal.aborted) throw new ErrorAstra("Se canceló la presentación.", "cancelado", 499);
-    throw new ErrorAstra("No se pudo llegar a Astra.", "proveedor", 502);
+    // Falló la conexión (no una respuesta HTTP): DNS, TLS, puente caído o corte a mitad del stream.
+    const causa = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    let host = "?";
+    try { host = new URL(o.dest.url).host; } catch { /* dirección inválida */ }
+    console.error(`[pilo-presentaciones] no se pudo llegar a Astra (${host}): ${causa}`);
+    throw new ErrorAstra(`No se pudo llegar a Astra (${causa.slice(0, 160)}). Revise que el servidor de Astra esté encendido y que la dirección de Pilo Work sea alcanzable desde el servidor.`, "proveedor", 502);
   } finally {
     clearTimeout(reloj);
     o.signal?.removeEventListener("abort", cancelar);

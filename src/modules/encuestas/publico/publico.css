@@ -1754,3 +1754,130 @@ a.ep-btn {
     animation: none;
   }
 }
+
+/* ---------- Traer logros y retos desde Excel ---------- */
+.ep-xl {
+  margin: 18px 0 6px;
+  padding: 16px 18px;
+  border: 1.5px dashed var(--ep-line-2);
+  border-radius: 14px;
+  background: var(--ep-paper);
+}
+
+.ep-xl h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.ep-xl .ep-fila-botones {
+  margin: 12px 0 4px;
+}
+
+.ep-xl__estado {
+  min-height: 22px;
+  font-size: 15px;
+  color: var(--ep-ink-2);
+}
+
+.ep-xl__panel {
+  margin-top: 10px;
+  padding: 16px;
+  border: 1.5px solid var(--ep-teal-line);
+  border-radius: 14px;
+  background: var(--ep-teal-soft);
+}
+
+.ep-xl__h {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: var(--ep-teal-ink);
+}
+
+.ep-xl__h:focus-visible {
+  outline: 2.5px solid var(--ep-blue);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.ep-xl__lista {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.ep-xl__item {
+  padding: 12px 14px;
+  border: 1.5px solid var(--ep-line);
+  border-radius: 12px;
+  background: var(--ep-paper);
+}
+
+.ep-xl__item[data-estado="ok"] {
+  border-color: var(--ep-ok);
+}
+
+.ep-xl__item[data-estado="error"] {
+  border-color: var(--ep-err);
+  background: var(--ep-err-soft);
+}
+
+.ep-xl__cab {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ep-xl__tit {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ep-xl__estado-item {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: var(--ep-ink-2);
+}
+
+.ep-xl__item[data-estado="ok"] .ep-xl__estado-item {
+  color: var(--ep-ok);
+  font-weight: 600;
+}
+
+.ep-xl__probs {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.ep-xl__probs li[data-nivel="error"] {
+  color: var(--ep-err);
+}
+
+.ep-xl__probs li[data-nivel="aviso"] {
+  color: var(--ep-reto);
+}
+
+.ep-xl__donde {
+  font-weight: 600;
+}
+
+.ep-xl__acc {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .ep-xl {
+    padding: 14px;
+  }
+  .ep-xl__acc .ep-btn {
+    flex: 1 1 100%;
+  }
+}

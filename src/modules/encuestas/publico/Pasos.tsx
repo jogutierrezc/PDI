@@ -183,9 +183,12 @@ export function Elegir({
   onQuitar,
   onEnviar,
   acceso,
+  importador,
 }: {
   /** El acceso a «Mis envíos», si lo hay. */
   acceso?: ReactNode;
+  /** Traer logros y retos desde Excel (ImportarExcel), si la encuesta lo ofrece. */
+  importador?: ReactNode;
   cuenta: CuentaMicrosoft;
   dependencia: string;
   aportes: readonly AporteEnvio[];
@@ -229,6 +232,7 @@ export function Elegir({
         </button>
       </div>
       {!caben(aportes.length) && <p className="ep-fino">Llegó al máximo de {LIMITES.aportes} aportes por envío. Envíe estos y vuelva a empezar.</p>}
+      {importador}
 
       <div className="ep-cola">
         <h3 id="ep-cola-h">Lo que lleva registrado</h3>

@@ -330,6 +330,9 @@ export function MisEnvios({ slug, pase, correo, onVolver, onSesionVencida, onCop
             </div>
           </div>
 
+          {todos.some((e) => e.items.length > 0) && (
+            <p className="ep-fino">Ese Excel también sirve para corregir y volver a mandar: en la encuesta use «Importar desde Excel» y revisamos cada fila antes de agregarla.</p>
+          )}
           {lista.length === 0 ? (
             <div className="ep-mis-vacio">
               <h3>{todos.length === 0 ? "Aquí quedará su historial" : "Nada con este filtro"}</h3>

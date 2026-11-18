@@ -31,6 +31,14 @@ export interface HojaExcel {
   celdas?: { fila: number; columna: number; tipo: TipoCelda }[];
   /** Filas con color y lista bajo los datos (de esta hoja); manda sobre `OpcionesLibro.filasLibres`. */
   filasLibres?: number;
+  /** Ajusta el texto de todas las celdas de datos a varias líneas (hojas de instrucciones). */
+  envolver?: boolean;
+  /** Filas de datos (desde 0) que van en negrita (títulos de sección). */
+  negritas?: number[];
+  /** Fórmulas de solo ayuda (fila de `filas` desde 0, columna desde 0): el libro las calcula al abrirse; al leer se ignoran. */
+  formulas?: { fila: number; columna: number; formula: string }[];
+  /** Validación de largo de texto por columna (índice desde 0) con mensaje de entrada y de error. */
+  largos?: Record<number, { min: number; max: number; titulo: string; ayuda: string; error: string }>;
   /** Protege la hoja (sin contraseña): solo se pueden escribir las celdas que no son «bloqueada». */
   proteger?: boolean;
 }
@@ -127,6 +135,18 @@ export async function construirLibro(hojas: HojaExcel[], opciones: OpcionesLibro
         fila.getCell(c + 1).value = v;
       });
     });
+    if (h.envolver) {
+      h.filas.forEach((f, i) => {
+        f.forEach((_, c) => {
+          const cel = hoja.getRow(primera + i).getCell(c + 1);
+          cel.alignment = { vertical: "top", wrapText: true };
+        });
+      });
+    }
+    for (const i of h.negritas ?? []) {
+      for (let c = 1; c <= nCol; c++) hoja.getRow(primera + i).getCell(c).font = { bold: true, color: { argb: COLORES_LIBRO.azul } };
+    }
+    for (const f of h.formulas ?? []) hoja.getCell(primera + f.fila, f.columna + 1).value = { formula: f.formula, result: "" };
     const conTipos = Boolean(h.tipos?.length || h.celdas?.length);
     const libres = h.filasLibres ?? opciones.filasLibres ?? 30;
     const total = h.tipos?.length ? h.filas.length + libres : h.filas.length;
@@ -153,6 +173,15 @@ export async function construirLibro(hojas: HojaExcel[], opciones: OpcionesLibro
       if (!porRango && texto.length > 255) continue;
       for (let r = primera; r <= Math.max(primera + 58, primera + Math.max(total, h.filas.length) - 1); r++) {
         hoja.getCell(r, Number(col) + 1).dataValidation = { type: "list", allowBlank: true, formulae: [texto], ...(porRango ? { showErrorMessage: false } : {}) };
+      }
+    }
+    for (const [col, v] of Object.entries(h.largos ?? {})) {
+      for (let r = primera; r < primera + Math.max(total, h.filas.length); r++) {
+        hoja.getCell(r, Number(col) + 1).dataValidation = {
+          type: "textLength", operator: "between", allowBlank: true, formulae: [v.min, v.max],
+          showInputMessage: true, promptTitle: v.titulo.slice(0, 32), prompt: v.ayuda.slice(0, 255),
+          showErrorMessage: true, errorStyle: "stop", errorTitle: v.titulo.slice(0, 32), error: v.error.slice(0, 255),
+        };
       }
     }
     if (h.proteger) {

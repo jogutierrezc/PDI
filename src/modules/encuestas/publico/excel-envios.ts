@@ -12,7 +12,7 @@
 
 import { construirLibro, type HojaExcel } from "../../informes/ui/excel";
 import { downloadBlob } from "../../admin/traslado/transfer";
-import type { CifraHist, EnvioHist } from "../tipos";
+import type { CifraHist, EnvioHist, TipoCifra } from "../tipos";
 
 export const HOJA_ENVIOS = "Logros y retos";
 export const HOJA_CIFRAS = "Cifras";
@@ -21,7 +21,16 @@ export const FORMATO_ENVIOS = "pilo-encuestas-logros-retos";
 export const VERSION_ENVIOS = 1;
 
 export const COLUMNAS_ENVIOS = ["N.º", "Encuesta", "Fecha de envío", "Tipo", "Título", "Descripción", "Cifras", "Estado"] as const;
-export const COLUMNAS_CIFRAS = ["N.º", "Tipo", "Título", "Qué mide", "Valor", "Unidad"] as const;
+export const COLUMNAS_CIFRAS = ["N.º", "Tipo", "Título", "Qué mide", "Valor", "Unidad", "Tipo de cifra"] as const;
+
+/** El tipo de cifra con el texto de la lista desplegable del libro. */
+export const TEXTO_TIPO_CIFRA: Record<TipoCifra, string> = { estudiantes: "Estudiantes", programas: "Programas", porcentaje: "Porcentaje", dinero: "Dinero", otro: "Otro" };
+
+/** De la unidad que guarda «Mis envíos» («%», «$», «estudiantes», «programas» o una palabra) al tipo de cifra. */
+export function tipoDeUnidad(unidad: string): TipoCifra {
+  const u = unidad.trim().toLowerCase();
+  return u === "%" ? "porcentaje" : u === "$" ? "dinero" : u === "estudiantes" ? "estudiantes" : u === "programas" ? "programas" : "otro";
+}
 
 const ETAPAS = ["Recibido", "Revisado", "En el video"] as const;
 const tipoTexto = (t: "logro" | "reto") => (t === "logro" ? "Logro" : "Reto");
@@ -54,7 +63,7 @@ export function filasDeEnvios(envios: readonly EnvioHist[]): FilaEnvio[] {
       n++;
       filas.push({
         fila: [n, e.encuesta.titulo, fecha(e.creado), tipoTexto(it.tipo), it.titulo, it.descripcion, cifrasEnTexto(it.cifras), ETAPAS[e.etapa - 1]],
-        cifras: it.cifras.map((c) => [n, tipoTexto(it.tipo), it.titulo, c.que, c.valor, c.unidad]),
+        cifras: it.cifras.map((c) => [n, tipoTexto(it.tipo), it.titulo, c.que, c.valor, c.unidad, TEXTO_TIPO_CIFRA[tipoDeUnidad(c.unidad)]]),
       });
     }
   }
@@ -74,8 +83,8 @@ export function hojasDeEnvios(envios: readonly EnvioHist[], opciones: { slug: st
     },
     {
       nombre: HOJA_CIFRAS,
-      banner: { titulo: "Cifras de mis logros y retos", subtitulo: titulo, ayuda: "El N.º es el mismo de la hoja «Logros y retos»." },
-      columnas: COLUMNAS_CIFRAS.map((t, i) => ({ titulo: t, ancho: [6, 9, 34, 36, 14, 12][i] })),
+      banner: { titulo: "Cifras de mis logros y retos", subtitulo: titulo, ayuda: "El N.º es el mismo de la hoja «Logros y retos». Para volver a importar este libro en la encuesta (Importar desde Excel) no cambie los encabezados." },
+      columnas: COLUMNAS_CIFRAS.map((t, i) => ({ titulo: t, ancho: [6, 9, 34, 36, 14, 12, 16][i] })),
       filas: filas.flatMap((f) => f.cifras),
     },
     {
@@ -85,6 +94,7 @@ export function hojasDeEnvios(envios: readonly EnvioHist[], opciones: { slug: st
       filas: [
         ["formato", FORMATO_ENVIOS],
         ["version", VERSION_ENVIOS],
+        ["origen", "descarga"],
         ["alcance", opciones.alcance],
         ["encuesta", opciones.alcance === "esta" ? opciones.slug : ""],
         ["generado", hoy],
@@ -96,7 +106,7 @@ export function hojasDeEnvios(envios: readonly EnvioHist[], opciones: { slug: st
 
 export const nombreArchivoEnvios = (slug: string, alcance: "esta" | "todas", ahora = new Date()): string => `logros-y-retos-${alcance === "esta" ? slug : "todas"}-${ahora.toISOString().slice(0, 10)}.xlsx`;
 
-async function cargarLogo(): Promise<string | undefined> {
+export async function cargarLogo(): Promise<string | undefined> {
   try {
     const base = (import.meta.env.BASE_URL as string | undefined) ?? "/";
     const r = await fetch(`${base}logo-udes-blanco.png`);

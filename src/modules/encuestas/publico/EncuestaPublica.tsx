@@ -21,7 +21,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cerrarSesionMicrosoft, consumirRegresoMicrosoft, iniciarMicrosoft, tokenDeMicrosoft } from "../../internacionalizacion/contactos/api";
 import { datosMicrosoft, enviarAportes, ErrorEncuestas, esCerrada, esDeRed, infoEncuesta, sesionVencida } from "../api";
 import { guardarBorrador, leerBorrador } from "../lib/borrador";
-import { caben } from "../lib/validacion";
+import { caben, LIMITES } from "../lib/validacion";
 import { estaCerrada } from "../lib/tabla";
 import type { AporteEnvio, CuentaMicrosoft, InfoEncuesta, TipoAporte } from "../tipos";
 import { Bienvenida } from "./Bienvenida";
@@ -33,6 +33,7 @@ import { Guia } from "./Guia";
 import type { MensajeGuia } from "./Guia";
 import { AccesoMisEnvios, MisEnvios } from "./MisEnvios";
 import { Detalle, Elegir, Identificacion } from "./Pasos";
+import { ImportarExcel } from "./ImportarExcel";
 import type { EstadoMicrosoft } from "./Pasos";
 import type { DecirGuia } from "./tipos-pub";
 import "./publico.css";
@@ -328,6 +329,17 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
             ) : paso === "elegir" ? (
               <Elegir
                 acceso={<AccesoMisEnvios slug={slug} pase={pase} onAbrir={() => setVerMis(true)} />}
+                importador={
+                  <ImportarExcel
+                    slug={slug}
+                    titulo={info.titulo}
+                    yaHay={aportes}
+                    max={LIMITES.aportes}
+                    decir={decir}
+                    deshabilitado={enviando}
+                    onAgregar={(nuevos) => setAportes((l) => [...l, ...nuevos].slice(0, LIMITES.aportes))}
+                  />
+                }
                 cuenta={cuenta}
                 dependencia={dependencia}
                 aportes={aportes}

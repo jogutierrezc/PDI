@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cifrasEnTexto, COLUMNAS_ENVIOS, filasDeEnvios, hojasDeEnvios, nombreArchivoEnvios } from "./excel-envios";
+import { cifrasEnTexto, COLUMNAS_CIFRAS, COLUMNAS_ENVIOS, tipoDeUnidad, filasDeEnvios, hojasDeEnvios, nombreArchivoEnvios } from "./excel-envios";
 import type { EnvioHist } from "../tipos";
 
 const envio = (id: string, creado: string, etapa: 1 | 2 | 3, items: EnvioHist["items"]): EnvioHist => ({
@@ -26,6 +26,11 @@ describe("Mis envíos en Excel", () => {
     expect(h[1].filas).toHaveLength(2);
     expect(h[0].columnas.map((c) => c.titulo)).toEqual([...COLUMNAS_ENVIOS]);
     expect(h[2].oculta).toBe(true);
+    // El libro se puede volver a importar: cada cifra lleva su tipo (de la unidad) y los encabezados son los de la plantilla.
+    expect(h[1].columnas.map((c) => c.titulo)).toEqual([...COLUMNAS_CIFRAS]);
+    expect(h[1].filas.map((f) => f[6])).toEqual(["Otro", "Porcentaje"]);
+    expect(h[2].filas).toContainEqual(["origen", "descarga"]);
+    expect(["%", "$", "estudiantes", "programas", "convenios", ""].map(tipoDeUnidad)).toEqual(["porcentaje", "dinero", "estudiantes", "programas", "otro", "otro"]);
   });
   it("sin logros ni retos no hay filas y el nombre del archivo es estable", () => {
     expect(filasDeEnvios([])).toEqual([]);

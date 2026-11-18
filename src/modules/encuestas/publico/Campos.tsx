@@ -12,6 +12,7 @@ import type { ItemBloque, Pregunta, Valor } from "../lib/estructura";
 import { formatearValor, leerNumero } from "../lib/validacion";
 import { textoTipoAporte } from "../tipos";
 import { Detalle } from "./Pasos";
+import { ImportarExcel } from "./ImportarExcel";
 import type { DecirGuia } from "./tipos-pub";
 
 export interface PropsCampo {
@@ -23,6 +24,9 @@ export interface PropsCampo {
   onCambio: (v: Valor) => void;
   onFoco: () => void;
   describe?: string;
+  /** La encuesta (para la plantilla de Excel del bloque de logros y retos). */
+  slug?: string;
+  tituloEncuesta?: string;
 }
 
 const id = (p: Pregunta) => `q-${p.id}`;
@@ -73,7 +77,7 @@ function CampoArchivo({ p }: { p: Pregunta }) {
 
 const vacioItems: ItemBloque[] = [];
 
-function CampoBloque({ p, valor, decir, onCambio }: PropsCampo) {
+function CampoBloque({ p, valor, decir, onCambio, slug, tituloEncuesta }: PropsCampo) {
   const items = Array.isArray(valor) ? (valor as ItemBloque[]) : vacioItems;
   const max = p.validaciones?.maxItems ?? 30;
   const [modo, setModo] = useState<{ tipo: "logro" | "reto"; editando: number | null } | null>(null);
@@ -120,6 +124,16 @@ function CampoBloque({ p, valor, decir, onCambio }: PropsCampo) {
           Agregar un reto
         </button>
       </div>
+      {slug && (
+        <ImportarExcel
+          slug={slug}
+          titulo={tituloEncuesta}
+          yaHay={items}
+          max={max}
+          decir={decir}
+          onAgregar={(nuevos) => onCambio([...items, ...nuevos].slice(0, max))}
+        />
+      )}
       <h3 id={`${id(p)}-h`}>Lo que lleva registrado</h3>
       {items.length ? (
         <ul aria-labelledby={`${id(p)}-h`}>

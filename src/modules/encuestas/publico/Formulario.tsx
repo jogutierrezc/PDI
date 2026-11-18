@@ -62,6 +62,8 @@ export function Formulario({
   errorEnvio,
   onEnviar,
   extra,
+  slug,
+  tituloEncuesta,
 }: {
   estructura: Estructura;
   config: ConfigPilo;
@@ -73,6 +75,9 @@ export function Formulario({
   onEnviar: () => void;
   /** Lo que va antes del botón de enviar, en el último paso (verificación, consentimiento). */
   extra?: ReactNode;
+  /** La encuesta, para ofrecer la plantilla de Excel en el bloque de logros y retos. */
+  slug?: string;
+  tituloEncuesta?: string;
 }) {
   const [paso, setPaso] = useState(0);
   const [errores, setErrores] = useState<Record<string, string>>({});
@@ -192,7 +197,7 @@ export function Formulario({
                     {p.apoyo}
                   </div>
                 )}
-                <Entrada p={p} valor={valores[p.id]} error={errores[p.id]} describe={describe} decir={() => undefined} onCambio={(v) => poner(p, v)} onFoco={() => setFoco(p.id)} />
+                <Entrada p={p} valor={valores[p.id]} error={errores[p.id]} describe={describe} slug={slug} tituloEncuesta={tituloEncuesta} decir={() => undefined} onCambio={(v) => poner(p, v)} onFoco={() => setFoco(p.id)} />
                 <div id={`err-${p.id}`} className="ep-error" role="alert">
                   {errores[p.id]}
                 </div>

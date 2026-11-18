@@ -27,7 +27,7 @@ export function frasesBienvenida(intro: string): Frase[] {
     ...(propio ? [{ id: "intro", say: propio, face: "atrevido" as const, look: [0.35, 0.15] as [number, number], chips: [], voz: "atrevido" as const }] : []),
     { id: "importa", say: "Su aporte es muy significativo, y nos importa de verdad. Ahora le explico cómo funciona este formulario, para que lo recorramos juntos.", face: "emocionado", look: [0, -0.2], chips: ["Su aporte importa"], voz: "emocionado" },
     { id: "ingreso", say: "Primero se identifica con su correo institucional de la UDES, a través de Microsoft. Solo ingresan los correos autorizados.", face: "feliz", look: [-0.3, 0.3], chips: ["Correo institucional", "Ingreso con Microsoft"], voz: "atento" },
-    { id: "elegir", say: "Después elige qué quiere contar: un logro o un reto. Puede registrar varios, de uno en uno.", face: "atrevido", look: [0.3, 0.2], chips: ["Un logro", "Un reto"], voz: "atrevido" },
+    { id: "elegir", say: "Después elige qué quiere contar: un logro o un reto. Puede registrar varios, de uno en uno, o traerlos desde una plantilla de Excel que yo reviso.", face: "atrevido", look: [0.3, 0.2], chips: ["Un logro", "Un reto"], voz: "atrevido" },
     { id: "detalle", say: "De cada uno me cuenta cuál es, lo describe en máximo quinientos caracteres y agrega las cifras que lo respaldan: qué es la cifra, de qué tipo es y su valor.", face: "feliz", look: [-0.2, 0.3], chips: ["Descripción, 500 caracteres", "Qué es la cifra", "Tipo de cifra", "Valor"], voz: "atento" },
     { id: "envio", say: "Cuando termine, lo envía y yo me despido. ¡Empecemos!", face: "emocionado", look: [0, 0], chips: ["Enviar", "Despedida de Pilo"], voz: "emocionado" },
   ];
@@ -48,7 +48,7 @@ export const GUIA = {
   identificar: "Para empezar, necesito saber quién es usted. Escriba su dependencia y continúe con Microsoft con su correo de la UDES.",
   revisar: "Revise la dependencia. Necesito el nombre de su dependencia para continuar.",
   verificando: "Estoy confirmando su cuenta con Microsoft, un momento.",
-  confirmada: "Ya lo reconozco. Ahora cuénteme qué quiere enviar: un logro o un reto.",
+  confirmada: "Ya lo reconozco. Ahora cuénteme qué quiere enviar: un logro o un reto. Si prefiere, también puede traerlos desde una plantilla de Excel.",
   microsoftFalla: "No pude confirmar su cuenta con Microsoft. Pruebe de nuevo con su correo de la UDES.",
   elegir: "¿Qué quiere contar? Elija un logro o un reto.",
   sinPrisa: "Sin problema. ¿Qué quiere contar?",

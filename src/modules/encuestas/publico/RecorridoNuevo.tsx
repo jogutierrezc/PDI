@@ -255,7 +255,7 @@ export function RecorridoNuevo({ slug, info, estructura }: { slug: string; info:
                     </div>
                   )}
                   {cuenta && <AccesoMisEnvios slug={slug} pase={pase} onAbrir={() => setVerMis(true)} />}
-                  <Formulario estructura={estructura} config={config} modo={guiado ? "guiado" : "clasico"} valores={valores} onValores={setValores} enviando={enviando} errorEnvio={errorEnvio} onEnviar={() => void enviar()} extra={extra} />
+                  <Formulario estructura={estructura} config={config} modo={guiado ? "guiado" : "clasico"} valores={valores} onValores={setValores} enviando={enviando} errorEnvio={errorEnvio} onEnviar={() => void enviar()} extra={extra} slug={slug} tituloEncuesta={info.titulo} />
                 </div>
               </>
             )}

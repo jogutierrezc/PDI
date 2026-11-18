@@ -171,7 +171,7 @@ export interface CuerpoRespuesta {
 }
 
 /** Envía una respuesta de una encuesta del modelo nuevo. */
-export const enviarRespuesta = (slug: string, c: CuerpoRespuesta) => llamar<{ ok: true; id: string }>("responder", { ...c, web: "" });
+export const enviarRespuesta = (slug: string, c: CuerpoRespuesta) => llamar<{ ok: true; id: string }>("responder", { ...c, slug, web: "" });
 
 /** Una sesión de Microsoft vencida o inválida: hay que volver a confirmar. */
 export const sesionVencida = (e: unknown): boolean => e instanceof ErrorEncuestas && (e.estado === 401 || (e.estado === 403 && e.codigo !== "cerrada"));

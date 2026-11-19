@@ -1375,7 +1375,9 @@ textarea.inf-in {
 .inf-dim__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .inf-dim__top h4 { margin: var(--space-4) 0 var(--space-2); }
 .inf-seg { display: inline-flex; border: 1px solid rgba(0, 150, 165, 0.4); border-radius: var(--radius-pill, 999px); overflow: hidden; }
-.inf-seg button { padding: 4px 12px; border: 0; background: transparent; font: inherit; font-size: var(--text-xs); font-weight: 700; cursor: pointer; }
+.inf-seg button { padding: 4px 12px; border: 0; background: var(--surface, #fff); color: var(--brand-blue-strong, #0b3d91); font: inherit; font-size: var(--text-xs); font-weight: 700; cursor: pointer; transition: background-color 150ms ease-out; }
+.inf-seg button:hover:not([aria-pressed="true"]) { background: rgba(0, 150, 165, 0.12); }
+.inf-seg button:focus-visible { outline: 2px solid var(--brand-blue-strong, #0b3d91); outline-offset: -2px; }
 .inf-seg button[aria-pressed="true"] { background: var(--brand-blue-strong, #0b3d91); color: #fff; }
 .inf-dimtab-wrap { overflow-x: auto; }
 .inf-dimtab { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius-sm); font-size: var(--text-sm); }

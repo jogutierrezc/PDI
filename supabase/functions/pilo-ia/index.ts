@@ -2818,6 +2818,13 @@ export const ASTRA_RULE =
 export const ASTRA_RESEARCH_RULE =
   "Es una investigación: responde a fondo y con orden. Empieza por la conclusión, desarrolla en secciones cortas con títulos, compara alternativas o enfoques, di tus supuestos y los límites de lo que sabes, y cierra con los pasos siguientes si los hay. Lo que no es de la UDES no lleva corchetes de fuente; no inventes referencias, citas ni cifras.";
 
+/** Cuando la app pide un resultado en JSON (la práctica y las tarjetas de Pilo Profe): solo el JSON, completo, sin el límite de frases. */
+export const JSON_RULE =
+  "La persona pidió un resultado en JSON. Responde SOLO con ese JSON válido y completo, sin texto antes ni después, sin Markdown y sin cercas de código; el límite de frases de la regla 1 no aplica. Usa comillas dobles, sin comas finales, y no cortes el resultado: si es largo, acórtalo antes de dejarlo incompleto.";
+
+/** ¿Pide la pregunta un resultado solo en JSON? */
+export const wantsJson = (question: string): boolean => /\bsolo con json\b|\bresponde (?:solo|[uú]nicamente) (?:con )?json\b/i.test(question);
+
 /** Matemáticas, lógica, programación, inteligencia artificial y razonamiento: se responde con toda la capacidad, sin el límite de frases. */
 export const ABILITY_RULE =
   "Esta pregunta pide matemáticas, lógica, programación, inteligencia artificial, ciencia o razonamiento. Responde con toda tu capacidad y sin el límite de 6 frases de la regla 1: razona paso a paso, calcula con exactitud y verifica el resultado antes de darlo, explica la idea con claridad y, si ayuda, usa listas y tablas de Markdown. El código va completo en un bloque de Markdown que diga su lenguaje, con una explicación breve; no ejecutas el código, así que sugiere probarlo. Si algo es incierto o depende de datos que no tienes, dilo en vez de inventar. Formato limpio: las fórmulas van en texto simple con símbolos Unicode (x², √x, ½, ×, ≤, π, ∑), nunca en LaTeX ni con signos de dólar ni barras invertidas; usa **negrita** solo con pareja de asteriscos y nunca asteriscos sueltos. Esto no es información de la UDES: no uses corchetes de fuente, ignora sin mencionarlos los bloques de datos que no vengan al caso y no te limites a tu campo temático. Empieza por el resultado final y después muestra el procedimiento. Las tres reglas A, B y C siguen mandando.";
@@ -3058,6 +3065,8 @@ export interface AskPrompt {
   question: string;
   /** La pregunta es de matemáticas, lógica, IA o razonamiento: sin el límite de frases (ABILITY_RULE). */
   ability?: boolean;
+  /** La pregunta pide solo JSON (ver JSON_RULE). */
+  jsonOut?: boolean;
   /** Responde Pilo Astra (razona antes de responder): ver ASTRA_RULE. */
   astra?: boolean;
   /** Con un archivo adjunto que se pide modificar: ver DOC_EDIT_RULE. */
@@ -3115,6 +3124,7 @@ export function buildAskMessages(plan: AskPlan, prompt: AskPrompt): ChatMessage[
     ASK_CONDUCT_RULES,
     ASK_DIRECT_RULE,
     prompt.ability ? ABILITY_RULE : "",
+    prompt.jsonOut ? JSON_RULE : "",
     prompt.astra ? ASTRA_RULE : "",
     prompt.astra && prompt.research ? ASTRA_RESEARCH_RULE : "",
     plan.facts ? ASK_FIGURES_RULE : "",
@@ -8487,6 +8497,8 @@ async function handle(request: Request): Promise<Response> {
     const longAnswer = Boolean(doc) || codeOk || reasonAsked || Boolean(astraRun);
     /** Pedir cambiar el archivo adjunto: la respuesta es el archivo completo, con más sitio (DOC_EDIT_RULE). */
     const editAsked = Boolean(doc) && wantsEdit(question);
+    /** Un resultado solo en JSON (la práctica de Pilo Profe): más sitio y sin el límite de frases. */
+    const jsonAsked = wantsJson(question);
     /** Fuera del espacio de partida, la respuesta dice para qué rol se redactó y, si no trae cara propia, la del rol. */
     const face = roleFace(profile, rol);
     const dress = <T extends Record<string, unknown>>(payload: T): T => (spaced ? withRole(payload, rol, face) : payload);
@@ -9019,6 +9031,7 @@ async function handle(request: Request): Promise<Response> {
         ...(reasonAsked ? { ability: true } : {}),
         ...(astraRun ? { astra: true } : {}),
         ...(editAsked ? { edit: true } : {}),
+        ...(jsonAsked ? { jsonOut: true } : {}),
         ...(astraRun && parseNivel(body.nivel) === "investigacion" ? { research: true } : {}),
         ...(relations.length ? { relations, relationLimits } : {}),
         ...(analysis ? { analysis: true } : {}),
@@ -9092,7 +9105,7 @@ async function handle(request: Request): Promise<Response> {
         // Con análisis pedido, sus tres frases no le quitan sitio a la respuesta.
         const baseTokens = (longAnswer ? Math.max(ask.maxTokens, extras.codeMaxTokens) : member ? Math.max(ask.maxTokens, extras.memberMaxTokens) : ask.maxTokens) + (analysed ? ANALYSIS_TOKENS : 0);
         // Investigaciones: más sitio para razonar y para escribir.
-        const wanted = Math.max(baseTokens, astraRun && parseNivel(body.nivel) === "investigacion" ? 4000 : 0, editAsked ? 6000 : 0);
+        const wanted = Math.max(baseTokens, astraRun && parseNivel(body.nivel) === "investigacion" ? 4000 : 0, editAsked ? 6000 : 0, jsonAsked ? 3000 : 0);
         // Con Astra, el razonamiento gasta tope: nunca menos que `astra_max_tokens`.
         const maxTokens = astraRun ? (astraRun.maxTokens === 0 ? 0 : Math.max(wanted, astraRun.maxTokens)) : wanted;
         const { response } = await chat(sent, { temperature: ask.temperature, max_tokens: maxTokens, stream: Boolean(onDelta), signal: abort.signal, ...(astraRun ? { astra: { dest: astraRun.dest, effort: astraRun.effort } } : {}) });

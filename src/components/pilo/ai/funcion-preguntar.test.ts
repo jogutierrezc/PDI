@@ -4173,3 +4173,20 @@ describe("modificar el archivo adjunto", () => {
     expect(sys({ edit: true })).not.toContain(DOC_EDIT_RULE);
   });
 });
+
+describe("resultado solo en JSON (Pilo Profe)", () => {
+  it("wantsJson reconoce el pedido de la app y no cualquier mención de JSON", async () => {
+    const { wantsJson } = await import("./logic");
+    expect(wantsJson('Arma una práctica. Responde SOLO con JSON, sin texto antes ni después, así: {"preguntas":[]}')).toBe(true);
+    expect(wantsJson("Responde únicamente con json")).toBe(true);
+    for (const q of ["¿Qué es JSON?", "Explícame el formato json", "Dame un ejemplo de JSON"]) expect(wantsJson(q), q).toBe(false);
+  });
+  it("la regla solo va cuando se pide JSON", async () => {
+    const { JSON_RULE, buildAskMessages, planAsk } = await import("./logic");
+    const { ASK_CASES } = await import("./rol-casos");
+    const c = ASK_CASES[0];
+    const sys = (p: Record<string, unknown>) => String(buildAskMessages(planAsk(c.plan), { ...c.prompt, ...p })[0].content);
+    expect(sys({ jsonOut: true })).toContain(JSON_RULE);
+    expect(sys({})).not.toContain(JSON_RULE);
+  });
+});

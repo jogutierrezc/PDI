@@ -238,3 +238,4 @@ body.ps-arrastrando { user-select: none; cursor: grabbing; }
 .ps-barra-act > .ps-selector, .ps-barra-act > .ps-oficina-fija { max-width: 420px; }
 .ps-mover span { white-space: nowrap; }
 .ps-tarjeta__pie { flex-wrap: wrap; }
+.ps-campo select, .ps-campo input[type="date"] { width: 100%; box-sizing: border-box; min-width: 0; }

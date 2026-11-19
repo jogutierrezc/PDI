@@ -31,7 +31,7 @@
   --n-glass: color-mix(in srgb, var(--c-bg) 66%, transparent);
   --n-glass-edge: color-mix(in srgb, var(--c-ink) 12%, transparent);
   --n-hair: color-mix(in srgb, var(--c-ink) 10%, transparent);
-  --n-fill: color-mix(in srgb, var(--c-ink) 6%, var(--c-bg));
+  --n-fill: color-mix(in srgb, var(--c-ink) 4%, var(--c-bg));
   --n-r-card: 16px;
   --n-r-sheet: 28px;
   --n-spring: linear(0, 0.2 6%, 0.55 13%, 0.85 21%, 1.02 31%, 1.03 38%, 1 52%, 0.995 65%, 1);
@@ -365,11 +365,7 @@
   background: var(--c-chip);
 }
 
-/* terms/terms.css también define «.pt-i» (un icono de 18 px): aquí se anula para que la pestaña ocupe su columna. */
 .pa[data-diseno="nuevo"] .pt-i {
-  width: auto;
-  height: auto;
-  flex: none;
   min-height: 48px;
   gap: 2px;
   color: var(--c-ink2);
@@ -821,8 +817,47 @@
   font-weight: 600;
 }
 
+/* El bloque «Mr. Pilo / Universidad de Santander» no se parte: dos líneas, la segunda recortada con puntos suspensivos. */
 .pa[data-diseno="nuevo"] .pa-w-brand {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font: var(--n-foot);
+}
+
+/* En un teléfono la fila lleva idioma, sonido y «Saltar»: solo cabe «Mr. Pilo» (el subtítulo, que no es información nueva, se omite). */
+@media (max-width: 479px) {
+  .pa[data-diseno="nuevo"] .pa-w-top .pa-w-brand {
+    font-size: 0;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-w-top .pa-w-brand b {
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+}
+
+.pa[data-diseno="nuevo"] .pa-w-top .pilo-lang,
+.pa[data-diseno="nuevo"] .pc-stage-top .pilo-lang {
+  flex: none;
+  margin-inline-end: 0;
+}
+
+.pa[data-diseno="nuevo"] .pa-w-top .pilo-lang button {
+  min-width: 32px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+/* La columna de la escena no crece con el texto sin partir: se queda del ancho de la pantalla. */
+.pa[data-diseno="nuevo"] .pa-w {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pa[data-diseno="nuevo"] .pa-w-top {
+  min-width: 0;
 }
 
 .pa[data-diseno="nuevo"] .pa-w-brand b {

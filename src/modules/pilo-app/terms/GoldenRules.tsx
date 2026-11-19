@@ -33,7 +33,7 @@ const GLYPH: Record<RuleIcon, ReactNode> = {
 };
 
 export const TermsIcon = ({ children }: { children: ReactNode }) => (
-  <svg className="pt-i" viewBox="0 0 18 18" aria-hidden="true">
+  <svg className="pt-ico" viewBox="0 0 18 18" aria-hidden="true">
     {children}
   </svg>
 );

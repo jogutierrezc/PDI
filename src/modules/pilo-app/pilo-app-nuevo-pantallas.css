@@ -1,0 +1,758 @@
+/* =============================================================================
+   Mr. Pilo · la app móvil · el diseño nuevo (beta) · las demás pantallas.
+
+   Hoja hermana de pilo-app-nuevo.css (fase 1b): la cuenta (entrar y crear),
+   Yo con cuenta, el carnet, Pilo U por dentro, guardadas, el selector de rol,
+   la llamada, las hojas de instalación y la política. Mismas reglas: todo
+   selector va bajo .pa[data-diseno="nuevo"], los colores salen de las variables
+   del tema, no hay cristal aquí (solo la barra y la caja de escribir lo tienen)
+   y el movimiento es transform y opacidad.
+   ========================================================================== */
+
+/* --- Cuenta: entrar, crear, olvidé, visita ------------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .pc-gate {
+  background: var(--c-bubble);
+}
+
+/* La escena azul se vuelve el encabezado de una hoja: la cara a la izquierda y lo que dice Pilo, en su globo. */
+.pa[data-diseno="nuevo"] .pc-stage {
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  justify-items: stretch;
+  column-gap: 12px;
+  row-gap: 10px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 4px max(16px, env(safe-area-inset-left, 0px));
+  color: var(--c-ink);
+  text-align: left;
+  max-width: 560px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.pa[data-diseno="nuevo"] .pc-stage-bg {
+  display: none;
+}
+
+.pa[data-diseno="nuevo"] .pc-stage-top {
+  grid-column: 1 / -1;
+  min-height: 44px;
+}
+
+.pa[data-diseno="nuevo"] .pc-stage-top > :first-child {
+  margin-right: auto;
+}
+
+.pa[data-diseno="nuevo"] .pc-stage-top .pa-w-brand {
+  display: none;
+}
+
+.pa[data-diseno="nuevo"] .pc-stage .pa-sbtn {
+  border: 0;
+  background: var(--c-chip);
+  color: var(--c-ink);
+}
+
+.pa[data-diseno="nuevo"] .pc-stage .pa-sbtn[aria-pressed="true"] {
+  background: var(--c-chip);
+  color: var(--c-link);
+}
+
+.pa[data-diseno="nuevo"] .pc-stage :focus-visible {
+  outline-color: var(--c-link);
+}
+
+.pa[data-diseno="nuevo"] .pc-face,
+.pa[data-diseno="nuevo"] .pc-face__in {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.pa[data-diseno="nuevo"] .pc-face {
+  grid-column: 1;
+  background: var(--c-chip);
+}
+
+.pa[data-diseno="nuevo"] .pc-bubble {
+  grid-column: 2;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 20px;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font: var(--n-body);
+  text-wrap: pretty;
+}
+
+.pa[data-diseno="nuevo"] .pc-stage .pa-w-mood {
+  grid-column: 1 / -1;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink2);
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pc-stage .pa-w-mood i {
+  background: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .pc-form {
+  gap: 16px;
+  padding-top: 12px;
+}
+
+.pa[data-diseno="nuevo"] .pc-step {
+  gap: 14px;
+}
+
+.pa[data-diseno="nuevo"] .pc-step h2 {
+  font: var(--n-title2);
+  letter-spacing: -0.01em;
+}
+
+.pa[data-diseno="nuevo"] .pc-step > p,
+.pa[data-diseno="nuevo"] .pc-sheet__in > p,
+.pa[data-diseno="nuevo"] .pc-or {
+  font: var(--n-foot);
+  font-weight: 400;
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .pc-label,
+.pa[data-diseno="nuevo"] .pc-field label {
+  font: var(--n-body-s);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--c-ink);
+}
+
+/* Campos rellenos, sin borde: la superficie agrupada con esquinas de 16. */
+.pa[data-diseno="nuevo"] .pc-field input,
+.pa[data-diseno="nuevo"] .pc-field select,
+.pa[data-diseno="nuevo"] .pc-field textarea {
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--c-bg);
+  font: 400 17px/1.3 var(--n-font);
+}
+
+.pa[data-diseno="nuevo"] .pc-field [aria-invalid="true"] {
+  border: 0;
+  box-shadow: inset 0 0 0 2px var(--c-bad);
+}
+
+.pa[data-diseno="nuevo"] .pc-field input:focus-visible,
+.pa[data-diseno="nuevo"] .pc-field select:focus-visible,
+.pa[data-diseno="nuevo"] .pc-field textarea:focus-visible {
+  outline: 2px solid var(--c-link);
+  outline-offset: 0;
+  border-radius: 16px;
+}
+
+.pa[data-diseno="nuevo"] .pc-reveal {
+  top: 4px;
+  right: 4px;
+  bottom: 4px;
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pc-msg,
+.pa[data-diseno="nuevo"] .pc-hint {
+  font: var(--n-foot);
+  font-weight: 500;
+}
+
+/* La acción principal arriba y a lo ancho; lo demás, debajo y centrado (como en PiloApple). */
+.pa[data-diseno="nuevo"] .pc-actions {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.pa[data-diseno="nuevo"] .pc-actions > .pc-quiet {
+  justify-self: center;
+  justify-content: center;
+}
+
+.pa[data-diseno="nuevo"] .pc-step .pa-btn,
+.pa[data-diseno="nuevo"] .pc-sheet .pa-btn,
+.pa[data-diseno="nuevo"] .pc-save .pa-btn {
+  min-height: 54px;
+  border-radius: 27px;
+}
+
+.pa[data-diseno="nuevo"] .pc-actions .pa-btn {
+  width: 100%;
+}
+
+.pa[data-diseno="nuevo"] .pc-quiet {
+  font: var(--n-body-s);
+  color: var(--c-link);
+}
+
+.pa[data-diseno="nuevo"] .pc-links {
+  gap: 0 16px;
+}
+
+.pa[data-diseno="nuevo"] .pc-ms {
+  min-height: 54px;
+  border: 1px solid var(--n-hair);
+  border-radius: 27px;
+  background: transparent;
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pc-opt,
+.pa[data-diseno="nuevo"] .pc-aside,
+.pa[data-diseno="nuevo"] .pc-terms,
+.pa[data-diseno="nuevo"] .pc-rows {
+  border: 0;
+  border-radius: 16px;
+  background: var(--c-bg);
+}
+
+.pa[data-diseno="nuevo"] .pc-opt {
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pc-opt[aria-pressed="true"] {
+  background: var(--c-chip);
+  box-shadow: inset 0 0 0 2px var(--c-link);
+}
+
+.pa[data-diseno="nuevo"] .pc-aside[data-strong] {
+  background: var(--c-chip);
+  box-shadow: none;
+}
+
+.pa[data-diseno="nuevo"] .pc-rows > div {
+  border-top-color: var(--n-hair);
+}
+
+.pa[data-diseno="nuevo"] .pc-domains li {
+  border-radius: 8px;
+}
+
+.pa[data-diseno="nuevo"] .pc-segs span {
+  height: 4px;
+}
+
+.pa[data-diseno="nuevo"] .pc-code {
+  font-size: 1.75rem;
+}
+
+.pa[data-diseno="nuevo"] .pc-seg {
+  border: 0;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c-ink) 8%, transparent);
+}
+
+.pa[data-diseno="nuevo"] .pc-seg__thumb {
+  border-radius: 11px;
+}
+
+/* El «¿Sin cuenta?» de la puerta no es la columna del perfil: en el clásico, a 960 px o más, la regla de .pc-aside lo
+   manda a una segunda columna y descuadra el formulario. Aquí queda en su sitio. */
+.pa[data-diseno="nuevo"] .pc-form .pc-aside {
+  grid-column: 1;
+  grid-row: auto;
+  position: static;
+  display: flex;
+}
+
+/* Pantalla ancha: la hoja se parte en dos; a la izquierda, Pilo con su globo; a la derecha, el formulario. */
+@media (min-width: 900px) {
+  .pa[data-diseno="nuevo"] .pc-gate {
+    background: var(--c-bubble);
+  }
+
+  .pa[data-diseno="nuevo"] .pc-stage {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    justify-items: center;
+    max-width: none;
+    padding: 24px;
+    background: var(--c-bg);
+    text-align: center;
+  }
+
+  .pa[data-diseno="nuevo"] .pc-stage-top {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    right: 20px;
+    width: auto;
+  }
+
+  .pa[data-diseno="nuevo"] .pc-face,
+  .pa[data-diseno="nuevo"] .pc-face__in {
+    width: 148px;
+    height: 148px;
+  }
+
+  .pa[data-diseno="nuevo"] .pc-face {
+    grid-column: 1;
+  }
+
+  .pa[data-diseno="nuevo"] .pc-bubble {
+    grid-column: 1;
+    max-width: 34ch;
+    background: var(--c-bubble);
+    text-align: center;
+  }
+
+  .pa[data-diseno="nuevo"] .pc-stage .pa-w-mood {
+    grid-column: 1;
+    justify-self: center;
+  }
+
+  .pa[data-diseno="nuevo"] .pc-form {
+    padding-top: 32px;
+  }
+}
+
+/* --- Yo con cuenta ------------------------------------------------------------------------- */
+
+/* El encabezado deja de ser una escena azul: una tarjeta lisa con la cara en círculo. */
+.pa[data-diseno="nuevo"] .pc-me {
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+  color: var(--c-ink);
+}
+
+.pa[data-diseno="nuevo"] .pc-me__orb {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--c-chip);
+}
+
+.pa[data-diseno="nuevo"] .pc-me__rings {
+  display: none;
+}
+
+.pa[data-diseno="nuevo"] .pc-me__face {
+  width: 72px;
+  height: 72px;
+  filter: none;
+}
+
+.pa[data-diseno="nuevo"] .pc-me h2 {
+  font: var(--n-title2);
+}
+
+.pa[data-diseno="nuevo"] .pc-me p {
+  font: var(--n-body);
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .pc-me .pc-tag {
+  background: var(--c-chip);
+  color: var(--c-link);
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .pa[data-diseno="nuevo"] .pc-me {
+    grid-template-columns: 72px minmax(0, 1fr);
+    justify-items: stretch;
+  }
+}
+
+/* Secciones como grupos: tarjeta blanca, rótulo en mayúsculas pequeñas encima. */
+.pa[data-diseno="nuevo"] .pc-profile--v2 .pc-sheet {
+  border-top: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .pc-profile--v2 .pc-sheet__in {
+  padding: 16px;
+}
+
+.pa[data-diseno="nuevo"] .pc-line {
+  padding: 16px;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .pc-facts > div {
+  border-top-color: var(--n-hair);
+}
+
+.pa[data-diseno="nuevo"] .pc-facts dt {
+  font: var(--n-foot);
+  font-weight: 500;
+}
+
+.pa[data-diseno="nuevo"] .pc-facts dd {
+  font: var(--n-body);
+  font-weight: 500;
+}
+
+.pa[data-diseno="nuevo"] .pc-sample__bubble {
+  border: 0;
+  border-radius: 20px;
+  background: var(--c-bg);
+  font: var(--n-body);
+  font-weight: 400;
+}
+
+.pa[data-diseno="nuevo"] .pc-profile--v2 .pc-save {
+  border-radius: var(--n-r-card);
+}
+
+.pa[data-diseno="nuevo"] .pc-tag {
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+/* --- Carnet con cuenta ----------------------------------------------------------------------- */
+
+/* La tarjeta del carnet sigue siendo la escena azul del tema (es el objeto); lo de alrededor, agrupado. */
+.pa[data-diseno="nuevo"] .cn-face {
+  border: 0;
+  border-radius: 20px;
+}
+
+.pa[data-diseno="nuevo"] .cn-pane {
+  gap: 12px;
+}
+
+.pa[data-diseno="nuevo"] .cn-wbtn,
+.pa[data-diseno="nuevo"] .cn-block {
+  min-height: 54px;
+  border-radius: 27px;
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .cn-block {
+  border: 1px solid var(--n-hair);
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .cn-wbtn[aria-disabled="true"],
+.pa[data-diseno="nuevo"] .cn-wbtn:disabled {
+  border-color: var(--n-hair);
+}
+
+.pa[data-diseno="nuevo"] .cn-group h2 {
+  font: var(--n-foot);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pa[data-diseno="nuevo"] .cn-list {
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .cn-row {
+  min-height: 60px;
+}
+
+.pa[data-diseno="nuevo"] .cn-row + .cn-row {
+  border-top-color: var(--n-hair);
+}
+
+.pa[data-diseno="nuevo"] button.cn-row:active {
+  transform: none;
+  background: var(--c-chip);
+}
+
+.pa[data-diseno="nuevo"] .cn-row__t b {
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .cn-row__t small {
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .cn-row__i {
+  border-radius: 10px;
+}
+
+.pa[data-diseno="nuevo"] .cn-complete {
+  border-radius: var(--n-r-card);
+}
+
+/* --- Pilo U por dentro ------------------------------------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .pu-head p {
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .pu-chip {
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pu-chip--mut,
+.pa[data-diseno="nuevo"] .pu-chip--ok,
+.pa[data-diseno="nuevo"] .pu-chip--go {
+  border-width: 1px;
+}
+
+/* --- Guardadas ------------------------------------------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .pc-saved > li {
+  border-top-color: var(--n-hair);
+}
+
+.pa[data-diseno="nuevo"] .pc-confirm {
+  border-radius: var(--n-r-card);
+}
+
+.pa[data-diseno="nuevo"] .pc-saved {
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .pc-search input {
+  border: 0;
+  border-radius: 14px;
+  background: var(--n-fill);
+  font: 400 17px/1.3 var(--n-font);
+}
+
+/* --- Mis clases y Mis notas --------------------------------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .pcl-card,
+.pa[data-diseno="nuevo"] .pnt-card {
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+}
+
+/* El encabezado azul de la tarjeta de permiso pasa a ser liso: la escena azul es de la bienvenida. */
+.pa[data-diseno="nuevo"] .pcl-card__head {
+  background: var(--c-bubble);
+  color: var(--c-ink);
+}
+
+.pa[data-diseno="nuevo"] .pcl-card__head h2,
+.pa[data-diseno="nuevo"] .pcl-card--note h2 {
+  font: var(--n-title2);
+}
+
+.pa[data-diseno="nuevo"] .pcl-card__head p {
+  font: var(--n-body);
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .pcl-card--note p,
+.pa[data-diseno="nuevo"] .pcl .pcl-text {
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .pcl-list,
+.pa[data-diseno="nuevo"] .pnt-list {
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .pcl-group h3 {
+  font: var(--n-foot);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pa[data-diseno="nuevo"] .pcl-item__main small {
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pt-consent {
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bg);
+}
+
+.pa[data-diseno="nuevo"] .pnt-tabs {
+  border: 0;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c-ink) 8%, transparent);
+}
+
+.pa[data-diseno="nuevo"] .pnt-tabs button {
+  border-radius: 10px;
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pnt-tabs button[aria-selected="true"] {
+  background: var(--c-bubble);
+  color: var(--c-ink);
+  box-shadow: 0 1px 3px var(--c-shadow);
+}
+
+.pa[data-diseno="nuevo"] .pcl-beta {
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+/* --- Respuestas ricas y selector de rol --------------------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .ap-a__text {
+  font: var(--n-body);
+  line-height: 1.45;
+}
+
+.pa[data-diseno="nuevo"] .pa .ap-a__text,
+.pa[data-diseno="nuevo"] .pa-bubble :is(li, td, th) {
+  font-size: 1.0625rem;
+}
+
+.pa[data-diseno="nuevo"] .pa-bubble :is(table, pre, blockquote) {
+  border-radius: 12px;
+}
+
+.pa[data-diseno="nuevo"] .ap-rolp__q {
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .ap-rolp__b {
+  min-height: 48px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--c-chip);
+  color: var(--c-link);
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .ap-rolp__b[data-quiet] {
+  background: none;
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .ap-rolp__b[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--c-link);
+}
+
+/* En la bienvenida el selector de rol es dorado sólido, como su botón principal. */
+.pa[data-diseno="nuevo"] .pa-w .ap-rolp__b {
+  background: var(--n-gold);
+  color: var(--n-gold-ink);
+  box-shadow: none;
+}
+
+.pa[data-diseno="nuevo"] .pa-w .ap-rolp__b[data-quiet] {
+  background: none;
+  color: var(--s-ink);
+  box-shadow: inset 0 0 0 1px var(--s-line);
+}
+
+/* La tarjeta de permiso (terms/: .pt-card, que Mis clases y Mis notas reutilizan): lisa, sin banda azul. */
+.pa[data-diseno="nuevo"] .pt-card {
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+  color: var(--c-ink);
+}
+
+.pa[data-diseno="nuevo"] .pt-card__head {
+  background: var(--c-bubble);
+  color: var(--c-ink);
+}
+
+.pa[data-diseno="nuevo"] .pt-card__head h2 {
+  font: var(--n-title2);
+}
+
+.pa[data-diseno="nuevo"] .pt-card__head p {
+  font: var(--n-body);
+  color: var(--c-ink2);
+}
+
+/* --- Política de uso («Antes de empezar») ------------------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .pt-gate {
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .pt-accept h2 {
+  font: var(--n-title2);
+}
+
+.pa[data-diseno="nuevo"] .pt-rules b {
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pt-rules p,
+.pa[data-diseno="nuevo"] .pt-hint {
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pt-rules__icon {
+  border-radius: 10px;
+}
+
+.pa[data-diseno="nuevo"] .pt-go {
+  min-height: 54px;
+  border-radius: 27px;
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pt-link {
+  font: var(--n-body-s);
+  text-decoration: none;
+}
+
+/* --- Llamada con Pilo, hojas de instalación y novedad -------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .ll-preview,
+.pa[data-diseno="nuevo"] .ll-lead,
+.pa[data-diseno="nuevo"] .ll-state,
+.pa[data-diseno="nuevo"] .ll-caption {
+  font-family: var(--n-font);
+}
+
+.pa[data-diseno="nuevo"] .ll-btn {
+  min-height: 54px;
+  border-radius: 27px;
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .ll-ctl {
+  min-width: 56px;
+  min-height: 56px;
+}
+
+.pa[data-diseno="nuevo"] .ll-log {
+  border-radius: var(--n-r-card);
+}
+
+/* Las hojas de Android, iPhone y novedad son .pa-sheet: ya heredan asa, resorte y tarjetas. */
+.pa[data-diseno="nuevo"] .pa-steps-list li {
+  border-radius: var(--n-r-card);
+}
+
+.pa[data-diseno="nuevo"] .pa-apk__actions .pa-btn {
+  min-height: 54px;
+  border-radius: 27px;
+}
+
+/* --- Pilo U: el saludo ya no compite con el título grande -------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .pu-head h1 {
+  font: var(--n-title2);
+  letter-spacing: -0.01em;
+}

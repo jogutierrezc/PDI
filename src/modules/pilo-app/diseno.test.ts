@@ -62,7 +62,7 @@ describe("el interruptor del diseño nuevo", () => {
 });
 
 describe("la hoja del diseño nuevo", () => {
-  const css = readFileSync(resolve(process.cwd(), "src/modules/pilo-app/pilo-app-nuevo.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const css = ["pilo-app-nuevo.css", "pilo-app-nuevo-pantallas.css"].map((f) => readFileSync(resolve(process.cwd(), "src/modules/pilo-app", f), "utf8")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("todo selector va bajo data-diseno=\"nuevo\" (salvo el conmutador): sin atributo, nada cambia", () => {
     const loose: string[] = [];

@@ -74,6 +74,7 @@ import "./pilo-app-themes.css";
 import "./pilo-app.css";
 import "./account/account.css";
 import "./pilo-app-nuevo.css";
+import "./pilo-app-nuevo-pantallas.css";
 import { tr, useLang, localizeDeep } from "../../components/pilo/i18n";
 
 const KEY_VOICE = storageKey(APP_PREFIX, "voz");

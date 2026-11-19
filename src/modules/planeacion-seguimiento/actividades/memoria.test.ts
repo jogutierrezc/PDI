@@ -8,7 +8,7 @@ import { SIN_RESPONSABLE } from "./modelo";
 
 const lineas = real as unknown as Linea[];
 const api = (nivel: PsNivel, papel: PapelOficina | "ninguno") => crearActividadesMemoria({ nivel, papel, campus: ["Bucaramanga", "Valledupar", "Cúcuta"], lineas: async () => structuredClone(lineas), espera: async () => {} });
-const nueva = (o: Partial<DatosActividad> = {}): DatosActividad => ({ oficinaId: "of-4", lineaNo: null, titulo: "Probar el adaptador", descripcion: "", inicio: "2027-07-01", fin: "2027-07-31", esHito: false, prioridad: "Media", campus: "Bucaramanga", asignados: [], ...o });
+const nueva = (o: Partial<DatosActividad> = {}): DatosActividad => ({ oficinaId: "of-4", lineaNo: null, titulo: "Probar el adaptador", descripcion: "", inicio: "2027-07-01", fin: "2027-07-31", esHito: false, prioridad: "Medio", campus: "Bucaramanga", asignados: [], ...o });
 
 describe("adaptador en memoria · oficinas por unidad, papel y herencia", () => {
   it("el administrador ve todas las oficinas y opera todo", async () => {
@@ -157,7 +157,7 @@ describe("filtros, agrupación y orden", () => {
   });
   it("agrupar por prioridad y por campus", async () => {
     const acts = await api("admin", "jefe").actividades(["of-4"]);
-    expect(agrupar(acts, "prioridad", { ...ctx, personas: [], campus: [], lineas: [] }).map((c) => c.id)).toEqual(["Crítica", "Alta", "Media", "Baja"]);
+    expect(agrupar(acts, "prioridad", { ...ctx, personas: [], campus: [], lineas: [] }).map((c) => c.id)).toEqual(["Crítico", "Alto", "Medio", "Bajo"]);
     const camp = agrupar(acts, "campus", { ...ctx, personas: [], campus: ["Bucaramanga"], lineas: [] });
     expect(camp.reduce((s, c) => s + c.acts.length, 0)).toBe(acts.length);
   });

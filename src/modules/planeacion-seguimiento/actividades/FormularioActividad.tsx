@@ -52,7 +52,7 @@ export function FormularioActividad({ id }: { id?: string }) {
 
 function valoresDe(a: NonNullable<ReturnType<typeof useActividad>["data"]>["actividad"] | null, lineaInicial: string | null, campusPorDefecto: string): Valores {
   if (a) return { titulo: a.titulo, descripcion: a.descripcion ?? "", linea: a.lineaNo ?? "propia", inicio: a.inicio ?? "", fin: a.fin ?? "", esHito: a.esHito, prioridad: a.prioridad, campus: a.campus, asignados: a.asignados };
-  return { titulo: "", descripcion: "", linea: lineaInicial ?? "", inicio: "", fin: "", esHito: false, prioridad: "Media", campus: campusPorDefecto, asignados: [] };
+  return { titulo: "", descripcion: "", linea: lineaInicial ?? "", inicio: "", fin: "", esHito: false, prioridad: "Medio", campus: campusPorDefecto, asignados: [] };
 }
 
 function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; oficinaId: string; inicial: Parameters<typeof valoresDe>[0]; lineaInicial: string | null }) {

@@ -9,10 +9,10 @@
 import { roleAt, roleSource, type UnitMember, type UnitRole } from "../../tableros/model";
 import type { Linea, PsNivel } from "../modelo";
 import { CAMPUS_TODOS, llano } from "../modelo";
-import type { PersonaRef, PsApiAct, ResultadoCargaAct } from "./contratoApi";
+import type { ConflictoCampus, PersonaRef, PsApiAct, ResultadoAccion, ResultadoCargaAct } from "./contratoApi";
 import type { Actividad, ActividadDetalle, AvisoPrevio, DatosActividad, EstadoAct, EventoActividad, LineaOficina, MiembroEquipo, OficinaVista, PapelOficina } from "./modelo";
 import { DEF_ESTADOS, cargaPorPersona } from "./modelo";
-import { avisoAsignacion, avisoTransferencia, poderEn, puedeAsignar, puedeCrear, puedeImportar, puedeMarcarChecklist, puedeMover, puedeTransferir, validarActividad, validarTransferencia } from "./reglas";
+import { avisoAsignacion, avisoTransferencia, requiereNotaDevolucion, poderEn, puedeAsignar, puedeCrear, puedeImportar, puedeMarcarChecklist, puedeMover, puedeTransferir, validarActividad, validarTransferencia } from "./reglas";
 import { HOY_DEMO, ID_YO, PERSONAS_DEMO, UNIDADES_DEMO, correoDemo, generarActividades, oficinaDeLinea, type PersonaSemilla } from "./semilla";
 
 export interface OpcionesActividadesMemoria {
@@ -58,14 +58,16 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
 
   const papelEn = (oficinaId: string): PapelOficina | null => roleAt(unidades, miembros, yoId, oficinaId);
   const poderOf = (oficinaId: string) => poderEn(op.nivel, papelEn(oficinaId));
-  const visibles = () => unidades.filter((u) => op.nivel === "admin" || papelEn(u.id) !== null);
+  // Contrato: lector y aprobador ven todas las oficinas (en lectura); gestor y colaborador, donde tienen pertenencia.
+  const visibles = () => unidades.filter((u) => op.nivel === "admin" || op.nivel === "lector" || op.nivel === "aprobador" || papelEn(u.id) !== null);
+  const campusDe = new Map(PERSONAS_DEMO.filter((x) => x.campus).map((x) => [x.id, x.campus!]));
 
   const equipoDe = (oficinaId: string, todas: readonly Actividad[]): MiembroEquipo[] => {
     // La carga es la que la persona tiene en ESTA oficina (lo que el gestor ve y reparte).
     const acts = todas.filter((a) => a.oficinaId === oficinaId);
     return miembros
       .filter((m) => m.unitId === oficinaId)
-      .map((m) => ({ id: m.profileId, nombre: m.name, correo: m.email, papel: m.role, asignable: m.role !== "visor", esYo: m.profileId === yoId, carga: cargaPorPersona(acts, m.profileId, hoy) }))
+      .map((m) => ({ id: m.profileId, nombre: m.name, correo: m.email, papel: m.role, asignable: m.role !== "visor", esYo: m.profileId === yoId, campus: campusDe.get(m.profileId) ?? null, carga: cargaPorPersona(acts, m.profileId, hoy) }))
       .sort((a, b) => Number(b.esYo) - Number(a.esYo) || ({ jefe: 0, editor: 1, visor: 2 }[a.papel] - { jefe: 0, editor: 1, visor: 2 }[b.papel]) || a.nombre.localeCompare(b.nombre, "es"));
   };
 
@@ -77,6 +79,12 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
   const exigir = (ok: boolean, mensaje: string) => {
     if (!ok) throw new Error(mensaje);
   };
+  /** Personas con campus propio y una actividad de otro campus (la «Todos» no choca con nadie). */
+  const conflictosDe = (act: { id?: string; campus: string }, ids: readonly string[]): ConflictoCampus[] =>
+    ids.flatMap((id) => {
+      const c = campusDe.get(id);
+      return c && act.campus !== CAMPUS_TODOS && c !== act.campus ? [{ personaId: id, nombre: nombreDe(id), campusPersona: c, campusActividad: act.campus, actividadId: act.id }] : [];
+    });
   const lineasDe = (lineas: readonly Linea[], oficinaId: string): LineaOficina[] =>
     lineas.filter((l) => oficinaDeLinea(l) === oficinaId).map((l) => ({ no: l.no, nombre: l.nombre, monto: l.monto, campus: l.campus, prioridad: l.prioridad, inicio: l.inicio, fin: l.fin, clasif: l.clasif }));
 
@@ -151,16 +159,19 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       exigir(Boolean(a) && visibles().some((u) => u.id === a!.oficinaId), "Esa actividad no existe o no puede verla.");
       return structuredClone({ actividad: a!, eventos: e.eventos.get(id) ?? [] });
     },
-    async guardarActividad(d) {
+    async guardarActividad(d, confirmarCampus = false) {
       const e = await cargar();
       await op.espera();
       exigir(puedeCrear(poderOf(d.oficinaId)) || (Boolean(d.id) && puedeCrear(poderOf(d.oficinaId))), "Solo el gestor de la oficina crea y edita actividades.");
       const errs = validarActividad(d, ctxValidar(d, e.lineas, e.acts));
       exigir(!errs.length, errs[0]?.mensaje ?? "");
+      const previa = d.id ? e.acts.find((x) => x.id === d.id) : undefined;
+      const conflictos = conflictosDe({ campus: d.campus }, d.asignados.filter((x) => !previa?.asignados.includes(x)));
+      if (conflictos.length && !confirmarCampus) return { id: null, avisara: [], conflictos };
       const { a, avisara } = await aplicar(d, e.acts, e.lineas);
-      return { id: a.id, avisara };
+      return { id: a.id, avisara, conflictos: [] };
     },
-    async moverActividad(id, destino: EstadoAct) {
+    async moverActividad(id, destino: EstadoAct, nota = "") {
       const e = await cargar();
       await op.espera();
       const a = e.acts.find((x) => x.id === id);
@@ -168,10 +179,12 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       const dec = puedeMover(poderOf(a!.oficinaId), a!, destino, yoId);
       if (!dec.ok) throw new Error(dec.motivo);
       const de = a!.estado;
+      const devuelve = requiereNotaDevolucion(de, destino);
+      if (devuelve) exigir(nota.trim().length >= 20, "Devolver una actividad pide una nota de al menos 20 caracteres.");
       a!.estado = destino;
-      await registrar(a!, { tipo: "estado", detalle: `Pasó de «${DEF_ESTADOS[de].nombre}» a «${DEF_ESTADOS[destino].nombre}».` });
+      await registrar(a!, { tipo: "estado", detalle: `${devuelve ? "La devolvió" : "Pasó"} de «${DEF_ESTADOS[de].nombre}» a «${DEF_ESTADOS[destino].nombre}».`, motivo: devuelve ? nota.trim() : null });
     },
-    async asignar(ids, personaId) {
+    async asignar(ids, personaId, confirmarCampus = false): Promise<ResultadoAccion> {
       const e = await cargar();
       await op.espera();
       const avisara: AvisoPrevio[] = [];
@@ -182,6 +195,8 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
         const equipo = equipoDe(a!.oficinaId, e.acts);
         exigir(equipo.some((m) => m.id === personaId && m.asignable), `${nombreDe(personaId)} no es miembro de la oficina de «${a!.titulo}»: un gestor solo asigna a su oficina.`);
       }
+      const conflictos = objetivo.flatMap((a) => (a!.asignados.includes(personaId) ? [] : conflictosDe(a!, [personaId])));
+      if (conflictos.length && !confirmarCampus) return { avisara: [], conflictos };
       for (const a of objetivo) {
         if (a!.asignados.includes(personaId)) continue;
         a!.asignados.push(personaId);
@@ -189,9 +204,9 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       }
       const eq = e.acts.length ? equipoDe(objetivo[0]!.oficinaId, e.acts) : [];
       avisara.push(...avisoAsignacion([personaId], eq, yoId));
-      return { avisara };
+      return { avisara, conflictos: [] };
     },
-    async transferir(id, de, a, motivo) {
+    async transferir(id, de, a, motivo, confirmarCampus = false): Promise<ResultadoAccion> {
       const e = await cargar();
       await op.espera();
       const act = e.acts.find((x) => x.id === id);
@@ -200,9 +215,11 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       const equipo = equipoDe(act!.oficinaId, e.acts);
       const errs = validarTransferencia({ de, a, motivo }, act!, equipo);
       exigir(!errs.length, errs[0]?.mensaje ?? "");
+      const conflictos = conflictosDe(act!, [a]);
+      if (conflictos.length && !confirmarCampus) return { avisara: [], conflictos };
       act!.asignados = act!.asignados.map((x) => (x === de ? a : x));
       await registrar(act!, { tipo: "transferida", detalle: `Se transfirió de ${nombreDe(de)} a ${nombreDe(a)}.`, de, a, motivo: motivo.trim() });
-      return { avisara: avisoTransferencia(de, a, equipo, yoId) };
+      return { avisara: avisoTransferencia(de, a, equipo, yoId), conflictos: [] };
     },
     async marcarChecklist(id, itemId, hecho) {
       const e = await cargar();
@@ -226,7 +243,7 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       a!.checklist.push({ id: `${a!.id}-c${Date.now()}`, texto: t, hecho: false });
       await registrar(a!, { tipo: "checklist", detalle: `Agregó «${t}».` });
     },
-    async cargarActividades(oficinaId, filas, nombreArchivo): Promise<ResultadoCargaAct> {
+    async cargarActividades(oficinaId, filas, nombreArchivo, confirmarCampus = false): Promise<ResultadoCargaAct> {
       const e = await cargar();
       await op.espera();
       exigir(puedeImportar(poderOf(oficinaId)), "Solo el gestor de la oficina importa su planificación.");
@@ -234,6 +251,7 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       filas.forEach((d, i) => {
         if (d.oficinaId !== oficinaId) errores.push({ fila: i + 1, campo: "oficina", mensaje: "La actividad es de otra oficina." });
         for (const er of validarActividad(d, ctxValidar(d, e.lineas, e.acts))) errores.push({ fila: i + 1, campo: er.campo, mensaje: er.mensaje });
+        if (!confirmarCampus) for (const c of conflictosDe(d, d.asignados)) errores.push({ fila: i + 1, campo: "responsable", campus: true, mensaje: `${c.nombre} trabaja en el campus ${c.campusPersona} y la actividad es de ${c.campusActividad}: confirme el campus para asignarla.` });
       });
       void nombreArchivo;
       if (errores.length) return { recibidas: filas.length, creadas: 0, errores, avisara: [] };

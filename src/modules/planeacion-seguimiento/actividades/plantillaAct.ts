@@ -59,11 +59,11 @@ function ejemplos(op: OpcionesPlantillaAct): DatosActividad[] {
   return [
     {
       oficinaId: op.oficina.id, lineaNo: op.lineas[0]?.no ?? null, titulo: "Ejemplo: levantar el inventario de lo existente", descripcion: "Ejemplo de una actividad con fechas y un responsable. Esta fila no se importa.",
-      inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alta", campus, asignados: asignable[0] ? [asignable[0].id] : [],
+      inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alto", campus, asignados: asignable[0] ? [asignable[0].id] : [],
     },
     {
       oficinaId: op.oficina.id, lineaNo: null, titulo: "Ejemplo: entrega del informe de cierre (hito)", descripcion: "Un hito lleva solo la fecha de fin y no tiene fecha de inicio. Esta fila no se importa.",
-      inicio: null, fin: "2027-06-30", esHito: true, prioridad: "Media", campus, asignados: [],
+      inicio: null, fin: "2027-06-30", esHito: true, prioridad: "Medio", campus, asignados: [],
     },
   ];
 }

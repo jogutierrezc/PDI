@@ -4,7 +4,7 @@ import { useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePs } from "./contexto";
-import { PaginaCompleta } from "./marco/PaginaCompleta";
+import { DESDE_MODULO, PaginaCompleta } from "./marco/PaginaCompleta";
 import { EstadoEvaluacion, InversionPorAnio, Nota, Prioridad } from "./partes";
 import { CRITERIOS, VIABILIDADES, fecha, millones1, pesos, pilarCodigo, pilarNombre, porcentaje, rotuloCampus, type Linea } from "./modelo";
 import { EmptyBlock } from "../../components/ui/QueryState";
@@ -66,7 +66,7 @@ export function DetalleLinea({ id }: { id: string }) {
     const s = new URLSearchParams(params);
     if (p === "resumen") s.delete("pestana");
     else s.set("pestana", p);
-    setParams(s, { replace: true });
+    setParams(s, { replace: true, state: DESDE_MODULO });
   };
   const alTeclear = (e: KeyboardEvent, i: number) => {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;

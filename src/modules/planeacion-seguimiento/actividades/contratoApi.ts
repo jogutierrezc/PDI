@@ -9,11 +9,28 @@ export interface PersonaRef {
   correo: string;
 }
 
+/** Una persona con campus propio y una actividad de otro campus: la base no asigna sin que quien asigna lo confirme. */
+export interface ConflictoCampus {
+  personaId: string;
+  nombre: string;
+  campusPersona: string | null;
+  campusActividad: string | null;
+  actividadId?: string;
+}
+
+/** Resultado de una acción que avisa por correo. Con `conflictos` NO se cambió nada: hay que confirmar el campus y repetirla. */
+export interface ResultadoAccion {
+  avisara: AvisoPrevio[];
+  conflictos: ConflictoCampus[];
+}
+
 export interface ErrorCargaAct {
   /** Posición (desde 1) dentro de lo enviado; nulo si es de toda la carga. */
   fila: number | null;
   campo: string;
   mensaje: string;
+  /** El error es una diferencia de campus que se puede confirmar. */
+  campus?: boolean;
 }
 
 export interface ResultadoCargaAct {
@@ -40,14 +57,15 @@ export interface PsApiAct {
   lineasDeOficina(oficinaId: string): Promise<LineaOficina[]>;
   actividades(oficinaIds: string[]): Promise<Actividad[]>;
   actividad(id: string): Promise<ActividadDetalle>;
-  /** Crea (sin `id`) o edita. Devuelve a quién se avisará por correo (lo envía el servidor). */
-  guardarActividad(d: DatosActividad): Promise<{ id: string; avisara: AvisoPrevio[] }>;
-  moverActividad(id: string, estado: EstadoAct): Promise<void>;
-  /** Agrega a una persona a varias actividades (asignación masiva). */
-  asignar(ids: string[], personaId: string): Promise<{ avisara: AvisoPrevio[] }>;
-  transferir(id: string, de: string, a: string, motivo: string): Promise<{ avisara: AvisoPrevio[] }>;
+  /** Crea (sin `id`) o edita. Devuelve a quién se avisará por correo (lo envía el servidor). `id` nulo + conflictos: hay que confirmar el campus. */
+  guardarActividad(d: DatosActividad, confirmarCampus?: boolean): Promise<ResultadoAccion & { id: string | null }>;
+  /** `nota` (≥ 20 caracteres) solo cuando se DEVUELVE una actividad de «En revisión» (contrato: ps_actividad_mover). */
+  moverActividad(id: string, estado: EstadoAct, nota?: string): Promise<void>;
+  /** Agrega a una persona a varias actividades (asignación masiva, todo o nada). */
+  asignar(ids: string[], personaId: string, confirmarCampus?: boolean): Promise<ResultadoAccion>;
+  transferir(id: string, de: string, a: string, motivo: string, confirmarCampus?: boolean): Promise<ResultadoAccion>;
   marcarChecklist(id: string, itemId: string, hecho: boolean): Promise<void>;
   agregarItemChecklist(id: string, texto: string): Promise<void>;
   /** Todo o nada: si una fila no pasa, no se crea ninguna. */
-  cargarActividades(oficinaId: string, filas: DatosActividad[], nombreArchivo: string): Promise<ResultadoCargaAct>;
+  cargarActividades(oficinaId: string, filas: DatosActividad[], nombreArchivo: string, confirmarCampus?: boolean): Promise<ResultadoCargaAct>;
 }

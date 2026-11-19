@@ -147,20 +147,33 @@ export function MenuMover({ actividad, poder, yo, onMover, onRechazo, etiqueta =
     setPos({ top: arriba ? r.top - 4 : r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)), arriba });
   }, [abierto]);
   useEffect(() => {
+    if (!abierto) setPos(null);
+  }, [abierto]);
+  useEffect(() => {
+    // El foco entra al menú en cuanto tiene su sitio (antes está oculto y no lo recibiría).
+    if (abierto && pos) menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus({ preventScroll: true });
+  }, [abierto, pos]);
+  useEffect(() => {
     if (!abierto) return;
-    const primero = menu.current?.querySelector<HTMLElement>("[role=menuitem]");
-    primero?.focus();
+    const y0 = window.scrollY;
+    const ancho0 = window.innerWidth;
+    const x0 = boton.current?.closest<HTMLElement>(".ps-cubos")?.scrollLeft ?? 0;
     const fuera = (e: PointerEvent) => {
       if (!menu.current?.contains(e.target as Node) && !boton.current?.contains(e.target as Node)) setAbierto(false);
     };
-    const mover = () => setAbierto(false);
+    // El menú es fijo: si la página se desplaza de verdad o cambia de ancho, se cierra (el sitio ya no valdría).
+    const alDesplazar = (e: Event) => {
+      if (menu.current?.contains(e.target as Node)) return;
+      if (Math.abs(window.scrollY - y0) > 60 || (e.target instanceof HTMLElement && e.target.classList.contains("ps-cubos") && Math.abs(e.target.scrollLeft - x0) > 40)) setAbierto(false);
+    };
+    const alAjustar = () => window.innerWidth !== ancho0 && setAbierto(false);
     document.addEventListener("pointerdown", fuera);
-    window.addEventListener("scroll", mover, true);
-    window.addEventListener("resize", mover);
+    window.addEventListener("scroll", alDesplazar, true);
+    window.addEventListener("resize", alAjustar);
     return () => {
       document.removeEventListener("pointerdown", fuera);
-      window.removeEventListener("scroll", mover, true);
-      window.removeEventListener("resize", mover);
+      window.removeEventListener("scroll", alDesplazar, true);
+      window.removeEventListener("resize", alAjustar);
     };
   }, [abierto]);
 

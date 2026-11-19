@@ -72,7 +72,7 @@ export function DetalleActividad({ id }: { id: string }) {
     const s = new URLSearchParams(params);
     if (p === "resumen") s.delete("pestana");
     else s.set("pestana", p);
-    setParams(s, { replace: true });
+    setParams(s, { replace: true, state: DESDE_MODULO });
   };
   const alTeclear = (e: KeyboardEvent, i: number) => {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;

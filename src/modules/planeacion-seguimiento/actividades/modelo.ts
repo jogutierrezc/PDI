@@ -28,7 +28,7 @@ export const DEF_ESTADOS: Record<EstadoAct, DefEstado> = {
   hecho: { id: "hecho", nombre: "Hecho", ayuda: "El gestor la dio por cumplida.", tono: "ok" },
 };
 
-export const PRIORIDADES_ACT = ["Crítica", "Alta", "Media", "Baja"] as const;
+export const PRIORIDADES_ACT = ["Crítico", "Alto", "Medio", "Bajo"] as const;
 export type PrioridadAct = (typeof PRIORIDADES_ACT)[number];
 export const rangoPrioridad = (p: string): number => Math.max(0, PRIORIDADES_ACT.findIndex((x) => x === p));
 
@@ -56,8 +56,11 @@ export interface OficinaVista {
 export interface MiembroEquipo {
   id: string;
   nombre: string;
+  /** Vacío si la base no se lo muestra a quien pregunta (solo gestor y administrador ven correos). */
   correo: string;
   papel: PapelOficina;
+  /** Campus del miembro (`unit_members.campus_id`); nulo = todos. */
+  campus: string | null;
   /** Se le pueden asignar actividades (los lectores no). */
   asignable: boolean;
   esYo: boolean;
@@ -140,7 +143,7 @@ export interface AvisoPrevio {
   personaId: string;
   nombre: string;
   correo: string;
-  motivo: "asignacion" | "transferencia_entra" | "transferencia_sale" | "copia_gestor";
+  motivo: "asignacion" | "transferencia_entra" | "transferencia_sale" | "copia_gestor" | "devolucion";
 }
 
 export interface LineaOficina {

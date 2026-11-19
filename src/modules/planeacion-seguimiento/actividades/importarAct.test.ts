@@ -24,14 +24,14 @@ function hojaDe(filas: Record<string, string>[]): HojaCruda[] {
   const cuerpo = filas.map((f) => COLUMNAS_ACT.map((c) => f[c.id] ?? ""));
   return [{ nombre: HOJA_ACTIVIDADES, oculta: false, filas: [["banda"], [""], [""], enc, ...cuerpo] }];
 }
-const fila = (o: Record<string, string> = {}): Record<string, string> => ({ linea: textoLineaLista(delaOficina[0]), titulo: "Levantar el inventario", inicio: "2027-02-01", fin: "2027-03-31", prioridad: "Alta", campus: "Cúcuta", "resp:1": equipo[1].correo, ...o });
+const fila = (o: Record<string, string> = {}): Record<string, string> => ({ linea: textoLineaLista(delaOficina[0]), titulo: "Levantar el inventario", inicio: "2027-02-01", fin: "2027-03-31", prioridad: "Alto", campus: "Cúcuta", "resp:1": equipo[1].correo, ...o });
 
 describe("importar actividades · reglas por fila", () => {
   it("una fila completa se lee sin problemas", () => {
     const r = analizarActividades(hojaDe([fila()]), op);
     expect(r.error).toBeNull();
     expect(problemasDeActividades(r)).toHaveLength(1); // solo el aviso de «sin _Control»
-    expect(actividadesListas(r)).toEqual([{ oficinaId: "of-4", lineaNo: delaOficina[0].no, titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alta", campus: "Cúcuta", asignados: [equipo[1].id] }]);
+    expect(actividadesListas(r)).toEqual([{ oficinaId: "of-4", lineaNo: delaOficina[0].no, titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alto", campus: "Cúcuta", asignados: [equipo[1].id] }]);
   });
   it("«Actividad propia de la oficina» no lleva línea", () => {
     expect(actividadesListas(analizarActividades(hojaDe([fila({ linea: ACT_PROPIA })]), op))[0].lineaNo).toBeNull();
@@ -100,7 +100,7 @@ describe("plantilla de actividades ↔ importador (ida y vuelta, con exceljs)", 
     const idx = (id: string) => COLUMNAS_ACT.findIndex((c) => c.id === id);
     expect(h[1].listas?.[idx("linea")]).toEqual({ rango: expect.stringContaining("Listas") });
     expect(h[1].listas?.[idx("resp:1")]).toEqual({ rango: expect.stringContaining("Listas") });
-    expect(h[1].listas?.[idx("prioridad")]).toEqual(["Crítica", "Alta", "Media", "Baja"]);
+    expect(h[1].listas?.[idx("prioridad")]).toEqual(["Crítico", "Alto", "Medio", "Bajo"]);
     expect(h[1].listas?.[idx("campus")]).toEqual(CAMPUS);
     // colores: amarillo obligatorio, azul claro opcional (tipos por columna) y gris en los dos ejemplos
     expect(h[1].tipos?.[idx("titulo")]).toBe("obligatoria");

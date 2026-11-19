@@ -31,14 +31,16 @@ export interface PersonaSemilla {
   nombre: string;
   oficina: string;
   papel: PapelOficina;
+  /** Campus propio (`unit_members.campus_id`); ausente = todos. */
+  campus?: string;
 }
-const p = (id: string, nombre: string, oficina: string, papel: PapelOficina): PersonaSemilla => ({ id, nombre, oficina, papel });
+const p = (id: string, nombre: string, oficina: string, papel: PapelOficina, campus?: string): PersonaSemilla => ({ id, nombre, oficina, papel, campus });
 /** Ficticias. Sin la persona de la sesión (u-yo), que se agrega según `?papel=`. */
 export const PERSONAS_DEMO: PersonaSemilla[] = [
   p("u-01", "Rosa Elena Pardo", "of-1", "jefe"), p("u-02", "Julián Camacho", "of-1", "editor"),
   p("u-03", "Marcela Duarte", "of-2", "jefe"), p("u-04", "Felipe Arenas", "of-2", "editor"), p("u-05", "Tatiana Gómez", "of-2", "editor"),
   p("u-06", "Héctor Mantilla", "of-3", "jefe"), p("u-07", "Sandra Ruiz", "of-3", "editor"), p("u-08", "Óscar Beltrán", "of-3", "editor"), p("u-09", "Paola Neira", "of-3", "visor"),
-  p("u-10", "Diana Cárdenas", "of-4", "jefe"), p("u-11", "Camilo Rojas", "of-4", "editor"), p("u-12", "Valentina Sarmiento", "of-4", "editor"), p("u-13", "Iván Quiroga", "of-4", "editor"), p("u-14", "Natalia Prada", "of-4", "visor"),
+  p("u-10", "Diana Cárdenas", "of-4", "jefe"), p("u-11", "Camilo Rojas", "of-4", "editor", "Valledupar"), p("u-12", "Valentina Sarmiento", "of-4", "editor"), p("u-13", "Iván Quiroga", "of-4", "editor", "Cúcuta"), p("u-14", "Natalia Prada", "of-4", "visor"),
   p("u-15", "Gustavo Peña", "of-5", "jefe"), p("u-16", "Liliana Franco", "of-5", "editor"), p("u-17", "Mauricio Ortiz", "of-5", "editor"),
   p("u-18", "Claudia Vargas", "of-6", "jefe"), p("u-19", "Ricardo Serrano", "of-6", "editor"), p("u-20", "Yesenia Cote", "of-6", "editor"),
 ];
@@ -147,13 +149,13 @@ export function generarActividades(lineas: readonly Linea[], personas: readonly 
       cursor = sumarDias(fin, -10 + Math.floor(r() * 12));
       if (cursor < base) cursor = base;
       const cam = l.campus === "Todos" ? pick(["Todos", ...campus]) : l.campus;
-      nuevo(of, l.no, pl.t(corto(l.nombre)), ini, fin, Boolean(pl.hito), pl.items, cam, i === 0 && l.prioridad === "Crítico" ? "Crítica" : PRIORIDADES_ACT[Math.min(3, Math.max(0, ["Crítico", "Alto", "Medio", "Largo plazo"].indexOf(l.prioridad)) + (r() < 0.3 ? 1 : 0))]);
+      nuevo(of, l.no, pl.t(corto(l.nombre)), ini, fin, Boolean(pl.hito), pl.items, cam, PRIORIDADES_ACT[Math.min(3, Math.max(0, ["Crítico", "Alto", "Medio", "Largo plazo"].indexOf(l.prioridad)) + (r() < 0.3 ? 1 : 0))]);
     });
   }
   for (const u of UNIDADES_DEMO.filter((x) => x.id !== "of-1")) {
     PROPIAS.forEach((pr, i) => {
       const ini = sumarDias(hoy, -40 + i * 30 + Math.floor(r() * 10));
-      nuevo(u.id, null, pr.t, ini, sumarDias(ini, 20 + Math.floor(r() * 30)), false, pr.items, campus[0], pick(["Media", "Baja", "Alta"] as const));
+      nuevo(u.id, null, pr.t, ini, sumarDias(ini, 20 + Math.floor(r() * 30)), false, pr.items, campus[0], pick(["Medio", "Bajo", "Alto"] as const));
     });
   }
   return { actividades, eventos };

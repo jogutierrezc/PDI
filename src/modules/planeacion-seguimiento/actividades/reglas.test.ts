@@ -6,7 +6,7 @@ import { MIN_MOTIVO, avisoAsignacion, avisoTransferencia, destinosPosibles, pode
 
 const YO = "u-yo";
 const act = (o: Partial<Actividad> = {}): Actividad => ({
-  id: "a-1", oficinaId: "of-4", lineaNo: "7", titulo: "Tarea", descripcion: null, estado: "en_curso", prioridad: "Media", inicio: "2027-03-01", fin: "2027-05-01", esHito: false, campus: "Bucaramanga",
+  id: "a-1", oficinaId: "of-4", lineaNo: "7", titulo: "Tarea", descripcion: null, estado: "en_curso", prioridad: "Medio", inicio: "2027-03-01", fin: "2027-05-01", esHito: false, campus: "Bucaramanga",
   asignados: [YO], checklist: [], creadaPor: "u-10", creadaEn: "2027-01-01T00:00:00Z", ...o,
 });
 
@@ -18,14 +18,14 @@ describe("poder efectivo = el menor entre ps_nivel y el papel en la oficina (uni
   const esperado: Record<string, Poder> = {
     // none: nada, sea cual sea el papel
     "none|null": "ninguno", "none|visor": "ninguno", "none|editor": "ninguno", "none|jefe": "ninguno",
-    // lector: techo lector
-    "lector|null": "ninguno", "lector|visor": "lector", "lector|editor": "lector", "lector|jefe": "lector",
+    // lector y aprobador ven todas las oficinas, en lectura (contrato de la base)
+    "lector|null": "lector", "lector|visor": "lector", "lector|editor": "lector", "lector|jefe": "lector",
     // colaborador: techo colaborador
     "colaborador|null": "ninguno", "colaborador|visor": "lector", "colaborador|editor": "colaborador", "colaborador|jefe": "colaborador",
     // gestor: lo decide el papel
     "gestor|null": "ninguno", "gestor|visor": "lector", "gestor|editor": "colaborador", "gestor|jefe": "gestor",
     // aprobador: solo mira (aprobar es de la fase 4)
-    "aprobador|null": "ninguno", "aprobador|visor": "lector", "aprobador|editor": "lector", "aprobador|jefe": "lector",
+    "aprobador|null": "lector", "aprobador|visor": "lector", "aprobador|editor": "lector", "aprobador|jefe": "lector",
     // admin: opera todo, sea miembro o no
     "admin|null": "gestor", "admin|visor": "gestor", "admin|editor": "gestor", "admin|jefe": "gestor",
   };
@@ -120,7 +120,7 @@ describe("plazos", () => {
 describe("validación de la actividad", () => {
   const equipo = [{ id: YO, asignable: true }, { id: "u-11", asignable: true }, { id: "u-14", asignable: false }];
   const ctx = { lineas: ["7", "8"], campus: ["Bucaramanga", "Cúcuta", "Todos"], equipo };
-  const ok = { oficinaId: "of-4", lineaNo: "7", titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alta" as const, campus: "Bucaramanga", asignados: [YO] };
+  const ok = { oficinaId: "of-4", lineaNo: "7", titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alto" as const, campus: "Bucaramanga", asignados: [YO] };
 
   it("una actividad completa no tiene errores", () => expect(validarActividad(ok, ctx)).toEqual([]));
   it("actividad propia (sin línea) también vale", () => expect(validarActividad({ ...ok, lineaNo: null }, ctx)).toEqual([]));
@@ -153,6 +153,12 @@ describe("validación de la actividad", () => {
   it("solo se asigna a miembros de la oficina que reciben actividades (un gestor solo asigna a su gente)", () => {
     expect(validarActividad({ ...ok, asignados: ["u-99"] }, ctx)[0]).toMatchObject({ campo: "act-asignados", paso: "quien" });
     expect(validarActividad({ ...ok, asignados: ["u-14"] }, ctx)[0].campo).toBe("act-asignados");
+  });
+  it("las fechas deben caer en la vigencia del plan", () => {
+    const v = { ...ctx, vigencia: { anioIni: 2027, anioFin: 2035 } };
+    expect(validarActividad(ok, v)).toEqual([]);
+    expect(validarActividad({ ...ok, fin: "2036-01-10" }, v)[0].mensaje).toMatch(/vigencia del plan \(2027 a 2035\)/);
+    expect(validarActividad({ ...ok, inicio: "2026-12-31" }, v)[0].campo).toBe("act-inicio");
   });
   it("avisos que no impiden crear", () => {
     const a = avisosActividad({ ...ok, fin: "2029-01-01" }, { inicio: "2027-01-01", fin: "2028-12-31" }, "2027-06-30");

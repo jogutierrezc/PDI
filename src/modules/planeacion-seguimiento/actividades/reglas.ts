@@ -43,6 +43,8 @@ export function techoDelPapel(papel: PapelOficina | null): Poder {
 /** Poder efectivo en una oficina: el menor de los dos techos; el administrador opera todo. */
 export function poderEn(nivel: PsNivel, papel: PapelOficina | null): Poder {
   if (nivel === "admin") return "gestor";
+  // Contrato de la base: lector y aprobador ven TODAS las oficinas, en lectura, sean o no miembros.
+  if ((nivel === "lector" || nivel === "aprobador") && papel === null) return "lector";
   return MIN(techoDelNivel(nivel), techoDelPapel(papel));
 }
 
@@ -90,6 +92,9 @@ export function puedeMover(poder: Poder, a: Pick<Actividad, "estado" | "asignado
   return { ok: true };
 }
 
+/** Devolver una actividad de «En revisión» a otro cubo exige una nota de al menos 20 caracteres (contrato: ps_actividad_mover). */
+export const requiereNotaDevolucion = (origen: EstadoAct, destino: EstadoAct): boolean => origen === "en_revision" && (destino === "por_iniciar" || destino === "en_curso" || destino === "en_riesgo");
+
 /** Todos los cubos con su decisión (los no permitidos se muestran con el motivo). */
 export const destinosPosibles = (poder: Poder, a: Pick<Actividad, "estado" | "asignados">, yo: string | null): { estado: EstadoAct; decision: Decision }[] =>
   ESTADOS.map((estado) => ({ estado, decision: puedeMover(poder, a, estado, yo) }));
@@ -108,12 +113,14 @@ export interface ContextoValidacion {
   /** Claves de las líneas del plan que la oficina tiene a su cargo. */
   lineas: readonly string[];
   campus: readonly string[];
+  /** Vigencia del plan (años): la base rechaza fechas fuera de 1 ene anioIni a 31 dic anioFin. */
+  vigencia?: { anioIni: number; anioFin: number };
   /** Personas a las que se puede asignar (miembros de la oficina). */
   equipo: readonly Pick<MiembroEquipo, "id" | "asignable">[];
 }
 
 export const MAX_TITULO = 200;
-export const MAX_DESCRIPCION = 1000;
+export const MAX_DESCRIPCION = 1000; // la base admite 4000; la pantalla es más estricta a propósito
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export const fechaValida = (s: string): boolean => ISO.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
 
@@ -132,6 +139,12 @@ export function validarActividad(d: DatosActividad, ctx: ContextoValidacion): Er
     if (!d.inicio) e.push({ campo: "act-inicio", paso: "cuando", mensaje: "Escriba la fecha de inicio." });
     else if (!fechaValida(d.inicio)) e.push({ campo: "act-inicio", paso: "cuando", mensaje: "La fecha de inicio no es válida. Use el selector de fecha." });
     else if (finOk && d.fin! < d.inicio) e.push({ campo: "act-fin", paso: "cuando", mensaje: "La fecha de fin no puede ser anterior a la de inicio." });
+  }
+  if (ctx.vigencia) {
+    const fuera = (f: string | null) => f !== null && fechaValida(f) && (Number(f.slice(0, 4)) < ctx.vigencia!.anioIni || Number(f.slice(0, 4)) > ctx.vigencia!.anioFin);
+    const m = `Las fechas deben caer dentro de la vigencia del plan (${ctx.vigencia.anioIni} a ${ctx.vigencia.anioFin}).`;
+    if (fuera(d.fin)) e.push({ campo: "act-fin", paso: "cuando", mensaje: m });
+    else if (!d.esHito && fuera(d.inicio)) e.push({ campo: "act-inicio", paso: "cuando", mensaje: m });
   }
   if (!PRIORIDADES_ACT.some((p) => p === d.prioridad)) e.push({ campo: "act-prioridad", paso: "cuando", mensaje: "Elija la prioridad." });
   if (!ctx.campus.includes(d.campus)) e.push({ campo: "act-campus", paso: "cuando", mensaje: "Elija el campus donde se hace." });
@@ -194,9 +207,15 @@ export function avisoTransferencia(de: string | null, a: string | null, equipo: 
   return out;
 }
 
+/** Quién recibe el aviso de devolución: las personas que tienen la actividad. */
+export function avisoDevolucion(asignados: readonly string[], equipo: readonly MiembroEquipo[], yo: string | null): AvisoPrevio[] {
+  return asignados.filter((id) => id !== yo).flatMap((id) => { const m = equipo.find((x) => x.id === id); return m ? [persona(m, "devolucion")] : []; });
+}
+
 export const ROTULO_AVISO: Record<AvisoPrevio["motivo"], string> = {
   asignacion: "Recibe la actividad",
   transferencia_entra: "Recibe la actividad",
   transferencia_sale: "Deja la actividad",
   copia_gestor: "Copia al gestor",
+  devolucion: "Se le devuelve la actividad",
 };

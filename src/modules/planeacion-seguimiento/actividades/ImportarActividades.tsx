@@ -81,7 +81,8 @@ export function ImportarActividades() {
   const [bajando, setBajando] = useState(false);
   const [errorBajada, setErrorBajada] = useState<string | null>(null);
   const [acepto, setAcepto] = useState(false);
-  const [erroresBD, setErroresBD] = useState<{ fila: number | null; campo: string; mensaje: string }[] | null>(null);
+  const [confirmaCampus, setConfirmaCampus] = useState(false);
+  const [erroresBD, setErroresBD] = useState<{ fila: number | null; campo: string; mensaje: string; campus?: boolean }[] | null>(null);
   const [hecho, setHecho] = useState<{ n: number; avisos: number } | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
   const migas = [{ texto: "Planeación y Seguimiento", a: ruta("planificacion") }, { texto: "Importar la planificación" }];
@@ -127,6 +128,7 @@ export function ImportarActividades() {
     if (!f) return;
     setLeyendo(true);
     setAcepto(false);
+    setConfirmaCampus(false);
     setErroresBD(null);
     setArchivo(f.name);
     setResultado(await importarActividadesArchivo(f, opciones));
@@ -167,7 +169,7 @@ export function ImportarActividades() {
       errorEnvio={cargar.error ? (cargar.error as Error).message : null}
       onEnviar={async () => {
         setErroresBD(null);
-        const res = await cargar.mutateAsync({ oficinaId: oficina.id, filas: listas, archivo });
+        const res = await cargar.mutateAsync({ oficinaId: oficina.id, filas: listas, archivo, confirmar: confirmaCampus });
         if (res.errores.length || res.creadas === 0) {
           setErroresBD(res.errores.length ? res.errores : [{ fila: null, campo: "carga", mensaje: "La base no creó ninguna actividad." }]);
           return;
@@ -283,7 +285,9 @@ export function ImportarActividades() {
                       {erroresBD.slice(0, 30).map(traer).map((e, i) => <li key={i}>{e.filaLibro ? `Fila ${e.filaLibro} del libro` : "De la carga"}{e.campo ? `, ${e.campo}` : ""}: {e.mensaje}</li>)}
                     </ul>
                     {erroresBD.length > 30 ? <p>y {erroresBD.length - 30} más.</p> : null}
-                    <p>Corrija esas celdas, guarde el archivo y elíjalo de nuevo en el paso 1.</p>
+                    {erroresBD.length > 0 && erroresBD.every((e) => e.campus) ? (
+                      <label className="ps-opcion ps-opcion--grande"><input type="checkbox" checked={confirmaCampus} onChange={(e) => setConfirmaCampus(e.target.checked)} /><span>Confirmo el campus de esas personas y quiero crear las actividades: vuelva a pulsar «Crear».</span></label>
+                    ) : <p>Corrija esas celdas, guarde el archivo y elíjalo de nuevo en el paso 1.</p>}
                   </div>
                 </div>
               ) : null}

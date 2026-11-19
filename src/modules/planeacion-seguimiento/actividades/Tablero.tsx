@@ -22,7 +22,7 @@ import { useAsignar, useEquipo, useMoverActividad } from "./hooks";
 import { ROTULO_PODER, type Actividad, type EstadoAct, type Poder } from "./modelo";
 import { asentarTarjeta, devolverTarjeta } from "./movimientoAct";
 import { Avatar, Banner, ChecklistMini, ChipEstado, ChipPlazo, GlifoEstado, MenuMover, MensajeRechazo, PilaAvatares, PrioridadAct } from "./partes";
-import { avisoAsignacion, puedeMover } from "./reglas";
+import { avisoAsignacion, puedeMover, requiereNotaDevolucion } from "./reglas";
 import { SinOficinas } from "./vacios";
 import { DEF_ESTADOS } from "./modelo";
 
@@ -166,6 +166,11 @@ export function Tablero() {
       if (!dec.ok) {
         devolverTarjeta(el);
         return setRechazo(dec.motivo);
+      }
+      if (requiereNotaDevolucion(act.estado, destino as EstadoAct)) {
+        // Devolver pide una nota: pantalla completa.
+        devolverTarjeta(el);
+        return ir(`${ruta("devolver", act.id)}?a=${destino}`);
       }
       // FASE 3: al soltar en «En revisión» (colaborador) o «Hecho» (gestor) se abrirá el reporte de avance a pantalla completa.
       el.style.transform = "";

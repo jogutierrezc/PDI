@@ -76,7 +76,7 @@ describe("adaptador en memoria · mover, crear, asignar, transferir", () => {
     const otro = equipo.find((m) => !m.esYo && m.asignable)!;
     const r = await g.guardarActividad(nueva({ asignados: [otro.id] }));
     expect(r.avisara.map((x) => x.personaId)).toEqual([otro.id]);
-    expect((await g.actividad(r.id)).actividad).toMatchObject({ estado: "por_iniciar", asignados: [otro.id], titulo: "Probar el adaptador" });
+    expect((await g.actividad(r.id!)).actividad).toMatchObject({ estado: "por_iniciar", asignados: [otro.id], titulo: "Probar el adaptador" });
     await expect(g.guardarActividad(nueva({ titulo: "x" }))).rejects.toThrow(/al menos 3 letras/);
     await expect(g.guardarActividad(nueva({ asignados: ["u-01"] }))).rejects.toThrow(/miembros de esta oficina/);
     await expect(api("gestor", "editor").guardarActividad(nueva())).rejects.toThrow(/Solo el gestor/);
@@ -84,7 +84,7 @@ describe("adaptador en memoria · mover, crear, asignar, transferir", () => {
   it("editar conserva el id y solo avisa a quien se suma", async () => {
     const g = api("gestor", "jefe");
     const otro = (await g.equipo("of-4")).find((m) => !m.esYo && m.asignable)!;
-    const { id } = await g.guardarActividad(nueva({ asignados: [otro.id] }));
+    const { id } = (await g.guardarActividad(nueva({ asignados: [otro.id] }))) as { id: string };
     const r = await g.guardarActividad(nueva({ id, titulo: "Nuevo título", asignados: [otro.id] }));
     expect(r.id).toBe(id);
     expect(r.avisara).toEqual([]);
@@ -104,14 +104,59 @@ describe("adaptador en memoria · mover, crear, asignar, transferir", () => {
     const g = api("gestor", "jefe");
     const equipo = await g.equipo("of-4");
     const [de, a] = equipo.filter((m) => m.asignable && !m.esYo);
-    const act = { ...nueva({ asignados: [de.id] }) };
-    const { id } = await g.guardarActividad(act);
+    const act = { ...nueva({ campus: "Todos", asignados: [de.id] }) };
+    const { id } = (await g.guardarActividad(act)) as { id: string };
+    
     await expect(g.transferir(id, de.id, a.id, "corto")).rejects.toThrow(/al menos 20 caracteres/);
     const r = await g.transferir(id, de.id, a.id, "El equipo de seguridad necesita más manos esta semana");
     expect(r.avisara.map((x) => x.motivo).sort()).toEqual(["transferencia_entra", "transferencia_sale"].sort());
     const d = await g.actividad(id);
     expect(d.actividad.asignados).toEqual([a.id]);
     expect(d.eventos.at(-1)).toMatchObject({ tipo: "transferida", de: de.id, a: a.id, motivo: "El equipo de seguridad necesita más manos esta semana" });
+  });
+  it("devolver de «En revisión» exige una nota de 20 caracteres (contrato: ps_actividad_mover)", async () => {
+    const g = api("gestor", "jefe");
+    const x = (await g.actividades(["of-4"])).find((v) => v.estado === "en_revision")!;
+    await expect(g.moverActividad(x.id, "en_curso")).rejects.toThrow(/nota de al menos 20/);
+    await g.moverActividad(x.id, "en_curso", "Falta anexar el acta firmada por la dirección");
+    const d = await g.actividad(x.id);
+    expect(d.actividad.estado).toBe("en_curso");
+    expect(d.eventos.at(-1)?.motivo).toMatch(/acta firmada/);
+    // pasar a «Hecho» desde «En revisión» no es devolver: no pide nota
+    const y = (await g.actividades(["of-4"])).find((v) => v.estado === "en_revision")!;
+    await g.moverActividad(y.id, "hecho");
+  });
+  it("campus: asignar a alguien de otro campus pide confirmación y no cambia nada hasta confirmar", async () => {
+    const g = api("gestor", "jefe");
+    const equipo = await g.equipo("of-4");
+    const ivan = equipo.find((m) => m.campus === "Cúcuta")!;
+    const bga = (await g.actividades(["of-4"])).find((v) => v.campus === "Bucaramanga" && !v.asignados.includes(ivan.id))!;
+    const r = await g.asignar([bga.id], ivan.id);
+    expect(r.conflictos).toEqual([{ personaId: ivan.id, nombre: ivan.nombre, campusPersona: "Cúcuta", campusActividad: "Bucaramanga", actividadId: bga.id }]);
+    expect((await g.actividad(bga.id)).actividad.asignados).not.toContain(ivan.id);
+    const ok = await g.asignar([bga.id], ivan.id, true);
+    expect(ok.conflictos).toEqual([]);
+    expect((await g.actividad(bga.id)).actividad.asignados).toContain(ivan.id);
+    // una actividad de «Todos los campus» no choca con nadie
+    const todos = nueva({ campus: "Todos", asignados: [ivan.id] });
+    expect((await g.guardarActividad(todos)).conflictos).toEqual([]);
+    const choca = await g.guardarActividad(nueva({ campus: "Valledupar", asignados: [ivan.id] }));
+    expect(choca.id).toBeNull();
+    expect(choca.conflictos).toHaveLength(1);
+  });
+  it("lector y aprobador ven todas las oficinas en lectura (contrato)", async () => {
+    for (const n of ["lector", "aprobador"] as const) {
+      const o = await api(n, "ninguno").oficinasVisibles();
+      expect(o).toHaveLength(6);
+      expect(o.every((x) => x.poder === "lector")).toBe(true);
+    }
+  });
+  it("editar solo suma responsables; quitar es de «Transferir»", async () => {
+    const g = api("gestor", "jefe");
+    const [a, b] = (await g.equipo("of-4")).filter((m) => m.asignable && !m.esYo && !m.campus);
+    const { id } = (await g.guardarActividad(nueva({ asignados: [a.id] }))) as { id: string };
+    await g.guardarActividad(nueva({ id, asignados: [b.id] }));
+    expect((await g.actividad(id)).actividad.asignados.sort()).toEqual([a.id, b.id].sort());
   });
   it("cargar actividades es todo o nada", async () => {
     const g = api("gestor", "jefe");

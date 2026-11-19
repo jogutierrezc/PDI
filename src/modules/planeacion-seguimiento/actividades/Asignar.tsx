@@ -10,7 +10,8 @@ import { DESDE_MODULO } from "../marco/PaginaCompleta";
 import { useAct, useActividades, useAsignar, useEquipo, useOficinaActual } from "./hooks";
 import { comparar } from "./filtros";
 import { ROTULO_PAPEL } from "./modelo";
-import { Banner, ChipEstado, ChipPlazo, SelectorOficina, VistaPreviaAvisos } from "./partes";
+import { Banner, ChipEstado, ChipPlazo, ConfirmarCampus, SelectorOficina, VistaPreviaAvisos } from "./partes";
+import type { ConflictoCampus } from "./contratoApi";
 import { avisoAsignacion, puedeAsignar } from "./reglas";
 import { SinOficinas } from "./vacios";
 
@@ -28,6 +29,7 @@ export function Asignar() {
   const [ver, setVer] = useState("");
   const [resultado, setResultado] = useState<string | null>(null);
   const [errorCampo, setErrorCampo] = useState<string | null>(null);
+  const [conflictos, setConflictos] = useState<ConflictoCampus[]>([]);
   const equipo = useMemo(() => equipoQ.data ?? [], [equipoQ.data]);
   const acts = useMemo(() => actsQ.data ?? [], [actsQ.data]);
   const sinResp = useMemo(() => acts.filter((x) => !x.asignados.length && x.estado !== "hecho").sort(comparar), [acts]);
@@ -42,13 +44,15 @@ export function Asignar() {
   const avisos = persona ? avisoAsignacion([persona], equipo, a.yo) : [];
   const deVer = ver ? acts.filter((x) => x.asignados.includes(ver) && x.estado !== "hecho").sort(comparar) : [];
 
-  const enviar = () => {
+  const enviar = (confirmar = false) => {
     setResultado(null);
     setErrorCampo(null);
     if (!sel.length) return setErrorCampo("Marque al menos una actividad.");
     if (!persona) return setErrorCampo("Elija a quién se las asigna.");
-    asignar.mutate({ ids: sel, personaId: persona }, {
+    asignar.mutate({ ids: sel, personaId: persona, confirmar }, {
       onSuccess: (r) => {
+        setConflictos(r.conflictos);
+        if (r.conflictos.length) return;
         setResultado(`Se asignaron ${sel.length} ${sel.length === 1 ? "actividad" : "actividades"} a ${a.nombreDe(persona)}.${r.avisara.length ? ` Se avisará a ${r.avisara.length} ${r.avisara.length === 1 ? "persona" : "personas"} por correo.` : ""}`);
         setSel([]);
       },
@@ -117,10 +121,11 @@ export function Asignar() {
                   {asignables.map((m) => <option key={m.id} value={m.id}>{m.nombre}{m.esYo ? " (usted)" : ""} · {m.carga.activas} activas</option>)}
                 </select>
               </div>
-              <button type="button" className="button-primary" onClick={enviar} disabled={asignar.isPending} aria-busy={asignar.isPending || undefined}>{asignar.isPending ? "Un momento…" : `Asignar${sel.length ? ` ${sel.length}` : ""}`}</button>
+              <button type="button" className="button-primary" onClick={() => enviar()} disabled={asignar.isPending} aria-busy={asignar.isPending || undefined}>{asignar.isPending ? "Un momento…" : `Asignar${sel.length ? ` ${sel.length}` : ""}`}</button>
             </div>
             {errorCampo ? <p className="ps-campo__error" role="alert"><Icon name="alert" size={14} /> {errorCampo}</p> : null}
             {asignar.error ? <Banner tipo="error" rol="alert">{(asignar.error as Error).message}</Banner> : null}
+            <ConfirmarCampus conflictos={conflictos} ocupado={asignar.isPending} onConfirmar={() => enviar(true)} />
             {persona ? <VistaPreviaAvisos avisos={avisos} que="la persona elegida es quien está asignando." /> : null}
           </>
         )}

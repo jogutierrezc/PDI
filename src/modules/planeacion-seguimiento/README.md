@@ -32,3 +32,9 @@ Asistente de pantalla completa. Uso (ver `CrearPlan.tsx`, el ejemplo corto, y `C
 
 ## Pruebas
 `npx vitest run src/modules/planeacion-seguimiento`: ida y vuelta plantilla ↔ importador con los 75 reales, casos de error, cálculos, capa en memoria, forma de los datos del contrato y el nivel/rol.
+
+## Fase 2 · actividades por oficina (carpeta `actividades/`)
+
+Oficina = unidad (`units`); papel = `unit_role` (jefe→gestor, editor→colaborador, visor→lector); poder efectivo = mínimo entre `ps_nivel` y el papel (`reglas.ts: poderEn`). Rutas dentro de `/admin/planeacion-seguimiento/`: `planificacion`, `tablero`, `lista`, `mis-tareas` (y `mis-tareas/<id>`, el enlace de los correos), `asignar`, `cronograma-act`, `actividad/<id>`, `actividad-nueva`, `actividad-editar/<id>`, `importar-actividades`, `transferir/<id>`, `devolver/<id>`, `avisos`.
+Capa de datos: `contratoApi.ts` (`PsApiAct`), `memoria.ts` + `semilla.ts` (demostración, semilla fija) y `supabaseAct.ts` (contrato `CONTRATO-BD-F2.md`). Demo dev: `/__ps-demo/tablero?papel=gestor|colaborador|lector|ninguno&nivel=…`.
+FASE 3 (avances en pantalla completa): los puntos están marcados con `FASE 3` en `partes.tsx` (menú «Mover a…»), `Tablero.tsx` (soltar) y `Devolver.tsx`.

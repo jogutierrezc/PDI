@@ -9,8 +9,9 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { DEF_ESTADOS, ESTADOS, PRIORIDADES_ACT, estadoPlazo, iniciales, progresoChecklist, rangoPrioridad, textoPlazo, type Actividad, type AvisoPrevio, type EstadoAct, type MiembroEquipo, type OficinaVista, type Poder } from "./modelo";
-import { ROTULO_AVISO, destinosPosibles } from "./reglas";
-import type { PersonaRef } from "./contratoApi";
+import { ROTULO_AVISO, destinosPosibles, requiereNotaDevolucion } from "./reglas";
+import type { ConflictoCampus, PersonaRef } from "./contratoApi";
+import { usePs } from "../contexto";
 
 /* ---------- Estado ---------- */
 
@@ -87,9 +88,26 @@ export function VistaPreviaAvisos({ avisos, que }: { avisos: AvisoPrevio[]; que:
       <p><Icon name="mail" size={14} /> <span><strong>Se avisará a {avisos.length} {avisos.length === 1 ? "persona" : "personas"}</strong> por correo. Lo envía el servidor, no esta pantalla.</span></p>
       <ul>
         {avisos.map((a) => (
-          <li key={`${a.personaId}-${a.motivo}`}><Avatar nombre={a.nombre} tam={22} /> <span><b>{a.nombre}</b> <em>{a.correo}</em></span> <small>{ROTULO_AVISO[a.motivo]}</small></li>
+          <li key={`${a.personaId}-${a.motivo}`}><Avatar nombre={a.nombre} tam={22} /> <span><b>{a.nombre}</b> {a.correo ? <em>{a.correo}</em> : null}</span> <small>{ROTULO_AVISO[a.motivo]}</small></li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** La base no asigna a alguien con otro campus sin que quien asigna lo confirme; nada cambió todavía. */
+export function ConfirmarCampus({ conflictos, onConfirmar, ocupado }: { conflictos: ConflictoCampus[]; onConfirmar: () => void; ocupado?: boolean }) {
+  if (!conflictos.length) return null;
+  return (
+    <div className="ps-aviso ps-aviso--info" role="alert">
+      <Icon name="info" size={16} />
+      <div>
+        <strong>Antes de seguir, confirme el campus.</strong> Aún no se ha cambiado nada.
+        <ul className="ps-lista-errores">
+          {conflictos.map((c, i) => <li key={`${c.personaId}-${i}`}>{c.nombre} trabaja en el campus {c.campusPersona ?? "—"} y la actividad es de {c.campusActividad ?? "todos los campus"}.</li>)}
+        </ul>
+        <button type="button" className="button-secondary" onClick={onConfirmar} disabled={ocupado} aria-busy={ocupado || undefined}>{ocupado ? "Un momento…" : "Confirmar el campus y continuar"}</button>
+      </div>
     </div>
   );
 }
@@ -136,6 +154,7 @@ export function MenuMover({ actividad, poder, yo, onMover, onRechazo, etiqueta =
   const boton = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLUListElement>(null);
   const id = useId();
+  const { ir, ruta } = usePs();
   const opciones = destinosPosibles(poder, actividad, yo);
 
   useLayoutEffect(() => {
@@ -216,6 +235,12 @@ export function MenuMover({ actividad, poder, yo, onMover, onRechazo, etiqueta =
                     if (!decision.ok) {
                       cerrar();
                       onRechazo(decision.motivo);
+                      return;
+                    }
+                    // Devolver de «En revisión» pide una nota (≥ 20 caracteres): es una pantalla completa.
+                    if (requiereNotaDevolucion(actividad.estado, estado)) {
+                      cerrar(false);
+                      ir(`${ruta("devolver", actividad.id)}?a=${estado}`);
                       return;
                     }
                     // FASE 3: al pasar a «En revisión» (colaborador) o a «Hecho» (gestor), aquí se abrirá el reporte de

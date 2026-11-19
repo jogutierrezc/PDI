@@ -26,8 +26,8 @@ import { leerUnidades } from "./unidadesPortal";
 import type { PsNivel } from "../modelo";
 import { CAMPUS_TODOS } from "../modelo";
 import type { ConflictoCampus, ErrorCargaAct, PersonaRef, PsApiAct, ResultadoAccion } from "./contratoApi";
-import type { Actividad, ActividadDetalle, AvisoPrevio, DatosActividad, EventoActividad, LineaOficina, MiembroEquipo, OficinaVista, PapelOficina, Poder } from "./modelo";
-import { avisoAsignacion, avisoTransferencia, avisoDevolucion } from "./reglas";
+import type { Actividad, ActividadDetalle, AvisoPrevio, DatosActividad, EventoActividad, LineaOficina, MiembroEquipo, OficinaVista, PapelOficina, Poder, TipoEvento } from "./modelo";
+import { avisoAsignacion, avisoTransferencia } from "./reglas";
 
 type Fila = Record<string, unknown>;
 const hoyLocal = (): string => {
@@ -167,14 +167,14 @@ export function crearActividadesSupabase(): PsApiAct {
       const base = actDe(d.actividad as Fila);
       const actividad: Actividad = { ...base, checklist: lista<Fila>(d.checklist).map((i) => ({ id: String(i.id), texto: String(i.texto), hecho: Boolean(i.hecho) })) };
       const eventos: EventoActividad[] = [
-        { id: `${id}-creada`, tipo: "creada", por: nombres.get(actividad.creadaPor)?.nombre ?? "Alguien", en: actividad.creadaEn, detalle: "Se creó la actividad." },
+        { id: `${id}-creada`, tipo: "creada" as const, por: nombres.get(actividad.creadaPor)?.nombre ?? "Alguien", en: actividad.creadaEn, detalle: "Se creó la actividad." },
         ...lista<Fila>(d.asignaciones).flatMap((a): EventoActividad[] => {
           const quien = String(a.nombre ?? "Persona sin nombre");
           const ev: EventoActividad[] = [{ id: `${a.id}-a`, tipo: "asignada", por: nombres.get(String(a.asignado_por))?.nombre ?? "Alguien", en: String(a.asignado_en), detalle: `Se asignó a ${quien}.`, a: String(a.perfil_id), motivo: texto(a.nota) }];
           if (a.quitado_en) ev.push({ id: `${a.id}-q`, tipo: "quitada", por: "Gestor de la oficina", en: String(a.quitado_en), detalle: `Dejó de tener asignada la actividad ${quien}.`, de: String(a.perfil_id), motivo: texto(a.motivo) });
           return ev;
         }),
-        ...lista<Fila>(d.comentarios).map((c): EventoActividad => ({ id: String(c.id), tipo: c.tipo === "transferencia" ? "transferida" : c.tipo === "cambio_estado" || c.tipo === "devolucion" ? "estado" : "editada", por: String(c.autor ?? "Alguien"), en: String(c.creado_en), detalle: c.tipo === "transferencia" ? "Transfirió la actividad." : c.tipo === "devolucion" ? "Devolvió la actividad." : c.tipo === "comentario" ? "Comentó." : String(c.texto), motivo: c.tipo === "comentario" || c.tipo === "transferencia" || c.tipo === "devolucion" ? texto(c.texto) : null })),
+        ...lista<Fila>(d.comentarios).map((c): EventoActividad => ({ id: String(c.id), tipo: (c.tipo === "transferencia" ? "transferida" : c.tipo === "cambio_estado" || c.tipo === "devolucion" ? "estado" : "editada") as TipoEvento, por: String(c.autor ?? "Alguien"), en: String(c.creado_en), detalle: c.tipo === "transferencia" ? "Transfirió la actividad." : c.tipo === "devolucion" ? "Devolvió la actividad." : c.tipo === "comentario" ? "Comentó." : String(c.texto), motivo: c.tipo === "comentario" || c.tipo === "transferencia" || c.tipo === "devolucion" ? texto(c.texto) : null })),
       ].sort((a, b) => a.en.localeCompare(b.en));
       return { actividad, eventos };
     },
@@ -238,4 +238,3 @@ export function crearActividadesSupabase(): PsApiAct {
   };
 }
 
-export { avisoDevolucion };

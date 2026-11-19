@@ -11,7 +11,8 @@ import { Campo } from "../marco/FormularioPasos";
 import { PaginaCompleta } from "../marco/PaginaCompleta";
 import { useAct, useActividad, useEquipo, useTransferir } from "./hooks";
 import { MIN_MOTIVO, avisoTransferencia, puedeTransferir, validarTransferencia } from "./reglas";
-import { Banner, ChipEstado, ChipPlazo, VistaPreviaAvisos } from "./partes";
+import { Banner, ChipEstado, ChipPlazo, ConfirmarCampus, VistaPreviaAvisos } from "./partes";
+import type { ConflictoCampus } from "./contratoApi";
 
 export function Transferir({ id }: { id: string }) {
   const { ruta, ir } = usePs();
@@ -26,6 +27,7 @@ export function Transferir({ id }: { id: string }) {
   const [motivo, setMotivo] = useState("");
   const [intento, setIntento] = useState(false);
   const [hecho, setHecho] = useState<string | null>(null);
+  const [conflictos, setConflictos] = useState<ConflictoCampus[]>([]);
   const regresar = ruta("actividad", id);
   const migas = [{ texto: "Planeación y Seguimiento", a: ruta("planificacion") }, { texto: "Actividad", a: regresar }, { texto: "Transferir" }];
   if (a.cargando || det.isPending || (act && equipoQ.isPending)) return <PaginaCompleta titulo="Transferir actividad" migas={migas} regresarA={regresar}><LoadingBlock rows={3} label="Cargando" /></PaginaCompleta>;
@@ -46,14 +48,14 @@ export function Transferir({ id }: { id: string }) {
       </PaginaCompleta>
     );
   }
-  const enviar = () => {
+  const enviar = (confirmar = false) => {
     setIntento(true);
     if (errs.length) {
       document.getElementById(errs[0].campo)?.focus();
       return;
     }
-    transferir.mutate({ id, de, a: para, motivo: motivo.trim() }, {
-      onSuccess: (r) => setHecho(`«${act.titulo}» pasó de ${a.nombreDe(de)} a ${a.nombreDe(para)}. Quedó en el historial con el motivo.${r.avisara.length ? ` Se avisará a ${r.avisara.length} ${r.avisara.length === 1 ? "persona" : "personas"} por correo.` : ""}`),
+    transferir.mutate({ id, de, a: para, motivo: motivo.trim(), confirmar }, {
+      onSuccess: (r) => r.conflictos.length ? setConflictos(r.conflictos) : setHecho(`«${act.titulo}» pasó de ${a.nombreDe(de)} a ${a.nombreDe(para)}. Quedó en el historial con el motivo.${r.avisara.length ? ` Se avisará a ${r.avisara.length} ${r.avisara.length === 1 ? "persona" : "personas"} por correo.` : ""}`),
     });
   };
   return (
@@ -63,7 +65,7 @@ export function Transferir({ id }: { id: string }) {
       migas={migas}
       regresarA={regresar}
       ancho="angosto"
-      pie={<><div className="ps-pie__izq"><span className="ps-guardado">Nada se envía hasta que confirme.</span></div><div className="ps-pie__der"><button type="button" className="button-primary" onClick={enviar} disabled={transferir.isPending} aria-busy={transferir.isPending || undefined}>{transferir.isPending ? "Un momento…" : "Transferir la actividad"}</button></div></>}
+      pie={<><div className="ps-pie__izq"><span className="ps-guardado">Nada se envía hasta que confirme.</span></div><div className="ps-pie__der"><button type="button" className="button-primary" onClick={() => enviar()} disabled={transferir.isPending} aria-busy={transferir.isPending || undefined}>{transferir.isPending ? "Un momento…" : "Transferir la actividad"}</button></div></>}
     >
       <div className="ps-bloques">
         <p className="ps-fila-act ps-fila-act--ficha"><ChipEstado estado={act.estado} /> <ChipPlazo a={act} hoy={a.hoy} /></p>
@@ -96,6 +98,7 @@ export function Transferir({ id }: { id: string }) {
           </Campo>
         </div>
         <VistaPreviaAvisos avisos={avisos} que="elija primero a las dos personas." />
+        <ConfirmarCampus conflictos={conflictos} ocupado={transferir.isPending} onConfirmar={() => enviar(true)} />
       </div>
     </PaginaCompleta>
   );

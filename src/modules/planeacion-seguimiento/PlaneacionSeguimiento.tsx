@@ -30,6 +30,7 @@ import { Lista } from "./actividades/Lista";
 import { MisTareas } from "./actividades/MisTareas";
 import { Planificacion } from "./actividades/Planificacion";
 import { Tablero } from "./actividades/Tablero";
+import { Devolver } from "./actividades/Devolver";
 import { Transferir } from "./actividades/Transferir";
 import { PsApiContext, crearApiSupabase, psKeys, usePsApi, type PsApi } from "./api";
 import { Calidad } from "./Calidad";
@@ -80,11 +81,12 @@ export const SECCIONES: Def[] = [
   { id: "actividad-editar", nombre: "Editar actividad", descripcion: "Cambiar los datos de una actividad" },
   { id: "importar-actividades", nombre: "Importar la planificación", descripcion: "Plantilla de Excel y creación de las actividades de la oficina" },
   { id: "transferir", nombre: "Transferir actividad", descripcion: "Pasar una actividad a otra persona, con motivo" },
+  { id: "devolver", nombre: "Devolver actividad", descripcion: "Devolver una actividad de «En revisión» con una nota" },
   { id: "avisos", nombre: "Cómo te avisamos", descripcion: "Qué correos llegan y con qué plazo", riel: true },
 ];
 
 /** Secciones que muestran el plan: sin plan o sin versión se reemplazan por el estado vacío guiado. */
-const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
+const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "devolver", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
 
 function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
   const { plan, cargando, error } = usePs();
@@ -99,7 +101,7 @@ function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
     case "planificacion": return <Planificacion />;
     case "tablero": return <Tablero />;
     case "lista": return <Lista />;
-    case "mis-tareas": return <MisTareas />;
+    case "mis-tareas": return id ? <DetalleActividad id={id} /> : <MisTareas />; // el enlace de los correos: /mis-tareas/<id de la actividad>
     case "asignar": return <Asignar />;
     case "cronograma-act": return <CronogramaAct />;
     case "actividad": return id ? <DetalleActividad id={id} /> : <Planificacion />;
@@ -107,6 +109,7 @@ function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
     case "actividad-editar": return id ? <FormularioActividad id={id} /> : <Planificacion />;
     case "importar-actividades": return <ImportarActividades />;
     case "transferir": return id ? <Transferir id={id} /> : <Tablero />;
+    case "devolver": return id ? <Devolver id={id} /> : <Tablero />;
     case "avisos": return <Avisos />;
     case "resumen": return <Resumen />;
     case "proyectos": return id ? <DetalleLinea id={id} /> : <Proyectos />;
@@ -130,7 +133,7 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
   const { plan, ruta, ir, nivel } = usePs();
   const seccion = seccionDe(seccionParam);
   const def = SECCIONES.find((s) => s.id === seccion)!;
-  const completa = !def.riel || (seccion === "proyectos" && Boolean(id));
+  const completa = !def.riel || ((seccion === "proyectos" || seccion === "mis-tareas") && Boolean(id));
   const ofi = useOficinaActual().oficina;
   const tituloDef = seccion === "planificacion" && ofi ? (ofi.papel !== null ? "Mi planificación" : `Planificación de ${ofi.nombre}`) : def.nombre;
   const riel = SECCIONES.filter((x) => x.riel && (x.id !== "asignar" || nivel === "gestor" || nivel === "admin"));

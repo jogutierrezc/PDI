@@ -114,17 +114,17 @@ function useInvalidar() {
 export function useGuardarActividad() {
   const api = usePsApi();
   const inv = useInvalidar();
-  return useMutation({ mutationFn: (d: DatosActividad) => api.guardarActividad(d), onSuccess: inv });
+  return useMutation({ mutationFn: (d: { datos: DatosActividad; confirmar?: boolean }) => api.guardarActividad(d.datos, d.confirmar), onSuccess: inv });
 }
 export function useAsignar() {
   const api = usePsApi();
   const inv = useInvalidar();
-  return useMutation({ mutationFn: (d: { ids: string[]; personaId: string }) => api.asignar(d.ids, d.personaId), onSuccess: inv });
+  return useMutation({ mutationFn: (d: { ids: string[]; personaId: string; confirmar?: boolean }) => api.asignar(d.ids, d.personaId, d.confirmar), onSuccess: inv });
 }
 export function useTransferir() {
   const api = usePsApi();
   const inv = useInvalidar();
-  return useMutation({ mutationFn: (d: { id: string; de: string; a: string; motivo: string }) => api.transferir(d.id, d.de, d.a, d.motivo), onSuccess: inv });
+  return useMutation({ mutationFn: (d: { id: string; de: string; a: string; motivo: string; confirmar?: boolean }) => api.transferir(d.id, d.de, d.a, d.motivo, d.confirmar), onSuccess: inv });
 }
 export function useMarcarChecklist() {
   const api = usePsApi();
@@ -139,7 +139,7 @@ export function useAgregarItem() {
 export function useCargarActividades() {
   const api = usePsApi();
   const inv = useInvalidar();
-  return useMutation({ mutationFn: (d: { oficinaId: string; filas: DatosActividad[]; archivo: string }) => api.cargarActividades(d.oficinaId, d.filas, d.archivo), onSuccess: inv });
+  return useMutation({ mutationFn: (d: { oficinaId: string; filas: DatosActividad[]; archivo: string; confirmar?: boolean }) => api.cargarActividades(d.oficinaId, d.filas, d.archivo, d.confirmar), onSuccess: inv });
 }
 
 /** Mover de cubo con actualización inmediata en pantalla; si la base lo rechaza, vuelve a como estaba. */
@@ -147,7 +147,7 @@ export function useMoverActividad() {
   const api = usePsApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (d: { id: string; estado: EstadoAct }) => api.moverActividad(d.id, d.estado),
+    mutationFn: (d: { id: string; estado: EstadoAct; nota?: string }) => api.moverActividad(d.id, d.estado, d.nota),
     onMutate: async (d) => {
       await qc.cancelQueries({ queryKey: ["ps", "act", "lista"] });
       const previos = qc.getQueriesData<Actividad[]>({ queryKey: ["ps", "act", "lista"] });

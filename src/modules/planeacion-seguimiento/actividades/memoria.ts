@@ -92,7 +92,8 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
     const equipo = equipoDe(d.oficinaId, acts);
     const previa = d.id ? acts.find((x) => x.id === d.id) : undefined;
     const nuevosIds = d.asignados.filter((id) => !previa?.asignados.includes(id));
-    const base = { oficinaId: d.oficinaId, lineaNo: d.lineaNo, titulo: d.titulo.trim(), descripcion: d.descripcion.trim() || null, prioridad: d.prioridad, inicio: d.esHito ? null : d.inicio, fin: d.fin, esHito: d.esHito, campus: d.campus, asignados: [...new Set(d.asignados)] };
+    // Editar solo suma responsables (contrato: quitar a alguien pide motivo y se hace con «Transferir»).
+    const base = { oficinaId: d.oficinaId, lineaNo: d.lineaNo, titulo: d.titulo.trim(), descripcion: d.descripcion.trim() || null, prioridad: d.prioridad, inicio: d.esHito ? null : d.inicio, fin: d.fin, esHito: d.esHito, campus: d.campus, asignados: [...new Set([...(previa?.asignados ?? []), ...d.asignados])] };
     let a: Actividad;
     if (previa) {
       Object.assign(previa, base);

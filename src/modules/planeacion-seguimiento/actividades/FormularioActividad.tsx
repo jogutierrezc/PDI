@@ -16,7 +16,8 @@ import { DESDE_MODULO, PaginaCompleta } from "../marco/PaginaCompleta";
 import { CAMPUS_TODOS, fecha, rotuloCampus } from "../modelo";
 import { useAct, useActividad, useEquipo, useGuardarActividad, useLineasOficina } from "./hooks";
 import { PRIORIDADES_ACT, type DatosActividad, type PrioridadAct } from "./modelo";
-import { Banner, VistaPreviaAvisos } from "./partes";
+import { Banner, ConfirmarCampus, VistaPreviaAvisos } from "./partes";
+import type { ConflictoCampus } from "./contratoApi";
 import { MAX_DESCRIPCION, MAX_TITULO, avisoAsignacion, avisosActividad, puedeCrear, validarActividad } from "./reglas";
 import { SinOficinas } from "./vacios";
 
@@ -68,6 +69,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
   const [paso, setPaso] = useState<string>("que");
   const [tocados, setTocados] = useState<Record<string, boolean>>({});
   const [hecho, setHecho] = useState<{ id: string; n: number } | null>(null);
+  const [conflictos, setConflictos] = useState<ConflictoCampus[]>([]);
   const { guardado, descartar } = useBorradorLocal<Valores>(id ? `actividad-${id}` : `actividad-nueva-${oficinaId}`, v, setV);
   const migas = [{ texto: "Planeación y Seguimiento", a: ruta("planificacion") }, { texto: id ? "Editar actividad" : "Crear actividad" }];
   const titulo = id ? "Editar actividad" : "Crear actividad";
@@ -123,7 +125,8 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
       errorEnvio={guardar.error ? (guardar.error as Error).message : null}
       guardado={guardado}
       onEnviar={async () => {
-        const r = await guardar.mutateAsync({ ...datos, titulo: v.titulo.trim() });
+        const r = await guardar.mutateAsync({ datos: { ...datos, titulo: v.titulo.trim() } });
+        if (r.conflictos.length || !r.id) return setConflictos(r.conflictos);
         descartar();
         setHecho({ id: r.id, n: r.avisara.length });
       }}
@@ -204,7 +207,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
                     return (
                       <li key={m.id}>
                         <label className="ps-opcion ps-persona">
-                          <input type="checkbox" checked={marcado} onChange={(e) => poner("asignados", e.target.checked ? [...v.asignados, m.id] : v.asignados.filter((x) => x !== m.id))} />
+                          <input type="checkbox" checked={marcado} disabled={Boolean(id) && previa.includes(m.id)} onChange={(e) => poner("asignados", e.target.checked ? [...v.asignados, m.id] : v.asignados.filter((x) => x !== m.id))} />
                           <span className="ps-persona__n"><strong>{m.nombre}{m.esYo ? " (usted)" : ""}</strong><em>{m.correo}</em></span>
                           <span className="ps-persona__carga" data-alta={pesada || undefined}>{m.carga.activas} {m.carga.activas === 1 ? "activa" : "activas"}{m.carga.vencidas ? ` · ${m.carga.vencidas} vencida${m.carga.vencidas === 1 ? "" : "s"}` : ""}</span>
                         </label>
@@ -212,6 +215,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
                     );
                   })}
                 </ul>
+                {id ? <p className="ps-nota">Para quitar o cambiar a quien ya la tiene, use «Transferir» en la actividad: pide un motivo y queda en el historial.</p> : null}
                 {equipo.some((m) => !m.asignable) ? <p className="ps-nota">{equipo.filter((m) => !m.asignable).map((m) => m.nombre).join(", ")}: lector{equipo.filter((m) => !m.asignable).length === 1 ? "" : "es"} de la oficina; no recibe{equipo.filter((m) => !m.asignable).length === 1 ? "" : "n"} actividades.</p> : null}
                 {equipo.filter((m) => m.asignable).length === 0 && !equipoQ.isPending ? <p className="ps-nota">La oficina no tiene colaboradores todavía. Pida al administrador que los agregue en Usuarios; mientras, la actividad queda sin responsable.</p> : null}
               </fieldset>
@@ -238,6 +242,12 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
               </dl>
               {adv.map((t) => <Banner key={t}>{t}</Banner>)}
               <VistaPreviaAvisos avisos={avisos} que="no hay personas nuevas asignadas." />
+              <ConfirmarCampus conflictos={conflictos} ocupado={guardar.isPending} onConfirmar={async () => {
+                const r = await guardar.mutateAsync({ datos: { ...datos, titulo: v.titulo.trim() }, confirmar: true });
+                if (!r.id) return setConflictos(r.conflictos);
+                descartar();
+                setHecho({ id: r.id, n: r.avisara.length });
+              }} />
               <p className="ps-nota">¿Prefiere cargar muchas a la vez? <Link to={`${ruta("importar-actividades")}?oficina=${encodeURIComponent(oficinaId)}`} state={DESDE_MODULO}>Importar desde Excel</Link>.</p>
             </>
           ),

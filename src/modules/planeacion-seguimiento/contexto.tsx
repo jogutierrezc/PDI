@@ -13,7 +13,7 @@ import type { Linea, PlanVista, PsNivel } from "./modelo";
 import { DESDE_MODULO } from "./marco/PaginaCompleta";
 
 export type Seccion = "resumen" | "proyectos" | "cronograma" | "calidad" | "versiones" | "roles" | "cargar" | "crear" | "publicar" | "comparar"
-  | "planificacion" | "tablero" | "lista" | "cronograma-act" | "mis-tareas" | "asignar" | "actividad" | "actividad-nueva" | "actividad-editar" | "importar-actividades" | "transferir" | "avisos";
+  | "planificacion" | "tablero" | "lista" | "cronograma-act" | "mis-tareas" | "asignar" | "actividad" | "actividad-nueva" | "actividad-editar" | "importar-actividades" | "transferir" | "devolver" | "avisos";
 
 export interface Ctx {
   nivel: PsNivel;

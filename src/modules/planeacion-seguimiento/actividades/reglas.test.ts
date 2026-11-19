@@ -195,7 +195,7 @@ describe("transferencia", () => {
 });
 
 describe("a quién se avisa", () => {
-  const m = (id: string, papel: PapelOficina, esYo = false): MiembroEquipo => ({ id, nombre: id, correo: `${id}@x.test`, papel, asignable: papel !== "visor", esYo, carga: { activas: 0, vencidas: 0, enRiesgo: 0, total: 0 } });
+  const m = (id: string, papel: PapelOficina, esYo = false): MiembroEquipo => ({ id, nombre: id, correo: `${id}@x.test`, papel, asignable: papel !== "visor", campus: null, esYo, carga: { activas: 0, vencidas: 0, enRiesgo: 0, total: 0 } });
   const equipo = [m("g1", "jefe"), m(YO, "jefe", true), m("c1", "editor"), m("c2", "editor")];
   it("asignar: a quien recibe, no a quien asigna", () => {
     expect(avisoAsignacion(["c1", YO], equipo, YO).map((a) => a.personaId)).toEqual(["c1"]);

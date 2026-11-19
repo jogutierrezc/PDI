@@ -19,6 +19,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
 import { EmptyBlock, LoadingBlock } from "../../components/ui/QueryState";
 import { Icon } from "../../components/ui/Icon";
+import { Asignar } from "./actividades/Asignar";
+import { Avisos } from "./actividades/Avisos";
+import { CronogramaAct } from "./actividades/CronogramaAct";
+import { DetalleActividad } from "./actividades/DetalleActividad";
+import { FormularioActividad } from "./actividades/FormularioActividad";
+import { useOficinaActual } from "./actividades/hooks";
+import { ImportarActividades } from "./actividades/ImportarActividades";
+import { Lista } from "./actividades/Lista";
+import { MisTareas } from "./actividades/MisTareas";
+import { Planificacion } from "./actividades/Planificacion";
+import { Tablero } from "./actividades/Tablero";
+import { Transferir } from "./actividades/Transferir";
 import { PsApiContext, crearApiSupabase, psKeys, usePsApi, type PsApi } from "./api";
 import { Calidad } from "./Calidad";
 import { Cargar } from "./Cargar";
@@ -34,6 +46,7 @@ import { Vacio } from "./Vacio";
 import { Comparar, PublicarVersion, Versiones } from "./Versiones";
 import { puedeAdministrar, type PsNivel } from "./modelo";
 import "./planeacion-seguimiento.css";
+import "./actividades/actividades.css";
 
 export const BASE = "/admin/planeacion-seguimiento";
 
@@ -46,6 +59,12 @@ interface Def {
 }
 
 export const SECCIONES: Def[] = [
+  { id: "planificacion", nombre: "Mi planificación", descripcion: "Las actividades de su oficina y las líneas del plan a su cargo; crear una actividad o importarlas desde Excel", riel: true },
+  { id: "tablero", nombre: "Tablero", descripcion: "Las actividades en cubos (por iniciar, en curso, en riesgo, en revisión, hecho); arrastre o use «Mover a…»", riel: true },
+  { id: "lista", nombre: "Lista", descripcion: "Las actividades en una lista que se ordena por cualquier columna", riel: true },
+  { id: "mis-tareas", nombre: "Mis tareas", descripcion: "Lo que usted tiene asignado: vencidas, próximas, más adelante y hechas", riel: true },
+  { id: "asignar", nombre: "Asignar", descripcion: "El equipo con su carga, las actividades sin responsable y la asignación masiva", riel: true },
+  { id: "cronograma-act", nombre: "Cronograma de actividades", descripcion: "Las actividades en el tiempo, por persona o por oficina", riel: true },
   { id: "resumen", nombre: "Resumen", descripcion: "Inversión, prioridad, pilar, campus y fuente de las líneas del plan, con filtros que se conservan", riel: true },
   { id: "proyectos", nombre: "Proyectos", descripcion: "Las líneas del plan con búsqueda, filtros y orden; cada una se abre a pantalla completa", riel: true },
   { id: "cronograma", nombre: "Cronograma", descripcion: "Las líneas del plan entre sus años de inicio y fin", riel: true },
@@ -56,10 +75,16 @@ export const SECCIONES: Def[] = [
   { id: "crear", nombre: "Crear plan", descripcion: "Nombre y años del plan" },
   { id: "publicar", nombre: "Publicar versión", descripcion: "Confirmar la publicación" },
   { id: "comparar", nombre: "Comparar versiones", descripcion: "Qué cambió entre dos versiones" },
+  { id: "actividad", nombre: "Actividad", descripcion: "El detalle de una actividad" },
+  { id: "actividad-nueva", nombre: "Crear actividad", descripcion: "Qué se va a hacer, cuándo, quién y revisar" },
+  { id: "actividad-editar", nombre: "Editar actividad", descripcion: "Cambiar los datos de una actividad" },
+  { id: "importar-actividades", nombre: "Importar la planificación", descripcion: "Plantilla de Excel y creación de las actividades de la oficina" },
+  { id: "transferir", nombre: "Transferir actividad", descripcion: "Pasar una actividad a otra persona, con motivo" },
+  { id: "avisos", nombre: "Cómo te avisamos", descripcion: "Qué correos llegan y con qué plazo", riel: true },
 ];
 
 /** Secciones que muestran el plan: sin plan o sin versión se reemplazan por el estado vacío guiado. */
-const NECESITAN_PLAN: Seccion[] = ["resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
+const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
 
 function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
   const { plan, cargando, error } = usePs();
@@ -71,6 +96,18 @@ function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
     if (!plan.version) return <Vacio sinVersion />;
   }
   switch (seccion) {
+    case "planificacion": return <Planificacion />;
+    case "tablero": return <Tablero />;
+    case "lista": return <Lista />;
+    case "mis-tareas": return <MisTareas />;
+    case "asignar": return <Asignar />;
+    case "cronograma-act": return <CronogramaAct />;
+    case "actividad": return id ? <DetalleActividad id={id} /> : <Planificacion />;
+    case "actividad-nueva": return <FormularioActividad />;
+    case "actividad-editar": return id ? <FormularioActividad id={id} /> : <Planificacion />;
+    case "importar-actividades": return <ImportarActividades />;
+    case "transferir": return id ? <Transferir id={id} /> : <Tablero />;
+    case "avisos": return <Avisos />;
     case "resumen": return <Resumen />;
     case "proyectos": return id ? <DetalleLinea id={id} /> : <Proyectos />;
     case "cronograma": return <Cronograma />;
@@ -94,6 +131,9 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
   const seccion = seccionDe(seccionParam);
   const def = SECCIONES.find((s) => s.id === seccion)!;
   const completa = !def.riel || (seccion === "proyectos" && Boolean(id));
+  const ofi = useOficinaActual().oficina;
+  const tituloDef = seccion === "planificacion" && ofi ? (ofi.papel !== null ? "Mi planificación" : `Planificación de ${ofi.nombre}`) : def.nombre;
+  const riel = SECCIONES.filter((x) => x.riel && (x.id !== "asignar" || nivel === "gestor" || nivel === "admin"));
   const rotuloPlan = plan ? `${plan.nombre}${plan.version ? ` · ${plan.version.etiqueta}${plan.version.estado === "borrador" ? " (borrador)" : ""}` : ""}` : "Sin plan cargado";
   const cuerpo = <Cuerpo seccion={seccion} id={id} />;
 
@@ -102,7 +142,7 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
       <div className="ps-demo">
         <header className="ps-demo__cab">
           <strong>Planeación y Seguimiento</strong> <span>{rotuloPlan} · modo demostración (solo desarrollo)</span>
-          <nav aria-label="Secciones">{SECCIONES.filter((s) => s.riel).map((s) => <button key={s.id} type="button" aria-current={seccion === s.id && !id ? "page" : undefined} onClick={() => ir(ruta(s.id))}>{s.nombre}</button>)}</nav>
+          <nav aria-label="Secciones">{riel.map((s) => <button key={s.id} type="button" aria-current={seccion === s.id && !id ? "page" : undefined} onClick={() => ir(ruta(s.id))}>{s.nombre}</button>)}</nav>
         </header>
         <main className="ps-main"><div className="ps">{cuerpo}</div></main>
       </div>
@@ -115,12 +155,12 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
     <AdminShell
       section="planeacion_seguimiento"
       kicker="Planeación y Seguimiento"
-      title={completa ? "Planeación y Seguimiento" : def.nombre}
+      title={completa ? "Planeación y Seguimiento" : tituloDef}
       description={completa ? rotuloPlan : `${rotuloPlan} · ${def.descripcion}`}
       actions={acciones}
       rail={!completa ? (
         <AdminRail label="Secciones de Planeación y Seguimiento">
-          {SECCIONES.filter((s) => s.riel).map((s) => <AdminRailTab key={s.id} current={seccion === s.id} onSelect={() => ir(ruta(s.id))}>{s.nombre}</AdminRailTab>)}
+          {riel.map((s) => <AdminRailTab key={s.id} current={seccion === s.id} onSelect={() => ir(ruta(s.id))}>{s.nombre}</AdminRailTab>)}
         </AdminRail>
       ) : undefined}
     >

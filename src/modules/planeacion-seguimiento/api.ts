@@ -12,6 +12,10 @@
 import { createContext, useContext } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
+import type { PsApiAct } from "./actividades/contratoApi";
+import { crearActividadesMemoria } from "./actividades/memoria";
+import { crearActividadesSupabase } from "./actividades/supabaseAct";
+import type { PapelOficina } from "./actividades/modelo";
 import { CAMPUS, CAMPUS_TODOS, PRIORIDADES, type CargaPlanificacion, type ClaveCriterio, type ClaveViabilidad, type Linea, type Oficina, type PlanVista, type PsNivel, type VersionResumen, aniosDe, llano } from "./modelo";
 
 export interface ErrorCarga {
@@ -29,7 +33,7 @@ export interface ResultadoCarga {
   errores: ErrorCarga[];
 }
 
-export interface PsApi {
+export interface PsApi extends PsApiAct {
   nivel(): Promise<PsNivel>;
   /** Nombres de los campus del portal (sin «Todos»). */
   campus(): Promise<string[]>;
@@ -110,6 +114,10 @@ export interface OpcionesMemoria {
   latencia?: number;
   campus?: string[];
   oficinas?: string[];
+  /** Fase 2: papel de la persona de la demostración en su oficina (TI). «ninguno»: no es miembro de ninguna. */
+  papel?: PapelOficina | "ninguno";
+  /** Fase 2: «hoy» de la demostración (AAAA-MM-DD). */
+  hoy?: string;
 }
 
 export const OFICINAS_DEMO = ["Vicerrectoría Administrativa y Financiera", "Planeación Institucional", "Infraestructura y Planta Física", "Tecnología e Infraestructura TI", "Compras y Contratación", "Bienestar Universitario"];
@@ -151,7 +159,13 @@ export function crearApiMemoria(op: OpcionesMemoria = {}): PsApi {
     return { ...plan, version: v ? { ...v.meta } : null };
   };
 
+  const act = crearActividadesMemoria({
+    nivel: op.nivel ?? "admin", papel: op.papel ?? "jefe", hoy: op.hoy, campus, espera,
+    lineas: async () => { await iniciar(); const v = versiones.find((x) => x.meta.vigente) ?? versiones.find((x) => x.meta.estado === "borrador"); return structuredClone(v?.lineas ?? []); },
+  });
+
   return {
+    ...act,
     async nivel() { await espera(); return op.nivel ?? "admin"; },
     async campus() { await espera(); return campus; },
     async oficinas() { await espera(); return oficinas; },
@@ -267,6 +281,7 @@ export function crearApiSupabase(): PsApi {
     return ((r.data ?? []) as { id: string; name: string }[]).map((u) => ({ id: u.id, nombre: u.name }));
   };
   return {
+    ...crearActividadesSupabase(),
     async nivel() {
       const r = await supabase.rpc("ps_nivel_actual");
       if (r.error) throw errorDe(r.error);

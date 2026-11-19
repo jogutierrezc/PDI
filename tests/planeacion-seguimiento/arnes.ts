@@ -17,7 +17,7 @@ const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS = join(ROOT, "supabase/migrations");
 
 /** Migraciones de las que depende 0286: si fallan, la prueba no vale. */
-const NECESARIAS = ["0001", "0002", "0017", "0024", "0057", "0063", "0078", "0286"];
+const NECESARIAS = ["0001", "0002", "0017", "0024", "0057", "0063", "0078", "0286", "0287"];
 
 export async function createTestDb(): Promise<TestDb & { omitidas: string[] }> {
   const omitidas: string[] = [];

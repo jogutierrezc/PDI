@@ -267,12 +267,24 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     },
   },
   "planeacion-seguimiento": {
-    text: "Planes institucionales como el PDIFyT 2027-2035: las líneas, su cronograma y sus versiones",
+    text: "Planes institucionales como el PDIFyT 2027-2035: las líneas, su cronograma y sus versiones, y la planificación de cada oficina",
     color: "var(--wall-planeacion-seguimiento)",
     rank: 5.85,
     sections: () => {
       const base = "/admin/planeacion-seguimiento";
       return [
+        {
+          title: "Su planificación",
+          cards: [
+            { key: "ps-planificacion", title: "Mi planificación", text: "Las actividades de su oficina y las líneas del plan a su cargo; crear una actividad o importarlas desde Excel", to: `${base}/planificacion`, screen: "planeacion_seguimiento" },
+            { key: "ps-tablero", title: "Tablero", text: "Por iniciar, en curso, en riesgo, en revisión y hecho: arrastre las tarjetas o use «Mover a…»", to: `${base}/tablero`, screen: "planeacion_seguimiento" },
+            { key: "ps-lista", title: "Lista de actividades", text: "Las actividades de la oficina en una lista que se ordena por cualquier columna", to: `${base}/lista`, screen: "planeacion_seguimiento" },
+            { key: "ps-mis-tareas", title: "Mis tareas", text: "Lo que tiene asignado: vencidas, próximas, más adelante y hechas", to: `${base}/mis-tareas`, screen: "planeacion_seguimiento" },
+            { key: "ps-asignar", title: "Asignar", text: "El equipo con su carga, las actividades sin responsable y la asignación masiva", to: `${base}/asignar`, when: (ctx) => ctx.psNivel === "gestor" || ctx.psNivel === "admin", screen: "planeacion_seguimiento" },
+            { key: "ps-cronograma-act", title: "Cronograma de actividades", text: "Las actividades en el tiempo, por persona o por oficina", to: `${base}/cronograma-act`, screen: "planeacion_seguimiento" },
+            { key: "ps-avisos", title: "Cómo te avisamos", text: "Qué correos llegan (asignación, por vencer, vencida, transferencia, cumplida) y con qué plazo", to: `${base}/avisos`, screen: "planeacion_seguimiento" },
+          ],
+        },
         {
           title: "El plan",
           cards: [

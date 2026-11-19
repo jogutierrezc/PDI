@@ -1717,6 +1717,72 @@ async function avisoDeGestionMaster(request: Request, body: Record<string, unkno
   return json({ ok: true });
 }
 
+/* --- Planeación y Seguimiento (0287): asignación, transferencia, devolución, vencimientos y cumplimiento ------ */
+
+/** El texto de respaldo si la plantilla c-ps-* no está en la base (sin la migración 0287, o borrada). */
+const PLANTILLA_PS_RESPALDO: Plantilla = {
+  clave: "c-ps-respaldo",
+  identidad: "plan",
+  tipo: "aviso",
+  html: null,
+  alcance: "cuerpo",
+  grupo: "Planeación y Seguimiento",
+  nombre: "Aviso de Planeación y Seguimiento",
+  cuando: "Actividades de la planificación de cada oficina",
+  asunto: "Planeación y Seguimiento: {{titulo_aviso}}",
+  previa: "",
+  titulo: "{{titulo_aviso}}",
+  saludo: "Hola, {{nombre}}:",
+  mensaje: "{{detalle}}",
+  boton: "Abrir en el portal",
+  nota: "Este aviso lo envía el portal de Planeación.",
+  roles: null,
+};
+
+/** Solo la función `planeacion-seguimiento`, con la clave de servicio: arma los valores desde la cola ps_avisos, nunca la persona. */
+async function avisoDePlaneacionSeguimiento(request: Request, body: Record<string, unknown>, url: string, serviceKey: string): Promise<Response> {
+  if ((request.headers.get("Authorization") ?? "") !== `Bearer ${serviceKey}`) return json({ error: "Falta la sesión.", code: "sesion" }, 401);
+  const para = typeof body.to === "string" ? body.to.trim().toLowerCase().slice(0, 254) : "";
+  if (!correoValido(para)) return json({ ok: false, code: "datos", error: "Falta el correo." }, 400);
+  const clave = typeof body.clave === "string" && /^c-ps-[a-z0-9-]{1,30}$/.test(body.clave) ? body.clave : "";
+  if (!clave) return json({ ok: false, code: "datos", error: "Falta la plantilla." }, 400);
+  // Un texto de la persona (el título de una actividad, una nota) no puede traer marcadores {{…}}.
+  const limpio = (v: unknown, max: number): string => texto(v, max).replace(/\{\{|\}\}/g, "");
+  const v = (body.valores && typeof body.valores === "object" ? body.valores : {}) as Record<string, unknown>;
+  const valores: Record<string, string> = {
+    titulo_aviso: limpio(v.titulo_aviso, 160),
+    detalle: limpio(v.detalle, 1200).replace(/\s+/g, " ").trim(),
+    oficina: limpio(v.oficina, 120),
+    fecha_limite: limpio(v.fecha_limite, 40),
+    dias: limpio(v.dias, 40),
+    comentario: limpio(v.comentario, 600),
+    autor: limpio(v.autor, 120),
+    modulo: "Planeación y Seguimiento",
+  };
+  const enlace = typeof body.enlace === "string" && /^https:\/\//.test(body.enlace) ? body.enlace.slice(0, 500) : "";
+  const admin = cliente(url, serviceKey);
+  const hash = await huella(para, ENV("SEND_EMAIL_HOOK_SECRET") || serviceKey);
+  const ctx = await contextoDe(admin, hash, "");
+  const plantilla = plantillaDeFila(ctx?.templates?.[clave], clave) ?? PLANTILLA_PS_RESPALDO;
+  const sitio = basePublica(typeof body.sitio === "string" ? body.sitio : "", ENV("CORREOS_URL_PUBLICA"), "");
+  const salida = await enviar(admin, ctx, {
+    tipo: "aviso",
+    plantilla,
+    persona: personaDe({ correo: para, nombre: limpio(body.nombre, 120), sede: "", rol: "" }),
+    rol: "administrativo",
+    para,
+    hash,
+    enlace: enlace || sitio || "https://planeacion.udes.edu.co",
+    valores,
+    sitio,
+    accion: "ps",
+    hook: "",
+    topeMs: SMTP_TOTAL_GANCHO_MS,
+  });
+  if (!salida.ok) return json({ ok: false, code: salida.code, error: salida.message }, salida.http);
+  return json({ ok: true });
+}
+
 /* --- La cola de UI GreenMetric (0213): asignación, envío, devolución, aprobación, recordatorio y resumen ------ */
 
 /** El texto de respaldo si la plantilla c-ugm-* no está en la base (sin la migración 0213, o borrada). */
@@ -2028,6 +2094,7 @@ async function panel(request: Request, crudo: string, url: string, anonKey: stri
   if (action === "codigo") return await codigoDePilo(request, body, url, serviceKey);
   if (action === "soporte") return await avisoDeSoporte(request, body, url, serviceKey);
   if (action === "gm") return await avisoDeGestionMaster(request, body, url, serviceKey);
+  if (action === "ps") return await avisoDePlaneacionSeguimiento(request, body, url, serviceKey);
   if (action === "ugm_cola") return await colaDeUgm(request, body, url, anonKey, serviceKey);
   if (action === "thi_cola") return await colaDeThi(request, body, url, anonKey, serviceKey);
   if (action === "conv_envio") return await envioDeConvenios(request, body, url, serviceKey);

@@ -59,6 +59,9 @@ import { NotasPane } from "./notas/NotasPane";
 import { canUseNotas, clearLink as clearNotasLink } from "./notas/logic";
 import { clearGoals as clearNotasGoals } from "./notas/guia";
 import { APP_PREFIX, readTheme, writeTheme } from "./themes";
+import { DisenoContext, disenoAttr, disenoFromSearch, readDiseno } from "./diseno";
+import type { Diseno } from "./diseno";
+import { TabTitle, useScrolledMark } from "./diseno-ui";
 import type { AppTheme } from "./themes";
 import { welcomeVoice } from "./welcome-script";
 import { registerAppWorker, useInstall, useKeyboardViewport, useOnline } from "./pwa";
@@ -70,13 +73,29 @@ import "../pregunta/ask-pilo.css";
 import "./pilo-app-themes.css";
 import "./pilo-app.css";
 import "./account/account.css";
+import "./pilo-app-nuevo.css";
 import { tr, useLang, localizeDeep } from "../../components/pilo/i18n";
 
 const KEY_VOICE = storageKey(APP_PREFIX, "voz");
 const KEY_INSTALL = storageKey(APP_PREFIX, "instalar");
 const ENSENANZA = ASK_SPACES.ensenanza;
 
+/** El diseño (clásico por defecto; nuevo = beta): ?diseno=… lo fija y se recuerda en el dispositivo. */
 export function PiloApp() {
+  const location = useLocation();
+  const [diseno, setDiseno] = useState<Diseno>(() => readDiseno(location.search));
+  useEffect(() => {
+    if (disenoFromSearch(location.search)) setDiseno(readDiseno(location.search));
+  }, [location.search]);
+  const value = useMemo(() => ({ diseno, setDiseno }), [diseno]);
+  return (
+    <DisenoContext.Provider value={value}>
+      <PiloAppBody diseno={diseno} />
+    </DisenoContext.Provider>
+  );
+}
+
+function PiloAppBody({ diseno }: { diseno: Diseno }) {
   useLang();
   const location = useLocation();
   const navigate = useNavigate();
@@ -103,6 +122,7 @@ export function PiloApp() {
   useKeyboardViewport(root);
 
   const [theme, setTheme] = useState<AppTheme>(readTheme);
+  const dz = disenoAttr(diseno);
   // La voz: encendida mientras no se apague. Vale para la bienvenida y para leer las respuestas.
   const [voiceOn, setVoiceOn] = useState(() => readStored(KEY_VOICE) !== "0");
   const [installDismissed, setInstallDismissed] = useState(() => readStored(KEY_INSTALL) === "0");
@@ -215,7 +235,7 @@ export function PiloApp() {
   if (desk !== "libre" && place.kind !== "cuenta" && !welcoming) {
     if (desk === "espera") {
       return (
-        <div className="pa" ref={root} data-tema={theme} aria-busy="true">
+        <div className="pa" ref={root} data-diseno={dz} data-tema={theme} aria-busy="true">
           <p className="pa-wait" role="status">
             {tr("Abriendo a Pilo…")}
           </p>
@@ -231,7 +251,7 @@ export function PiloApp() {
 
   if (place.kind === "cuenta") {
     return (
-      <div className="pa" ref={root} data-tema={theme}>
+      <div className="pa" ref={root} data-diseno={dz} data-tema={theme}>
         <AccountGate
           voice={greeting}
           voiceOn={voiceOn}
@@ -258,7 +278,7 @@ export function PiloApp() {
   if (place.kind === "perfil" || place.kind === "guardadas") {
     const profilePage = place.kind === "perfil";
     return (
-      <div className="pa" ref={root} data-tema={theme} data-tabs={tabsOn || undefined}>
+      <div className="pa" ref={root} data-diseno={dz} data-tema={theme} data-tabs={tabsOn || undefined}>
         <AppPage
           title={profilePage ? (account ? tr("Mi perfil") : tr("Mis preferencias")) : tr("Respuestas guardadas")}
           lead={
@@ -292,7 +312,7 @@ export function PiloApp() {
 
   if (place.kind === "clases") {
     return (
-      <div className="pa" ref={root} data-tema={theme}>
+      <div className="pa" ref={root} data-diseno={dz} data-tema={theme}>
         <AppPage
           title={tr("Mis clases")}
           tag={tr("Beta")}
@@ -310,7 +330,7 @@ export function PiloApp() {
 
   if (place.kind === "notas") {
     return (
-      <div className="pa" ref={root} data-tema={theme}>
+      <div className="pa" ref={root} data-diseno={dz} data-tema={theme}>
         <AppPage
           title={tr("Mis notas")}
           tag={tr("Beta")}
@@ -335,7 +355,7 @@ export function PiloApp() {
       <CarnetPane state={cuenta} online={online} person={person} wide={wide} />
     );
     return (
-      <div className="pa" ref={root} data-tema={theme} data-tabs={tabsOn || undefined}>
+      <div className="pa" ref={root} data-diseno={dz} data-tema={theme} data-tabs={tabsOn || undefined}>
         {wide ? (
           <AppPage
             title={isU ? "Pilo U" : tr("Carnet digital")}
@@ -346,7 +366,7 @@ export function PiloApp() {
             {pane}
           </AppPage>
         ) : (
-          <div className="pa-frame pa-frame--tab">{pane}</div>
+          <TabFrame title={isU ? "Pilo U" : tr("Carnet")}>{pane}</TabFrame>
         )}
         {tabsOn && <AppTabs active={isU ? "u" : "carnet"} home={APP_PATHS[home]} />}
       </div>
@@ -358,7 +378,7 @@ export function PiloApp() {
   const door = doors[spaceId];
 
   return (
-    <div className="pa" ref={root} data-tema={theme} data-tabs={tabsOn && !welcoming && !gating ? true : undefined}>
+    <div className="pa" ref={root} data-diseno={dz} data-tema={theme} data-tabs={tabsOn && !welcoming && !gating ? true : undefined}>
       {/* Mientras la bienvenida o la aceptación están encima, lo de debajo no se enfoca ni se lee. */}
       <ShellFrame inert={welcoming || gating}>
         <AppShell
@@ -480,6 +500,18 @@ function ShellFrame({ inert, children }: { inert: boolean; children: React.React
   }, [inert]);
   return (
     <div className="pa-frame" ref={frame} aria-hidden={inert || undefined}>
+      {children}
+    </div>
+  );
+}
+
+/** El marco de una pestaña sin cabecera propia (Pilo U, Carnet). En el diseño nuevo lleva el título grande. */
+function TabFrame({ title, children }: { title: string; children: React.ReactNode }) {
+  const frame = useRef<HTMLDivElement>(null);
+  useScrolledMark(frame);
+  return (
+    <div className="pa-frame pa-frame--tab" ref={frame}>
+      <TabTitle title={title} />
       {children}
     </div>
   );

@@ -22,6 +22,7 @@ import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
 import { Icon } from "./icons";
+import { DisenoSwitch, useScrolledMark } from "./diseno-ui";
 import { ThemePicker } from "./account/parts";
 import { PolicyLink } from "./terms/PolicyLink";
 import { tr, useLang, LangSwitch } from "../../components/pilo/i18n";
@@ -311,6 +312,7 @@ export function AppSide({
               {tr("Tema")}
             </p>
             <ThemePicker value={theme} onPick={(id) => onTheme(id)} labelledBy="pa-s-tema" />
+            <DisenoSwitch />
             <button
               type="button"
               className="pa-sl"
@@ -337,8 +339,11 @@ export function AppSide({
 /** El marco de una pantalla que no es la conversación. */
 export function AppPage({ title, tag, lead, home, side, children }: { title: string; /** Una etiqueta junto al título («Beta»). */ tag?: string; lead: string; home: string; side: ReactNode; children: ReactNode }) {
   useLang();
+  const frame = useRef<HTMLDivElement>(null);
+  // Diseño nuevo: al desplazar, el título grande cede al de la cabecera.
+  useScrolledMark(frame);
   return (
-    <div className="pa-frame pa-frame--page">
+    <div className="pa-frame pa-frame--page" ref={frame}>
       {side}
       <header className="pa-bar pa-bar--page">
         <div className="pa-bar__in">

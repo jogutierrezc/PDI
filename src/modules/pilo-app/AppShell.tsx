@@ -77,6 +77,7 @@ import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
 import { pickPassages, turnFile } from "../pregunta/attach";
 import { AttachButton, AttachTray, useAttachment } from "../pregunta/Extras";
 import { tr, useLang } from "../../components/pilo/i18n";
+import { useDiseno } from "./diseno";
 
 type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone" | "android" | "llamada" | "novedad";
 
@@ -121,6 +122,23 @@ export function AppShell({ account, space, door, waking, online, person, member,
   const prefix = space.storagePrefix;
   const usual = space.id === "planeacion";
   const location = useLocation();
+  // Diseño nuevo: la conversación pasa por debajo de la caja de escribir; el marco necesita saber cuánto mide.
+  const { diseno } = useDiseno();
+  const dock = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = dock.current;
+    const frame = el?.parentElement;
+    if (diseno !== "nuevo" || !el || !frame) return;
+    const fit = () => frame.style.setProperty("--dock-h", `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(fit);
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      frame.style.removeProperty("--dock-h");
+    };
+  }, [diseno]);
   const [convs, setConvs] = useConversations(prefix);
   const [currentId, setCurrentId] = useState<string | null>(() => {
     // La que se pidió desde el menú del otro Pilo; si no, la última de este.
@@ -814,7 +832,7 @@ export function AppShell({ account, space, door, waking, online, person, member,
         </div>
       </div>
 
-      <div className="pa-dock">
+      <div className="pa-dock" ref={dock}>
         <div className="pa-dock__in">
           {member && <LimitBanner state={account} space={space.id} refreshKey={current?.turns.length ?? 0} />}
           {!current && can && (

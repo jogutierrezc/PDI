@@ -26,6 +26,7 @@ import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
 import { Layer } from "./Layer";
+import { DisenoSwitch } from "./diseno-ui";
 import { Icon } from "./icons";
 import { PersonBlock, RECENT_CONVERSATIONS, StudyIcon } from "./AppSide";
 import type { Person } from "./AppSide";
@@ -252,6 +253,7 @@ export function SettingsSheet({
           <ThemePicker value={theme} onPick={onTheme} labelledBy="pa-m-tema" />
         </section>
         <AlertasEmergencia open={open} />
+        <DisenoSwitch />
         <div>
           <button type="button" className="pa-mi pa-mi--line" onClick={onWelcome}>
             <strong>{tr("Ver la bienvenida")}</strong>

@@ -1,0 +1,1007 @@
+/* =============================================================================
+   Mr. Pilo · la app móvil · el diseño nuevo (beta), el de Mr. Pilo para Apple.
+
+   Solo se aplica con data-diseno="nuevo" en la raíz .pa (diseno.ts). Quitar el
+   atributo devuelve el diseño clásico, que está en pilo-app.css y no se toca:
+   aquí todo son selectores .pa[data-diseno="nuevo"] que sobrescriben.
+
+   Colores: los de cada tema (--c-*, --s-*; el dorado, --n-gold, en la hoja de
+   temas). Lo derivado (cristal, filetes) sale de ellos con color-mix.
+   Cristal (backdrop-filter): SOLO la barra de pestañas y la caja de escribir,
+   que flotan sobre el contenido; el contenido va sobre fondos lisos y nunca se
+   apila cristal sobre cristal. Sin backdrop-filter, un color sólido.
+   Movimiento: solo transform y opacidad. Pulsar 0.97 en 140 ms; hojas con
+   resorte de 0.35 s; nada se anima con el teclado ([data-quick]) ni al cambiar
+   de pestaña (solo el indicador). Con «reducir movimiento»: solo fundido.
+   Letra: la del sistema, con la escala de Dynamic Type en rem (zoom del usuario).
+   ========================================================================== */
+
+.pa[data-diseno="nuevo"] {
+  --n-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--n-font);
+  --font-display: var(--n-font);
+  /* Escala tipo Dynamic Type (rem: respeta el tamaño de letra del usuario). */
+  --n-large: 700 2.125rem/1.2059 var(--n-font);
+  --n-title2: 600 1.375rem/1.2727 var(--n-font);
+  --n-body: 400 1.0625rem/1.2941 var(--n-font);
+  --n-body-s: 600 1.0625rem/1.2941 var(--n-font);
+  --n-foot: 400 0.8125rem/1.3846 var(--n-font);
+  --n-caption: 600 0.6875rem/1.2 var(--n-font);
+  /* Materiales (derivados del tema). */
+  --n-glass: color-mix(in srgb, var(--c-bg) 66%, transparent);
+  --n-glass-edge: color-mix(in srgb, var(--c-ink) 12%, transparent);
+  --n-hair: color-mix(in srgb, var(--c-ink) 10%, transparent);
+  --n-fill: color-mix(in srgb, var(--c-ink) 6%, var(--c-bg));
+  --n-r-card: 16px;
+  --n-r-sheet: 28px;
+  --n-spring: linear(0, 0.2 6%, 0.55 13%, 0.85 21%, 1.02 31%, 1.03 38%, 1 52%, 0.995 65%, 1);
+  --n-pt: calc(70px + env(safe-area-inset-bottom, 0px));
+  --pt-h: var(--n-pt);
+  --pa-r-bubble: 20px;
+  --pa-r-mine: 20px 20px 6px 20px;
+  --pa-r-sheet: var(--n-r-sheet) var(--n-r-sheet) 0 0;
+  font: var(--n-body);
+  letter-spacing: 0;
+}
+
+/* Objetivos táctiles: nada de 44 px hacia abajo. */
+.pa[data-diseno="nuevo"] :is(.pa-icon, .pa-act, .pa-btn, .pa-sug, .pa-mi) {
+  min-height: 44px;
+}
+
+/* --- Pulsar: 0.97 en 140 ms con la salida fuerte; sin escala con «reducir movimiento» ---- */
+
+.pa[data-diseno="nuevo"] :is(.pa-icon, .pa-btn, .pa-sbtn, .pa-sug, .pa-mi, .pa-act, .pa-src, .pa-send, .pa-w-next, .pt-i, .pa-sl, .pa-diseno, .pu-row, .pu-mark, .cn-row) {
+  transition: transform 140ms var(--ease-out), background-color 140ms ease-out, opacity 140ms ease-out;
+}
+
+.pa[data-diseno="nuevo"] :is(.pa-diseno):active {
+  transform: scale(0.97);
+}
+
+/* --- Cabecera de la conversación: clara, sin banda de color ---------------------------- */
+
+.pa[data-diseno="nuevo"] .pa-bar {
+  background: var(--c-bg);
+  color: var(--c-ink);
+  border-bottom: 1px solid var(--n-hair);
+  padding-top: calc(6px + env(safe-area-inset-top, 0px));
+  padding-bottom: 6px;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar__in {
+  grid-template-columns: 44px 44px minmax(0, 1fr) 44px 44px;
+  gap: 8px;
+  min-height: 52px;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar__in[data-wide] {
+  grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar-face {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--c-chip);
+}
+
+.pa[data-diseno="nuevo"] .pa-bar-id strong {
+  font: var(--n-body-s);
+  letter-spacing: -0.01em;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar-id span {
+  font: var(--n-foot);
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .pa-bar .pa-icon {
+  background: var(--c-chip);
+  color: var(--c-ink);
+}
+
+.pa[data-diseno="nuevo"] .pa-bar .pa-icon:disabled {
+  opacity: 0.45;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar .pa-icon:focus-visible {
+  outline-color: var(--c-link);
+}
+
+/* --- Conversación ------------------------------------------------------------------------ */
+
+.pa[data-diseno="nuevo"] .pa-msgs {
+  padding-top: 16px;
+}
+
+.pa[data-diseno="nuevo"] .pa-msg {
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.pa[data-diseno="nuevo"] .pa-msg__face {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--c-chip);
+}
+
+/* Las propias, en el azul de marca; las de Pilo, sobre el fondo liso, sin burbuja. */
+.pa[data-diseno="nuevo"] .pa-me {
+  max-width: 82%;
+  padding: 10px 16px;
+  border-radius: var(--pa-r-mine);
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .pa-bubble {
+  padding: 4px 0 0;
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .pa-bubble > p {
+  font-weight: 400;
+}
+
+.pa[data-diseno="nuevo"] .pa-hint,
+.pa[data-diseno="nuevo"] .pa-note {
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pa-steps {
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+/* Chip de fuente: píldora suave, texto de enlace; el área táctil sigue en 44 px. */
+.pa[data-diseno="nuevo"] .pa-src {
+  position: relative;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--c-chip);
+  color: var(--c-link);
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pa-src::after {
+  content: "";
+  position: absolute;
+  inset: -4px -2px;
+}
+
+.pa[data-diseno="nuevo"] .pa-src__n {
+  color: inherit;
+}
+
+.pa[data-diseno="nuevo"] .pa-keep[aria-pressed="true"] {
+  background: var(--c-chip);
+  color: var(--c-ok);
+}
+
+.pa[data-diseno="nuevo"] .pa-act {
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .pa-act[aria-pressed="true"] {
+  background: var(--c-chip);
+  color: var(--c-link);
+}
+
+.pa[data-diseno="nuevo"] .pa-gen {
+  border-style: solid;
+  border-color: var(--n-hair);
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pa-warn {
+  border-radius: var(--n-r-card);
+  font: var(--n-foot);
+}
+
+/* Tarjeta de estado («Pilo está descansando»): superficie lisa, sin filete de color. */
+.pa[data-diseno="nuevo"] .pa-card {
+  border: 0;
+  border-radius: var(--n-r-card);
+}
+
+.pa[data-diseno="nuevo"] .pa-card h2 {
+  font: var(--n-title2);
+}
+
+.pa[data-diseno="nuevo"] .pa-card p {
+  font: var(--n-body);
+}
+
+/* --- Caja de escribir: flota sobre la conversación, con cristal -------------------------- */
+
+/* La conversación ocupa también el sitio de la caja y pasa por debajo; --dock-h lo mide AppShell. */
+.pa[data-diseno="nuevo"] .pa-frame:not(.pa-frame--page):not(.pa-frame--tab) > .pa-msgs {
+  grid-row: 2 / 4;
+  padding-bottom: calc(var(--dock-h, 150px) + 12px);
+}
+
+.pa[data-diseno="nuevo"] .pa-dock {
+  grid-row: 3;
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  pointer-events: none;
+  padding-bottom: 0;
+}
+
+.pa[data-diseno="nuevo"][data-tabs="true"] .pa-dock {
+  padding-bottom: var(--n-pt);
+}
+
+.pa[data-diseno="nuevo"]:not([data-tabs="true"]) .pa-dock {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pa[data-diseno="nuevo"] .pa-dock > * {
+  pointer-events: auto;
+}
+
+.pa[data-diseno="nuevo"] .pa-dock__in {
+  pointer-events: none;
+}
+
+.pa[data-diseno="nuevo"] .pa-dock__in > * {
+  pointer-events: auto;
+}
+
+.pa[data-diseno="nuevo"] .pa-sug {
+  min-height: 44px;
+  border: 1px solid var(--n-hair);
+  border-radius: 22px;
+  background: var(--c-bubble);
+  font: var(--n-foot);
+  font-weight: 600;
+  padding: 8px 16px;
+}
+
+.pa[data-diseno="nuevo"] .pa-sugs {
+  padding-bottom: 8px;
+}
+
+.pa[data-diseno="nuevo"] .pa-install {
+  margin-inline: var(--pa-side);
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+  box-shadow: 0 1px 0 var(--n-hair), 0 6px 20px color-mix(in srgb, var(--c-shadow) 60%, transparent);
+}
+
+/* El compositor: la segunda (y última) pieza de cristal. */
+.pa[data-diseno="nuevo"] .pa-compose {
+  margin: 0 var(--pa-side-r) 8px var(--pa-side);
+  padding: 6px;
+  gap: 6px;
+  border: 1px solid var(--n-glass-edge);
+  border-radius: 30px;
+  background: var(--n-glass);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--c-shadow) 70%, transparent);
+}
+
+.pa[data-diseno="nuevo"] .pa-compose[data-clip] {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.pa[data-diseno="nuevo"] .pa-compose,
+.pa[data-diseno="nuevo"][data-tabs="true"] .pa-compose {
+  padding: 6px;
+}
+
+.pa[data-diseno="nuevo"] .pa-compose {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: end;
+}
+
+.pa[data-diseno="nuevo"] .pa-compose textarea {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--c-bubble);
+  font: 400 16px/1.3 var(--n-font);
+}
+
+.pa[data-diseno="nuevo"] .pa-compose textarea:focus-visible {
+  outline: 2px solid var(--c-link);
+  outline-offset: 0;
+  border-radius: 22px;
+}
+
+.pa[data-diseno="nuevo"] .pa-send {
+  width: 44px;
+  height: 44px;
+}
+
+.pa[data-diseno="nuevo"] .pa-send[data-mic] {
+  background: transparent;
+  color: var(--c-link);
+}
+
+/* El dock comparte fila con la conversación: que ambos queden en la misma columna. */
+@media (max-width: 959px) {
+  .pa[data-diseno="nuevo"] .pa-frame:not(.pa-frame--page):not(.pa-frame--tab) > :is(.pa-msgs, .pa-dock, .pa-bar) {
+    grid-column: 1;
+  }
+}
+
+/* --- Barra de pestañas: píldora flotante de cristal con indicador ------------------------- */
+
+.pa[data-diseno="nuevo"][data-tabs="true"] .pa-frame {
+  bottom: 0;
+}
+
+.pa[data-diseno="nuevo"] .pt {
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  height: 64px;
+  max-width: 520px;
+  margin-inline: auto;
+  padding: 4px;
+  border: 1px solid var(--n-glass-edge);
+  border-radius: 32px;
+  background: var(--n-glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--c-shadow) 80%, transparent);
+}
+
+.pa[data-diseno="nuevo"] .pt-ind {
+  top: 4px;
+  width: calc((100% - 8px) / 4);
+  height: calc(100% - 8px);
+  border-radius: 28px;
+  background: var(--c-chip);
+}
+
+/* terms/terms.css también define «.pt-i» (un icono de 18 px): aquí se anula para que la pestaña ocupe su columna. */
+.pa[data-diseno="nuevo"] .pt-i {
+  width: auto;
+  height: auto;
+  flex: none;
+  min-height: 48px;
+  gap: 2px;
+  color: var(--c-ink2);
+  font: var(--n-caption);
+  white-space: nowrap;
+}
+
+.pa[data-diseno="nuevo"] .pt-i[aria-current="page"] {
+  color: var(--c-link);
+}
+
+.pa[data-diseno="nuevo"] .pt-i:active {
+  transform: scale(0.97);
+}
+
+.pa[data-diseno="nuevo"] .pt-i:focus-visible {
+  outline-offset: -3px;
+  border-radius: 28px;
+}
+
+.pa[data-diseno="nuevo"] .pt-ic .pa-i {
+  width: 24px;
+  height: 24px;
+}
+
+/* --- Título grande de cada pestaña; colapsa al desplazar -------------------------------- */
+
+.pa[data-diseno="nuevo"] .pa-lt {
+  position: relative;
+  z-index: 3;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 4px max(16px, env(safe-area-inset-left, 0px));
+  background: var(--c-bg);
+}
+
+.pa[data-diseno="nuevo"] .pa-lt::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--n-hair);
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.pa[data-diseno="nuevo"] .pa-lt__t {
+  display: block;
+  height: 48px;
+  margin: 0;
+  font: var(--n-large);
+  letter-spacing: -0.02em;
+  color: var(--c-ink);
+  transform-origin: left center;
+  transition: transform 200ms var(--ease-out);
+}
+
+.pa[data-diseno="nuevo"] [data-scrolled] > .pa-lt::after {
+  opacity: 1;
+}
+
+.pa[data-diseno="nuevo"] [data-scrolled] > .pa-lt .pa-lt__t {
+  transform: scale(0.5);
+}
+
+.pa[data-diseno="nuevo"] .pa-frame--tab > .pu[data-wide="false"] {
+  grid-row: 2 / -1;
+  padding-top: 8px;
+  padding-bottom: calc(var(--n-pt) + 16px);
+}
+
+.pa[data-diseno="nuevo"] .pa-frame--tab > .cn-pane:not([data-wide]) {
+  grid-row: 2 / -1;
+  padding-bottom: calc(var(--n-pt) + 16px);
+}
+
+/* Páginas (Yo, Guardadas, Mis clases…): el título grande va en el contenido; la cabecera solo
+   lleva «volver» y, al desplazar, el título pequeño. */
+.pa[data-diseno="nuevo"] .pa-bar--page {
+  position: relative;
+  z-index: 3;
+  border-bottom-color: transparent;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar--page .pa-bar__in {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  min-height: 48px;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar--page .pa-bar-id {
+  grid-column: 2;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar--page .pa-bar-id span {
+  display: none;
+}
+
+.pa[data-diseno="nuevo"] [data-scrolled] > .pa-bar--page {
+  border-bottom-color: var(--n-hair);
+}
+
+.pa[data-diseno="nuevo"] [data-scrolled] > .pa-bar--page .pa-bar-id {
+  opacity: 1;
+}
+
+.pa[data-diseno="nuevo"] .pa-bar--page {
+  transition: border-color 180ms ease-out;
+}
+
+.pa[data-diseno="nuevo"] .pc-pane__head h1,
+.pa[data-diseno="nuevo"] .pu-head h1 {
+  font: var(--n-large);
+  letter-spacing: -0.02em;
+}
+
+.pa[data-diseno="nuevo"] .pc-pane__head p {
+  font: var(--n-body);
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"][data-tabs="true"] .pc-page {
+  padding-bottom: calc(var(--n-pt) + 16px);
+}
+
+/* --- Listas agrupadas (Yo, Pilo U, Carnet): superficie lisa, esquinas de 16, filetes finos -- */
+
+.pa[data-diseno="nuevo"] .pc-sheet,
+.pa[data-diseno="nuevo"] .cn-block,
+.pa[data-diseno="nuevo"] .cn-gate__in,
+.pa[data-diseno="nuevo"] .pu-gate {
+  border: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+}
+
+.pa[data-diseno="nuevo"] .pc-sheet__in {
+  padding: 16px;
+}
+
+.pa[data-diseno="nuevo"] .pc-label,
+.pa[data-diseno="nuevo"] .pc-h,
+.pa[data-diseno="nuevo"] .pu-group h2 {
+  font: var(--n-foot);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-ink2);
+}
+
+.pa[data-diseno="nuevo"] .pc-hint,
+.pa[data-diseno="nuevo"] .cn-hint,
+.pa[data-diseno="nuevo"] .cn-note {
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pc-line {
+  border-radius: var(--n-r-card);
+}
+
+.pa[data-diseno="nuevo"] .pu-group ul,
+.pa[data-diseno="nuevo"] .pu-list {
+  gap: 0;
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+  overflow: hidden;
+}
+
+.pa[data-diseno="nuevo"] .pu-group li + li,
+.pa[data-diseno="nuevo"] .pu-list > li + li {
+  border-top: 1px solid var(--n-hair);
+  margin-left: 64px;
+}
+
+.pa[data-diseno="nuevo"] .pu-group li + li > .pu-row,
+.pa[data-diseno="nuevo"] .pu-group li + li > .pu-mark {
+  margin-left: -64px;
+}
+
+.pa[data-diseno="nuevo"] .pu-row,
+.pa[data-diseno="nuevo"] .pu-item,
+.pa[data-diseno="nuevo"] .pu-mark {
+  min-height: 56px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .pu-row__t b,
+.pa[data-diseno="nuevo"] .pu-item__t b,
+.pa[data-diseno="nuevo"] .pu-mark b {
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pu-row__t > span,
+.pa[data-diseno="nuevo"] .pu-item__t > span {
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pu-row:active,
+.pa[data-diseno="nuevo"] .pu-mark:active {
+  transform: none;
+  background: var(--c-chip);
+}
+
+.pa[data-diseno="nuevo"] .pu-ico {
+  border-radius: 10px;
+}
+
+/* --- Botones ----------------------------------------------------------------------------- */
+
+.pa[data-diseno="nuevo"] .pa-btn,
+.pa[data-diseno="nuevo"] .pu-btn,
+.pa[data-diseno="nuevo"] .pc-quiet {
+  min-height: 48px;
+  border-radius: 14px;
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pa-btn--main,
+.pa[data-diseno="nuevo"] .pu-btn--main {
+  background: var(--c-mine);
+  color: var(--c-mine-ink);
+}
+
+.pa[data-diseno="nuevo"] .pa-btn--line,
+.pa[data-diseno="nuevo"] .pu-btn--line {
+  border: 1px solid var(--n-hair);
+  background: transparent;
+  color: var(--c-ink);
+}
+
+/* --- Interruptor «Diseño nuevo (beta)» ----------------------------------------------------- */
+
+.pa-diseno {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm, 12px);
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pa-diseno__t {
+  display: grid;
+  min-width: 0;
+}
+
+.pa-diseno__t strong {
+  font-weight: 700;
+}
+
+.pa-diseno__t small {
+  font-size: 0.8125rem;
+  color: var(--c-ink2);
+}
+
+.pa-diseno__sw {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  border-radius: 16px;
+  border: 2px solid var(--c-ink2);
+  background: transparent;
+  transition: background-color 140ms ease-out, border-color 140ms ease-out;
+}
+
+.pa-diseno__sw i {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--c-ink2);
+  transition: transform 200ms var(--ease-out), background-color 140ms ease-out;
+}
+
+.pa-diseno[aria-checked="true"] .pa-diseno__sw {
+  background: var(--c-mine);
+  border-color: var(--c-mine);
+}
+
+.pa-diseno[aria-checked="true"] .pa-diseno__sw i {
+  transform: translateX(20px);
+  background: var(--c-mine-ink);
+}
+
+.pa-diseno:focus-visible {
+  outline: 2px solid var(--c-link);
+  outline-offset: 2px;
+}
+
+.pa-side .pa-diseno {
+  min-height: 48px;
+  padding: 8px 10px;
+  border-color: transparent;
+  color: inherit;
+}
+
+.pa-side .pa-diseno__t small {
+  color: var(--c-bar-muted);
+}
+
+/* --- Hojas (fuentes, ajustes, menú): abajo, con asa y resorte de 0.35 s ------------------- */
+
+.pa[data-diseno="nuevo"] .pa-scrim {
+  transition: opacity 200ms ease-out;
+}
+
+.pa[data-diseno="nuevo"] .pa-scrim[data-open] {
+  transition: opacity 350ms ease-out;
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet,
+.pa[data-diseno="nuevo"] .pa-menu {
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: 0;
+  width: auto;
+  max-height: 86%;
+  border-radius: var(--pa-r-sheet);
+  background: var(--c-sheet);
+  transform: translateY(102%);
+  /* El resorte puede pasarse un poco hacia arriba: el borde de abajo se tapa con una sombra del mismo color. */
+  box-shadow: 0 -10px 40px var(--c-shadow), 0 48px 0 var(--c-sheet);
+  transition: transform 200ms var(--ease-out), visibility 0s linear 200ms;
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet[data-open],
+.pa[data-diseno="nuevo"] .pa-menu[data-open] {
+  transform: none;
+  transition: transform 350ms var(--n-spring);
+}
+
+.pa[data-diseno="nuevo"] .pa-menu {
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pa[data-diseno="nuevo"] .pa-menu-head {
+  padding-top: 8px;
+}
+
+/* El asa de la hoja del menú. */
+.pa[data-diseno="nuevo"] .pa-menu-head::before {
+  content: "";
+  justify-self: center;
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-ink2) 45%, transparent);
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet {
+  padding: 8px max(20px, env(safe-area-inset-right, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet__grip {
+  width: 36px;
+  height: 5px;
+  background: color-mix(in srgb, var(--c-ink2) 45%, transparent);
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet h2,
+.pa[data-diseno="nuevo"] .pa-menu h2 {
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet p,
+.pa[data-diseno="nuevo"] .pa-sheet li small {
+  font: var(--n-foot);
+}
+
+/* Las fuentes como tarjetas sueltas, no como filas con filete. */
+.pa[data-diseno="nuevo"] .pa-sheet ul {
+  display: grid;
+  gap: 10px;
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet li {
+  padding: 12px 14px;
+  border: 1px solid var(--n-hair);
+  border-radius: var(--n-r-card);
+  background: var(--c-bubble);
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet li > strong {
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pa-sheet li a {
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pa-menu[data-quick],
+.pa[data-diseno="nuevo"] .pa-sheet[data-quick],
+.pa[data-diseno="nuevo"] .pa-scrim[data-quick] {
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+.pa[data-diseno="nuevo"] .pa-mi {
+  border-radius: var(--n-r-card);
+}
+
+/* --- Bienvenida: la escena azul con su resplandor y el botón dorado sólido ----------------- */
+
+.pa[data-diseno="nuevo"] .pa-w-title {
+  font: var(--n-large);
+  letter-spacing: -0.02em;
+}
+
+.pa[data-diseno="nuevo"] .pa-w-bubble {
+  font: var(--n-body);
+}
+
+.pa[data-diseno="nuevo"] .pa-w-next {
+  min-width: 132px;
+  min-height: 50px;
+  padding: 10px 28px;
+  border-radius: 25px;
+  background: var(--n-gold);
+  color: var(--n-gold-ink);
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pa-w-next:focus-visible {
+  outline-color: var(--s-ink);
+  outline-offset: 3px;
+}
+
+.pa[data-diseno="nuevo"] .pa-sbtn {
+  font: var(--n-foot);
+  font-weight: 600;
+}
+
+.pa[data-diseno="nuevo"] .pa-w-brand {
+  font: var(--n-foot);
+}
+
+.pa[data-diseno="nuevo"] .pa-w-brand b {
+  font-weight: 700;
+}
+
+.pa[data-diseno="nuevo"] .pa-w-back {
+  font: var(--n-body-s);
+}
+
+.pa[data-diseno="nuevo"] .pa-segs span i {
+  background: var(--n-gold);
+}
+
+.pa[data-diseno="nuevo"] .pa-w-bg {
+  background: radial-gradient(90% 55% at 50% 30%, color-mix(in srgb, var(--s1) 70%, var(--s2)) 0%, var(--s2) 58%, color-mix(in srgb, var(--s3) 40%, var(--s2)) 100%);
+}
+
+/* --- Pantalla ancha: barra lateral tipo split-view ------------------------------------------ */
+
+@media (min-width: 960px) {
+  .pa[data-diseno="nuevo"] .pa-side {
+    --c-bar-ink: var(--c-ink);
+    --c-bar-muted: var(--c-ink2);
+    --pa-side-line: var(--n-hair);
+    --pa-side-chip: color-mix(in srgb, var(--c-ink) 7%, transparent);
+    padding: 20px 12px 14px;
+    border-right: 1px solid var(--n-hair);
+    background: var(--n-fill);
+    color: var(--c-ink);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side__brand {
+    font: var(--n-title2);
+    letter-spacing: -0.01em;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sl {
+    min-height: 44px;
+    border-radius: 12px;
+    font: var(--n-body);
+    font-weight: 400;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sl .pa-i {
+    width: 22px;
+    height: 22px;
+    color: var(--c-link);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sl[aria-current] {
+    background: var(--c-mine);
+    color: var(--c-mine-ink);
+    box-shadow: none;
+    font-weight: 600;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sl[aria-current] .pa-i,
+  .pa[data-diseno="nuevo"] .pa-sl[aria-current] > span small {
+    color: inherit;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sl--new {
+    border: 0;
+    background: var(--c-mine);
+    color: var(--c-mine-ink);
+    font-weight: 600;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sl--new .pa-i {
+    color: inherit;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side__label {
+    padding: 14px 12px 4px;
+    font: var(--n-foot);
+    font-weight: 600;
+    color: var(--c-ink2);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side__two {
+    border: 0;
+    border-radius: 10px;
+    background: var(--n-fill);
+    background: color-mix(in srgb, var(--c-ink) 8%, transparent);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side__two button {
+    border-radius: 8px;
+    font: var(--n-foot);
+    font-weight: 600;
+    color: var(--c-ink2);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side__two button[aria-pressed="true"] {
+    background: var(--c-bubble);
+    box-shadow: 0 1px 3px var(--c-shadow);
+    color: var(--c-ink);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side .pa-who {
+    border: 0;
+    background: transparent;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side .pa-who[aria-current="page"] {
+    box-shadow: none;
+    background: var(--pa-side-chip);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side .pa-join__main {
+    background: var(--c-mine);
+    color: var(--c-mine-ink);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side__pop {
+    border-radius: var(--n-r-card);
+  }
+
+  .pa[data-diseno="nuevo"] .pa-side :focus-visible {
+    outline-color: var(--c-link);
+  }
+
+  /* En el escritorio la cabecera de la conversación es plana; la caja no necesita hueco para las pestañas. */
+  .pa[data-diseno="nuevo"] .pa-bar {
+    border-bottom: 0;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sheet {
+    left: calc(292px + (100% - 292px) / 2);
+    right: auto;
+    width: min(560px, calc(100% - 292px - 24px));
+    translate: -50% 0;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-frame--page > .pa-msgs {
+    padding-bottom: 24px;
+  }
+}
+
+/* --- Sin cristal en el navegador: color sólido ---------------------------------------------- */
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .pa[data-diseno="nuevo"] .pt,
+  .pa[data-diseno="nuevo"] .pa-compose {
+    background: var(--c-bubble);
+  }
+}
+
+/* --- Movimiento reducido: solo fundido ----------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .pa[data-diseno="nuevo"] :is(.pa-icon, .pa-btn, .pa-sbtn, .pa-sug, .pa-mi, .pa-act, .pa-src, .pa-send, .pa-w-next, .pt-i, .pa-sl, .pa-diseno):active {
+    transform: none;
+    opacity: 0.7;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sheet,
+  .pa[data-diseno="nuevo"] .pa-menu {
+    transform: none;
+    opacity: 0;
+    transition: opacity 150ms ease-out, visibility 0s linear 150ms;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-sheet[data-open],
+  .pa[data-diseno="nuevo"] .pa-menu[data-open] {
+    opacity: 1;
+    transition: opacity 150ms ease-out;
+  }
+
+  .pa[data-diseno="nuevo"] .pa-lt__t,
+  .pa[data-diseno="nuevo"] [data-scrolled] > .pa-lt .pa-lt__t {
+    transform: none;
+    font-size: 1.0625rem;
+    line-height: 48px;
+    transition: none;
+  }
+
+  .pa-diseno__sw i {
+    transition: none;
+  }
+}

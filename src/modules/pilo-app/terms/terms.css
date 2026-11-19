@@ -128,7 +128,7 @@
 
 /* --- Las cuatro reglas de oro ------------------------------------------------------------------ */
 
-.pt-i {
+.pt-ico {
   width: 18px;
   height: 18px;
   flex: none;
@@ -331,7 +331,7 @@
   align-items: start;
 }
 
-.pt-promise .pt-i {
+.pt-promise .pt-ico {
   margin-top: 2px;
   color: var(--c-ok);
 }

@@ -35,6 +35,7 @@ import { Benefits, Field, Msg, Seg, ThemePicker } from "./parts";
 import { tr, useLang } from "../../../components/pilo/i18n";
 import { MisDatos } from "../yo/MisDatos";
 import { LimitesCard } from "../limites/LimitesCard";
+import { DisenoSwitch } from "../diseno-ui";
 
 gsap.registerPlugin(useGSAP);
 
@@ -64,6 +65,7 @@ export function ProfilePane({
           {tr("Tema de la app")}
         </p>
         <ThemePicker value={theme} onPick={onTheme} labelledBy="pc-p-tema" />
+        <DisenoSwitch />
         <button type="button" className="pc-quiet" onClick={onWelcome}>
           {tr("Ver la bienvenida otra vez")}
         </button>
@@ -214,6 +216,7 @@ function MemberPrefs({ state, theme, onTheme }: { state: AccountState; theme: Ap
         </h2>
         <p className="pc-hint">{tr("Los colores salen de la paleta institucional. Se recuerda en este dispositivo.")}</p>
         <ThemePicker value={theme} onPick={(id) => onTheme(id)} labelledBy="pc-p-tema" />
+        <DisenoSwitch />
       </section>
 
       <div className="pc-cols">

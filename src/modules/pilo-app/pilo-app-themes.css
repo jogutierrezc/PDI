@@ -549,3 +549,17 @@
   --w-card-ok: #0d6a2d;
   color-scheme: light;
 }
+
+/* =============================================================================
+   El diseño nuevo (pilo-app-nuevo.css) · el dorado de Mr. Pilo para Apple.
+
+   Una sola variable de acción sobre la escena azul, igual en los doce temas
+   (los doce temas definen la escena en --s1..--s3 con tinta clara; el dorado
+   #f6b93f con su texto #1d1402 pasa de 9:1 sobre todas). El resto del diseño
+   nuevo sale de las variables --c-* y --s-* de cada tema, sin colores propios.
+   ========================================================================== */
+
+:where(.pa) {
+  --n-gold: #f6b93f;
+  --n-gold-ink: #1d1402;
+}

@@ -64,6 +64,7 @@ export type AdminSection =
   | "udrive"
   | "gestion_master"
   | "cumplimiento_tipologia"
+  | "planeacion_seguimiento"
   | "cms"
   | "portales_publicos"
   | "obs_observatorios"
@@ -79,7 +80,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "encuestas" | "udrive" | "gestion-master" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "encuestas" | "udrive" | "gestion-master" | "planeacion-seguimiento" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -233,6 +234,17 @@ export const navigation: NavGroup[] = [
     items: [
       { id: "gestion_master", label: "Gestión de Actividades", icon: "clipboard", to: "/admin/gestion-master", minimum: "consulta" },
       { id: "cumplimiento_tipologia", label: "Cumplimiento de Tipología", icon: "spark-chart", to: "/admin/cumplimiento-tipologia", minimum: "consulta" },
+    ],
+  },
+  {
+    // Planes institucionales (hoy el PDIFyT 2027-2035): líneas, versiones y, en fases siguientes, actividades y avances (0286).
+    // Lo ve quien tenga un nivel de Planeación y Seguimiento en su rol de acceso; la capacidad global no basta.
+    id: "planeacion-seguimiento",
+    icon: "spark-chart",
+    short: "Planeación y Seguimiento",
+    label: "Planeación y Seguimiento",
+    items: [
+      { id: "planeacion_seguimiento", label: "Planeación y Seguimiento", icon: "spark-chart", to: "/admin/planeacion-seguimiento", minimum: "consulta" },
     ],
   },
   {

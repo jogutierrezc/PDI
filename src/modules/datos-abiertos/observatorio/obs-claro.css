@@ -349,6 +349,7 @@
   --wall-programas-en-cifras: var(--od-line-4);
   --wall-udrive: var(--od-line-2);
   --wall-gestion-master: var(--od-line-6);
+  --wall-planeacion-seguimiento: var(--od-line-3);
   --wall-ink: #ffffff;
   --wall-numeral: rgba(255, 255, 255, 0.16);
   --wall-veil: rgba(255, 255, 255, 0.14);

@@ -31,6 +31,7 @@ import { useProgramOffer, useUnitOptions, type UnitOption } from "./people-db";
 import { reason, roleMatrix } from "./summary";
 import {
   CT_NIVELES,
+  PS_NIVELES,
   EXPLICIT_ONLY,
   LEVEL_LABEL,
   MODULES,
@@ -504,6 +505,8 @@ function RoleEditor({
           gm_funcion: columns.gm_funcion,
           // Sin la migración 0260 la columna no existe: solo se envía si el rol usa Cumplimiento de Tipología o ya la traía.
           ...(columns.ct_nivel !== "none" || role?.ct_nivel !== undefined ? { ct_nivel: columns.ct_nivel } : {}),
+          // Sin la migración 0286 la columna no existe: solo se envía si el rol usa Planeación y Seguimiento o ya la traía.
+          ...(columns.ps_nivel !== "none" || role?.ps_nivel !== undefined ? { ps_nivel: columns.ps_nivel } : {}),
           // Sin la migración 0231 la columna no existe: solo se envía si el rol usa el Observatorio o ya la traía.
           ...(columns.obs_nivel !== "none" || role?.obs_nivel !== undefined ? { obs_nivel: columns.obs_nivel, all_obs: columns.all_obs } : {}),
         },
@@ -763,6 +766,20 @@ function RoleEditor({
                         ))}
                       </div>
                       <small>{CT_NIVELES.find((nivel) => nivel.id === matrix.ct.nivel)?.hint}</small>
+                    </div>
+                  )}
+                  {module.id === "planeacion-seguimiento" && choice.screens.includes("planeacion_seguimiento") && (
+                    <div className="us-reports" role="group" aria-label="Nivel en Planeación y Seguimiento">
+                      <strong>Nivel en Planeación y Seguimiento</strong>
+                      <div className="us-screens">
+                        {PS_NIVELES.map((nivel) => (
+                          <label key={nivel.id} className="oda-check" title={nivel.hint}>
+                            <input type="radio" name="nivel-ps" checked={matrix.ps.nivel === nivel.id} onChange={() => update((draft) => void (draft.ps.nivel = nivel.id))} />
+                            {nivel.label}
+                          </label>
+                        ))}
+                      </div>
+                      <small>{PS_NIVELES.find((nivel) => nivel.id === matrix.ps.nivel)?.hint}</small>
                     </div>
                   )}
                   {module.id === "observatorio" && (

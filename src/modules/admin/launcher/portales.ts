@@ -13,7 +13,7 @@
      when     condición propia (p. ej. el lado de Impacto de la persona)
    ========================================================================== */
 
-import type { AdminScreen, AppRole, CtNivel, GmNivel } from "../../../types/database";
+import type { AdminScreen, AppRole, CtNivel, GmNivel, PsNivel } from "../../../types/database";
 import type { ImpactoSide } from "../../../lib/auth";
 import { navigation, type AdminSection, type NavGroup } from "../components/AdminShell";
 import { STATIONS } from "../udes-en-cifras/progress";
@@ -36,6 +36,8 @@ export interface PortalContext {
   gmNivel?: GmNivel;
   /** Nivel en Cumplimiento de Tipología (0260). */
   ctNivel?: CtNivel;
+  /** Nivel en Planeación y Seguimiento (0286). */
+  psNivel?: PsNivel;
 }
 
 export interface PortalCard {
@@ -259,6 +261,33 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
             { key: "gm-flujos", title: "Flujos de aprobación", text: "Pasos, funciones, suplentes y plazos", to: `${base}/flujos`, when: (ctx) => ctx.gmNivel === "gestor", screen: "gestion_master" },
             { key: "gm-conexion", title: "Conexión con el Warehouse", text: "Lo capturado del Master, lo que falta aplicar y el corte", to: `${base}/conexion`, when: (ctx) => ctx.gmNivel === "gestor", screen: "gestion_master" },
             { key: "gm-rua", title: "Histórico de Rua", text: "Las solicitudes que se tramitaron en Rua, solo para consultar", to: `${base}/rua`, screen: "gestion_master" },
+          ],
+        },
+      ];
+    },
+  },
+  "planeacion-seguimiento": {
+    text: "Planes institucionales como el PDIFyT 2027-2035: las líneas, su cronograma y sus versiones",
+    color: "var(--wall-planeacion-seguimiento)",
+    rank: 5.85,
+    sections: () => {
+      const base = "/admin/planeacion-seguimiento";
+      return [
+        {
+          title: "El plan",
+          cards: [
+            { key: "ps-resumen", title: "Resumen del plan", text: "Inversión, prioridad, pilar, campus y fuente de las líneas, con filtros", to: `${base}/resumen`, screen: "planeacion_seguimiento" },
+            { key: "ps-proyectos", title: "Proyectos", text: "Las líneas del plan con búsqueda, filtros y orden; cada una se abre a pantalla completa", to: `${base}/proyectos`, screen: "planeacion_seguimiento" },
+            { key: "ps-cronograma", title: "Cronograma", text: "Las líneas del plan entre 2027 y 2035", to: `${base}/cronograma`, screen: "planeacion_seguimiento" },
+          ],
+        },
+        {
+          title: "Control del plan",
+          cards: [
+            { key: "ps-calidad", title: "Calidad de datos", text: "Qué falta diligenciar o está inconsistente en la matriz", to: `${base}/calidad`, screen: "planeacion_seguimiento" },
+            { key: "ps-versiones", title: "Versiones", text: "La línea base, los borradores y la publicación", to: `${base}/versiones`, screen: "planeacion_seguimiento" },
+            { key: "ps-cargar", title: "Cargar la planificación", text: "Plantilla de Excel, revisión de lo leído y creación de la versión borrador", to: `${base}/cargar`, when: (ctx) => ctx.psNivel === "admin", screen: "planeacion_seguimiento" },
+            { key: "ps-roles", title: "Roles y permisos", text: "Qué puede hacer cada nivel en el módulo", to: `${base}/roles`, screen: "planeacion_seguimiento" },
           ],
         },
       ];

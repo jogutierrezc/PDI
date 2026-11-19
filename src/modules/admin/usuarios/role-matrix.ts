@@ -55,13 +55,13 @@
    función en esa pertenencia (unit_members.role).
    ========================================================================== */
 
-import type { AccessRole, AdminScreen, AppRole, CtNivel, GmNivel, ImpactLevel, InformeLevel, ObsNivel } from "../../../types/database";
+import type { AccessRole, AdminScreen, AppRole, CtNivel, GmNivel, ImpactLevel, InformeLevel, ObsNivel, PsNivel } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type ModuleId =
   | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
-  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "udrive" | "datos-sostenibilidad" | "gestion-master" | "pilo" | "sistema";
+  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "udrive" | "datos-sostenibilidad" | "gestion-master" | "planeacion-seguimiento" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -241,6 +241,16 @@ export const MODULES: ModuleDef[] = [
     },
   },
   {
+    id: "planeacion-seguimiento",
+    label: "Planeación y Seguimiento",
+    screens: [
+      { id: "planeacion_seguimiento", label: "Planeación y Seguimiento", note: "el acceso lo da el nivel que se elige abajo (lector, colaborador, gestor, aprobador o administrador del módulo), no la capacidad" },
+    ],
+    levels: {
+      ver: { hint: "Marca la pantalla; el nivel que se elige abajo decide qué puede hacer. Sin nivel, no entra.", needs: "consulta" },
+    },
+  },
+  {
     id: "rankings",
     label: "Rankings (THE, GreenMetric)",
     seenFrom: "planeacion",
@@ -404,9 +414,25 @@ export interface Matrix {
   gm: GmScope;
   /** Cumplimiento de Tipología (0260): el nivel del rol; vale solo si la pantalla está marcada. */
   ct: CtScope;
+  /** Planeación y Seguimiento (0286): el nivel del rol; vale solo si la pantalla está marcada. */
+  ps: PsScope;
   /** Observatorio (0231): todos los observatorios, o solo los que se asignen a la persona. */
   obs: ObsScope;
 }
+
+/** Planeación y Seguimiento (0286): none · lector · colaborador · gestor · aprobador · administrador del módulo. */
+export interface PsScope {
+  nivel: PsNivel;
+}
+
+export const PS_NIVELES: { id: PsNivel; label: string; hint: string }[] = [
+  { id: "none", label: "Sin acceso", hint: "La pantalla está marcada pero la persona no entra: elija un nivel." },
+  { id: "lector", label: "Lector o directivo", hint: "Ve el resumen, los proyectos, el cronograma y las versiones del plan, solo para leer." },
+  { id: "colaborador", label: "Colaborador", hint: "Además reportará avances de las actividades que le asignen (fases siguientes)." },
+  { id: "gestor", label: "Gestor de oficina", hint: "Además asignará y validará el trabajo de su oficina (fases siguientes)." },
+  { id: "aprobador", label: "Aprobador", hint: "Además decidirá las solicitudes de cambio al plan, salvo las propias (fases siguientes)." },
+  { id: "admin", label: "Administrador de planeación", hint: "Además carga la planificación desde Excel, crea el plan y publica versiones." },
+];
 
 /** Cumplimiento de Tipología (0260): none · programa o decano · vicerrectoría · administrador del módulo. */
 export interface CtScope {
@@ -446,6 +472,8 @@ export interface RoleColumns {
   gm_funcion: string | null;
   /** Cumplimiento de Tipología (0260): none sin la pantalla; programa · vicerrectoria · admin con ella. */
   ct_nivel: CtNivel;
+  /** Planeación y Seguimiento (0286): none sin la pantalla; lector · colaborador · gestor · aprobador · admin con ella. */
+  ps_nivel: PsNivel;
   /** Observatorio (0231): none sin el módulo; ver · editar · administrar con él. */
   obs_nivel: ObsNivel;
   /** Observatorio (0231): todos los observatorios o solo los asignados (obs_responsables). */
@@ -456,6 +484,7 @@ const emptyImpact = (): ImpactScope => ({ allUnits: false, units: [] });
 const emptyInforme = (): InformeScope => ({ level: "none", allUnits: false, units: [] });
 const emptyGm = (): GmScope => ({ papel: "solicitante", funcion: "" });
 const emptyCt = (): CtScope => ({ nivel: "none" });
+const emptyPs = (): PsScope => ({ nivel: "none" });
 const emptyObs = (): ObsScope => ({ allObs: true });
 
 /** Nivel de la matriz → gm_nivel. «Ver» no da acceso (como Impacto): el permiso es explícito. */
@@ -506,6 +535,8 @@ export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
   if (id === "informes") return choice.level;
   // Gestión Master: el nivel es el elegido (gm_nivel), nunca la capacidad (0194).
   if (id === "gestion-master") return choice.level;
+  // Planeación y Seguimiento: el permiso es el nivel elegido (ps_nivel), nunca la capacidad (0286).
+  if (id === "planeacion-seguimiento") return choice.level;
   // Observatorio: el nivel es el elegido (obs_nivel); pedir Editar o Administrar ya sube la capacidad a Planeación (0231).
   if (id === "observatorio") return choice.level;
   const capacity = capacityOf(matrix);
@@ -572,6 +603,8 @@ export function compile(matrix: Matrix): RoleColumns {
     gm_funcion: (gmNivel === "revisor" || gmNivel === "gestor") && matrix.gm.funcion ? matrix.gm.funcion : null,
     // Cumplimiento de Tipología: con la pantalla marcada, el nivel elegido; sin ella, ninguno (0260).
     ct_nivel: matrix.modules["gestion-master"].screens.includes("cumplimiento_tipologia") ? matrix.ct.nivel : "none",
+    // Planeación y Seguimiento: con la pantalla marcada, el nivel elegido; sin ella, ninguno (0286).
+    ps_nivel: matrix.modules["planeacion-seguimiento"].screens.includes("planeacion_seguimiento") ? matrix.ps.nivel : "none",
     obs_nivel: obsNivel,
     all_obs: obsOn ? matrix.obs.allObs : true,
   };
@@ -580,7 +613,7 @@ export function compile(matrix: Matrix): RoleColumns {
 /** Columnas de un rol guardado → matriz, para editarlo. */
 export function decompile(
   role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports"> &
-    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion" | "gm_nivel" | "gm_funcion" | "ct_nivel" | "obs_nivel" | "all_obs">>,
+    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units" | "informe_gestion" | "gm_nivel" | "gm_funcion" | "ct_nivel" | "ps_nivel" | "obs_nivel" | "all_obs">>,
   reports: string[],
   units: string[] = [],
   informeUnits: string[] = [],
@@ -596,6 +629,7 @@ export function decompile(
     informe: { level: role.informe_level ?? "none", allUnits: role.all_informe_units ?? false, units: [...informeUnits] },
     gm: { papel: role.gm_nivel === "revisor" ? "revisor" : "solicitante", funcion: role.gm_funcion ?? "" },
     ct: { nivel: role.ct_nivel ?? "none" },
+    ps: { nivel: role.ps_nivel ?? "none" },
     obs: { allObs: role.all_obs ?? true },
   };
   for (const module of MODULES) {
@@ -607,7 +641,7 @@ export function decompile(
   // esa capacidad le permite. Es lo que la base hace cumplir.
   const capacity = role.base_role;
   for (const module of MODULES) {
-    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto" || module.id === "informes" || module.id === "gestion-master" || module.id === "observatorio") continue;
+    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto" || module.id === "informes" || module.id === "gestion-master" || module.id === "planeacion-seguimiento" || module.id === "observatorio") continue;
     let best: Level = "ver";
     for (const [level, def] of Object.entries(module.levels) as [Exclude<Level, "none">, { needs: AppRole }][]) {
       if (module.id === "cifras" && level === "administrar" && !role.all_reports) continue;
@@ -650,7 +684,7 @@ function full(id: ModuleId, level: Level): ModuleChoice {
 /** La matriz de una plantilla. */
 export function templateMatrix(template: Exclude<TemplateId, "personalizada">): Matrix {
   const modules = emptyModules();
-  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme(), gm: emptyGm(), ct: emptyCt(), obs: emptyObs() };
+  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme(), gm: emptyGm(), ct: emptyCt(), ps: emptyPs(), obs: emptyObs() };
   if (template === "consulta") {
     for (const module of MODULES) modules[module.id] = full(module.id, "ver");
     return base;
@@ -699,6 +733,7 @@ const sameColumns = (a: RoleColumns, b: RoleColumns) =>
   a.informe_gestion === b.informe_gestion &&
   a.gm_nivel === b.gm_nivel &&
   a.ct_nivel === b.ct_nivel &&
+  a.ps_nivel === b.ps_nivel &&
   a.obs_nivel === b.obs_nivel &&
   a.all_obs === b.all_obs &&
   (a.gm_funcion ?? "") === (b.gm_funcion ?? "") &&
@@ -792,6 +827,14 @@ export function describe(
           : ct === "vicerrectoria"
             ? "En Cumplimiento de Tipología compara programas y sedes de su vicerrectoría."
             : "En Cumplimiento de Tipología administra: calcula el corte, asigna programas a unidades y ve las observaciones para Master.",
+    );
+  }
+  if (matrix.modules["planeacion-seguimiento"].screens.includes("planeacion_seguimiento")) {
+    const ps = matrix.ps.nivel;
+    lines.push(
+      ps === "none"
+        ? "En Planeación y Seguimiento la pantalla aparece, pero sin acceso (falta elegir un nivel)."
+        : `En Planeación y Seguimiento entra como ${PS_NIVELES.find((n) => n.id === ps)?.label.toLowerCase()}: ${PS_NIVELES.find((n) => n.id === ps)?.hint.toLowerCase().replace(/\.$/, "")}.`,
     );
   }
   const gm = effectiveLevel(matrix, "gestion-master");

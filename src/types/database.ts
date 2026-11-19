@@ -72,6 +72,7 @@ export type AdminScreen =
   | "udrive"
   | "gestion_master"
   | "cumplimiento_tipologia"
+  | "planeacion_seguimiento"
   | "cms"
   | "portales_publicos"
   // Paneles del Observatorio de Analítica (0231). «observatorio» sigue siendo la entrada general al módulo.
@@ -108,6 +109,8 @@ export interface AccessRole {
   gm_funcion?: string | null;
   /** Cumplimiento de Tipología (0260): none · programa (programa o decano) · vicerrectoria · admin (administrador del módulo). Exige la pantalla «cumplimiento_tipologia». */
   ct_nivel?: CtNivel;
+  /** Planeación y Seguimiento (0286): none · lector · colaborador · gestor · aprobador · admin. Exige la pantalla «planeacion_seguimiento». */
+  ps_nivel?: PsNivel;
   /** Observatorio (0231): none (se deriva de la capacidad, como antes) · ver · editar · administrar. */
   obs_nivel?: ObsNivel;
   /** Observatorio (0231): todos los observatorios, o solo aquellos donde la persona figure en obs_responsables. */
@@ -126,6 +129,8 @@ export type InformeLevel = "none" | "editor" | "jefe";
 export type GmNivel = "none" | "solicitante" | "revisor" | "gestor";
 /** Cumplimiento de Tipología (0260). */
 export type CtNivel = "none" | "programa" | "vicerrectoria" | "admin";
+/** Planeación y Seguimiento (0286). */
+export type PsNivel = "none" | "lector" | "colaborador" | "gestor" | "aprobador" | "admin";
 
 export interface AccessRoleReport {
   access_role_id: string;

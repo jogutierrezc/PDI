@@ -246,6 +246,8 @@ const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default:
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
 const UDrive = lazy(() => import("./modules/udrive/ui/UDrive").then((m) => ({ default: m.UDrive })));
 const GestionMaster = lazy(() => import("./modules/gestion-master/GestionMaster").then((m) => ({ default: m.GestionMaster })));
+const PlaneacionSeguimiento = lazy(() => import("./modules/planeacion-seguimiento/PlaneacionSeguimiento").then((m) => ({ default: m.PlaneacionSeguimiento })));
+const PsDemo = import.meta.env.DEV ? lazy(() => import("./modules/planeacion-seguimiento/Demo").then((m) => ({ default: m.PsDemo }))) : null;
 const CumplimientoTipologia = lazy(() => import("./modules/cumplimiento-tipologia/CumplimientoTipologia").then((m) => ({ default: m.CumplimientoTipologia })));
 const ProgramasEnCifras = lazy(() => import("./modules/programas-en-cifras/ui/ProgramasEnCifras").then((m) => ({ default: m.ProgramasEnCifras })));
 const Encuestas = lazy(() => import("./modules/encuestas/ui/Encuestas").then((m) => ({ default: m.Encuestas })));
@@ -578,6 +580,17 @@ export default function App() {
               </RequireRole>
             }
           />
+          {/* Planeación y Seguimiento (0286): planes institucionales, líneas, versiones. El acceso es el nivel del rol (ps_nivel), no la capacidad. */}
+          <Route
+            path="/admin/planeacion-seguimiento/:seccion?/:id?"
+            element={
+              <RequireRole minimum="consulta" screen="planeacion_seguimiento">
+                <PlaneacionSeguimiento />
+              </RequireRole>
+            }
+          />
+          {/* Solo en desarrollo (Vite lo elimina de la compilación): Planeación y Seguimiento con datos en memoria, sin sesión. Ver modules/planeacion-seguimiento/Demo.tsx. */}
+          {PsDemo ? <Route path="/__ps-demo/:seccion?/:id?" element={<PsDemo />} /> : null}
           {/* Datos de Sostenibilidad al estilo UDrive (0202): archivos, indicadores y portal; las tablas, gráficas y cruces se abren en /tabla/:id, /grafica/:id y /cruce/:id. */}
           <Route
             path="/admin/datos-sostenibilidad/:vista?/:id?"

@@ -55,3 +55,24 @@ Contrato de la base: `docs/planeacion-seguimiento/CONTRATO-BD-F3.md` (§6 = lo i
 - **Plantilla por plan.** `modeloPlanes.columnasDeConfig` arma las columnas desde la configuración del plan; `plantilla.ts` y `importar.ts` las usan (`config`, `anios`, `oficinaDuena`). Sin configuración todo sigue como el PDIFyT. Criterios, viabilidades, «% de inversión» y correo del gestor no se configuran: viajan siempre como opcionales (la base solo conoce `no, clasif, nombre, descripcion, campus, pilar, monto, prioridad, resultado, fuente, origen, inicio, fin, oficina`). Con pilares definidos, la columna «Pilar» se valida contra ellos; una línea sin oficina hereda la del plan.
 - **Todos los planes** (`TodosLosPlanes.tsx`, ruta `planes`; administrador, aprobador, lector y financiero en lectura): totales, alertas, tarjetas por plan (con el hueco «Financiero: próximamente»), matriz plan × oficina con el número escrito, avance por oficina y ritmo semanal. Los cálculos vienen de `ps_tablero_admin`.
 - **Demostración:** 3 planes (PDIFyT institucional de Planeación, Plan de Tecnología de oficina con otra plantilla y pilares, Plan de Bienestar archivado), cada uno con su adaptador de actividades. La interfaz de la VAF (evaluación, presupuesto, vigilancia) queda para la fase siguiente.
+
+## VAF · financiación y presupuesto (CONTRATO-BD-F3B.md §6–§7, migración 0290; carpeta `vaf/`)
+
+La Vicerrectoría Administrativa y Financiera evalúa lo financiero de cada plan y vigila el presupuesto y su ejecución. **No bloquea**: las oficinas operan mientras tanto. Nivel `financiero` (lector global que además escribe lo financiero); el administrador también opera todo para revisar y probar. La ejecución la registra solo la VAF/admin; las oficinas la ven (lectura) en el detalle de sus líneas.
+- **Pantallas** (todas a pantalla completa con «Regresar», sin modales): `financiacion` (pestañas Por evaluar · Presupuesto · Alertas · Configuración), `vaf-evaluar/<plan>` (ficha en dos pasos; observaciones ≥ 20 caracteres con ajustes o no viable; historial), `vaf-linea/<ps_lineas.id>` (cifras, ejecución junto al avance físico validado, financiación por año —se edita en la misma página— y libro con anular inline), `vaf-mov/<línea>` (registrar), `vaf-cargar/<plan>?tipo=financiacion|ejecucion` (Excel todo o nada, errores por fila y columna), `vaf-umbrales/<plan>`, `vaf-config` (unidad de la VAF, solo admin). El panel «Presupuesto y ejecución de la línea» está en el detalle de la línea y de la actividad.
+- **Lógica pura** (`modeloVaf.ts`): pesos (`$ 12,5 MM` = miles de millones, `$ 1.250 M` = millones; completo para lector de pantalla), validaciones, cifras (aprobado = movimientos `aprobado` del año o, si no hay, lo aprobado por la VAF; disponible = vigente − max(comprometido, ejecutado)), desviación = % de ejecución − avance físico, alertas (`sobreejecucion`, `ejecucion_sobre_avance`, `avance_sobre_ejecucion`, `sin_movimientos`, `sin_evaluar_vaf`) y umbrales (15 puntos, 100 %, 3 meses). Excel: `excelVaf.ts`. Datos: `contratoVaf.ts`, `memoriaVaf.ts` (demo), `supabaseVaf.ts` (rpc `ps_vaf_*`, `ps_presupuesto_*`, `ps_vigilancia_*`, `ps_plan_config_*`).
+- El chip de estado financiero (glifo + texto) está en la barra de plan, en las tarjetas de «Todos los planes» y en la línea; el tablero suma presupuesto y evaluaciones por plan.
+
+### Asignar el nivel a «Director VAF» (solo texto: no se ejecuta desde la aplicación)
+El nivel se asigna por rol de acceso (Usuarios y roles › Planeación y Seguimiento › «Financiero (VAF)»); también se puede dejar en SQL, idempotente (requiere 0289 aplicada y que el rol «Director VAF» exista):
+```sql
+update public.access_roles
+   set ps_nivel = 'financiero',
+       screens = (select array(select distinct unnest(screens || array['planeacion_seguimiento']))) -- agrega la pantalla sin quitar las que ya tiene
+ where name = 'Director VAF'
+   and not all_screens
+   and (ps_nivel is distinct from 'financiero' or not ('planeacion_seguimiento' = any (screens)));
+-- Si el rol marca «todas las pantallas» (all_screens = true), basta con el nivel:
+update public.access_roles set ps_nivel = 'financiero' where name = 'Director VAF' and all_screens and ps_nivel is distinct from 'financiero';
+```
+La unidad que recibe los avisos se fija en «Financiación y presupuesto › Configuración» (solo administrador).

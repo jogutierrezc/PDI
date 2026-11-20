@@ -10,13 +10,16 @@ import { Icon } from "../../components/ui/Icon";
 import { useAct } from "./actividades/hooks";
 import { usePs } from "./contexto";
 import { DESDE_MODULO } from "./marco/PaginaCompleta";
+import { ChipEstadoFinanciero } from "./vaf/partesVaf";
+import { estadoFinancieroDeConteos, estadoFinancieroPlan, veFinanciacion } from "./vaf/modeloVaf";
+import { useVafEvaluaciones } from "./vaf/hooksVaf";
 import { puedeCrearPlanes, puedeVerTodosLosPlanes, type PlanResumen } from "./modeloPlanes";
 
 export const rotuloPlan = (p: Pick<PlanResumen, "nombre" | "oficina" | "estado">): string => `${p.nombre}${p.oficina ? ` · ${p.oficina.nombre}` : ""}${p.estado === "archivado" ? " (archivado)" : ""}`;
 
-/** El hueco del estado financiero (evaluación de la VAF y ejecución): llega con la fase de financiación y presupuesto. */
-export function ChipFinanciero() {
-  return <span className="ps-fin-chip" title="El estado financiero llega con la evaluación de la VAF"><Icon name="clock" size={12} /> Financiero: próximamente</span>;
+/** El estado financiero (evaluación de la VAF), a partir de los conteos del tablero. */
+export function ChipFinanciero({ conteos }: { conteos?: { pendientes: number; aprobadas: number; ajustadas: number; noViables: number } | null }) {
+  return <ChipEstadoFinanciero estado={estadoFinancieroDeConteos(conteos)} />;
 }
 
 export function SelectorPlan() {
@@ -24,6 +27,7 @@ export function SelectorPlan() {
   const { planes, planId, elegirPlan, ruta, nivel, plan } = usePs();
   const act = useAct();
   const gestor = act.oficinas.some((o) => o.poder === "gestor");
+  const evs = useVafEvaluaciones(planId, veFinanciacion(nivel));
   const activo = planes.find((p) => p.id === planId);
   const puedeEditar = nivel === "admin" || (nivel === "gestor" && Boolean(plan?.oficina && act.oficinas.some((o) => o.id === plan.oficina!.id && o.poder === "gestor")));
   return (
@@ -36,13 +40,13 @@ export function SelectorPlan() {
           </select>
         ) : <strong>Aún no hay planes</strong>}
       </div>
-      {activo ? <p className="ps-barra-plan__info"><span className="ps-estado" data-tono={activo.estado === "archivado" ? "pend" : "ok"}>{activo.estado === "archivado" ? "Archivado" : "Activo"}</span> {activo.oficina ? `Oficina dueña: ${activo.oficina.nombre}` : "Sin oficina asignada"}{activo.versionVigente ? ` · versión ${activo.versionVigente}` : " · sin versión vigente"}</p> : null}
+      {activo ? <p className="ps-barra-plan__info"><span className="ps-estado" data-tono={activo.estado === "archivado" ? "pend" : "ok"}>{activo.estado === "archivado" ? "Archivado" : "Activo"}</span> {activo.oficina ? `Oficina dueña: ${activo.oficina.nombre}` : "Sin oficina asignada"}{activo.versionVigente ? ` · versión ${activo.versionVigente}` : " · sin versión vigente"} {evs.data ? <ChipEstadoFinanciero estado={estadoFinancieroPlan(evs.data)} /> : null}</p> : null}
       <div className="ps-barra-plan__acc">
         {puedeVerTodosLosPlanes(nivel) ? <Link className="button-secondary ps-btn-peq" to={ruta("planes")} state={DESDE_MODULO}><Icon name="grid" size={13} /> Todos los planes</Link> : null}
         {!activo?.oficina && activo && nivel === "admin" ? <Link className="button-primary ps-btn-peq" to={ruta("plan-editar", activo.id)} state={DESDE_MODULO}>Asignar la oficina del plan</Link> : null}
         {puedeEditar && activo ? <Link className="button-secondary ps-btn-peq" to={ruta("plan-editar", activo.id)} state={DESDE_MODULO}><Icon name="pen" size={13} /> Editar el plan</Link> : null}
         {puedeCrearPlanes(nivel, gestor) ? <Link className="button-secondary ps-btn-peq" to={ruta("crear")} state={DESDE_MODULO}><Icon name="plus" size={13} /> Crear un plan</Link> : null}
-        <span className="ps-barra-plan__fin" aria-disabled="true" role="link" tabIndex={0} title="Próximamente"><Icon name="lock" size={13} /> Financiación y presupuesto <em>próximamente</em></span>
+        {veFinanciacion(nivel) ? <Link className="button-secondary ps-btn-peq" to={ruta("financiacion")} state={DESDE_MODULO}><Icon name="chart" size={13} /> Financiación y presupuesto</Link> : null}
       </div>
     </section>
   );

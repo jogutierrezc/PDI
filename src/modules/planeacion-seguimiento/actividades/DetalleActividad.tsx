@@ -19,6 +19,7 @@ import { ROTULO_PODER, progresoChecklist, type EventoActividad } from "./modelo"
 import { Avatar, Banner, ChipEstado, ChipPlazo, MenuMover, MensajeRechazo, PrioridadAct } from "./partes";
 import { PanelAvances, PanelComentarios, PanelEvidencias, PanelRiesgos } from "./PestanasDetalle";
 import { BarraAvance, ChipPdi } from "./partesF3";
+import { PanelPresupuestoLinea } from "../vaf/PanelPresupuestoLinea";
 import { puedeEditar, puedeMarcarChecklist, puedeTransferir } from "./reglas";
 
 const PESTANAS = [
@@ -134,6 +135,7 @@ export function DetalleActividad({ id }: { id: string }) {
               <div><dt>Plan de Desarrollo Institucional</dt><dd>{x.pdi.conexion === "con_pdi" ? <ul className="ps-pdi-lista">{x.pdi.items.map((i) => <li key={`${i.pillarId}-${i.lineaId}`}><strong>{i.pilar}</strong>{i.linea ? <span>{i.area ? `${i.area} · ` : ""}{i.lineaCodigo} {i.linea}</span> : <span>Pilar completo</span>}</li>)}</ul> : x.pdi.conexion === "sin_pdi" ? "No tiene conexión con el PDI." : <em>Sin definir (es anterior a este dato).{puedeEditar(poder) ? " Edite la actividad para definirlo." : ""}</em>}</dd></div>
               <div><dt>Responsables</dt><dd>{x.asignados.length ? <ul className="ps-resp">{x.asignados.map((p) => <li key={p}><Avatar nombre={a.nombreDe(p)} tam={22} /> {a.nombreDe(p)}</li>)}</ul> : <em>Sin responsable</em>}</dd></div>
             </dl>
+            {x.lineaNo ? <PanelPresupuestoLinea no={x.lineaNo} /> : null}
           </>
         ) : null}
         {pestana === "avances" ? <PanelAvances x={x} det={det} poder={poder} /> : null}

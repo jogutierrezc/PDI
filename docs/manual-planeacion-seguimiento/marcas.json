@@ -1,0 +1,331 @@
+{
+ "resumen": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "resumen-full": {
+  "ms": [],
+  "ratio": 2.5859
+ },
+ "selector-plan": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "tablero": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "tablero-full": {
+  "ms": [],
+  "ratio": 3.2852
+ },
+ "lista": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "planificacion": {
+  "ms": [
+   [
+    1,
+    1.78,
+    33.22
+   ],
+   [
+    2,
+    0.34,
+    45.55
+   ],
+   [
+    3,
+    0.34,
+    65.7
+   ]
+  ],
+  "ratio": 0.7627
+ },
+ "mis-tareas": {
+  "ms": [
+   [
+    1,
+    0.34,
+    12.44
+   ],
+   [
+    2,
+    0.34,
+    50.94
+   ],
+   [
+    3,
+    0.34,
+    75.28
+   ]
+  ],
+  "ratio": 0.7627
+ },
+ "planes": {
+  "ms": [
+   [
+    1,
+    0.34,
+    35.59
+   ],
+   [
+    2,
+    42.06,
+    9
+   ],
+   [
+    3,
+    0.34,
+    59.61
+   ]
+  ],
+  "ratio": 0.7627
+ },
+ "crear-datos": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "crear-oficina": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "crear-plantilla": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "crear-pilares": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "cargar-archivo": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "avisos": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "plazos": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "roles": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "versiones": {
+  "ms": [],
+  "ratio": 0.2953
+ },
+ "revisar": {
+  "ms": [
+   [
+    1,
+    82.23,
+    37.28
+   ],
+   [
+    2,
+    90.85,
+    51.08
+   ]
+  ],
+  "ratio": 0.5803
+ },
+ "revisar-uno": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "cronograma-act": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "asignar": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "act-que": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "act-pdi": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "act-cuando": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "act-quien": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "importar-archivo": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "detalle": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "transferir": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "devolver": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "cerrar": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "riesgo": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "rep-que": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "rep-evid": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "rep-riesgos": {
+  "ms": [],
+  "ratio": 0.179
+ },
+ "calidad": {
+  "ms": [],
+  "ratio": 0.6729
+ },
+ "proyectos": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "movil-tablero": {
+  "ms": [],
+  "ratio": 13.491
+ },
+ "movil-reporte": {
+  "ms": [],
+  "ratio": 0.8862
+ },
+ "colab-sinacceso": {
+  "ms": [],
+  "ratio": 0.1453
+ },
+ "rep-revisar": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "cargar-revisar": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "cargar-corregir": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "importar-revisar": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "importar-corregir": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "vaf-evaluar": {
+  "ms": [
+   [
+    1,
+    0.34,
+    44.69
+   ],
+   [
+    3,
+    0.34,
+    79.3
+   ]
+  ],
+  "ratio": 0.5889
+ },
+ "vaf-presupuesto": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "vaf-alertas": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "vaf-config": {
+  "ms": [],
+  "ratio": 0.4198
+ },
+ "vaf-ficha": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "vaf-umbrales": {
+  "ms": [],
+  "ratio": 0.676
+ },
+ "vaf-cargar-fin": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "vaf-cargar-eje": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "movil-tareas": {
+  "ms": [],
+  "ratio": 2.3077
+ },
+ "vaf-linea": {
+  "ms": [],
+  "ratio": 0.7627
+ },
+ "vaf-mov": {
+  "ms": [],
+  "ratio": 0.7093
+ },
+ "anatomia": {
+  "ms": [
+   [
+    1,
+    2.03,
+    12.21
+   ],
+   [
+    2,
+    6.72,
+    45.74
+   ],
+   [
+    3,
+    43.76,
+    59.26
+   ],
+   [
+    4,
+    67.91,
+    59.26
+   ],
+   [
+    5,
+    79.34,
+    59.26
+   ],
+   [
+    6,
+    45.62,
+    46.84
+   ]
+  ],
+  "ratio": 0.2881
+ }
+}

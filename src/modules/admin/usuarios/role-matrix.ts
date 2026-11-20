@@ -244,7 +244,7 @@ export const MODULES: ModuleDef[] = [
     id: "planeacion-seguimiento",
     label: "Planeación y Seguimiento",
     screens: [
-      { id: "planeacion_seguimiento", label: "Planeación y Seguimiento", note: "el acceso lo da el nivel que se elige abajo (lector, colaborador, gestor, aprobador o administrador del módulo), no la capacidad" },
+      { id: "planeacion_seguimiento", label: "Planeación y Seguimiento", note: "el acceso lo da el nivel que se elige abajo (lector, colaborador, gestor, aprobador, financiero de la VAF o administrador del módulo), no la capacidad" },
     ],
     levels: {
       ver: { hint: "Marca la pantalla; el nivel que se elige abajo decide qué puede hacer. Sin nivel, no entra.", needs: "consulta" },
@@ -420,7 +420,7 @@ export interface Matrix {
   obs: ObsScope;
 }
 
-/** Planeación y Seguimiento (0286): none · lector · colaborador · gestor · aprobador · administrador del módulo. */
+/** Planeación y Seguimiento (0286, 0289): none · lector · colaborador · gestor · aprobador · financiero (VAF) · administrador del módulo. */
 export interface PsScope {
   nivel: PsNivel;
 }
@@ -431,7 +431,8 @@ export const PS_NIVELES: { id: PsNivel; label: string; hint: string }[] = [
   { id: "colaborador", label: "Colaborador", hint: "Además reportará avances de las actividades que le asignen (fases siguientes)." },
   { id: "gestor", label: "Gestor de oficina", hint: "Además asignará y validará el trabajo de su oficina (fases siguientes)." },
   { id: "aprobador", label: "Aprobador", hint: "Además decidirá las solicitudes de cambio al plan, salvo las propias (fases siguientes)." },
-  { id: "admin", label: "Administrador de planeación", hint: "Además carga la planificación desde Excel, crea el plan y publica versiones." },
+  { id: "financiero", label: "Financiero (VAF)", hint: "La Vicerrectoría Administrativa y Financiera: ve todos los planes y oficinas en lectura, evalúa la financiación de cada plan y de cada línea, registra la ejecución del presupuesto y vigila sus alertas. No crea actividades ni valida avances. Se asigna por persona, con el rol «Director VAF»." },
+  { id: "admin", label: "Administrador de planeación", hint: "Además carga la planificación desde Excel, crea el plan y publica versiones; también opera todo lo financiero (evaluar, registrar y vigilar) para revisar y probar." },
 ];
 
 /** Cumplimiento de Tipología (0260): none · programa o decano · vicerrectoría · administrador del módulo. */

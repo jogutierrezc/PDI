@@ -13,13 +13,17 @@ import { createContext, useContext } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import type { PsApiAct } from "./actividades/contratoApi";
+import type { PsApiVaf } from "./vaf/contratoVaf";
+import { crearVafMemoria } from "./vaf/memoriaVaf";
+import { crearVafSupabase } from "./vaf/supabaseVaf";
+import { cifrasDeJson } from "./vaf/supabaseVaf";
 import { crearActividadesMemoria } from "./actividades/memoria";
 import { crearActividadesSupabase } from "./actividades/supabaseAct";
 import type { PapelOficina } from "./actividades/modelo";
 import { catalogoColumnas, configPorOmision, listaDeConfig, saludDe, totalesDe, filtrarTablero, type ConfigPlan, type DatosPlan, type FiltrosTablero, type PlanOficinaCelda, type PlanResumen, type PlanTablero, type SaludPlan, type TableroAdmin, type AlertaTablero } from "./modeloPlanes";
 import { estadoPlazo, sumarDias } from "./actividades/modelo";
 import type { Actividad } from "./actividades/modelo";
-import { CATALOGO_PDI_DEMO } from "./actividades/semilla";
+import { CATALOGO_PDI_DEMO, oficinaDeLinea as oficinaDeLineaDemo } from "./actividades/semilla";
 import { CAMPUS, CAMPUS_TODOS, PRIORIDADES, type CargaPlanificacion, type ClaveCriterio, type ClaveViabilidad, type Linea, type Oficina, type PlanVista, type PsNivel, type VersionResumen, aniosDe, llano } from "./modelo";
 
 export interface ErrorCarga {
@@ -37,7 +41,7 @@ export interface ResultadoCarga {
   errores: ErrorCarga[];
 }
 
-export interface PsApi extends PsApiAct {
+export interface PsApi extends PsApiAct, PsApiVaf {
   nivel(): Promise<PsNivel>;
   /** Nombres de los campus del portal (sin «Todos»). */
   campus(): Promise<string[]>;
@@ -300,12 +304,34 @@ export function crearApiMemoria(op: OpcionesMemoria = {}): PsApi {
       const ini = sumarDias(fin, -6);
       return { semana: ini, avancesValidados: acts.filter((a) => a.avance.validadoEn && a.avance.validadoEn.slice(0, 10) >= ini && a.avance.validadoEn.slice(0, 10) <= fin).length };
     });
-    return { acts, resumen, tablero: { ...resumen, porOficina, porEstado, porPilar: [...pilares].map(([nombre, actividades]) => ({ nombre, actividades })).sort((a, b) => b.actividades - a.actividades), ritmoSemanas: ritmo, monto: vigenteDe(p)?.meta.inversion ?? 0 } };
+    const rv = await vaf.resumenPlan(p.id).catch(() => null);
+    return { acts, resumen, tablero: { ...resumen, presupuesto: rv?.presupuesto, evaluacionesVaf: rv?.evaluaciones, porOficina, porEstado, porPilar: [...pilares].map(([nombre, actividades]) => ({ nombre, actividades })).sort((a, b) => b.actividades - a.actividades), ritmoSemanas: ritmo, monto: vigenteDe(p)?.meta.inversion ?? 0 } };
   };
   const visibles = (): PlanMem[] => planes;
 
+  const vaf = crearVafMemoria({
+    hoy, nivel: nivelDe, espera, listo: iniciar,
+    planes: () => planes.map((p) => ({ id: p.id, nombre: p.nombre, anioIni: p.anioIni, anioFin: p.anioFin, oficinaId: p.oficinaId, estado: p.estado, versionId: vigenteDe(p)?.meta.id ?? null, versionEtiqueta: vigenteDe(p)?.meta.etiqueta ?? null, creadoEn: p.creadoEn })),
+    lineasDe: (id) => { const p = planes.find((x) => x.id === id); return p ? (vigenteDe(p)?.lineas ?? []) : []; },
+    oficina: (id) => oficinas.find((o) => o.id === id) ?? null,
+    oficinaDeLinea: (l) => oficinas.find((o) => llano(o.nombre) === llano(l.oficina ?? ""))?.id ?? oficinaDeLineaDemo(l),
+    avanceDeLinea: async (planId, no) => {
+      const api = adaptadorDe(planId);
+      const acts = (await api.actividades(await oficinasDe(api))).filter((a) => a.lineaNo === no);
+      return acts.length ? Math.round((acts.reduce((s, a) => s + a.avance.fisico, 0) / acts.length) * 10) / 10 : null;
+    },
+    veLinea: async (planId, linea) => {
+      if (["admin", "financiero", "lector", "aprobador"].includes(nivelDe)) return true;
+      const api = adaptadorDe(planId);
+      const ofId = oficinas.find((o) => llano(o.nombre) === llano(linea.oficina ?? ""))?.id ?? oficinaDeLineaDemo(linea);
+      return (await api.oficinasVisibles()).some((o) => o.id === ofId && o.poder !== "ninguno");
+    },
+    unidades: () => oficinas.map((o) => ({ id: o.id, nombre: o.nombre, codigo: o.id.toUpperCase() })),
+  });
+
   return {
     ...(delegados as unknown as PsApiAct),
+    ...vaf,
     async nivel() { await espera(); return nivelDe; },
     async campus() { await espera(); return campus; },
     async oficinas() { await espera(); return oficinas; },
@@ -348,6 +374,7 @@ export function crearApiMemoria(op: OpcionesMemoria = {}): PsApi {
           if (o.lineas > 0 && o.actividades === 0) alertas.push({ tipo: "oficina_sin_responsable", planId: p.id, oficinaId: o.unitId, severidad: "baja", texto: `${o.nombre} tiene líneas en «${p.nombre}» pero aún no planifica actividades.` });
         }
       }
+      for (const a of await vaf.vigilanciaGlobal()) alertas.push({ tipo: a.tipo, planId: a.planId, oficinaId: a.oficinaId, severidad: a.severidad, texto: a.texto });
       const filtrado = filtrarTablero({ generadoEn: new Date().toISOString(), totales: totalesDe(tableros), planes: tableros, alertas }, f);
       return { ...filtrado, totales: totalesDe(filtrado.planes) };
     },
@@ -402,6 +429,9 @@ export function crearApiMemoria(op: OpcionesMemoria = {}): PsApi {
       if (v.meta.estado === "publicada") throw new Error("Esa versión ya está publicada.");
       if (!v.lineas.length) throw new Error("No se puede publicar una versión sin líneas.");
       v.meta = { ...v.meta, estado: "publicada", vigente: true, publicadaEn: new Date().toISOString() };
+      // Contrato F3B §6: publicar abre la evaluación financiera pendiente de la VAF (no bloquea nada).
+      const dueno = planes.find((p) => p.versiones.includes(v));
+      if (dueno) vaf.abrirEvaluacion(dueno.id, v.meta.id, v.meta.etiqueta, v.meta.inversion);
       return { etiqueta: v.meta.etiqueta };
     },
   };
@@ -481,7 +511,7 @@ export function tableroDeJson(v: unknown): TableroAdmin {
   const t = (f.totales ?? {}) as Fila;
   return {
     generadoEn: String(f.generado_en ?? ""),
-    totales: { planes: Number(t.planes ?? 0), activos: Number(t.activos ?? 0), lineas: Number(t.lineas ?? 0), actividades: Number(t.actividades ?? 0), vencidas: Number(t.vencidas ?? 0), enRiesgo: Number(t.en_riesgo ?? 0), porValidar: Number(t.por_validar ?? 0), avanceFisico: Number(t.avance_fisico ?? 0), avanceFinanciero: num(t.avance_financiero), monto: Number(t.monto ?? 0) },
+    totales: { planes: Number(t.planes ?? 0), activos: Number(t.activos ?? 0), lineas: Number(t.lineas ?? 0), actividades: Number(t.actividades ?? 0), vencidas: Number(t.vencidas ?? 0), enRiesgo: Number(t.en_riesgo ?? 0), porValidar: Number(t.por_validar ?? 0), avanceFisico: Number(t.avance_fisico ?? 0), avanceFinanciero: num(t.avance_financiero), monto: Number(t.monto ?? 0), ...(t.presupuesto ? { presupuesto: cifrasDeJson(t.presupuesto) } : {}) },
     planes: ((f.planes ?? []) as Fila[]).map((p): PlanTablero => ({
       ...resumenDeFila(p),
       porOficina: ((p.por_oficina ?? []) as Fila[]).map((o) => ({ unitId: String(o.unit_id), nombre: String(o.nombre ?? ""), lineas: Number(o.lineas ?? 0), actividades: Number(o.actividades ?? 0), avance: Number(o.avance ?? 0), vencidas: Number(o.vencidas ?? 0), porValidar: Number(o.por_validar ?? 0), salud: saludDeTexto(o.salud) })),
@@ -489,6 +519,8 @@ export function tableroDeJson(v: unknown): TableroAdmin {
       porPilar: ((p.por_pilar ?? []) as Fila[]).map((x) => ({ nombre: String(x.nombre ?? x.pilar ?? ""), actividades: Number(x.actividades ?? x.lineas ?? 0) })),
       ritmoSemanas: ((p.ritmo_semanas ?? []) as Fila[]).map((x) => ({ semana: String(x.semana), avancesValidados: Number(x.avances_validados ?? 0) })),
       monto: Number(p.monto ?? 0),
+      presupuesto: p.presupuesto ? cifrasDeJson(p.presupuesto) : undefined,
+      evaluacionesVaf: p.evaluaciones_vaf ? { pendientes: Number((p.evaluaciones_vaf as Fila).pendientes ?? 0), aprobadas: Number((p.evaluaciones_vaf as Fila).aprobadas ?? 0), ajustadas: Number((p.evaluaciones_vaf as Fila).ajustadas ?? 0), noViables: Number((p.evaluaciones_vaf as Fila).no_viables ?? 0) } : undefined,
     })),
     alertas: ((f.alertas ?? []) as Fila[]).map((a): AlertaTablero => ({ tipo: String(a.tipo ?? "actividades_vencidas"), planId: String(a.plan_id ?? ""), oficinaId: texto(a.oficina_unit_id), texto: String(a.texto ?? ""), severidad: a.severidad === "alta" || a.severidad === "baja" ? a.severidad : "media" })),
   };
@@ -527,6 +559,7 @@ export function crearApiSupabase(): PsApi {
   };
   return {
     ...crearActividadesSupabase(() => planFijo),
+    ...crearVafSupabase(),
     async nivel() {
       const r = await supabase.rpc("ps_nivel_actual");
       if (r.error) throw errorDe(r.error);

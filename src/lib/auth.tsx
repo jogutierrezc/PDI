@@ -173,7 +173,7 @@ export function ctNivelDe(profile: Profile | null, access: AccessScope | null): 
 /**
  * ¿Entra a Planeación y Seguimiento? Espejo de ps_nivel_actual() (0286): la administración general siempre (como
  * administrador del módulo); los demás, solo si su rol de acceso marca la pantalla «planeacion_seguimiento» y lleva un
- * nivel (lector, colaborador, gestor, aprobador o admin). La capacidad global NO basta, igual que en Gestión Master.
+ * nivel (lector, colaborador, gestor, aprobador, financiero o admin). La capacidad global NO basta, igual que en Gestión Master.
  */
 export function psNivelDe(profile: Profile | null, access: AccessScope | null): PsNivel {
   if (!profile?.is_active) return "none";

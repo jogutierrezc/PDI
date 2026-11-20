@@ -4,6 +4,7 @@ import { useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePs } from "./contexto";
+import { PanelPresupuestoLinea } from "./vaf/PanelPresupuestoLinea";
 import { DESDE_MODULO, PaginaCompleta } from "./marco/PaginaCompleta";
 import { EstadoEvaluacion, InversionPorAnio, Nota, Prioridad } from "./partes";
 import { CRITERIOS, VIABILIDADES, fecha, millones1, pesos, pilarCodigo, pilarNombre, porcentaje, rotuloCampus, type Linea } from "./modelo";
@@ -98,6 +99,7 @@ export function DetalleLinea({ id }: { id: string }) {
           <>
             {l.descripcion ? <p className="ps-descripcion">{l.descripcion}</p> : <Nota>Esta línea no trae descripción.</Nota>}
             <Ficha l={l} />
+            <PanelPresupuestoLinea no={l.no} />
             <section className="ps-bloque">
               <h2>Inversión programada por año</h2>
               {hayDistribucion ? (

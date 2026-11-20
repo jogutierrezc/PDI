@@ -5,6 +5,7 @@
    ========================================================================== */
 
 import { COLUMNAS, type CampoId, type Columna } from "./columnas";
+import type { CifrasPresupuesto } from "./vaf/modeloVaf";
 import { CLASIFICACIONES, FUENTES, PILARES, PRIORIDADES, RESULTADOS, llano, type PsNivel } from "./modelo";
 
 export type EstadoPlan = "activo" | "archivado";
@@ -238,11 +239,14 @@ export interface PlanTablero extends PlanResumen {
   /** Avances validados por semana (la más antigua primero). */
   ritmoSemanas: { semana: string; avancesValidados: number }[];
   monto: number;
+  /** VAF: presupuesto del plan y evaluaciones por estado (`ps_tablero_admin`). */
+  presupuesto?: CifrasPresupuesto;
+  evaluacionesVaf?: { pendientes: number; aprobadas: number; ajustadas: number; noViables: number };
 }
 
 export interface TableroAdmin {
   generadoEn: string;
-  totales: { planes: number; activos: number; lineas: number; actividades: number; vencidas: number; enRiesgo: number; porValidar: number; avanceFisico: number; avanceFinanciero: number | null; monto: number };
+  totales: { planes: number; activos: number; lineas: number; actividades: number; vencidas: number; enRiesgo: number; porValidar: number; avanceFisico: number; avanceFinanciero: number | null; monto: number; presupuesto?: CifrasPresupuesto };
   planes: PlanTablero[];
   alertas: AlertaTablero[];
 }
@@ -292,7 +296,14 @@ export function totalesDe(planes: readonly PlanTablero[]): TableroAdmin["totales
     vencidas: planes.reduce((s, p) => s + p.vencidas, 0), enRiesgo: planes.reduce((s, p) => s + (p.porEstado.en_riesgo ?? 0), 0), porValidar: planes.reduce((s, p) => s + p.porValidar, 0),
     avanceFisico: actividades ? Math.round(pond / actividades) : 0, avanceFinanciero: fin.length ? Math.round(fin.reduce((s, p) => s + (p.avanceFinanciero ?? 0), 0) / fin.length) : null,
     monto: planes.reduce((s, p) => s + p.monto, 0),
+    ...(planes.some((p) => p.presupuesto) ? { presupuesto: sumaCifras(planes.flatMap((p) => (p.presupuesto ? [p.presupuesto] : []))) } : {}),
   };
+}
+
+function sumaCifras(xs: readonly CifrasPresupuesto[]): CifrasPresupuesto {
+  const s = (k: keyof CifrasPresupuesto) => xs.reduce((t, x) => t + ((x[k] as number) ?? 0), 0);
+  const vigente = s("vigente");
+  return { aprobado: s("aprobado"), modificado: s("modificado"), vigente, comprometido: s("comprometido"), ejecutado: s("ejecutado"), pagado: s("pagado"), disponible: s("disponible"), pctEjecucion: vigente > 0 ? Math.round((s("ejecutado") / vigente) * 1000) / 10 : null };
 }
 
 /** Color de calor 0..4 para la matriz plan × oficina (no solo color: la celda lleva el número). */

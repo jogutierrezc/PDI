@@ -16,6 +16,7 @@ import { entero, fecha, millones } from "./modelo";
 import { ROTULO_ALCANCE, ROTULO_SALUD, nivelCalor, ordenarPlanes, puedeVerTodosLosPlanes, type EstadoPlan, type FiltrosTablero, type OrdenPlanes, type PlanTablero, type SaludPlan } from "./modeloPlanes";
 import { useEntradaResumen } from "./movimiento";
 import { ChipFinanciero } from "./SelectorPlan";
+import { Pesos } from "./vaf/partesVaf";
 
 const GLIFO_SALUD: Record<SaludPlan, "check" | "alert" | "clock" | "info"> = { verde: "check", ambar: "clock", rojo: "alert", sin_datos: "info" };
 const Salud = ({ s }: { s: SaludPlan }) => <span className="ps-salud" data-s={s}><Icon name={GLIFO_SALUD[s]} size={13} />{ROTULO_SALUD[s]}</span>;
@@ -74,6 +75,7 @@ export function TodosLosPlanes() {
               <div><dt>Actividades</dt><dd data-cuenta={t.totales.actividades}>{entero(t.totales.actividades)}</dd><dd className="ps-kpis__s">{t.totales.enRiesgo} en riesgo</dd></div>
               <div><dt>Vencidas</dt><dd data-cuenta={t.totales.vencidas}>{entero(t.totales.vencidas)}</dd><dd className="ps-kpis__s">{t.totales.porValidar} avances por validar</dd></div>
               <div><dt>Avance físico validado</dt><dd data-cuenta={t.totales.avanceFisico} data-formato="pct">{t.totales.avanceFisico} %</dd><dd className="ps-kpis__s">financiero: {pct(t.totales.avanceFinanciero)}</dd></div>
+              {t.totales.presupuesto ? <div><dt>Presupuesto vigente</dt><dd><Pesos n={t.totales.presupuesto.vigente} fuerte /></dd><dd className="ps-kpis__s">ejecutado {t.totales.presupuesto.pctEjecucion ?? 0} %</dd></div> : null}
             </dl>
 
             {t.alertas.length ? (
@@ -106,13 +108,14 @@ export function TodosLosPlanes() {
                       <span className="ps-avbar"><span className="ps-avbar__pista" role="img" aria-label={`Avance físico validado: ${p.avanceFisico} %`}><i data-barra="x" style={{ width: `${p.avanceFisico}%` }} /></span><b>{p.avanceFisico} %</b></span>
                       <small>Financiero: {pct(p.avanceFinanciero)}</small>
                     </div>
+                    {p.presupuesto ? <p className="ps-plan-tarjeta__ppto">Presupuesto vigente <Pesos n={p.presupuesto.vigente} fuerte /> · ejecutado <Pesos n={p.presupuesto.ejecutado} /> ({p.presupuesto.pctEjecucion === null ? "sin vigente" : `${p.presupuesto.pctEjecucion} %`})</p> : null}
                     <dl className="ps-plan-tarjeta__cifras">
                       <div><dt>Líneas</dt><dd>{p.lineas}</dd></div>
                       <div><dt>Actividades</dt><dd>{p.actividades}</dd></div>
                       <div><dt>Vencidas</dt><dd data-mal={p.vencidas > 0 || undefined}>{p.vencidas}</dd></div>
                       <div><dt>Por validar</dt><dd>{p.porValidar}</dd></div>
                     </dl>
-                    <div className="ps-plan-tarjeta__pie"><ChipFinanciero />{!p.oficina && nivel === "admin" ? <button type="button" className="button-secondary ps-btn-peq" onClick={() => ir(ruta("plan-editar", p.id))}>Asignar la oficina</button> : null}<button type="button" className="button-primary ps-btn-peq" onClick={() => abrir(p)}>Abrir el plan<span className="sr-only"> «{p.nombre}»</span></button></div>
+                    <div className="ps-plan-tarjeta__pie"><ChipFinanciero conteos={p.evaluacionesVaf} />{!p.oficina && nivel === "admin" ? <button type="button" className="button-secondary ps-btn-peq" onClick={() => ir(ruta("plan-editar", p.id))}>Asignar la oficina</button> : null}<button type="button" className="button-primary ps-btn-peq" onClick={() => abrir(p)}>Abrir el plan<span className="sr-only"> «{p.nombre}»</span></button></div>
                   </li>
                 ))}
               </ul>

@@ -33,6 +33,14 @@ import { Tablero } from "./actividades/Tablero";
 import { Devolver } from "./actividades/Devolver";
 import { Transferir } from "./actividades/Transferir";
 import { SelectorPlan } from "./SelectorPlan";
+import { CargarVaf } from "./vaf/CargarVaf";
+import { ConfigVaf } from "./vaf/ConfigVaf";
+import { EvaluarPlan } from "./vaf/EvaluarPlan";
+import { Financiacion } from "./vaf/Financiacion";
+import { LineaFinanciera } from "./vaf/LineaFinanciera";
+import { RegistrarMov } from "./vaf/RegistrarMov";
+import { UmbralesPlan } from "./vaf/UmbralesPlan";
+import { veFinanciacion } from "./vaf/modeloVaf";
 import { TodosLosPlanes } from "./TodosLosPlanes";
 import { Cerrar } from "./actividades/Cerrar";
 import { EditarPlazos } from "./actividades/EditarPlazos";
@@ -91,6 +99,13 @@ export const SECCIONES: Def[] = [
   { id: "transferir", nombre: "Transferir actividad", descripcion: "Pasar una actividad a otra persona, con motivo" },
   { id: "devolver", nombre: "Devolver actividad", descripcion: "Devolver una actividad de «En revisión» con una nota" },
   { id: "planes", nombre: "Todos los planes", descripcion: "El seguimiento de todos los planes: avance, alertas, oficinas y ritmo", riel: true },
+  { id: "financiacion", nombre: "Financiación y presupuesto", descripcion: "La evaluación financiera de la VAF, el presupuesto y su ejecución, y las alertas de vigilancia", riel: true },
+  { id: "vaf-evaluar", nombre: "Evaluación financiera", descripcion: "La ficha de evaluación de un plan" },
+  { id: "vaf-linea", nombre: "Presupuesto de la línea", descripcion: "Financiación por año y libro de movimientos de una línea" },
+  { id: "vaf-mov", nombre: "Registrar un movimiento", descripcion: "Un movimiento del libro de presupuesto" },
+  { id: "vaf-cargar", nombre: "Cargar desde Excel", descripcion: "Financiación por línea o ejecución presupuestal" },
+  { id: "vaf-config", nombre: "Unidad de la VAF", descripcion: "La unidad que evalúa lo financiero" },
+  { id: "vaf-umbrales", nombre: "Umbrales de vigilancia", descripcion: "Cuándo la ejecución dispara una alerta" },
   { id: "plan-editar", nombre: "Editar plan", descripcion: "Datos, oficina dueña, plantilla y pilares del plan" },
   { id: "reportar", nombre: "Reportar avance", descripcion: "Qué avanzó, evidencias, riesgos y revisar" },
   { id: "revisar", nombre: "Por validar", descripcion: "Avances que esperan la revisión del gestor" },
@@ -101,7 +116,7 @@ export const SECCIONES: Def[] = [
 ];
 
 /** Secciones que muestran el plan: sin plan o sin versión se reemplazan por el estado vacío guiado. */
-const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "devolver", "reportar", "revisar", "cerrar", "riesgo", "plazos-aviso", "plan-editar", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
+const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "devolver", "reportar", "revisar", "cerrar", "riesgo", "plazos-aviso", "plan-editar", "financiacion", "vaf-evaluar", "vaf-linea", "vaf-mov", "vaf-cargar", "vaf-config", "vaf-umbrales", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
 
 function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
   const { plan, cargando, error } = usePs();
@@ -141,6 +156,13 @@ function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
     case "crear": return <CrearPlan />;
     case "plan-editar": return id ? <CrearPlan id={id} /> : <Resumen />;
     case "planes": return <TodosLosPlanes />;
+    case "financiacion": return <Financiacion />;
+    case "vaf-evaluar": return id ? <EvaluarPlan id={id} /> : <Financiacion />;
+    case "vaf-linea": return id ? <LineaFinanciera id={decodeURIComponent(id)} /> : <Financiacion />;
+    case "vaf-mov": return id ? <RegistrarMov id={decodeURIComponent(id)} /> : <Financiacion />;
+    case "vaf-cargar": return id ? <CargarVaf id={id} /> : <Financiacion />;
+    case "vaf-config": return <ConfigVaf />;
+    case "vaf-umbrales": return id ? <UmbralesPlan id={id} /> : <Financiacion />;
     case "publicar": return id ? <PublicarVersion id={id} /> : <Versiones />;
     case "comparar": return <Comparar />;
   }
@@ -158,7 +180,7 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
   const completa = !def.riel || ((seccion === "proyectos" || seccion === "mis-tareas") && Boolean(id));
   const ofi = useOficinaActual().oficina;
   const tituloDef = seccion === "planificacion" && ofi ? (ofi.papel !== null ? "Mi planificación" : `Planificación de ${ofi.nombre}`) : def.nombre;
-  const riel = SECCIONES.filter((x) => x.riel && (x.id !== "asignar" || nivel === "gestor" || nivel === "admin") && (x.id !== "planes" || puedeVerTodosLosPlanes(nivel)));
+  const riel = SECCIONES.filter((x) => x.riel && (x.id !== "asignar" || nivel === "gestor" || nivel === "admin") && (x.id !== "planes" || puedeVerTodosLosPlanes(nivel)) && (x.id !== "financiacion" || veFinanciacion(nivel)));
   const rotuloPlan = plan ? `${plan.nombre}${plan.version ? ` · ${plan.version.etiqueta}${plan.version.estado === "borrador" ? " (borrador)" : ""}` : ""}` : "Sin plan cargado";
   const cuerpo = <Cuerpo seccion={seccion} id={id} />;
 

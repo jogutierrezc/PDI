@@ -75,6 +75,7 @@ beforeAll(async () => {
   const carga = await call<Json>(P.admin, "ps_cargar_matriz", "$1, $2::jsonb, ''", [plan, JSON.stringify(["1", "2", "3", "4"].map(fila))]);
   expect(carga.errores).toEqual([]);
   for (const [clave, u] of [["1", TIC], ["2", TIC], ["3", INF]] as const) await call(P.admin, "ps_asignar_oficina_linea", "$1, $2, $3", [carga.version_id, clave, u]);
+  await call(P.admin, "ps_asignar_oficina_linea", "$1, $2, $3", [carga.version_id, "4", null]);   // 0291: la línea 4 queda sin oficina (0289 hereda la del plan)
   await call(P.admin, "ps_publicar_version", "$1, ''", [carga.version_id]);
 }, 240_000);
 
@@ -128,8 +129,8 @@ describe("0287 · crear actividades", () => {
 
   it("valida línea, fechas, hito, título y campus", async () => {
     const f = (d: Json) => errorOf(crear(P.gtic, TIC, { titulo: "Prueba válida", ...d }));
-    expect(await f({ linea_clave: "3" })).toMatch(/otra oficina/);          // línea de INF
-    expect(await f({ linea_clave: "4" })).toMatch(/otra oficina|sin oficina/); // línea sin oficina: solo admin
+    // 0291: una línea de INF (otra oficina del mismo plan) SÍ se puede vincular: la actividad aporta a INF (ver evaluacion.test.ts)
+    expect(await f({ linea_clave: "4" })).toMatch(/sin oficina/); // línea sin oficina: solo admin
     expect(await f({ linea_clave: "999" })).toMatch(/no existe en la versión vigente/);
     expect(await f({ inicio: "2027-05-01", fin: "2027-04-01" })).toMatch(/anterior/);
     expect(await f({ fin: "2040-01-01" })).toMatch(/vigencia del plan/);
@@ -314,7 +315,7 @@ describe("0287 · editar, checklist, comentar y eliminar", () => {
     expect(await fallo(P.col1, "ps_actividad_editar", "$1, $2::jsonb", [act, JSON.stringify({ titulo: "Otro título" })])).toMatch(/Sin permiso/);
     expect(await fallo(P.gtic, "ps_actividad_editar", "$1, $2::jsonb", [act, JSON.stringify({ oficina_unit_id: INF })])).toMatch(/no se puede editar/);
     expect(await fallo(P.gtic, "ps_actividad_editar", "$1, $2::jsonb", [act, JSON.stringify({ fin: "2050-01-01" })])).toMatch(/vigencia/);
-    expect(await fallo(P.gtic, "ps_actividad_editar", "$1, $2::jsonb", [act, JSON.stringify({ linea_clave: "3" })])).toMatch(/otra oficina/);
+    expect(await fallo(P.gtic, "ps_actividad_editar", "$1, $2::jsonb", [act, JSON.stringify({ linea_clave: "4" })])).toMatch(/sin oficina/);   // 0291: una línea de OTRA oficina sí se puede vincular; una sin oficina, no
     const r = await call(P.gtic, "ps_actividad_editar", "$1, $2::jsonb", [act, JSON.stringify({ titulo: "Documentar toda la red", fin: "2027-12-01", campus: "Valledupar" })]);
     expect(r).toMatchObject({ titulo: "Documentar toda la red", fin: "2027-12-01", campus: "Valledupar", linea_clave: "1" });
     const [ev] = await t.q<{ datos: Json }>("select datos from ps_eventos where actividad_id = $1 and tipo = 'actividad.editada'", [act]);
@@ -381,7 +382,7 @@ describe("0287 · carga masiva por Excel", () => {
     const r = await cargar(P.gtic, TIC, [
       { titulo: "Fila buena", linea: "1", fin: "2027-05-05", responsable: "col1@prueba.udes.edu.co" },
       { titulo: "", fin: "2027-05-05" },
-      { titulo: "Línea de INF", linea: "3" },
+      { titulo: "Línea sin oficina", linea: "4" },
       { titulo: "Campus raro", campus: "Medellín" },
       { titulo: "Responsable de fuera", responsable: "colinf@prueba.udes.edu.co" },
       { titulo: "Correo inexistente", responsable: "nadie@prueba.udes.edu.co" },
@@ -392,7 +393,7 @@ describe("0287 · carga masiva por Excel", () => {
     expect(r.recibidas).toBe(8);
     const por = (fila: number, campo: string) => r.errores.find((e: Json) => e.fila === fila && e.campo === campo);
     expect(por(2, "titulo")).toBeTruthy();
-    expect(por(3, "linea")?.mensaje).toMatch(/otra oficina/);
+    expect(por(3, "linea")?.mensaje).toMatch(/sin oficina/);
     expect(por(4, "campus")?.mensaje).toMatch(/Medellín/);
     expect(por(5, "responsable")?.mensaje).toMatch(/no pertenece a la oficina/);
     expect(por(6, "responsable")?.mensaje).toMatch(/No hay una persona/);
@@ -570,13 +571,13 @@ describe("0287 · idempotencia de la migración", () => {
   it("aplicarla otra vez no falla, no pisa plantillas editadas ni duplica filas", async () => {
     await t.q("update correo_templates set subject = 'Asunto editado por la administración' where key = 'c-ps-asignacion'");
     const antes = (await t.q<{ n: number }>("select (select count(*) from ps_actividades)::int + (select count(*) from ps_config)::int n"))[0].n;
-    const sql = ["0287_planeacion_seguimiento_actividades.sql", "0288_planeacion_seguimiento_avances.sql", "0289_planeacion_seguimiento_planes.sql", "0290_planeacion_seguimiento_presupuesto.sql"].map((f) => readFileSync(join(__dirname, "../../supabase/migrations", f), "utf8"));
+    const sql = ["0287_planeacion_seguimiento_actividades.sql", "0288_planeacion_seguimiento_avances.sql", "0289_planeacion_seguimiento_planes.sql", "0290_planeacion_seguimiento_presupuesto.sql", "0291_planeacion_seguimiento_evaluacion_proyectos.sql"].map((f) => readFileSync(join(__dirname, "../../supabase/migrations", f), "utf8"));
     for (let i = 0; i < 2; i++) for (const m of sql) await t.db.exec(m);
     const despues = (await t.q<{ n: number }>("select (select count(*) from ps_actividades)::int + (select count(*) from ps_config)::int n"))[0].n;
     expect(despues).toBe(antes);
     const [c] = await t.q<{ subject: string }>("select subject from correo_templates where key = 'c-ps-asignacion'");
     expect(c.subject).toBe("Asunto editado por la administración");
-    expect((await t.q("select 1 from correo_templates where key like 'c-ps-%'"))).toHaveLength(12);
+    expect((await t.q("select 1 from correo_templates where key like 'c-ps-%'"))).toHaveLength(13);
   });
 });
 
@@ -595,7 +596,7 @@ describe("0287 · bitácora solo-anexar y plantillas", () => {
   it("las plantillas c-ps-* existen, son del grupo y usan solo variables conocidas", async () => {
     const rows = await t.q<{ key: string; grp: string; action: string; tipo: string; subject: string; body: string; title: string; active: boolean }>(
       "select key, grp, action, tipo, subject, body, title, active from correo_templates where key like 'c-ps-%' order by key");
-    expect(rows.map((r) => r.key)).toEqual(["c-ps-asignacion", "c-ps-avance", "c-ps-cumplida", "c-ps-devuelto", "c-ps-por-vencer", "c-ps-transferencia", "c-ps-vaf-alerta", "c-ps-vaf-evaluar", "c-ps-vaf-resultado", "c-ps-validacion-pendiente", "c-ps-validado", "c-ps-vencida"]);
+    expect(rows.map((r) => r.key)).toEqual(["c-ps-aporte", "c-ps-asignacion", "c-ps-avance", "c-ps-cumplida", "c-ps-devuelto", "c-ps-por-vencer", "c-ps-transferencia", "c-ps-vaf-alerta", "c-ps-vaf-evaluar", "c-ps-vaf-resultado", "c-ps-validacion-pendiente", "c-ps-validado", "c-ps-vencida"]);
     const conocidas = new Set(["nombre", "correo", "sede", "rol", "enlace", "modulo", "titulo_aviso", "detalle", "oficina", "fecha_limite", "dias", "comentario", "autor"]);
     for (const r of rows) {
       expect(r).toMatchObject({ grp: "Planeación y Seguimiento", action: "ps", tipo: "aviso", active: true });

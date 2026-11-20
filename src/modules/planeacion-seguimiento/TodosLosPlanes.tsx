@@ -115,7 +115,7 @@ export function TodosLosPlanes() {
                       <div><dt>Vencidas</dt><dd data-mal={p.vencidas > 0 || undefined}>{p.vencidas}</dd></div>
                       <div><dt>Por validar</dt><dd>{p.porValidar}</dd></div>
                     </dl>
-                    <div className="ps-plan-tarjeta__pie"><ChipFinanciero conteos={p.evaluacionesVaf} />{!p.oficina && nivel === "admin" ? <button type="button" className="button-secondary ps-btn-peq" onClick={() => ir(ruta("plan-editar", p.id))}>Asignar la oficina</button> : null}<button type="button" className="button-primary ps-btn-peq" onClick={() => abrir(p)}>Abrir el plan<span className="sr-only"> «{p.nombre}»</span></button></div>
+                    <div className="ps-plan-tarjeta__pie"><ChipFinanciero conteos={p.evaluacionesVaf} />{!p.oficina && nivel === "admin" ? <button type="button" className="button-secondary ps-btn-peq" onClick={() => ir(ruta("plan-editar", p.id))}>Asignar la oficina</button> : null}{nivel === "admin" ? <button type="button" className="button-secondary ps-btn-peq" onClick={() => { elegirPlan(p.id); ir(ruta("asignar-oficinas")); }}>Asignar oficinas a los proyectos<span className="sr-only"> de «{p.nombre}»</span></button> : null}<button type="button" className="button-primary ps-btn-peq" onClick={() => abrir(p)}>Abrir el plan<span className="sr-only"> «{p.nombre}»</span></button></div>
                   </li>
                 ))}
               </ul>

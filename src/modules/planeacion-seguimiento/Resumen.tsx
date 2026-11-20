@@ -8,6 +8,7 @@ import { Gantt } from "./Cronograma";
 import { DESDE_MODULO } from "./marco/PaginaCompleta";
 import { useEntradaResumen } from "./movimiento";
 import { AnilloPrioridad, BarraFiltros, EstadoEvaluacion, InversionPorAnio, ListaBarras, Nota, Panel, Prioridad } from "./partes";
+import { ResumenAprobacionVista } from "./proyectos/ResumenAprobacion";
 import { clavePilar, entero, millones, millones1, porcentaje, rotuloCampus } from "./modelo";
 
 export function Resumen() {
@@ -77,6 +78,7 @@ export function Resumen() {
           </div>
         </Panel>
       </div>
+      <ResumenAprobacionVista compacto />
     </div>
   );
 }

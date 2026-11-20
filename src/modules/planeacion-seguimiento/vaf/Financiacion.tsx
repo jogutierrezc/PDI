@@ -15,12 +15,15 @@ import { useAct } from "../actividades/hooks";
 import { usePs } from "../contexto";
 import { DESDE_MODULO } from "../marco/PaginaCompleta";
 import { fecha } from "../modelo";
+import { ResumenAprobacionVista } from "../proyectos/ResumenAprobacion";
+import { useProyectosOps } from "../proyectos/hooksProy";
 import { CifrasPpto, ChipEstadoFinanciero, EjecucionVsAvance, ItemAlerta, Pesos, ordenarAlertas } from "./partesVaf";
 import { useVafConfig, useVafEvaluaciones, useVafPendientes, usePresupuestoPlan, useVigilancia, useUmbrales } from "./hooksVaf";
 import { ROTULO_EVALUACION, ROTULO_SEVERIDAD, antiguedadDias, esFinanciero, estadoFinancieroPlan, porcentajeVaf, puntos, textoAntiguedad, veFinanciacion, type SeveridadAlerta } from "./modeloVaf";
 
 const PESTANAS = [
   { id: "evaluar", texto: "Por evaluar" },
+  { id: "aprobacion", texto: "Solicitado vs aprobado" },
   { id: "presupuesto", texto: "Presupuesto" },
   { id: "alertas", texto: "Alertas" },
   { id: "config", texto: "Configuración" },
@@ -51,6 +54,7 @@ export function Financiacion() {
       </div>
       <div id="fin-panel" role="tabpanel" aria-labelledby={`fin-${pestana}`} className="ps-pestana-panel">
         {pestana === "evaluar" ? <PorEvaluar /> : null}
+        {pestana === "aprobacion" ? <ResumenAprobacionVista /> : null}
         {pestana === "presupuesto" ? <PresupuestoPlan planId={plan?.id ?? null} nombre={plan?.nombre ?? ""} /> : null}
         {pestana === "alertas" ? <Alertas planId={plan?.id ?? null} nombre={plan?.nombre ?? ""} /> : null}
         {pestana === "config" ? <ConfigResumen /> : null}
@@ -67,6 +71,7 @@ function PorEvaluar() {
   const q = useVafPendientes();
   const hist = useVafEvaluaciones(planId);
   const ahora = `${useAct().hoy}T12:00:00Z`;
+  const ops = useProyectosOps();
   if (q.isPending) return <LoadingBlock rows={3} label="Cargando la cola de evaluación" />;
   if (q.error) return <p className="ps-aviso ps-aviso--error" role="alert"><Icon name="alert" size={16} /> {(q.error as Error).message}</p>;
   const cola = q.data ?? [];
@@ -74,6 +79,16 @@ function PorEvaluar() {
     <>
       <section aria-labelledby="fin-cola-h">
         <div className="ps-seccion__cab"><h2 id="fin-cola-h">Esperan su evaluación <b className="ps-cubo__n" aria-label={`${cola.length} planes`}>{cola.length}</b></h2><p className="ps-sub">Un plan entra a la cola al publicarse su primera versión, o una nueva con montos distintos. La más antigua, primero.</p></div>
+        {esFinanciero(nivel) ? (
+          <div className="ps-botones">
+            <button type="button" className="button-secondary" onClick={() => ops.abrirPendientes.mutate()} disabled={ops.abrirPendientes.isPending} aria-busy={ops.abrirPendientes.isPending || undefined}><Icon name="clock" size={15} /> {ops.abrirPendientes.isPending ? "Abriendo…" : "Abrir evaluaciones pendientes"}</button>
+            <span className="ps-nota">Para los planes ya publicados que todavía no tienen evaluación de la VAF.</span>
+          </div>
+        ) : null}
+        <div role="status" aria-live="polite">
+          {ops.abrirPendientes.data ? <p className="ps-aviso ps-aviso--ok"><Icon name="check" size={16} /> {ops.abrirPendientes.data.abiertas === 0 ? "No había planes publicados sin evaluación: nada que abrir." : `Se ${ops.abrirPendientes.data.abiertas === 1 ? "abrió 1 evaluación" : `abrieron ${ops.abrirPendientes.data.abiertas} evaluaciones`}: ${ops.abrirPendientes.data.planes.join("; ")}.`}</p> : null}
+        </div>
+        {ops.abrirPendientes.error ? <p className="ps-aviso ps-aviso--error" role="alert"><Icon name="alert" size={16} /> {(ops.abrirPendientes.error as Error).message}</p> : null}
         {cola.length === 0 ? <EmptyBlock title="No hay planes por evaluar" hint="Cuando se publique una versión con montos nuevos, aparecerá aquí y se avisará a la VAF." /> : (
           <ul className="ps-cola__lista">
             {cola.map((e) => {

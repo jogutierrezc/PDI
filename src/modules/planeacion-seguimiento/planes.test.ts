@@ -97,9 +97,9 @@ describe("plantilla por plan", () => {
 
 describe("demostración con tres planes", () => {
   const api = (nivel: "admin" | "lector" | "gestor" = "admin") => crearApiMemoria({ estado: "publicado", nivel, papel: "jefe" });
-  it("hay tres planes: PDIFyT, uno de oficina y uno archivado, cada uno con su oficina", async () => {
+  it("hay cuatro planes: PDIFyT, dos de oficina, uno archivado y uno publicado sin evaluación, cada uno con su oficina", async () => {
     const p = await api().planes();
-    expect(p.map((x) => [x.nombre, x.alcance, x.estado, x.oficina?.id])).toEqual([["PDIFyT 2027-2035", "institucional", "activo", "of-2"], ["Plan de Tecnología 2027-2029", "oficina", "activo", "of-4"], ["Plan de Bienestar 2024-2026", "oficina", "archivado", "of-6"]]);
+    expect(p.map((x) => [x.nombre, x.alcance, x.estado, x.oficina?.id])).toEqual([["PDIFyT 2027-2035", "institucional", "activo", "of-2"], ["Plan de Tecnología 2027-2029", "oficina", "activo", "of-4"], ["Plan de Bienestar 2024-2026", "oficina", "archivado", "of-6"], ["Plan de Infraestructura 2027-2028", "oficina", "activo", "of-3"]]);
     expect(p[0].lineas).toBe(75);
   });
   it("cambiar de plan cambia las líneas, las oficinas con actividades y la configuración", async () => {
@@ -137,8 +137,8 @@ describe("demostración con tres planes", () => {
   });
   it("tablero de todos los planes: totales, por oficina, alertas, ritmo y filtros", async () => {
     const t = await api().tableroAdmin();
-    expect(t.totales.planes).toBe(3);
-    expect(t.totales.activos).toBe(2);
+    expect(t.totales.planes).toBe(4);
+    expect(t.totales.activos).toBe(3);
     expect(t.planes[0].porOficina.length).toBeGreaterThan(1);
     expect(t.planes[0].ritmoSemanas).toHaveLength(8);
     expect(t.alertas.length).toBeGreaterThan(0);
@@ -165,6 +165,6 @@ describe("tablero · cálculos puros", () => {
     expect(["rojo", "ambar", "verde", "sin_datos"].indexOf(o[0].salud)).toBeLessThanOrEqual(["rojo", "ambar", "verde", "sin_datos"].indexOf(o.at(-1)!.salud));
     const f = filtrarTablero(t, { oficinaId: "of-6" });
     expect(f.planes.length).toBeLessThan(t.planes.length + 1);
-    expect(totalesDe(t.planes).planes).toBe(3);
+    expect(totalesDe(t.planes).planes).toBe(4);
   });
 });

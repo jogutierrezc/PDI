@@ -14,7 +14,9 @@ import { usePs } from "../contexto";
 import { Campo, FormularioPasos, useBorradorLocal, type ErrorCampo } from "../marco/FormularioPasos";
 import { DESDE_MODULO, PaginaCompleta } from "../marco/PaginaCompleta";
 import { CAMPUS_TODOS, fecha, rotuloCampus } from "../modelo";
-import { useAct, useActividad, useCatalogoPdi, useEquipo, useGuardarActividad, useLineasOficina } from "./hooks";
+import { useAct, useActividad, useCatalogoPdi, useEquipo, useGuardarActividad } from "./hooks";
+import { useLineasParaActividad } from "../proyectos/hooksProy";
+import { agruparPorOficina, ayudaLineasParaActividad, filtrarLineasParaActividad } from "../proyectos/modeloProy";
 import { SELECCION_VACIA, resolverSeleccion, seleccionDe } from "./pdi";
 import { SelectorPdi } from "./SelectorPdi";
 import type { SeleccionPdi } from "./modeloF3";
@@ -62,11 +64,12 @@ function valoresDe(a: NonNullable<ReturnType<typeof useActividad>["data"]>["acti
 }
 
 function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; oficinaId: string; inicial: Parameters<typeof valoresDe>[0]; lineaInicial: string | null }) {
-  const { ruta, ir } = usePs();
+  const { ruta, ir, nivel } = usePs();
   const act = useAct();
   const oficina = act.porId.get(oficinaId)!;
   const campusQ = useCampus();
-  const lineasQ = useLineasOficina(oficinaId);
+  const lineasQ = useLineasParaActividad(oficinaId);
+  const [buscarLinea, setBuscarLinea] = useState("");
   const pdiQ = useCatalogoPdi();
   const equipoQ = useEquipo(oficinaId);
   const guardar = useGuardarActividad();
@@ -81,7 +84,13 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
   const titulo = id ? "Editar actividad" : "Crear actividad";
   const volver = `${ruta("planificacion")}?oficina=${encodeURIComponent(oficinaId)}`;
 
-  const lineas = useMemo(() => [...(lineasQ.data ?? [])].sort((a, b) => Number(a.no) - Number(b.no)), [lineasQ.data]);
+  const ordenar = <T extends { no: string }>(xs: readonly T[]) => [...xs].sort((a, b) => a.no.localeCompare(b.no, "es", { numeric: true }));
+  const para = lineasQ.data ?? { propias: [], otras: [], conOficina: 0, total: 0 };
+  const lineas = useMemo(() => [...ordenar(para.propias), ...ordenar(para.otras)], [lineasQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const visibles = filtrarLineasParaActividad({ ...para, propias: ordenar(para.propias), otras: ordenar(para.otras) }, buscarLinea, v.linea);
+  const gruposOtras = agruparPorOficina(visibles.otras);
+  const ayudaLinea = ayudaLineasParaActividad(para, oficina.nombre, nivel === "admin");
+  const deOtra = para.otras.find((l) => l.no === v.linea) ?? null;
   const equipo = useMemo(() => equipoQ.data ?? [], [equipoQ.data]);
   const campusSel = v.campus || (listaCampus[0] ?? "");
   const datos: DatosActividad = { id, oficinaId, lineaNo: v.linea === "propia" ? null : v.linea || "__sin_elegir__", titulo: v.titulo, descripcion: v.descripcion, inicio: v.inicio || null, fin: v.fin || null, esHito: v.esHito, prioridad: v.prioridad, campus: campusSel, asignados: v.asignados, pdi: v.pdi };
@@ -144,15 +153,22 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
           validar: validarPaso("que"),
           contenido: (
             <div className="ps-campos">
-              <Campo id="act-linea" etiqueta="Línea del plan a la que contribuye" ayuda={lineas.length ? `Las líneas que ${oficina.nombre} tiene a su cargo.` : `${oficina.nombre} no tiene líneas del plan asignadas: puede crear una actividad propia.`} error={mostrar("act-linea") ?? (tocados["act-linea"] && !v.linea ? "Elija una línea o «Actividad propia de la oficina»." : null)} obligatorio>
+              {para.total > 6 ? (
+                <label className="ps-buscar ps-buscar--linea"><Icon name="search" size={15} /><span className="sr-only">Buscar un proyecto por nombre, número u oficina</span><input type="search" value={buscarLinea} onChange={(e) => setBuscarLinea(e.target.value)} placeholder="Buscar un proyecto por nombre, N.º u oficina" /></label>
+              ) : null}
+              <Campo id="act-linea" etiqueta="Línea del plan a la que contribuye" ayuda={ayudaLinea.texto} error={mostrar("act-linea") ?? (tocados["act-linea"] && !v.linea ? "Elija una línea o «Actividad propia de la oficina»." : null)} obligatorio>
                 {(p) => (
                   <select {...p} value={v.linea} onChange={(e) => { poner("linea", e.target.value); const l = lineas.find((x) => x.no === e.target.value); if (l && !v.campus) poner("campus", l.campus); }} onBlur={salir("act-linea")}>
                     <option value="">Elija una opción…</option>
                     <option value="propia">Actividad propia de la oficina (no contribuye a una línea)</option>
-                    {lineas.map((l) => <option key={l.no} value={l.no}>#{l.no} · {l.nombre.replace(/\.$/, "").slice(0, 90)}</option>)}
+                    {visibles.propias.length ? <optgroup label={`Proyectos de ${oficina.nombre}`}>{visibles.propias.map((l) => <option key={l.no} value={l.no}>#{l.no} · {l.nombre.replace(/\.$/, "").slice(0, 90)}</option>)}</optgroup> : null}
+                    {gruposOtras.map((g) => <optgroup key={g.oficinaId} label={`Proyectos de otras oficinas del plan · ${g.oficinaNombre}`}>{g.lineas.map((l) => <option key={l.no} value={l.no}>#{l.no} · {l.nombre.replace(/\.$/, "").slice(0, 80)}</option>)}</optgroup>)}
                   </select>
                 )}
               </Campo>
+              {buscarLinea && visibles.propias.length + visibles.otras.length === 0 ? <p className="ps-nota" role="status">Ningún proyecto coincide con «{buscarLinea}».</p> : null}
+              {ayudaLinea.asignar ? <p className="ps-nota"><Icon name="info" size={13} /> <Link to={ruta("asignar-oficinas")} state={DESDE_MODULO}>Asignar oficinas a los proyectos</Link></p> : null}
+              {deOtra ? <p className="ps-aviso ps-aviso--info" role="status"><Icon name="info" size={16} /> <span>Este proyecto es de <strong>{deOtra.oficinaNombre}</strong>. Su actividad aportará a otra oficina y se le notificará a su gestor.</span></p> : null}
               <Campo id="act-titulo" etiqueta="Título de la actividad" ayuda="Empiece con un verbo: «Levantar el inventario de aulas»." error={mostrar("act-titulo")} obligatorio>
                 {(p) => <input {...p} type="text" value={v.titulo} onChange={(e) => poner("titulo", e.target.value)} onBlur={salir("act-titulo")} maxLength={MAX_TITULO + 20} autoComplete="off" />}
               </Campo>

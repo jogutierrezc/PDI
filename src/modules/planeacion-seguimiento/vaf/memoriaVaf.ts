@@ -82,6 +82,7 @@ export function crearVafMemoria(d: DepsVaf) {
         evaluaciones.push(ev("ev-1a", "no_viable", 60, { versionId: "ver-0", version: "v0.9", montoSolicitado: total * 1.4, observaciones: "El monto solicitado supera la capacidad de financiación del periodo; se pide reducir el alcance de las obras civiles.", evaluadoPor: persona, evaluadoEn: hace(52) }));
         evaluaciones.push(ev("ev-1b", "en_revision", 12));
       } else if (p.id === "plan-2") evaluaciones.push(ev("ev-2a", "pendiente", 3));
+      else if (p.id === "plan-4") { /* publicado sin evaluación: se abre con «Abrir evaluaciones pendientes» */ }
       else evaluaciones.push(ev("ev-3a", "aprobada_con_ajustes", 900, { montoAprobado: redondear(total * 0.82), fuente: "Presupuesto ordinario institucional", observaciones: "Se aprueba el 82 % del monto: las líneas de dotación se difieren a 2026.", evaluadoPor: persona, evaluadoEn: hace(880) }));
 
       const activo = p.estado === "activo";

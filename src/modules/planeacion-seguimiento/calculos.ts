@@ -5,7 +5,7 @@
    las líneas de UNA versión; aquí no hay avances (llegan en fases siguientes).
    ========================================================================== */
 
-import { ANIOS, CAMPUS_LISTA, CAMPUS_TODOS, PRIORIDADES, aniosDe, clavePilar, pilarCodigo, pilarNombre, rotuloCampus, type Linea } from "./modelo";
+import { ANIOS, CAMPUS_LISTA, CAMPUS_TODOS, PRIORIDADES, aniosDe, clavePilar, llano, pilarCodigo, pilarNombre, rotuloCampus, type Linea } from "./modelo";
 
 export const SIN_FUENTE = "Sin definir";
 export const SIN_OFICINA = "Sin oficina";
@@ -154,8 +154,11 @@ export interface HallazgoCalidad {
 
 const sumaPct = (l: Linea) => Object.values(l.pct).reduce((a, b) => a + b, 0);
 
+/** Un proyecto que la VAF rechazó: no lleva fechas ni distribución, y no es una inconsistencia. */
+const rechazada = (l: Linea): boolean => llano(l.resultado ?? "").startsWith("rechaz");
+
 export function calidadDeDatos(lineas: readonly Linea[]): HallazgoCalidad[] {
-  const ev = lineas.filter((l) => !sinEvaluar(l));
+  const ev = lineas.filter((l) => !sinEvaluar(l) && !rechazada(l));
   const sin = lineas.filter(sinEvaluar);
   const nombres = new Map<string, number>();
   for (const l of lineas) nombres.set(l.nombre, (nombres.get(l.nombre) ?? 0) + 1);

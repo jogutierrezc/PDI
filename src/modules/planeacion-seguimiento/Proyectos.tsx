@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { sinEvaluar } from "./calculos";
+import { SIN_EVALUAR } from "./calculos";
 import { usePs } from "./contexto";
 import { DESDE_MODULO } from "./marco/PaginaCompleta";
-import { BarraFiltros, EstadoEvaluacion, Prioridad } from "./partes";
+import { BarraFiltros, Prioridad } from "./partes";
+import { ChipEstadoProyecto } from "./proyectos/partesProy";
+import { estadoProyecto, puedeEvaluarProyecto } from "./proyectos/modeloProy";
 import { Icon } from "../../components/ui/Icon";
 import { PRIORIDADES, clavePilar, entero, llano, millones1, pilarCodigo, rotuloCampus, type Linea } from "./modelo";
 
@@ -26,7 +28,12 @@ const comparar: Record<Orden, (a: Linea, b: Linea) => number> = {
 };
 
 export function Proyectos() {
-  const { filtradas, ruta } = usePs();
+  const { filtradas, lineas, ruta, filtros, setFiltros, nivel } = usePs();
+  const soloSin = filtros.evaluacion?.length === 1 && filtros.evaluacion[0] === SIN_EVALUAR;
+  const alternarSin = () => { const f = { ...filtros }; if (soloSin) delete f.evaluacion; else f.evaluacion = [SIN_EVALUAR]; setFiltros(f); };
+  const nSin = lineas.filter((l) => estadoProyecto(l) === "sin_evaluar").length;
+  const nSinOficina = lineas.filter((l) => !l.oficina).length;
+  const evalua = puedeEvaluarProyecto(nivel);
   const [q, setQ] = useState("");
   const [orden, setOrden] = useState<Orden>("monto");
   const filas = useMemo(() => {
@@ -37,7 +44,14 @@ export function Proyectos() {
   return (
     <div className="ps-seccion">
       <BarraFiltros />
+      {nivel === "admin" && nSinOficina > 0 ? (
+        <p className="ps-aviso" role="note"><Icon name="info" size={16} /> <span><strong>{entero(nSinOficina)}</strong> {nSinOficina === 1 ? "proyecto no tiene" : "proyectos no tienen"} oficina responsable, así que nadie les planifica actividades. <Link to={ruta("asignar-oficinas")} state={DESDE_MODULO}>Asignar oficinas</Link></span></p>
+      ) : null}
       <div className="ps-herramientas">
+        <button type="button" className="ps-filtro-rapido" aria-pressed={soloSin} onClick={alternarSin}>
+          <Icon name="clock" size={14} /> Solo sin evaluar <b>{entero(nSin)}</b>
+        </button>
+        {nivel === "admin" || nivel === "gestor" ? <Link className="button-secondary ps-btn-peq" to={ruta("proyectos-plan")} state={DESDE_MODULO}><Icon name="pen" size={13} /> Proyectos del plan</Link> : null}
         <label className="ps-buscar">
           <Icon name="search" size={15} />
           <span className="sr-only">Buscar por nombre, descripción o número</span>
@@ -54,9 +68,9 @@ export function Proyectos() {
       {filas.length === 0 ? (
         <p className="ps-vacio-linea">Ninguna línea coincide con la búsqueda y los filtros. Quite alguno para ver más.</p>
       ) : (
-        <div className="ps-tabla" role="table" aria-label="Líneas del plan">
+        <div className="ps-tabla ps-tabla--evaluar" role="table" aria-label="Líneas del plan">
           <div className="ps-tabla__fila ps-tabla__cab" role="row">
-            <span role="columnheader">Línea</span><span role="columnheader">Campus</span><span role="columnheader">Prioridad</span><span role="columnheader" className="ps-der">Monto</span><span role="columnheader">Evaluación</span>
+            <span role="columnheader">Línea</span><span role="columnheader">Campus</span><span role="columnheader">Prioridad</span><span role="columnheader" className="ps-der">Monto</span><span role="columnheader">Evaluación</span><span role="columnheader">Acción</span>
           </div>
           {filas.map((l) => (
             <div className="ps-tabla__fila" role="row" key={l.no}>
@@ -67,7 +81,11 @@ export function Proyectos() {
               <span role="cell" data-l="Campus">{rotuloCampus(l.campus)}</span>
               <span role="cell" data-l="Prioridad"><Prioridad valor={l.prioridad} /></span>
               <span role="cell" className="ps-der" data-l="Monto">{l.monto === null ? "Sin monto" : millones1(l.monto)}</span>
-              <span role="cell" data-l="Evaluación"><EstadoEvaluacion evaluada={!sinEvaluar(l)} /></span>
+              <span role="cell" data-l="Evaluación"><ChipEstadoProyecto estado={estadoProyecto(l)} /></span>
+              <span role="cell" data-l="Acción">
+                {evalua ? <Link className={estadoProyecto(l) === "sin_evaluar" ? "button-primary ps-btn-peq" : "button-secondary ps-btn-peq"} to={ruta("proyecto-evaluar", l.no)} state={DESDE_MODULO}>{estadoProyecto(l) === "sin_evaluar" ? "Evaluar" : "Revisar"}<span className="sr-only"> el proyecto {l.no}</span></Link>
+                  : estadoProyecto(l) !== "sin_evaluar" ? <Link className="button-secondary ps-btn-peq" to={ruta("proyecto-evaluar", l.no)} state={DESDE_MODULO}>Ver evaluación<span className="sr-only"> del proyecto {l.no}</span></Link> : <span className="ps-nota">Espera a la VAF</span>}
+              </span>
             </div>
           ))}
         </div>

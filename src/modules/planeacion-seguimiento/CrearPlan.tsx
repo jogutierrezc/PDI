@@ -128,7 +128,7 @@ function Interior({ id, inicial, migas }: { id?: string; inicial: Valores; migas
   return (
     <FormularioPasos
       titulo={id ? "Editar plan" : "Crear plan"}
-      subtitulo={id ? "Los cambios en la plantilla valen para la próxima carga; lo ya publicado no cambia." : "Cada plan tiene su oficina dueña, su plantilla y sus pilares. Después se carga la planificación desde Excel."}
+      subtitulo={id ? "Los cambios en la plantilla valen para la próxima carga; lo ya publicado no cambia." : "Cada plan tiene su oficina dueña, su plantilla y sus pilares. Después se agregan los proyectos uno a uno o se cargan desde Excel."}
       migas={migas}
       regresarA={volver}
       paso={paso}
@@ -147,7 +147,7 @@ function Interior({ id, inicial, migas }: { id?: string; inicial: Valores; migas
           const nuevo = await crear.mutateAsync(datos);
           elegirPlan(nuevo);
           descartar();
-          ir(ruta("cargar"), { reemplazar: true });
+          ir(ruta("proyectos-plan"), { reemplazar: true });
         }
       }}
       pasos={[
@@ -296,7 +296,7 @@ function Interior({ id, inicial, migas }: { id?: string; inicial: Valores; migas
                 <div><dt>Columnas opcionales</dt><dd>{incluidas.filter((c) => !c.obligatoria).map((c) => c.etiqueta).join(", ") || "Ninguna"}</dd></div>
                 <div><dt>Pilares</dt><dd>{v.pilares.length ? v.pilares.map((p) => `${p.codigo ? `${p.codigo}. ` : ""}${p.nombre}`).join("; ") : "Sin pilares definidos (texto libre)"}</dd></div>
               </dl>
-              {!id ? <p className="ps-aviso"><Icon name="info" size={16} /> Al crear el plan pasará a cargar la planificación con su plantilla de Excel.</p> : null}
+              {!id ? <p className="ps-aviso"><Icon name="info" size={16} /> Al crear el plan pasará a «Proyectos del plan», donde agrega los proyectos uno a uno; si prefiere, también puede cargarlos con la plantilla de Excel.</p> : null}
             </>
           ),
         },

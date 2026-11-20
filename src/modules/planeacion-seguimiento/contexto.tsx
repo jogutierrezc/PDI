@@ -15,7 +15,8 @@ import { DESDE_MODULO } from "./marco/PaginaCompleta";
 
 export type Seccion = "resumen" | "proyectos" | "cronograma" | "calidad" | "versiones" | "roles" | "cargar" | "crear" | "publicar" | "comparar"
   | "planificacion" | "tablero" | "lista" | "cronograma-act" | "mis-tareas" | "asignar" | "actividad" | "actividad-nueva" | "actividad-editar" | "importar-actividades" | "transferir" | "devolver" | "avisos"
-  | "reportar" | "revisar" | "cerrar" | "riesgo" | "plazos-aviso" | "planes" | "plan-editar" | "financiacion" | "vaf-evaluar" | "vaf-linea" | "vaf-mov" | "vaf-cargar" | "vaf-config" | "vaf-umbrales";
+  | "reportar" | "revisar" | "cerrar" | "riesgo" | "plazos-aviso" | "planes" | "plan-editar" | "financiacion" | "vaf-evaluar" | "vaf-linea" | "vaf-mov" | "vaf-cargar" | "vaf-config" | "vaf-umbrales"
+  | "proyecto-evaluar" | "proyectos-plan" | "proyecto-nuevo" | "proyecto-editar" | "plan-enviar" | "asignar-oficinas";
 
 export interface Ctx {
   nivel: PsNivel;

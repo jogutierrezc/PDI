@@ -290,6 +290,8 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
           cards: [
             { key: "ps-resumen", title: "Resumen del plan", text: "Inversión, prioridad, pilar, campus y fuente de las líneas, con filtros", to: `${base}/resumen`, screen: "planeacion_seguimiento" },
             { key: "ps-proyectos", title: "Proyectos", text: "Las líneas del plan con búsqueda, filtros y orden; cada una se abre a pantalla completa", to: `${base}/proyectos`, screen: "planeacion_seguimiento" },
+            { key: "ps-proyectos-plan", title: "Proyectos del plan", text: "Agregar, editar y eliminar los proyectos del borrador y enviarlos a evaluación de la VAF", to: `${base}/proyectos-plan`, when: (ctx) => ctx.psNivel === "admin" || ctx.psNivel === "gestor", screen: "planeacion_seguimiento" },
+            { key: "ps-asignar-oficinas", title: "Asignar oficinas", text: "La oficina responsable de cada proyecto, uno por uno o en lote", to: `${base}/asignar-oficinas`, when: (ctx) => ctx.psNivel === "admin", screen: "planeacion_seguimiento" },
             { key: "ps-cronograma", title: "Cronograma", text: "Las líneas del plan entre 2027 y 2035", to: `${base}/cronograma`, screen: "planeacion_seguimiento" },
           ],
         },

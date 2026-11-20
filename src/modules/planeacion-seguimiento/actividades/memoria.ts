@@ -116,7 +116,8 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
   };
 
   const ctxValidar = (d: DatosActividad, lineas: Linea[], acts: Actividad[]) => ({
-    lineas: lineasDe(lineas, d.oficinaId).map((l) => l.no),
+    // Se puede aportar a un proyecto de otra oficina del plan (se avisa a su gestor): valen todas las líneas.
+    lineas: lineas.map((l) => l.no),
     campus: [...op.campus, CAMPUS_TODOS],
     equipo: equipoDe(d.oficinaId, acts),
   });

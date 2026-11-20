@@ -33,6 +33,9 @@ export function Vacio({ sinVersion = false }: { sinVersion?: boolean }) {
           </li>
         ))}
       </ol>
+      {hecho1 && (admin || nivel === "gestor") ? (
+        <p className="ps-sub">¿Prefiere no usar Excel? También puede <button type="button" className="ps-enlace" onClick={() => ir(ruta("proyectos-plan"))}>agregar los proyectos uno a uno</button> y enviarlos a evaluación de la VAF desde la app.</p>
+      ) : null}
     </div>
   );
 }

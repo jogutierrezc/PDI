@@ -6,8 +6,15 @@ import { useSearchParams } from "react-router-dom";
 import { usePs } from "./contexto";
 import { PanelPresupuestoLinea } from "./vaf/PanelPresupuestoLinea";
 import { DESDE_MODULO, PaginaCompleta } from "./marco/PaginaCompleta";
-import { EstadoEvaluacion, InversionPorAnio, Nota, Prioridad } from "./partes";
-import { CRITERIOS, VIABILIDADES, fecha, millones1, pesos, pilarCodigo, pilarNombre, porcentaje, rotuloCampus, type Linea } from "./modelo";
+import { InversionPorAnio, Nota, Prioridad } from "./partes";
+import { useOficinas } from "./api";
+import { useAct } from "./actividades/hooks";
+import { puedeCrear } from "./actividades/reglas";
+import { Link } from "react-router-dom";
+import { Icon } from "../../components/ui/Icon";
+import { ChipEstadoProyecto } from "./proyectos/partesProy";
+import { estadoProyecto, puedeEvaluarProyecto } from "./proyectos/modeloProy";
+import { CRITERIOS, VIABILIDADES, fecha, millones1, pesos, pilarCodigo, llano, pilarNombre, porcentaje, rotuloCampus, type Linea } from "./modelo";
 import { EmptyBlock } from "../../components/ui/QueryState";
 
 const PESTANAS = [
@@ -29,7 +36,8 @@ function Ficha({ l }: { l: Linea }) {
     ["Oficina responsable", l.oficina ?? <em>Sin oficina asignada</em>],
     ["Campus", rotuloCampus(l.campus)],
     ["Pilar", `${pilarCodigo(l.pilar)} · ${pilarNombre(l.pilar)}`],
-    ["Monto", l.monto === null ? "Sin monto" : `${pesos(l.monto)} (${millones1(l.monto)})`],
+    ["Monto solicitado", l.monto === null ? "Sin monto" : `${pesos(l.monto)} (${millones1(l.monto)})`],
+    ...(l.resultado && estadoProyecto(l) !== "sin_evaluar" ? ([["Monto aprobado", estadoProyecto(l) === "aprobado" ? pesos(l.montoAprobado ?? l.monto) : "No se aprobó monto"]] as [string, ReactNode][]) : []),
     ["Fuente de financiación", l.fuente ?? <em>Sin definir</em>],
     ["Inicio y fin", l.inicio && l.fin ? `${fecha(l.inicio)} a ${fecha(l.fin)}` : <em>Sin fechas</em>],
     ["Origen", l.origen ?? <em>Sin dato</em>],
@@ -45,7 +53,9 @@ function Ficha({ l }: { l: Linea }) {
 }
 
 export function DetalleLinea({ id }: { id: string }) {
-  const { lineas, plan, ruta } = usePs();
+  const { lineas, plan, ruta, nivel } = usePs();
+  const act = useAct();
+  const oficinasQ = useOficinas();
   const [params, setParams] = useSearchParams();
   const pestana = PESTANAS.find((p) => p.id === params.get("pestana"))?.id ?? "resumen";
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -63,6 +73,9 @@ export function DetalleLinea({ id }: { id: string }) {
     return { anio, monto: (l.monto ?? 0) * parte, parte };
   });
   const hayDistribucion = anios.some((a) => a.monto > 0);
+  const oficinaDe = oficinasQ.data?.find((o) => llano(o.nombre) === llano(l.oficina ?? ""));
+  const puedeActividad = act.oficinas.some((o) => puedeCrear(o.poder));
+  const crearAct = puedeActividad ? `${ruta("actividad-nueva")}?linea=${encodeURIComponent(l.no)}${oficinaDe && act.porId.get(oficinaDe.id) && puedeCrear(act.porId.get(oficinaDe.id)!.poder) ? `&oficina=${encodeURIComponent(oficinaDe.id)}` : ""}` : null;
   const cambiar = (p: string) => {
     const s = new URLSearchParams(params);
     if (p === "resumen") s.delete("pestana");
@@ -85,7 +98,11 @@ export function DetalleLinea({ id }: { id: string }) {
       regresarA={ruta("proyectos")}
       regresarTexto="Regresar a proyectos"
       claveFoco={l.no}
-      acciones={<><Prioridad valor={l.prioridad} /><EstadoEvaluacion evaluada={Boolean(l.resultado)} /></>}
+      acciones={<>
+        <Prioridad valor={l.prioridad} /><ChipEstadoProyecto estado={estadoProyecto(l)} />
+        <Link className={puedeEvaluarProyecto(nivel) && estadoProyecto(l) === "sin_evaluar" ? "button-primary" : "button-secondary"} to={ruta("proyecto-evaluar", l.no)} state={DESDE_MODULO}>{puedeEvaluarProyecto(nivel) ? (estadoProyecto(l) === "sin_evaluar" ? "Evaluar proyecto" : "Revisar la evaluación") : "Ver la evaluación"}</Link>
+        {crearAct ? <Link className="button-secondary" to={crearAct} state={DESDE_MODULO}><Icon name="plus" size={14} /> Crear actividad desde este proyecto</Link> : null}
+      </>}
     >
       <div className="ps-pestanas" role="tablist" aria-label="Secciones de la línea">
         {PESTANAS.map((p, i) => (
@@ -118,6 +135,9 @@ export function DetalleLinea({ id }: { id: string }) {
               Resultado de la evaluación: <strong>{l.resultado ?? "Sin evaluar"}</strong>.
               {l.resultado ? "" : " Los criterios y viabilidades se diligencian cuando la línea se evalúe."}
             </p>
+            {!l.resultado ? (
+              <p className="ps-aviso ps-aviso--info"><Icon name="info" size={16} /> <span>{puedeEvaluarProyecto(nivel) ? <>Este proyecto espera su evaluación. <Link to={ruta("proyecto-evaluar", l.no)} state={DESDE_MODULO}>Aprobarlo o rechazarlo</Link>.</> : "Este proyecto espera la evaluación de la VAF; usted no puede editarla, solo verla cuando exista."}</span></p>
+            ) : l.notaEvaluacion ? <Nota>Nota de la evaluación: {l.notaEvaluacion}</Nota> : null}
             <div className="ps-dos">
               <section className="ps-bloque">
                 <h2>Criterios de priorización</h2>

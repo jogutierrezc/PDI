@@ -38,6 +38,11 @@ import { ConfigVaf } from "./vaf/ConfigVaf";
 import { EvaluarPlan } from "./vaf/EvaluarPlan";
 import { Financiacion } from "./vaf/Financiacion";
 import { LineaFinanciera } from "./vaf/LineaFinanciera";
+import { AsignarOficinas } from "./proyectos/AsignarOficinas";
+import { EnviarPlan } from "./proyectos/EnviarPlan";
+import { EvaluarProyecto } from "./proyectos/EvaluarProyecto";
+import { FormularioProyecto } from "./proyectos/FormularioProyecto";
+import { ProyectosPlan } from "./proyectos/ProyectosPlan";
 import { RegistrarMov } from "./vaf/RegistrarMov";
 import { UmbralesPlan } from "./vaf/UmbralesPlan";
 import { veFinanciacion } from "./vaf/modeloVaf";
@@ -106,6 +111,12 @@ export const SECCIONES: Def[] = [
   { id: "vaf-cargar", nombre: "Cargar desde Excel", descripcion: "Financiación por línea o ejecución presupuestal" },
   { id: "vaf-config", nombre: "Unidad de la VAF", descripcion: "La unidad que evalúa lo financiero" },
   { id: "vaf-umbrales", nombre: "Umbrales de vigilancia", descripcion: "Cuándo la ejecución dispara una alerta" },
+  { id: "proyecto-evaluar", nombre: "Evaluar proyecto", descripcion: "Aprobar o rechazar un proyecto: criterios, viabilidades, fechas, distribución anual y monto" },
+  { id: "proyectos-plan", nombre: "Proyectos del plan", descripcion: "Agregar, editar y eliminar los proyectos del borrador, y enviarlos a evaluación de la VAF" },
+  { id: "proyecto-nuevo", nombre: "Agregar proyecto", descripcion: "Un proyecto nuevo en el borrador del plan" },
+  { id: "proyecto-editar", nombre: "Editar proyecto", descripcion: "Cambiar un proyecto del borrador del plan" },
+  { id: "plan-enviar", nombre: "Enviar a evaluación VAF", descripcion: "Revisar el borrador y publicar la versión para la evaluación de la VAF" },
+  { id: "asignar-oficinas", nombre: "Asignar oficinas", descripcion: "La oficina responsable de cada proyecto, uno por uno o en lote (administrador)" },
   { id: "plan-editar", nombre: "Editar plan", descripcion: "Datos, oficina dueña, plantilla y pilares del plan" },
   { id: "reportar", nombre: "Reportar avance", descripcion: "Qué avanzó, evidencias, riesgos y revisar" },
   { id: "revisar", nombre: "Por validar", descripcion: "Avances que esperan la revisión del gestor" },
@@ -116,7 +127,10 @@ export const SECCIONES: Def[] = [
 ];
 
 /** Secciones que muestran el plan: sin plan o sin versión se reemplazan por el estado vacío guiado. */
-const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "devolver", "reportar", "revisar", "cerrar", "riesgo", "plazos-aviso", "plan-editar", "financiacion", "vaf-evaluar", "vaf-linea", "vaf-mov", "vaf-cargar", "vaf-config", "vaf-umbrales", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
+const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "devolver", "reportar", "revisar", "cerrar", "riesgo", "plazos-aviso", "plan-editar", "proyecto-evaluar", "asignar-oficinas", "financiacion", "vaf-evaluar", "vaf-linea", "vaf-mov", "vaf-cargar", "vaf-config", "vaf-umbrales", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
+
+/** Estas pantallas funcionan aunque el plan aún no tenga versión (el borrador se crea con el primer proyecto). */
+const NECESITAN_SOLO_PLAN: Seccion[] = ["proyectos-plan", "proyecto-nuevo", "proyecto-editar", "plan-enviar"];
 
 function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
   const { plan, cargando, error } = usePs();
@@ -127,7 +141,14 @@ function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
     if (!plan) return <Vacio />;
     if (!plan.version) return <Vacio sinVersion />;
   }
+  if (NECESITAN_SOLO_PLAN.includes(seccion) && !plan) return <Vacio />;
   switch (seccion) {
+    case "proyecto-evaluar": return id ? <EvaluarProyecto id={decodeURIComponent(id)} /> : <Proyectos />;
+    case "proyectos-plan": return <ProyectosPlan />;
+    case "proyecto-nuevo": return <FormularioProyecto />;
+    case "proyecto-editar": return id ? <FormularioProyecto no={decodeURIComponent(id)} /> : <ProyectosPlan />;
+    case "plan-enviar": return id ? <EnviarPlan id={id} /> : <ProyectosPlan />;
+    case "asignar-oficinas": return <AsignarOficinas />;
     case "planificacion": return <Planificacion />;
     case "tablero": return <Tablero />;
     case "lista": return <Lista />;

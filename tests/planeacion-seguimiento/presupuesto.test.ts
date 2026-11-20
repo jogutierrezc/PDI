@@ -370,7 +370,7 @@ describe("0290 · idempotencia", () => {
     const cuenta = async () => (await t.q<{ n: number }>(`select ((select count(*) from ps_presupuesto_movs) + (select count(*) from ps_evaluaciones_vaf) + (select count(*) from ps_linea_financiacion)
       + (select count(*) from ps_planes) + (select count(*) from correo_templates where key like 'c-ps-%'))::int n`))[0].n;
     const antes = await cuenta();
-    for (let i = 0; i < 2; i++) for (const f of ["0289_planeacion_seguimiento_planes.sql", "0290_planeacion_seguimiento_presupuesto.sql"]) await t.db.exec(sql(f));
+    for (let i = 0; i < 2; i++) for (const f of ["0289_planeacion_seguimiento_planes.sql", "0290_planeacion_seguimiento_presupuesto.sql", "0291_planeacion_seguimiento_evaluacion_proyectos.sql"]) await t.db.exec(sql(f));
     expect(await cuenta()).toBe(antes);
     expect((await t.q<{ subject: string }>("select subject from correo_templates where key = 'c-ps-vaf-evaluar'"))[0].subject).toBe("Asunto editado de la VAF");
     const tpl = await t.q<{ key: string; grp: string; action: string; tipo: string }>("select key, grp, action, tipo from correo_templates where key like 'c-ps-vaf-%' order by key");

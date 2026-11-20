@@ -115,3 +115,85 @@ Decisiones y desviaciones de la parte de planes:
 - **Alertas por correo**: `ps_generar_alertas_presupuesto(p_hoy default null)` (solo service_role; **función hermana**, no parte de `ps_generar_avisos_vencimiento`) → `{hoy, planes_con_alertas, avisos}`; un `c-ps-vaf-alerta` por plan y destinatario por semana ISO (alta y media), idempotente. La función de borde `planeacion-seguimiento` la llama en la acción `vencimientos` (devuelve `alertas`), así que el cron diario existente basta.
 - `ps_tablero_admin` suma `presupuesto {aprobado, modificado, vigente, comprometido, ejecutado, pagado, disponible, pct_ejecucion}` por plan, oficina y pilar (más `presupuesto_por_anio`), `totales.presupuesto`, `evaluaciones_vaf` y agrega las alertas de vigilancia a `alertas`.
 - Plantillas `c-ps-vaf-evaluar`, `c-ps-vaf-resultado`, `c-ps-vaf-alerta` (`on conflict do nothing`). Eventos: `vaf.evaluacion_abierta`, `vaf.en_revision`, `vaf.evaluada`, `vaf.linea_evaluada`, `vaf.lineas_cargadas`, `presupuesto.registrado|anulado|cargado`, `config.vaf`.
+
+## 8. Firmas reales de la fase 3C (0291): evaluar proyectos, resumen solicitado vs aprobado, plan desde la app, oficinas de las líneas
+
+Migración `supabase/migrations/0291_planeacion_seguimiento_evaluacion_proyectos.sql`; script `supabase/actualizar-planeacion-seguimiento-f3c.sh`. Todo por `supabase.rpc`, parámetros `p_…`, security definer con `search_path = public`. Errores como siempre: 42501 permiso, P0002 «no existe», 22023 datos, 55000 estado no admite la acción, 23503 en uso. **Convención de esta fase:** las funciones que reciben una fila de la matriz (`ps_proyecto_crear/editar`, `ps_plan_enviar_a_evaluacion`, `ps_asignar_oficinas_lineas`) **no lanzan por errores de campo**: devuelven `{ok:false, errores:[{fila,campo,mensaje}]}` (y no escriben nada). La evaluación (`ps_proyecto_evaluar`) sí lanza 22023 con el mensaje en español.
+
+### A. Evaluar proyectos (VAF y administrador)
+
+Un «proyecto» es `ps_lineas.id` (`linea_id`). Solo `financiero` y `admin` evalúan; gestor, colaborador, lector y aprobador solo leen (42501 al evaluar). El proyecto debe estar en la **versión vigente** (55000 si el plan no tiene versión publicada o el plan está archivado: 22023).
+
+| Función | Respuesta / notas |
+| --- | --- |
+| `ps_proyecto_evaluar(p_linea uuid, p_datos jsonb)` | `EvaluacionProyectoJSON` (la fila nueva y vigente) |
+| `ps_proyecto_evaluacion_leer(p_linea uuid)` | `{linea_id, plan_id, clave, nombre, solicitado, estado:'sin_evaluar'\|'aprobado'\|'rechazado', vigente: EvaluacionProyectoJSON\|null, historial:[EvaluacionProyectoJSON] (la más reciente primero)}`. Quien ve el proyecto (gestor: solo los de sus oficinas) |
+
+`p_datos` (claves exactas):
+- `resultado`: `"Aprobado"` o `"Rechazado"` (los textos de `pdifyt-2027-2035.json`; se acepta en cualquier mayúscula).
+- `criterios`: `{alin, deficit, norm, pdi, sost}` y `viabilidad`: `{tec, fin, op}`; cada valor `true/false` o `"Sí"/"No"`. **Al aprobar, todos son obligatorios**; al rechazar son opcionales. Una clave que no sea de esa lista → 22023.
+- `prioridad`: `Crítico|Alto|Medio|Largo plazo` (por omisión la del proyecto).
+- `inicio`, `fin`: `AAAA-MM-DD`, dentro de la vigencia del plan; **obligatorias al aprobar**.
+- `pct`: distribución anual en **porcentaje 0-100**: `{"2027": 40, "2028": 60}`; **al aprobar suma 100 (±0,01)**; años dentro del plan. Al rechazar se guarda `{}`.
+- `monto_aprobado`: número > 0 al aprobar (por omisión el solicitado, `ps_version_lineas.monto`); al rechazar queda 0.
+- `fuente` (≤ 200; por omisión la del proyecto) y `nota` (≤ 1000): **`nota` ≥ 20 caracteres si rechaza o si aprueba con monto distinto del solicitado**.
+
+`EvaluacionProyectoJSON = {id, plan_id, linea_id, version_id, clave, resultado, criterios, viabilidad, prioridad, inicio, fin, pct, monto_solicitado, monto_aprobado, fuente, nota, evaluado_por:{id,nombre}|null, evaluado_en}`.
+
+Efectos: fila nueva en `ps_evaluaciones_proyecto` (insert-only; la vigente de cada proyecto es la de mayor `seq`; se puede **re-evaluar**, queda el historial); evento `proyecto.evaluado`; y `ps_linea_financiacion` por año: aprobado → `monto_aprobado × pct/100` (el último año absorbe el redondeo, la suma es exacta) con estado `aprobada` (monto = solicitado) o `ajustada`; los años que tenían financiación y la nueva distribución no usa quedan en 0; rechazado → `rechazada` con monto 0 (si no había filas, una por año con porcentaje programado o por el primer año del plan). Eso alimenta el `aprobado` de `ps_presupuesto_linea/plan` (0290) sin duplicar lógica. La tabla `ps_evaluaciones_proyecto` se puede leer con `select` (RLS: quien ve el presupuesto de la línea).
+
+### B. Resumen solicitado vs aprobado
+
+`ps_resumen_aprobacion(p_plan uuid default null) → jsonb` (cualquier nivel con acceso; gestor y colaborador solo ven los proyectos de sus oficinas). Con `p_plan` nulo agrega los planes **activos** visibles. Proyectos de la versión vigente (si no hay, la última). **«Sin evaluar» = sin fila en `ps_evaluaciones_proyecto`** (el `resultado` que trae la matriz Excel no cuenta: se devuelve aparte como `resultado_matriz`).
+
+```
+{ plan_id, generado_en,
+  totales: Agregado,
+  solicitado_sin_distribuir: number,            // monto solicitado de los proyectos sin pct programado
+  por_plan:    [{plan_id, plan} + Agregado],
+  por_pilar:   [{pilar} + Agregado],
+  por_campus:  [{campus} + Agregado],
+  por_oficina: [{unit_id|null, nombre ('Sin oficina')} + Agregado],
+  por_anio:    [{anio, solicitado, aprobado, diferencia}],   // solicitado = monto × pct programado (matriz); aprobado = ps_linea_financiacion aprobada/ajustada
+  proyectos:   [{plan_id, plan, linea_id, clave, nombre, pilar, campus, prioridad, oficina:{unit_id,nombre,codigo}|null,
+                 estado:'sin_evaluar'|'aprobado'|'rechazado', resultado:'Aprobado'|'Rechazado'|null, resultado_matriz,
+                 solicitado, aprobado (null si no está aprobado), diferencia (aprobado − solicitado, null si no aprobado),
+                 nota, evaluacion_id, evaluado_en, evaluado_por (nombre)}] }
+Agregado = { solicitado:{monto,cantidad},                       // todos los proyectos
+             aprobado:{monto,cantidad,solicitado,ajuste},       // monto aprobado, cuántos, lo que habían pedido y la diferencia
+             rechazado:{monto,cantidad},                        // monto = lo que se había solicitado
+             sin_evaluar:{monto,cantidad} }
+```
+
+### C. Crear el plan desde la app (borrador → evaluación VAF)
+
+Flujo: `ps_crear_plan` (0289) → `ps_proyecto_crear` × n (abre el borrador `v1.0` solo) → `ps_plan_enviar_a_evaluacion` (revalida, publica la versión y abre la evaluación VAF, con aviso a la VAF) → la VAF evalúa el plan (`ps_vaf_evaluar`) y cada proyecto (`ps_proyecto_evaluar`). Permisos: admin, o gestor de la oficina dueña de un plan de alcance `oficina` (`ps_plan_gestiona`). **Nadie edita una versión publicada** (55000; los cambios van por la solicitud de cambio de la fase 4). Plan archivado: 22023. La carga por Excel (`ps_cargar_matriz`) y la manual **comparten la misma validación** (`ps_validar_fila_matriz`, extraída de `ps_cargar_matriz`, que ahora la llama): plantilla del plan, obligatorias, listas, pilares, oficina, campus, prioridad, fechas, pct. Se pueden mezclar (la carga reemplaza el borrador completo).
+
+| Función | Respuesta / notas |
+| --- | --- |
+| `ps_proyecto_crear(p_plan, p_datos)` | `{ok:true, errores:[], version_id, etiqueta, proyecto: ProyectoJSON}` o `{ok:false, errores:[{fila:1,campo,mensaje}]}`. `p_datos` como una fila de la matriz: `nombre`, `descripcion`, `campus`, `pilar`, `monto`, `prioridad`, `oficina` (código o nombre) u `oficina_unit_id`, `fuente`, `clasif`, `origen`, `inicio`, `fin`, `pct` (fracciones 0-1 como en el Excel). `clave` (o `no`) opcional: sin ella se asigna el siguiente número. `resultado`, `criterios` y `viabilidad` se **ignoran** (son de la evaluación). Sin oficina en la fila: la dueña del plan. El plan debe tener oficina dueña (22023 si no) |
+| `ps_proyecto_editar(p_linea, p_cambios)` | igual que crear; solo los campos enviados cambian; la clave no cambia |
+| `ps_proyecto_borrar(p_linea, p_motivo default '')` | `{ok, linea_id, clave}`; 23503 si tiene actividades |
+| `ps_borrador_leer(p_plan)` | `{plan_id, publicada, puede_editar, version:{id,numero,etiqueta}\|null, proyectos:[ProyectoJSON], totales:{proyectos, monto}}` (quien ve el plan) |
+| `ps_plan_enviar_a_evaluacion(p_plan, p_nota default '')` | éxito `{enviada:true, version_id, etiqueta, huella, lineas, publicada_en, evaluacion_vaf:{id,estado}\|null}`; con errores `{enviada:false, errores:[{fila (=orden), campo, mensaje}]}`. Sin proyectos → 55000 |
+
+`ProyectoJSON = {linea_id, version_id, clave, orden, clasif, nombre, descripcion, campus, campus_id, pilar, monto, prioridad, fuente, origen, inicio, fin, pct, nota_no_eval, oficina:{unit_id,nombre,codigo}|null}`. Eventos: `proyecto.creado|editado|borrado`, `plan.enviado_evaluacion`.
+
+### D. Apertura retroactiva de la evaluación VAF
+
+`ps_vaf_abrir_pendientes() → {abiertas, planes:[{plan_id, plan, version_id, evaluacion_id}]}` (financiero/admin; 42501 al resto). Abre (vía `ps_vaf_abrir_evaluacion`, que ahora tiene `p_forzar boolean default false`) la evaluación `pendiente` de la **versión vigente** de los planes **activos** con versión publicada y **ninguna** evaluación; avisa a la VAF. Idempotente. La migración la ejecuta una vez al final (versión interna sin permiso, con el fallo capturado).
+
+### E. Oficinas de las líneas de un plan vigente y aportar a otra oficina
+
+| Función | Respuesta / notas |
+| --- | --- |
+| `ps_asignar_oficinas_lineas(p_plan uuid, p_asignaciones jsonb)` | **Solo admin.** `p_asignaciones = [{linea_id \| clave, oficina_unit_id (uuid o null para quitarla)}]` sobre la **versión publicada vigente** (en un borrador sigue `ps_asignar_oficina_linea`). Todo o nada, ≤ 2000. `{version_id, recibidas, asignadas, sin_cambio, errores:[{fila,campo,mensaje}]}`. La oficina es administrativa: no crea versión, no cambia montos ni abre evaluaciones. Evento `linea.oficina_asignada` `{antes, despues, vigente:true}` por línea cambiada. Actualiza `ps_version_lineas.oficina_unit_id` (lo que lee `ps_actividad_normalizar`; `ps_lineas` no guarda oficina). Para ello el trigger de `ps_version_lineas` admite *solo* ese cambio en una versión publicada |
+| `ps_lineas_para_actividad(p_oficina uuid, p_plan uuid default null)` | `[{plan_id, plan, linea_id, clave, nombre, pilar, campus, prioridad, oficina:{unit_id,nombre,codigo}\|null, propios, aporta, sin_oficina, puede_vincular}]`, propios primero. Sin dinero. `p_plan` nulo: todos los planes activos con versión vigente visibles. 42501 si la oficina no está al alcance. `propios` = la oficina responsable es `p_oficina`; `aporta` = es de otra oficina; `puede_vincular` = tiene oficina (o es admin) |
+| `ps_actividad_aporte(p_actividad uuid)` | `{aporta:boolean, oficina_duena:{unit_id,nombre}\|null}` (calculado con la oficina vigente de la línea) |
+
+**Cambio de comportamiento en `ps_actividad_crear`, `ps_actividad_editar` y `ps_actividades_cargar`** (vía `ps_actividad_normalizar`): ya **no** se rechaza «La línea es de otra oficina»; se puede vincular una línea con oficina asignada de otra oficina del mismo plan (la actividad queda en la oficina que la crea y *aporta* a la dueña). Al **crear** (también por carga masiva) con una línea de otra oficina: evento `actividad.aporta_otra_oficina {oficina_duena, titulo}` y aviso `c-ps-aporte` a los gestores de la oficina dueña (`ps_aviso_plan`; distintos de quien crea). Una línea **sin oficina** sigue rechazada salvo para el admin, con el mensaje «La línea «X» está sin oficina asignada: pida al administrador que se la asigne.». Plantilla nueva `c-ps-aporte` (13 plantillas `c-ps-*` en total; `avisos.ts` la redacta con el texto genérico hasta que se le añada un `case`).
+
+Desviaciones y notas:
+1. La huella guardada al publicar (`ps_versiones.huella`) **no se recalcula** al asignar oficinas: es la huella del contenido publicado. `ps_diff` entre dos versiones sí mostrará `oficina_unit_id` como campo cambiado si se asignó después de publicar.
+2. Los totales de `ps_resumen_aprobacion` usan el `monto_aprobado` de la evaluación; `por_anio.aprobado` usa `ps_linea_financiacion`, así que una financiación por año cargada a mano con `ps_vaf_linea_evaluar` aparece ahí aunque el proyecto esté «sin evaluar».
+3. La evaluación de proyectos no bloquea ni exige la evaluación del plan (`ps_vaf_evaluar`); son independientes.

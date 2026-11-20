@@ -60,6 +60,12 @@ export interface Linea {
   /** Nombre de la oficina responsable (de las unidades del portal), si se indicó. */
   oficina: string | null;
   gestorCorreo: string | null;
+  /** Monto que aprobó la evaluación del proyecto (0 si se rechazó); ausente mientras no se evalúa. */
+  montoAprobado?: number | null;
+  /** Nota de la última evaluación del proyecto. */
+  notaEvaluacion?: string | null;
+  /** `ps_lineas.id` (la identidad estable del proyecto en la base); no existe en la demostración. */
+  lineaId?: string;
 }
 
 export interface PlanVista {

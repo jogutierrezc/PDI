@@ -15,6 +15,9 @@ import { supabase } from "../../lib/supabase";
 import type { PsApiAct } from "./actividades/contratoApi";
 import type { PsApiVaf } from "./vaf/contratoVaf";
 import { crearVafMemoria } from "./vaf/memoriaVaf";
+import type { PsApiProy } from "./proyectos/contratoProy";
+import { crearProyectosMemoria } from "./proyectos/memoriaProy";
+import { crearProyectosSupabase } from "./proyectos/supabaseProy";
 import { crearVafSupabase } from "./vaf/supabaseVaf";
 import { cifrasDeJson } from "./vaf/supabaseVaf";
 import { crearActividadesMemoria } from "./actividades/memoria";
@@ -41,7 +44,7 @@ export interface ResultadoCarga {
   errores: ErrorCarga[];
 }
 
-export interface PsApi extends PsApiAct, PsApiVaf {
+export interface PsApi extends PsApiAct, PsApiVaf, PsApiProy {
   nivel(): Promise<PsNivel>;
   /** Nombres de los campus del portal (sin «Todos»). */
   campus(): Promise<string[]>;
@@ -231,10 +234,13 @@ export function crearApiMemoria(op: OpcionesMemoria = {}): PsApi {
     };
     const tec = lineasDeOficina(reales, "Tecnología e Infraestructura TI", "T", 8, 2027, 2029).map((l, i) => ({ ...l, pilar: ["T1. Continuidad de los servicios", "T2. Seguridad de la información", "T3. Datos e inteligencia"][i % 3] }));
     const bien = lineasDeOficina(reales, "Bienestar Universitario", "B", 5, 2024, 2026);
+    const infra = lineasDeOficina(reales, "Infraestructura y Planta Física", "I", 4, 2027, 2028);
     planes = [
       { id: "plan-1", nombre: "PDIFyT 2027-2035", anioIni: 2027, anioFin: 2035, descripcion: "Plan de Desarrollo de Infraestructura Física y Tecnológica de la Universidad.", estado: "activo", alcance: "institucional", oficinaId: "of-2", config: configPorOmision(), versiones: [{ meta: mkMeta("ver-1", "v1.0", pdi, op.estado === "publicado"), lineas: pdi }], creadoEn: "2026-11-19T10:00:00Z" },
       { id: "plan-2", nombre: "Plan de Tecnología 2027-2029", anioIni: 2027, anioFin: 2029, descripcion: "Plan propio de la oficina de Tecnología: continuidad, seguridad y datos.", estado: "activo", alcance: "oficina", oficinaId: "of-4", config: cfgTec, versiones: [{ meta: mkMeta("ver-t1", "v1.0", tec, op.estado === "publicado"), lineas: tec }], creadoEn: "2026-12-02T10:00:00Z" },
       { id: "plan-3", nombre: "Plan de Bienestar 2024-2026", anioIni: 2024, anioFin: 2026, descripcion: "Plan de la oficina de Bienestar del periodo anterior. Archivado.", estado: "archivado", alcance: "oficina", oficinaId: "of-6", config: configPorOmision(), versiones: [{ meta: { ...mkMeta("ver-b1", "v1.0", bien, true), creadaEn: "2023-11-01T10:00:00Z", publicadaEn: "2023-11-15T10:00:00Z" }, lineas: bien }], creadoEn: "2023-11-01T10:00:00Z" },
+      // Publicado sin evaluación de la VAF: sirve para probar «Abrir evaluaciones pendientes».
+      { id: "plan-4", nombre: "Plan de Infraestructura 2027-2028", anioIni: 2027, anioFin: 2028, descripcion: "Plan de la oficina de Infraestructura, publicado antes de que existiera la evaluación de la VAF.", estado: "activo", alcance: "oficina", oficinaId: "of-3", config: configPorOmision(), versiones: [{ meta: mkMeta("ver-i1", "v1.0", infra, op.estado === "publicado"), lineas: infra }], creadoEn: "2026-12-10T10:00:00Z" },
     ];
     activoId ??= "plan-1";
   };
@@ -329,9 +335,18 @@ export function crearApiMemoria(op: OpcionesMemoria = {}): PsApi {
     unidades: () => oficinas.map((o) => ({ id: o.id, nombre: o.nombre, codigo: o.id.toUpperCase() })),
   });
 
+  const proy = crearProyectosMemoria({
+    nivel: nivelDe, espera, listo: iniciar,
+    planes: () => planes, planActivo: planActual, crearMeta: mkMeta,
+    oficinas: () => oficinas, campus: () => campus,
+    oficinaDeLinea: (l) => oficinas.find((o) => llano(o.nombre) === llano(l.oficina ?? ""))?.id ?? oficinaDeLineaDemo(l),
+    vaf,
+  });
+
   return {
     ...(delegados as unknown as PsApiAct),
     ...vaf,
+    ...proy,
     async nivel() { await espera(); return nivelDe; },
     async campus() { await espera(); return campus; },
     async oficinas() { await espera(); return oficinas; },
@@ -457,6 +472,7 @@ export function lineaDeFila(f: Fila, nombreCampus: Map<string, string>, nombreOf
   const clave = (o: Record<string, unknown>, ks: string[]) => Object.fromEntries(ks.map((k) => [k, siNo(o[k])]));
   return {
     no: String(f.clave ?? ""),
+    lineaId: texto(f.linea_id) ?? undefined,
     clasif: texto(f.clasif) ?? "",
     nombre: String(f.nombre ?? ""),
     descripcion: texto(f.descripcion),
@@ -545,6 +561,36 @@ export function resumenDeFila(f: Fila): PlanResumen {
   };
 }
 
+/** La evaluación vigente de cada proyecto de la versión (`ps_evaluaciones_proyecto`, la de mayor `seq`); sin la tabla (0291) devuelve vacío. */
+async function evaluacionesDe(versionId: string): Promise<Map<string, Fila>> {
+  const r = await supabase.from("ps_evaluaciones_proyecto").select("linea_id,seq,resultado,monto_aprobado,nota,criterios,viabilidad,prioridad,inicio,fin,pct").eq("version_id", versionId).order("seq", { ascending: false });
+  const m = new Map<string, Fila>();
+  if (r.error) return m;
+  for (const f of (r.data ?? []) as Fila[]) if (!m.has(String(f.linea_id))) m.set(String(f.linea_id), f);
+  return m;
+}
+
+/** Pone sobre cada línea lo que decidió su evaluación: resultado, monto aprobado, nota y, si se aprobó, prioridad, fechas, distribución y criterios. */
+export function superponerEvaluaciones(lineas: Linea[], ev: Map<string, Fila>): Linea[] {
+  if (!ev.size) return lineas;
+  return lineas.map((l) => {
+    const e = l.lineaId ? ev.get(l.lineaId) : undefined;
+    if (!e) return l;
+    const aprobado = e.resultado === "Aprobado";
+    const base: Linea = { ...l, resultado: String(e.resultado), montoAprobado: Number(e.monto_aprobado ?? 0), notaEvaluacion: texto(e.nota) };
+    if (!aprobado) return base;
+    const jc = (e.criterios ?? {}) as Record<string, unknown>;
+    const jv = (e.viabilidad ?? {}) as Record<string, unknown>;
+    const pct = (e.pct ?? {}) as Record<string, unknown>;
+    return {
+      ...base, prioridad: texto(e.prioridad) ?? l.prioridad, inicio: texto(e.inicio) ?? l.inicio, fin: texto(e.fin) ?? l.fin,
+      pct: Object.keys(pct).length ? Object.fromEntries(Object.entries(pct).map(([a, v]) => [a, Number(v) / 100])) : l.pct,
+      criterios: { ...l.criterios, ...Object.fromEntries(Object.entries(jc).map(([k, v]) => [k, siNo(v)])) } as Linea["criterios"],
+      viabilidad: { ...l.viabilidad, ...Object.fromEntries(Object.entries(jv).map(([k, v]) => [k, siNo(v)])) } as Linea["viabilidad"],
+    };
+  });
+}
+
 export function crearApiSupabase(): PsApi {
   let planFijo: string | null = null;
   const nombresCampus = async () => {
@@ -560,6 +606,7 @@ export function crearApiSupabase(): PsApi {
   return {
     ...crearActividadesSupabase(() => planFijo),
     ...crearVafSupabase(),
+    ...crearProyectosSupabase(() => planFijo),
     async nivel() {
       const r = await supabase.rpc("ps_nivel_actual");
       if (r.error) throw errorDe(r.error);
@@ -649,7 +696,8 @@ export function crearApiSupabase(): PsApi {
       if (r.error) throw errorDe(r.error);
       const nc = new Map(campus.map((c) => [c.id, c.name]));
       const no = new Map(ofs.map((o) => [o.id, o.nombre]));
-      return ((r.data ?? []) as Fila[]).map((f) => lineaDeFila(f, nc, no));
+      const lineas = ((r.data ?? []) as Fila[]).map((f) => lineaDeFila(f, nc, no));
+      return superponerEvaluaciones(lineas, await evaluacionesDe(versionId));
     },
     async crearPlan(d) {
       const r = await supabase.rpc("ps_crear_plan", { p_nombre: d.nombre.trim(), p_anio_ini: d.anioIni, p_anio_fin: d.anioFin, p_oficina: d.oficinaId, p_alcance: d.alcance, p_descripcion: d.descripcion.trim(), p_config: { columnas: columnasParaBase(d.config), listas: d.config.listas } });

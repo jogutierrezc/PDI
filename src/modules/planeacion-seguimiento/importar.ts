@@ -18,6 +18,7 @@ import {
 import {
   ANIO_FIN, ANIO_INI, ANIOS, CAMPUS, CAMPUS_TODOS, CLASIFICACIONES, CRITERIOS, FUENTES, PILARES, PRIORIDADES, RESULTADOS, VIABILIDADES, llano, type ClaveCriterio, type ClaveViabilidad, type Linea,
 } from "./modelo";
+import { columnasDeConfig, listaDeConfig, pilaresDeConfig, resolverPilar, type ConfigPlan } from "./modeloPlanes";
 
 export { MAX_BYTES, MAX_LINEAS };
 
@@ -185,21 +186,37 @@ export interface OpcionesAnalisis {
   oficinas?: string[];
   /** Nombres de los campus del portal (sin «Todos», que siempre vale). Por omisión, los de la matriz real. */
   campus?: readonly string[];
+  /** Fase 3B: la configuración de la plantilla del plan (columnas obligatorias y opcionales, listas, pilares). Sin ella, la del PDIFyT. */
+  config?: ConfigPlan | null;
+  /** Años del plan (para las columnas «% de inversión» y el aviso de fechas). Por omisión, los del PDIFyT. */
+  anios?: readonly number[];
 }
 
 const nombresHoja = (h: HojaCruda) => llano(h.nombre);
 const textoCelda = (fila: string[], i: number | undefined) => (i === undefined ? "" : (fila[i] ?? "").trim());
 
-function hallarEncabezado(filas: string[][]): number {
-  const clave = new Set(COLUMNAS.filter((c) => c.tipo === "obligatoria").map((c) => llano(c.base)));
+function hallarEncabezado(filas: string[][], cols: readonly Columna[]): number {
+  const obl = cols.filter((c) => c.tipo === "obligatoria");
+  const minimo = Math.min(3, obl.length);
+  const clave = new Set(obl.map((c) => llano(c.base)));
   for (let i = 0; i < Math.min(filas.length, 25); i++) {
     const hallados = filas[i].filter((c) => clave.has(llano(baseDeEncabezado(c)))).length;
-    if (hallados >= 3) return i;
+    if (hallados >= minimo) return i;
   }
   return -1;
 }
 
 export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {}): ResultadoImportacion {
+  const cfg = opciones.config ?? null;
+  const ANIOS_P = opciones.anios ?? ANIOS;
+  const cols = columnasDeConfig(cfg, ANIOS_P);
+  const ANIO_I = ANIOS_P[0] ?? ANIO_INI;
+  const ANIO_F = ANIOS_P[ANIOS_P.length - 1] ?? ANIO_FIN;
+  const esObl = (id: CampoId) => cols.find((c) => c.id === id)?.tipo === "obligatoria";
+  const lClasif = listaDeConfig(cfg, "clasif");
+  const lPrioridad = listaDeConfig(cfg, "prioridad");
+  const lResultado = listaDeConfig(cfg, "resultado");
+  const lFuente = listaDeConfig(cfg, "fuente");
   const hoja = hojas.find((h) => nombresHoja(h) === llano(HOJA_LINEAS));
   if (!hoja) {
     return vacio(`No encuentro la hoja «${HOJA_LINEAS}». Este libro tiene: ${hojas.filter((h) => !h.oculta).map((h) => `«${h.nombre}»`).join(", ") || "ninguna hoja visible"}. Use la plantilla de la página «Cargar la planificación» y no cambie el nombre de sus hojas.`);
@@ -218,7 +235,7 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
     generales.push({ nivel: "aviso", hoja: HOJA_CONTROL, fila: null, columna: null, mensaje: "El libro no trae la hoja oculta «_Control» de la plantilla: se leyó por los encabezados. Si algo sale mal, descargue la plantilla y copie sus datos." });
   }
 
-  const filaEnc = hallarEncabezado(hoja.filas);
+  const filaEnc = hallarEncabezado(hoja.filas, cols);
   if (filaEnc < 0) {
     return vacio(`No encuentro los encabezados en la hoja «${hoja.nombre}» (N.º, Clasificación, Nombre, Campus…). No los cambie ni borre la banda de arriba: descargue la plantilla y copie sus datos.`, generales);
   }
@@ -226,10 +243,10 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
   const indice = new Map<CampoId, number>();
   encabezados.forEach((t, i) => {
     const base = llano(baseDeEncabezado(t));
-    const c = COLUMNAS.find((x) => llano(x.base) === base);
+    const c = cols.find((x) => llano(x.base) === base);
     if (c && !indice.has(c.id)) indice.set(c.id, i);
   });
-  const faltan = COLUMNAS.filter((c) => !indice.has(c.id));
+  const faltan = cols.filter((c) => !indice.has(c.id));
   const faltanObl = faltan.filter((c) => c.tipo === "obligatoria");
   if (faltanObl.length) {
     return vacio(`A la hoja «${hoja.nombre}» le faltan columnas obligatorias: ${faltanObl.map((c) => `«${c.base}»`).join(", ")}. No cambie los encabezados: descargue la plantilla y copie sus datos.`, generales);
@@ -263,11 +280,11 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
     const problemas: Problema[] = [];
     const err = (c: Columna | string, mensaje: string) => problemas.push({ nivel: "error", hoja: hoja.nombre, fila: nFila, columna: typeof c === "string" ? c : c.base, mensaje });
     const av = (c: Columna | string, mensaje: string) => problemas.push({ nivel: "aviso", hoja: hoja.nombre, fila: nFila, columna: typeof c === "string" ? c : c.base, mensaje });
-    const col = (id: CampoId) => COLUMNAS.find((c) => c.id === id)!;
+    const col = (id: CampoId) => cols.find((c) => c.id === id) ?? COLUMNAS.find((c) => c.id === id)!;
     const ver = <T,>(id: CampoId, f: (t: string) => Leido<T>, obligatoria = false): T | null => {
       const t = celda(id);
       if (!t) {
-        if (obligatoria) err(col(id), `Falta ${col(id).base.toLowerCase()}. Es obligatoria: escríbala en la celda amarilla.`);
+        if (obligatoria && esObl(id)) err(col(id), `Falta ${col(id).base.toLowerCase()}. Es obligatoria: escríbala en la celda amarilla.`);
         return null;
       }
       const r2 = f(t);
@@ -285,13 +302,16 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
     };
 
     const no = ver("no", (t) => (t.length > 40 ? mal("El N.º es muy largo (máximo 40 caracteres). Use un número corto, como 1, 2, 3…") : bien(t)), true);
-    const clasif = ver("clasif", deLista(CLASIFICACIONES, "una clasificación"), true);
+    const clasif = ver("clasif", deLista(lClasif, "una clasificación"), true);
     const nombre = ver("nombre", (t) => (t.length > 300 ? mal(`El nombre tiene ${t.length} caracteres y el máximo es 300. Acórtelo.`) : bien(t)), true);
     const descripcion = ver("descripcion", (t) => (t.length > 1000 ? mal(`La descripción tiene ${t.length} caracteres y el máximo es 1.000. Acórtela.`) : bien(t)));
     const campus = ver("campus", deLista(listaCampus, "un campus"), true);
     const pilar = ver(
       "pilar",
       (t) => {
+        const delPlan = resolverPilar(cfg, t);
+        if (delPlan) return bien(delPlan);
+        if (pilaresDeConfig(cfg)) return mal(`«${t}» no es un pilar de este plan. Elija uno de la lista desplegable (${pilaresDeConfig(cfg)!.join("; ")}).`);
         const cod = /^P\s*(\d)/i.exec(t.trim());
         const hallado = cod ? Object.keys(PILARES).find((k) => k === `P${cod[1]}`) : Object.keys(PILARES).find((k) => llano(PILARES[k]) === llano(t));
         return hallado ? bien(`${hallado}. ${PILARES[hallado]}`) : mal(`«${t}» no es un pilar del plan. Elija uno de la lista desplegable (${Object.entries(PILARES).map(([k, v]) => `${k}. ${v}`).join("; ")}).`);
@@ -308,14 +328,14 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
       },
       true,
     );
-    const prioridad = ver("prioridad", deLista(PRIORIDADES, "una prioridad"), true);
+    const prioridad = ver("prioridad", deLista(lPrioridad, "una prioridad"), true);
 
     const resultadoTxt = celda("resultado");
-    const resultado = resultadoTxt ? (RESULTADOS.find((x) => llano(x) === llano(resultadoTxt)) ?? resultadoTxt) : null;
-    if (resultado && !RESULTADOS.some((x) => x === resultado)) av(col("resultado"), `«${resultado}» no es un resultado conocido (${RESULTADOS.join(", ")}). Se importa tal como está.`);
+    const resultado = resultadoTxt ? (lResultado.find((x) => llano(x) === llano(resultadoTxt)) ?? resultadoTxt) : null;
+    if (resultado && !lResultado.some((x) => x === resultado)) av(col("resultado"), `«${resultado}» no es un resultado conocido (${lResultado.join(", ")}). Se importa tal como está.`);
     const fuenteTxt = celda("fuente");
-    const fuente = fuenteTxt ? (FUENTES.find((x) => llano(x) === llano(fuenteTxt)) ?? fuenteTxt) : null;
-    if (fuente && !FUENTES.some((x) => x === fuente)) av(col("fuente"), `«${fuente}» no está en la lista de fuentes. Se importa tal como está; si es un error de escritura, elíjala de la lista.`);
+    const fuente = fuenteTxt ? (lFuente.find((x) => llano(x) === llano(fuenteTxt)) ?? fuenteTxt) : null;
+    if (fuente && !lFuente.some((x) => x === fuente)) av(col("fuente"), `«${fuente}» no está en la lista de fuentes. Se importa tal como está; si es un error de escritura, elíjala de la lista.`);
 
     const siNo = (id: CampoId): boolean | null =>
       ver(id, (t) => (SI.has(llano(t)) ? bien(true) : NO.has(llano(t)) ? bien(false) : mal(`«${t}» no es Sí ni No. Elija Sí o No de la lista, o deje la celda vacía si no se evaluó.`)));
@@ -327,13 +347,13 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
     const fin = fechaDe("fin");
     if (inicio && fin && fin < inicio) err(col("fin"), `La fecha de fin (${fin}) es anterior a la de inicio (${inicio}). Corrija una de las dos.`);
     for (const [etq, f] of [["inicio", inicio], ["fin", fin]] as const) {
-      if (f && (Number(f.slice(0, 4)) < ANIO_INI || Number(f.slice(0, 4)) > ANIO_FIN)) av(col(etq), `La fecha ${f} queda fuera del plan (${ANIO_INI} a ${ANIO_FIN}). Se importa tal como está.`);
+      if (f && (Number(f.slice(0, 4)) < ANIO_I || Number(f.slice(0, 4)) > ANIO_F)) av(col(etq), `La fecha ${f} queda fuera del plan (${ANIO_I} a ${ANIO_F}). Se importa tal como está.`);
     }
 
     const pct: Record<string, number> = {};
     let suma = 0;
     let algunoPct = false;
-    for (const a of ANIOS) {
+    for (const a of ANIOS_P) {
       const v = ver(`pct:${a}`, (t) => {
         const n = leerNumero(t);
         if (n === null) return mal(`«${t}» no es un número. Escriba el porcentaje de 0 a 100 (12 para 12 %).`);
@@ -345,7 +365,7 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
       suma += v ?? 0;
     }
     if (algunoPct) {
-      const valores = ANIOS.map((a) => pct[String(a)] * 100);
+      const valores = ANIOS_P.map((a) => pct[String(a)] * 100);
       if (suma > 0 && suma <= 1.5 && valores.every((x) => x <= 1)) av("% de inversión", "Todos los porcentajes están entre 0 y 1: parece que escribió fracciones (0,12). Escriba 12 para 12 %; se leyó como puntos y la suma no da 100.");
       else if (Math.abs(suma - 100) > 0.05) av("% de inversión", `Los porcentajes suman ${(Math.round(suma * 100) / 100).toLocaleString("es-CO")} y deberían sumar 100. Se importa tal como está.`);
     }
@@ -377,9 +397,9 @@ export function analizarLibro(hojas: HojaCruda[], opciones: OpcionesAnalisis = {
       no: no ?? "",
       nombre: nombre ?? "",
       problemas,
-      linea: hayError || !no || !clasif || !nombre || !campus || !pilar || monto === null || !prioridad
+      linea: hayError || !no || !nombre
         ? null
-        : { no, clasif, nombre, descripcion, campus, pilar, monto, prioridad, resultado, fuente, criterios, viabilidad, inicio, fin, pct, origen: origenTxt || null, oficina, gestorCorreo },
+        : { no, clasif: clasif ?? "", nombre, descripcion, campus: campus ?? "", pilar: pilar ?? "", monto, prioridad: prioridad ?? "", resultado, fuente, criterios, viabilidad, inicio, fin, pct, origen: origenTxt || null, oficina, gestorCorreo },
     });
   }
   if (excedido) generales.push(aviso(`El libro tiene más de ${MAX_LINEAS} líneas: entraron las primeras ${MAX_LINEAS} y el resto no se leyó. Divida el archivo.`));

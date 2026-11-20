@@ -10,7 +10,9 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useCampus, useCargarPlanificacion, useOficinas, type ErrorCarga } from "./api";
+import { useCampus, useCargarPlanificacion, useConfigPlan, useOficinas, type ErrorCarga } from "./api";
+import { aniosDe } from "./modelo";
+import { useAct } from "./actividades/hooks";
 import { resumir } from "./calculos";
 import { usePs } from "./contexto";
 import { dondeEsta, importarArchivo, lineasListas, MAX_BYTES, MAX_LINEAS, problemasDe, type LineaLeida, type Problema, type ResultadoImportacion } from "./importar";
@@ -55,6 +57,10 @@ export function Cargar() {
   const [params, setParams] = useSearchParams();
   const campus = useCampus();
   const oficinas = useOficinas();
+  const cfgQ = useConfigPlan(plan?.id ?? null);
+  const act = useAct();
+  // Contrato F3B §6.4: carga el administrador, o el gestor de la oficina dueña de un plan de alcance «oficina».
+  const administraElPlan = puedeAdministrar(nivel) || (nivel === "gestor" && plan?.alcance === "oficina" && Boolean(plan.oficina) && act.oficinas.some((o) => o.id === plan.oficina!.id && o.poder === "gestor"));
   const cargar = useCargarPlanificacion();
   const [archivo, setArchivo] = useState<string>("");
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
@@ -74,14 +80,22 @@ export function Cargar() {
   const nombresCampus = campus.data;
   const nombresOficinas = useMemo(() => oficinas.data?.map((o) => o.nombre), [oficinas.data]);
 
-  if (!puedeAdministrar(nivel)) {
-    return <PaginaCompleta titulo="Cargar la planificación" migas={migas} regresarA={ruta("resumen")}><p className="ps-aviso"><Icon name="lock" size={16} /> Solo el administrador de planeación carga la planificación.</p></PaginaCompleta>;
+  if (!administraElPlan) {
+    return <PaginaCompleta titulo="Cargar la planificación" migas={migas} regresarA={ruta("resumen")}><p className="ps-aviso"><Icon name="lock" size={16} /> Carga la planificación el administrador de planeación o, en un plan de oficina, el gestor de esa oficina.</p></PaginaCompleta>;
   }
   if (!plan) {
     return (
       <PaginaCompleta titulo="Cargar la planificación" migas={migas} regresarA={ruta("resumen")}>
         <p className="ps-aviso"><Icon name="info" size={16} /> Primero hay que crear el plan (su nombre y años).</p>
         <div className="ps-botones"><button type="button" className="button-primary" onClick={() => ir(ruta("crear"), { reemplazar: true })}>Crear plan</button></div>
+      </PaginaCompleta>
+    );
+  }
+  if (!plan.oficina) {
+    return (
+      <PaginaCompleta titulo="Cargar la planificación" migas={migas} regresarA={ruta("resumen")}>
+        <p className="ps-aviso"><Icon name="info" size={16} /> El plan «{plan.nombre}» aún no tiene oficina dueña. Hace falta antes de cargar: las líneas sin oficina propia heredan la del plan.</p>
+        {nivel === "admin" ? <div className="ps-botones"><button type="button" className="button-primary" onClick={() => ir(ruta("plan-editar", plan.id))}>Asignar la oficina del plan</button></div> : <p className="ps-nota">Se lo pide al administrador de planeación.</p>}
       </PaginaCompleta>
     );
   }
@@ -120,7 +134,7 @@ export function Cargar() {
     setAcepto(false);
     setErroresBD(null);
     setArchivo(f.name);
-    const r = await importarArchivo(f, { oficinas: nombresOficinas, campus: nombresCampus });
+    const r = await importarArchivo(f, { oficinas: nombresOficinas, campus: nombresCampus, config: cfgQ.data ?? null, anios: plan ? aniosDe(plan.anioIni, plan.anioFin) : undefined });
     setResultado(r);
     setLeyendo(false);
     if (entrada.current) entrada.current.value = "";
@@ -129,7 +143,7 @@ export function Cargar() {
     setBajando(true);
     setErrorBajada(null);
     try {
-      await descargarPlantilla({ plan: plan.nombre, oficinas: nombresOficinas, campus: nombresCampus });
+      await descargarPlantilla({ plan: plan.nombre, planId: plan.id, oficinas: nombresOficinas, campus: nombresCampus, config: cfgQ.data ?? null, anios: aniosDe(plan.anioIni, plan.anioFin), oficinaDuena: plan.oficina?.nombre ?? null });
     } catch {
       setErrorBajada("No se pudo armar la plantilla. Vuelva a intentarlo.");
     }

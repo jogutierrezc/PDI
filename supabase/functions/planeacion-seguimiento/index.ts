@@ -1,9 +1,10 @@
 /* =============================================================================
    Edge Function · planeacion-seguimiento
 
-   Envía los avisos por correo de Planeación y Seguimiento (migración 0287). La base
+   Envía los avisos por correo de Planeación y Seguimiento (migraciones 0287 y 0288). La base
    deja cada aviso en la cola ps_avisos (al asignar, transferir, devolver, cerrar una
-   actividad y al generar vencimientos); esta función los toma y le pide a la función
+   actividad, reportar, validar o devolver un avance, y al generar vencimientos y avances
+   sin revisar); esta función los toma y le pide a la función
    `correos` que los envíe con las plantillas editables c-ps-* (pantalla «Correos»).
    El correo sale por el mismo servidor, con el mismo tope, los mismos dominios
    permitidos y la misma bitácora (correo_log, destinatario enmascarado) que los demás.
@@ -172,8 +173,10 @@ Deno.serve(async (request) => {
       if (generados.error) {
         return json({ error: /ps_generar_avisos_vencimiento/.test(generados.error.message) ? "Falta aplicar la migración 0287 (Planeación y Seguimiento, fase 2)." : "No se pudieron generar los avisos de vencimiento." }, 500);
       }
+      // 0290: alertas semanales de presupuesto para la VAF (idempotentes por semana). Si la migración no está, se omite.
+      const alertas = await admin.rpc("ps_generar_alertas_presupuesto");
       const resultado = await vaciarCola(admin, url, serviceKey, request.headers.get("Origin") ?? "");
-      return json({ ok: true, generados: generados.data, ...resultado });
+      return json({ ok: true, generados: generados.data, alertas: alertas.error ? null : alertas.data, ...resultado });
     }
 
     // accion === "avisos": el cron o una sesión con acceso al módulo.

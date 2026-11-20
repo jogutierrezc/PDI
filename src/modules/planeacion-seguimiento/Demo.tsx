@@ -17,7 +17,7 @@ import { crearApiMemoria } from "./api";
 import { PsApp } from "./PlaneacionSeguimiento";
 import type { PsNivel } from "./modelo";
 
-const NIVELES: PsNivel[] = ["none", "lector", "colaborador", "gestor", "aprobador", "admin"];
+const NIVELES: PsNivel[] = ["none", "lector", "colaborador", "gestor", "aprobador", "financiero", "admin"];
 
 export function PsDemo() {
   const { seccion, id } = useParams();

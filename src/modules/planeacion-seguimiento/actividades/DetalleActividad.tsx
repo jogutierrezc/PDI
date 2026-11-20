@@ -1,8 +1,8 @@
 /* =============================================================================
    Planeación y Seguimiento · Fase 2 · DETALLE DE UNA ACTIVIDAD, a pantalla completa (ruta propia).
    «Regresar» vuelve al tablero o a la lista tal como estaban (filtros y posición).
-   Pestañas: Resumen · Checklist · Asignaciones (historial y transferencias) · Historial.
-   Avances, evidencias, riesgos y comentarios llegan en la fase 3 y no aparecen vacíos.
+   Pestañas: Resumen · Avances · Evidencias · Riesgos y acciones · Comentarios · Checklist · Asignaciones · Historial.
+   (Fase 3: avances, evidencias con descarga por URL firmada, riesgos con acciones, comentarios y la conexión con el PDI.)
    ========================================================================== */
 
 import { useRef, useState } from "react";
@@ -17,10 +17,16 @@ import { fecha, rotuloCampus } from "../modelo";
 import { useAct, useActividad, useAgregarItem, useMarcarChecklist, useMoverActividad } from "./hooks";
 import { ROTULO_PODER, progresoChecklist, type EventoActividad } from "./modelo";
 import { Avatar, Banner, ChipEstado, ChipPlazo, MenuMover, MensajeRechazo, PrioridadAct } from "./partes";
+import { PanelAvances, PanelComentarios, PanelEvidencias, PanelRiesgos } from "./PestanasDetalle";
+import { BarraAvance, ChipPdi } from "./partesF3";
 import { puedeEditar, puedeMarcarChecklist, puedeTransferir } from "./reglas";
 
 const PESTANAS = [
   { id: "resumen", texto: "Resumen" },
+  { id: "avances", texto: "Avances" },
+  { id: "evidencias", texto: "Evidencias" },
+  { id: "riesgos", texto: "Riesgos y acciones" },
+  { id: "comentarios", texto: "Comentarios" },
   { id: "checklist", texto: "Checklist" },
   { id: "asignaciones", texto: "Asignaciones" },
   { id: "historial", texto: "Historial" },
@@ -64,6 +70,8 @@ export function DetalleActividad({ id }: { id: string }) {
     return <PaginaCompleta titulo="No encuentro esa actividad" migas={[...migas, { texto: "Actividad" }]} regresarA={ruta("tablero")} regresarTexto="Regresar al tablero"><Banner tipo="error" rol="alert">{(q.error as Error | null)?.message ?? "Esa actividad no existe o no puede verla."} Puede que la dirección esté mal escrita o que sea de una oficina que usted no ve.</Banner></PaginaCompleta>;
   }
   const { actividad: x, eventos } = q.data;
+  const det = q.data;
+  const abiertos = det.riesgos.filter((r) => r.estado !== "cerrado").length;
   const oficina = a.porId.get(x.oficinaId);
   const poder = a.poderDe(x.oficinaId);
   const cl = progresoChecklist(x);
@@ -108,11 +116,11 @@ export function DetalleActividad({ id }: { id: string }) {
       }
     >
       <MensajeRechazo mensaje={rechazo} onCerrar={() => setRechazo(null)} />
-      <div className="ps-fila-act ps-fila-act--ficha"><ChipEstado estado={x.estado} /><ChipPlazo a={x} hoy={a.hoy} /><PrioridadAct valor={x.prioridad} /></div>
+      <div className="ps-fila-act ps-fila-act--ficha"><ChipEstado estado={x.estado} /><ChipPlazo a={x} hoy={a.hoy} /><PrioridadAct valor={x.prioridad} /><BarraAvance avance={x.avance} compacta /><ChipPdi pdi={x.pdi} /></div>
       <div className="ps-pestanas" role="tablist" aria-label="Secciones de la actividad">
         {PESTANAS.map((p, i) => (
           <button key={p.id} ref={(el) => void (refs.current[p.id] = el)} type="button" role="tab" id={`pest-${p.id}`} aria-selected={pestana === p.id} aria-controls="pest-panel" tabIndex={pestana === p.id ? 0 : -1} onClick={() => cambiar(p.id)} onKeyDown={(e) => alTeclear(e, i)}>
-            {p.texto}{p.id === "checklist" && cl.total ? ` (${cl.hechos}/${cl.total})` : ""}
+            {p.texto}{p.id === "checklist" && cl.total ? ` (${cl.hechos}/${cl.total})` : ""}{p.id === "avances" && det.avances.length ? ` (${det.avances.length})` : ""}{p.id === "riesgos" && abiertos ? ` (${abiertos})` : ""}
           </button>
         ))}
       </div>
@@ -122,10 +130,16 @@ export function DetalleActividad({ id }: { id: string }) {
             {x.descripcion ? <p className="ps-descripcion">{x.descripcion}</p> : <p className="ps-nota">Esta actividad no trae descripción.</p>}
             <dl className="ps-ficha">
               {ficha.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+              <div><dt>Avance validado</dt><dd><BarraAvance avance={x.avance} />{x.avance.financiero !== null ? <small className="ps-nota"> · financiero {x.avance.financiero} %</small> : null}</dd></div>
+              <div><dt>Plan de Desarrollo Institucional</dt><dd>{x.pdi.conexion === "con_pdi" ? <ul className="ps-pdi-lista">{x.pdi.items.map((i) => <li key={`${i.pillarId}-${i.lineaId}`}><strong>{i.pilar}</strong>{i.linea ? <span>{i.area ? `${i.area} · ` : ""}{i.lineaCodigo} {i.linea}</span> : <span>Pilar completo</span>}</li>)}</ul> : x.pdi.conexion === "sin_pdi" ? "No tiene conexión con el PDI." : <em>Sin definir (es anterior a este dato).{puedeEditar(poder) ? " Edite la actividad para definirlo." : ""}</em>}</dd></div>
               <div><dt>Responsables</dt><dd>{x.asignados.length ? <ul className="ps-resp">{x.asignados.map((p) => <li key={p}><Avatar nombre={a.nombreDe(p)} tam={22} /> {a.nombreDe(p)}</li>)}</ul> : <em>Sin responsable</em>}</dd></div>
             </dl>
           </>
         ) : null}
+        {pestana === "avances" ? <PanelAvances x={x} det={det} poder={poder} /> : null}
+        {pestana === "evidencias" ? <PanelEvidencias det={det} /> : null}
+        {pestana === "riesgos" ? <PanelRiesgos x={x} det={det} poder={poder} /> : null}
+        {pestana === "comentarios" ? <PanelComentarios x={x} det={det} poder={poder} /> : null}
         {pestana === "checklist" ? (
           <>
             {cl.total ? <p className="ps-sub" role="status">{cl.hechos} de {cl.total} elementos hechos.</p> : <p className="ps-nota">La actividad no tiene checklist.{puedeEditar(poder) ? " Agregue el primer elemento." : ""}</p>}

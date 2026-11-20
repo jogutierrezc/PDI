@@ -65,7 +65,7 @@ export function agrupar(acts: readonly Actividad[], por: Agrupar, ctx: ContextoF
 
 /* ---------- Orden de la lista ---------- */
 
-export type ColumnaLista = "titulo" | "linea" | "oficina" | "responsable" | "estado" | "fin" | "prioridad";
+export type ColumnaLista = "titulo" | "linea" | "oficina" | "responsable" | "estado" | "fin" | "prioridad" | "avance";
 export interface OrdenLista {
   col: ColumnaLista;
   dir: "asc" | "desc";
@@ -81,6 +81,7 @@ export function ordenarLista(acts: readonly Actividad[], o: OrdenLista, ctx: Con
       case "estado": return ESTADOS.indexOf(a.estado);
       case "fin": return a.fin ?? "9999-12-31";
       case "prioridad": return rangoPrioridad(a.prioridad);
+      case "avance": return a.avance.fisico;
     }
   };
   const s = o.dir === "asc" ? 1 : -1;

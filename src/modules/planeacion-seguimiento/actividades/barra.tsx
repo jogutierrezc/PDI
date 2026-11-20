@@ -6,7 +6,9 @@ import { useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { usePs } from "../contexto";
 import { AGRUPACIONES, ROTULO_AGRUPAR, filtrarActividades, type Agrupar } from "./filtros";
-import { useAct, useActividades, useOficinaActual } from "./hooks";
+import { useAct, useActividades, useCatalogoPdi, useOficinaActual } from "./hooks";
+import { pasaFiltroPdi } from "./pdi";
+import { ROTULO_PDI, type ConexionPdi } from "./modeloF3";
 import { SelectorOficina } from "./partes";
 import type { Actividad } from "./modelo";
 
@@ -15,6 +17,9 @@ export interface FiltrosAct {
   q: string;
   mias: boolean;
   agrupar: Agrupar;
+  /** Fase 3: conexión con el PDI y pilar (en la dirección: ?pdi=, ?pilar=). */
+  pdi: "" | ConexionPdi;
+  pilar: string;
 }
 
 export function useFiltrosAct() {
@@ -25,8 +30,10 @@ export function useFiltrosAct() {
     q: params.get("q") ?? "",
     mias: params.get("mias") === "1",
     agrupar: (AGRUPACIONES as readonly string[]).includes(agr ?? "") ? (agr as Agrupar) : "estado",
+    pdi: (["con_pdi", "sin_pdi", "sin_definir"] as const).find((x) => x === params.get("pdi")) ?? "",
+    pilar: params.get("pilar") ?? "",
   };
-  const poner = (cambios: Partial<Record<"alcance" | "q" | "mias" | "agrupar", string | null>>) => {
+  const poner = (cambios: Partial<Record<"alcance" | "q" | "mias" | "agrupar" | "pdi" | "pilar", string | null>>) => {
     const s = new URLSearchParams(params);
     for (const [k, v] of Object.entries(cambios)) {
       if (v === null || v === "" || (k === "alcance" && v === "mi") || (k === "agrupar" && v === "estado") || (k === "mias" && v !== "1")) s.delete(k);
@@ -48,8 +55,9 @@ export function useDatosActividades() {
   const nombrePorNo = useMemo(() => new Map(lineas.map((l) => [l.no, l.nombre])), [lineas]);
   const nombreLinea = (no: string) => `${no} · ${(nombrePorNo.get(no) ?? "Línea del plan").replace(/\.$/, "")}`;
   const todas: Actividad[] = useMemo(() => q.data ?? [], [q.data]);
-  const filtradas = useMemo(() => filtrarActividades(todas, { q: f.q, mias: f.mias, yo: a.yo }, { nombreDe: a.nombreDe, nombreLinea }), [todas, f.q, f.mias, a.yo, a.personas, nombrePorNo]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { ...a, oficina, oficinas, elegir, f, poner, ids, todas, filtradas, nombreLinea, cargandoActs: q.isPending && ids.length > 0, errorActs: q.error as Error | null };
+  const catalogo = useCatalogoPdi();
+  const filtradas = useMemo(() => filtrarActividades(todas, { q: f.q, mias: f.mias, yo: a.yo }, { nombreDe: a.nombreDe, nombreLinea }).filter((x) => pasaFiltroPdi(x, { pdi: f.pdi, pilar: f.pilar })), [todas, f.q, f.mias, f.pdi, f.pilar, a.yo, a.personas, nombrePorNo]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { ...a, oficina, oficinas, elegir, f, poner, ids, todas, filtradas, pilares: catalogo.data ?? [], nombreLinea, cargandoActs: q.isPending && ids.length > 0, errorActs: q.error as Error | null };
 }
 
 export function BarraActividades({ d, agrupar = false }: { d: ReturnType<typeof useDatosActividades>; agrupar?: boolean }) {
@@ -66,6 +74,22 @@ export function BarraActividades({ d, agrupar = false }: { d: ReturnType<typeof 
           <label><input type="radio" name="alcance" checked={f.alcance === "todas"} onChange={() => poner({ alcance: "todas" })} /><span>Todas</span></label>
         </div>
         <label className="ps-opcion ps-opcion--linea"><input type="checkbox" checked={f.mias} onChange={(e) => poner({ mias: e.target.checked ? "1" : null })} /><span>Solo las mías</span></label>
+        <div className="ps-selector ps-selector--linea">
+          <label htmlFor="ps-pdi">Plan de Desarrollo (PDI)</label>
+          <select id="ps-pdi" value={f.pdi} onChange={(e) => poner({ pdi: e.target.value, ...(e.target.value === "sin_pdi" || e.target.value === "sin_definir" ? { pilar: null } : {}) })}>
+            <option value="">Todas</option>
+            {(["con_pdi", "sin_pdi", "sin_definir"] as const).map((c) => <option key={c} value={c}>{ROTULO_PDI[c]}</option>)}
+          </select>
+        </div>
+        {f.pdi === "" || f.pdi === "con_pdi" ? (
+          <div className="ps-selector ps-selector--linea">
+            <label htmlFor="ps-pilar">Pilar</label>
+            <select id="ps-pilar" value={f.pilar} onChange={(e) => poner({ pilar: e.target.value })}>
+              <option value="">Todos los pilares</option>
+              {d.pilares.map((p) => <option key={p.pillarId} value={p.pillarId}>{p.codigo} {p.nombre}</option>)}
+            </select>
+          </div>
+        ) : null}
         {agrupar ? (
           <div className="ps-selector ps-selector--linea">
             <label htmlFor="ps-agrupar">Agrupar por</label>

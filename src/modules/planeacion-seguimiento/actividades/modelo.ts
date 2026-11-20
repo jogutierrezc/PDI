@@ -7,6 +7,7 @@
    de CAMPUS, nunca de sede.
    ========================================================================== */
 
+import type { Avance, AvanceActividad, Comentario, PdiActividad, Riesgo, SeleccionPdi } from "./modeloF3";
 
 /** Los cinco cubos del tablero, en orden. */
 export const ESTADOS = ["por_iniciar", "en_curso", "en_riesgo", "en_revision", "hecho"] as const;
@@ -100,11 +101,15 @@ export interface Actividad {
   checklist: ItemChecklist[];
   creadaPor: string;
   creadaEn: string;
+  /** Conexión con el PDI (fase 3). Las actividades anteriores a la fase 3 están «sin definir». */
+  pdi: PdiActividad;
+  /** Avance validado (fase 3): el del último avance validado; sin ninguno, 0. */
+  avance: AvanceActividad;
   /** Dato de demostración (solo en el adaptador en memoria). */
   demo?: boolean;
 }
 
-export type TipoEvento = "creada" | "editada" | "estado" | "asignada" | "quitada" | "transferida" | "checklist";
+export type TipoEvento = "creada" | "editada" | "estado" | "asignada" | "quitada" | "transferida" | "checklist" | "avance" | "riesgo" | "evidencia" | "comentario" | "pdi";
 
 export interface EventoActividad {
   id: string;
@@ -122,6 +127,10 @@ export interface EventoActividad {
 export interface ActividadDetalle {
   actividad: Actividad;
   eventos: EventoActividad[];
+  /** Fase 3: más reciente primero. */
+  avances: Avance[];
+  riesgos: Riesgo[];
+  comentarios: Comentario[];
 }
 
 export interface DatosActividad {
@@ -136,6 +145,8 @@ export interface DatosActividad {
   prioridad: PrioridadAct;
   campus: string;
   asignados: string[];
+  /** Conexión con el PDI: al crear hay que elegir «con_pdi» o «sin_pdi». */
+  pdi: SeleccionPdi;
 }
 
 /** A quién llegará un aviso por correo (lo envía el servidor; la interfaz solo lo muestra). */
@@ -143,7 +154,7 @@ export interface AvisoPrevio {
   personaId: string;
   nombre: string;
   correo: string;
-  motivo: "asignacion" | "transferencia_entra" | "transferencia_sale" | "copia_gestor" | "devolucion";
+  motivo: "asignacion" | "transferencia_entra" | "transferencia_sale" | "copia_gestor" | "devolucion" | "avance" | "validado";
 }
 
 export interface LineaOficina {

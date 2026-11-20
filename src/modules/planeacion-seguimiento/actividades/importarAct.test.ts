@@ -7,7 +7,7 @@ import { ACT_PROPIA, COLUMNAS_ACT, HOJA_ACTIVIDADES } from "./columnasAct";
 import { actividadesListas, analizarActividades, problemasDeActividades, textoLineaLista, type OpcionesActividades } from "./importarAct";
 import type { DatosActividad } from "./modelo";
 import { construirPlantillaActividades, hojasPlantillaActividades } from "./plantillaAct";
-import { generarActividades, oficinaDeLinea, PERSONAS_DEMO, correoDemo, ID_YO, HOY_DEMO } from "./semilla";
+import { CATALOGO_PDI_DEMO, generarActividades, oficinaDeLinea, PERSONAS_DEMO, correoDemo, ID_YO, HOY_DEMO } from "./semilla";
 
 const lineasReales = real as unknown as Linea[];
 const CAMPUS = ["Bucaramanga", "Valledupar", "Cúcuta"];
@@ -24,14 +24,14 @@ function hojaDe(filas: Record<string, string>[]): HojaCruda[] {
   const cuerpo = filas.map((f) => COLUMNAS_ACT.map((c) => f[c.id] ?? ""));
   return [{ nombre: HOJA_ACTIVIDADES, oculta: false, filas: [["banda"], [""], [""], enc, ...cuerpo] }];
 }
-const fila = (o: Record<string, string> = {}): Record<string, string> => ({ linea: textoLineaLista(delaOficina[0]), titulo: "Levantar el inventario", inicio: "2027-02-01", fin: "2027-03-31", prioridad: "Alto", campus: "Cúcuta", "resp:1": equipo[1].correo, ...o });
+const fila = (o: Record<string, string> = {}): Record<string, string> => ({ linea: textoLineaLista(delaOficina[0]), titulo: "Levantar el inventario", inicio: "2027-02-01", fin: "2027-03-31", prioridad: "Alto", campus: "Cúcuta", "resp:1": equipo[1].correo, pdi: "Sin conexión", ...o });
 
 describe("importar actividades · reglas por fila", () => {
   it("una fila completa se lee sin problemas", () => {
     const r = analizarActividades(hojaDe([fila()]), op);
     expect(r.error).toBeNull();
     expect(problemasDeActividades(r)).toHaveLength(1); // solo el aviso de «sin _Control»
-    expect(actividadesListas(r)).toEqual([{ oficinaId: "of-4", lineaNo: delaOficina[0].no, titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alto", campus: "Cúcuta", asignados: [equipo[1].id] }]);
+    expect(actividadesListas(r)).toEqual([{ oficinaId: "of-4", lineaNo: delaOficina[0].no, titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alto", campus: "Cúcuta", asignados: [equipo[1].id], pdi: { conexion: "sin_pdi", items: [] } }]);
   });
   it("«Actividad propia de la oficina» no lleva línea", () => {
     expect(actividadesListas(analizarActividades(hojaDe([fila({ linea: ACT_PROPIA })]), op))[0].lineaNo).toBeNull();
@@ -88,13 +88,13 @@ describe("importar actividades · reglas por fila", () => {
 describe("plantilla de actividades ↔ importador (ida y vuelta, con exceljs)", () => {
   const semilla = generarActividades(lineasReales, [...PERSONAS_DEMO, { id: ID_YO, nombre: "Mariana Solano", oficina: "of-4", papel: "editor" }], HOY_DEMO, CAMPUS);
   const deTI = semilla.actividades.filter((a) => a.oficinaId === "of-4");
-  const datos: DatosActividad[] = deTI.map((a) => ({ oficinaId: a.oficinaId, lineaNo: a.lineaNo, titulo: a.titulo, descripcion: a.descripcion ?? "", inicio: a.esHito ? null : a.inicio, fin: a.fin, esHito: a.esHito, prioridad: a.prioridad, campus: a.campus, asignados: a.asignados }));
+  const datos: DatosActividad[] = deTI.map((a) => ({ oficinaId: a.oficinaId, lineaNo: a.lineaNo, titulo: a.titulo, descripcion: a.descripcion ?? "", inicio: a.esHito ? null : a.inicio, fin: a.fin, esHito: a.esHito, prioridad: a.prioridad, campus: a.campus, asignados: a.asignados, pdi: { conexion: "sin_pdi", items: [] } }));
   const base = { oficina: { id: "of-4", nombre: op.oficinaNombre }, equipo, lineas: delaOficina, campus: CAMPUS, plan: "PDIFyT 2027-2035", ahora: new Date("2027-06-30") };
 
   it("las hojas son Instrucciones, Actividades, Listas y _Control, con las dos últimas ocultas", () => {
     const h = hojasPlantillaActividades(base);
-    expect(h.map((x) => x.nombre)).toEqual(["Instrucciones", "Actividades", "Listas", "_Control"]);
-    expect(h.map((x) => Boolean(x.oculta))).toEqual([false, false, true, true]);
+    expect(h.map((x) => x.nombre)).toEqual(["Instrucciones", "Actividades", "PDI", "Listas", "_Control"]);
+    expect(h.map((x) => Boolean(x.oculta))).toEqual([false, false, false, true, true]);
     expect(h[1].banner?.titulo).toMatch(/Tecnología/);
     // las listas desplegables: línea y responsables por rango de la hoja oculta; prioridad y campus en línea
     const idx = (id: string) => COLUMNAS_ACT.findIndex((c) => c.id === id);
@@ -140,5 +140,30 @@ describe("plantilla de actividades ↔ importador (ida y vuelta, con exceljs)", 
 
   it("un archivo que no es .xlsx se explica", async () => {
     await expect(leerLibro(new Uint8Array([1, 2, 3, 4, 5]))).rejects.toThrow(/no es un libro de Excel/);
+  });
+});
+
+describe("importar actividades · conexión con el PDI (fase 3)", () => {
+  const cat = CATALOGO_PDI_DEMO;
+  const l = cat[0].areas[0].lineas[0];
+  const conCat = { ...op, catalogoPdi: cat };
+  it("«Con PDI» con una línea por código crea la selección (y su pilar)", () => {
+    const r = analizarActividades(hojaDe([fila({ pdi: "Con PDI", linea_pdi: l.codigo })]), conCat);
+    expect(actividadesListas(r)[0].pdi).toEqual({ conexion: "con_pdi", items: [{ pillarId: cat[0].pillarId, lineaId: l.lineaId }] });
+  });
+  it("la conexión es obligatoria: sin ella la fila no se importa y el error dice la columna", () => {
+    const r = analizarActividades(hojaDe([fila({ pdi: "" })]), conCat);
+    expect(r.filas[0].datos).toBeNull();
+    expect(r.filas[0].problemas.find((p) => p.nivel === "error")).toMatchObject({ columna: "Conexión con el PDI" });
+  });
+  it("línea inexistente o «Sin conexión» con línea: error en la columna de la línea", () => {
+    expect(analizarActividades(hojaDe([fila({ pdi: "Con PDI", linea_pdi: "LA-9.9.9" })]), conCat).filas[0].problemas[0].columna).toBe("Línea de acción del PDI");
+    expect(analizarActividades(hojaDe([fila({ pdi: "Sin conexión", linea_pdi: l.codigo })]), conCat).filas[0].datos).toBeNull();
+  });
+  it("la plantilla trae la hoja visible «PDI» con el catálogo", () => {
+    const h = hojasPlantillaActividades({ oficina: { id: "of-4", nombre: op.oficinaNombre }, equipo, lineas: delaOficina, campus: CAMPUS, catalogoPdi: cat });
+    const pdi = h.find((x) => x.nombre === "PDI")!;
+    expect(pdi.oculta).toBeFalsy();
+    expect(pdi.filas.some((f) => f[2] === l.codigo)).toBe(true);
   });
 });

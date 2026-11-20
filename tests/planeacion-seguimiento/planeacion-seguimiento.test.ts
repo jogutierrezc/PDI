@@ -28,6 +28,7 @@ const matriz: Fila[] = (JSON.parse(readFileSync(origen, "utf8")).projects as Fil
 let t: TestDb;
 let plan: string;
 let borrador: string;
+let OFI: string;
 
 const rpc = <T = unknown>(q: Query, fn: string, args: string, params: unknown[]) =>
   q<{ r: T }>(`select public.${fn}(${args}) as r`, params).then((x) => x[0].r);
@@ -37,6 +38,7 @@ const cargar = (q: Query, p: string, filas: unknown, nota = "") =>
 
 beforeAll(async () => {
   t = await createTestDb();
+  OFI = (await t.q<{ id: string }>("insert into public.units (code, name, slug) values ('OFPL', 'Oficina del plan', 'ofpl') returning id"))[0].id;
   const roles: [string, string, string, string, string | null][] = [
     [ADMIN, "admin", "admin", "", null],
     [LECTOR, "lector", "consulta", "lector", "ps-lector"],
@@ -94,10 +96,10 @@ describe("0286 · crear plan y cargar la matriz real", () => {
     for (const id of [LECTOR, APROBADOR, GESTOR, SIN_NIVEL, CAPACIDAD]) {
       expect(await errorOf(t.asUser(id, (q) => rpc(q, "ps_crear_plan", "'PDIFyT 2027-2035', 2027, 2035", [])))).toMatch(/Sin permiso/);
     }
-    plan = await t.asUser(ADMIN, (q) => rpc<string>(q, "ps_crear_plan", "'PDIFyT 2027-2035', 2027, 2035", []), { commit: true });
+    plan = await t.asUser(ADMIN, (q) => rpc<string>(q, "ps_crear_plan", "'PDIFyT 2027-2035', 2027, 2035, $1", [OFI]), { commit: true });
     expect(plan).toMatch(/^[0-9a-f-]{36}$/);
-    expect(await errorOf(t.asUser(ADMIN, (q) => rpc(q, "ps_crear_plan", "'pdifyt 2027-2035 ', 2027, 2035", [])))).toMatch(/Ya existe/);
-    expect(await errorOf(t.asUser(ADMIN, (q) => rpc(q, "ps_crear_plan", "'Otro', 2030, 2027", [])))).toMatch(/años/);
+    expect(await errorOf(t.asUser(ADMIN, (q) => rpc(q, "ps_crear_plan", "'pdifyt 2027-2035 ', 2027, 2035, $1", [OFI])))).toMatch(/Ya existe/);
+    expect(await errorOf(t.asUser(ADMIN, (q) => rpc(q, "ps_crear_plan", "'Otro', 2030, 2027, $1", [OFI])))).toMatch(/años/);
   });
 
   it("la matriz de prueba trae 75 filas", () => {
@@ -203,7 +205,7 @@ describe("0286 · resumen y calidad (borrador)", () => {
   it("el resumen suma lo que dice la matriz y no inventa distribución", async () => {
     const r = await t.asUser(LECTOR, (q) => rpc<any>(q, "ps_resumen_plan", "$1", [plan]));
     expect(r.version).toMatchObject({ etiqueta: "v1.0", estado: "borrador", es_vigente: false });
-    expect(r.totales).toMatchObject({ lineas: 75, evaluadas: 63, sin_evaluar: 12, con_oficina: 0, sin_oficina: 75, cobertura_oficina: 0 });
+    expect(r.totales).toMatchObject({ lineas: 75, evaluadas: 63, sin_evaluar: 12, con_oficina: 75, sin_oficina: 0 });
     expect(r.totales.monto).toBe(133374668643);
     expect(r.totales.monto_evaluado + r.totales.monto_sin_evaluar).toBe(r.totales.monto);
     expect(r.por_prioridad.map((p: any) => p.prioridad)).toEqual(["Crítico", "Alto", "Medio", "Largo plazo"]);
@@ -218,7 +220,7 @@ describe("0286 · resumen y calidad (borrador)", () => {
   it("la calidad distingue pendiente, no aplica todavía e inconsistente", async () => {
     const c = await t.asUser(LECTOR, (q) => rpc<any>(q, "ps_calidad_matriz", "$1", [borrador]));
     expect(c.resumen.lineas).toBe(75);
-    expect(c.resumen.por_campo.oficina_unit_id).toBe(75);
+    expect(c.resumen.por_campo.oficina_unit_id ?? 0).toBe(0); // 0289: las líneas heredan la oficina dueña del plan
     expect(c.resumen.por_categoria.no_aplica).toBeGreaterThanOrEqual(12 * 5);
     const sinEvaluar = c.hallazgos.filter((h: any) => h.campo === "resultado");
     expect(sinEvaluar).toHaveLength(12);
@@ -233,7 +235,7 @@ describe("0286 · resumen y calidad (borrador)", () => {
 
   it("una fila evaluada con vacíos e incoherencias se reporta pendiente e inconsistente", async () => {
     const [p2] = await t.asUser(ADMIN, async (q) => {
-      const id = await rpc<string>(q, "ps_crear_plan", "'Plan de calidad', 2027, 2030", []);
+      const id = await rpc<string>(q, "ps_crear_plan", "'Plan de calidad', 2027, 2030, $1", [OFI]);
       const r = await cargar(q, id, [
         { clave: "A", nombre: "A", pilar: "P1", campus: "Todos", prioridad: "Alto", resultado: "Aprobado", monto: 0 },
         { clave: "B", nombre: "B", pilar: "P1", campus: "Cucuta", prioridad: "medio", monto: 10, resultado: null, criterios: { alin: "Si" }, inicio: "2026-01-01" },
@@ -257,7 +259,7 @@ describe("0286 · asignar oficina solo en borrador", () => {
     const r = await t.asUser(ADMIN, (q) => rpc<any>(q, "ps_asignar_oficina_linea", "$1, '1', $2", [borrador, u.id]), { commit: true });
     expect(r).toMatchObject({ clave: "1", oficina_unit_id: u.id });
     const res = await t.asUser(LECTOR, (q) => rpc<any>(q, "ps_resumen_plan", "$1", [plan]));
-    expect(res.totales).toMatchObject({ con_oficina: 1, sin_oficina: 74 });
+    expect(res.totales).toMatchObject({ con_oficina: 75, sin_oficina: 0 });
     expect(await errorOf(t.asUser(ADMIN, (q) => rpc(q, "ps_asignar_oficina_linea", "$1, 'no-existe', $2", [borrador, u.id])))).toMatch(/no está en esta versión/);
     expect(await errorOf(t.asUser(ADMIN, (q) => rpc(q, "ps_asignar_oficina_linea", "$1, '1', '00000000-0000-4000-b000-00000000ffff'", [borrador])))).toMatch(/no existe/);
     await t.asUser(ADMIN, (q) => rpc(q, "ps_asignar_oficina_linea", "$1, '1', null", [borrador]), { commit: true });
@@ -386,16 +388,16 @@ describe("0286 · lectura, anon y eventos", () => {
   });
 
   it("el resumen de una versión publicada se marca vigente", async () => {
-    const r = await t.asUser(GESTOR, (q) => rpc<any>(q, "ps_resumen_plan", "$1", [plan]));
+    const r = await t.asUser(LECTOR, (q) => rpc<any>(q, "ps_resumen_plan", "$1", [plan]));
     expect(r.version).toMatchObject({ estado: "publicada", es_vigente: true });
   });
 });
 
 describe("0286 · idempotencia", () => {
   it("aplicar la migración otra vez no falla ni toca los datos", async () => {
-    const sql = readFileSync(new URL("../../supabase/migrations/0286_planeacion_seguimiento.sql", import.meta.url), "utf8");
-    await t.db.exec(sql);
-    await t.db.exec(sql);
+    const sql = ["0286_planeacion_seguimiento", "0287_planeacion_seguimiento_actividades", "0288_planeacion_seguimiento_avances", "0289_planeacion_seguimiento_planes", "0290_planeacion_seguimiento_presupuesto"]
+      .map((m) => readFileSync(new URL(`../../supabase/migrations/${m}.sql`, import.meta.url), "utf8"));
+    for (let i = 0; i < 2; i++) for (const m of sql) await t.db.exec(m);
     const [c] = await t.q<{ n: number; v: string }>(
       "select (select count(*) from ps_version_lineas where version_id = $1)::int n, (select estado from ps_versiones where id = $1) v", [borrador]);
     expect(c).toEqual({ n: 75, v: "publicada" });

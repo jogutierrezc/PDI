@@ -4,6 +4,7 @@ import { calidadDeDatos, filtrar, inversionPorAnio, opcionesFiltro, FILTROS, por
 import { crearApiMemoria } from "./api";
 import { lineaDeFila, lineaParaCarga } from "./api";
 import type { Linea } from "./modelo";
+import { configPorOmision, type DatosPlan } from "./modeloPlanes";
 
 const lineas = real as unknown as Linea[];
 
@@ -69,11 +70,13 @@ describe("cronograma", () => {
   });
 });
 
+const datosPlan = (nombre: string): DatosPlan => ({ nombre, anioIni: 2027, anioFin: 2035, descripcion: "", oficinaId: "of-2", alcance: "institucional", config: configPorOmision() });
+
 describe("capa de datos en memoria", () => {
   it("vacío → crear plan → cargar → publicar", async () => {
     const api = crearApiMemoria({ estado: "ninguno" });
     expect(await api.plan()).toBeNull();
-    const id = await api.crearPlan({ nombre: "PDIFyT 2027-2035", anioIni: 2027, anioFin: 2035 });
+    const id = await api.crearPlan(datosPlan("PDIFyT 2027-2035"));
     const r = await api.cargarPlanificacion({ planId: id, lineas: lineas.slice(0, 5), nombreArchivo: "x.xlsx" });
     expect(r).toMatchObject({ aceptadas: 5, etiqueta: "v1.0", errores: [] });
     expect((await api.plan())?.version).toMatchObject({ estado: "borrador", vigente: false });
@@ -84,7 +87,7 @@ describe("capa de datos en memoria", () => {
   });
   it("rechaza un campus que el portal no tiene", async () => {
     const api = crearApiMemoria({ estado: "ninguno" });
-    const id = await api.crearPlan({ nombre: "Plan", anioIni: 2027, anioFin: 2035 });
+    const id = await api.crearPlan(datosPlan("Plan"));
     const r = await api.cargarPlanificacion({ planId: id, lineas: [{ ...lineas[0], campus: "Medellín" }], nombreArchivo: "x.xlsx" });
     expect(r.errores[0]).toMatchObject({ fila: 1, campo: "campus" });
   });

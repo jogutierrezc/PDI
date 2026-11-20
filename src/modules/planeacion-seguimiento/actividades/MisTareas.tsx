@@ -6,7 +6,9 @@ import { Link } from "react-router-dom";
 import { EmptyBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { usePs } from "../contexto";
 import { DESDE_MODULO } from "../marco/PaginaCompleta";
-import { useAct, useActividades, useMoverActividad } from "./hooks";
+import { useAct, useActividades, useMisAvances, useMoverActividad } from "./hooks";
+import { ColaPorValidar } from "./Revisar";
+import { BarraAvance, TarjetaAvance } from "./partesF3";
 import { comparar } from "./filtros";
 import { diasEntre, estadoPlazo, type Actividad } from "./modelo";
 import { Banner, ChecklistMini, ChipEstado, ChipPlazo, MenuMover, MensajeRechazo, PrioridadAct } from "./partes";
@@ -24,6 +26,7 @@ export function MisTareas() {
   const { ruta } = usePs();
   const q = useActividades(a.oficinas.map((o) => o.id));
   const mover = useMoverActividad();
+  const mis = useMisAvances();
   const [rechazo, setRechazo] = useState<string | null>(null);
   const mias = useMemo(() => (q.data ?? []).filter((x) => a.yo && x.asignados.includes(a.yo)).sort(comparar), [q.data, a.yo]);
   if (a.cargando) return <LoadingBlock rows={4} label="Cargando sus tareas" />;
@@ -34,6 +37,14 @@ export function MisTareas() {
     <div className="ps-seccion">
       {q.error ? <Banner tipo="error" rol="alert">No se pudieron leer las actividades: {(q.error as Error).message}</Banner> : null}
       <MensajeRechazo mensaje={rechazo} onCerrar={() => setRechazo(null)} />
+      {a.oficinas.some((o) => o.poder === "gestor") ? <ColaPorValidar oficinaId={null} titulo="Por validar" /> : null}
+      {(mis.data ?? []).filter((v) => v.estado === "devuelto").length ? (
+        <section className="ps-tareas-grupo" aria-labelledby="tg-devueltos" data-grupo="devueltos">
+          <h2 id="tg-devueltos">Avances devueltos <b className="ps-cubo__n">{(mis.data ?? []).filter((v) => v.estado === "devuelto").length}</b></h2>
+          <p className="ps-sub">El gestor pidió correcciones. Léalas y reporte el avance de nuevo desde la actividad.</p>
+          <div className="ps-avances">{(mis.data ?? []).filter((v) => v.estado === "devuelto").slice(0, 3).map((v) => <TarjetaAvance key={v.id} a={v}><div className="ps-botones"><Link className="button-secondary ps-btn-peq" to={ruta("actividad", v.actividadId)} state={DESDE_MODULO}>Abrir la actividad</Link></div></TarjetaAvance>)}</div>
+        </section>
+      ) : null}
       {mias.length === 0 ? (
         <EmptyBlock title="No tiene actividades asignadas" hint="Cuando el gestor de su oficina le asigne una, aparecerá aquí y recibirá un correo." />
       ) : (
@@ -54,6 +65,7 @@ export function MisTareas() {
                       <ChipPlazo a={x} hoy={a.hoy} />
                       <PrioridadAct valor={x.prioridad} />
                       <ChecklistMini a={x} />
+                      <BarraAvance avance={x.avance} compacta />
                       <MenuMover actividad={x} poder={a.poderDe(x.oficinaId)} yo={a.yo} compacto onMover={(estado) => { setRechazo(null); mover.mutate({ id: x.id, estado }, { onError: (e) => setRechazo((e as Error).message) }); }} onRechazo={setRechazo} />
                     </li>
                   ))}

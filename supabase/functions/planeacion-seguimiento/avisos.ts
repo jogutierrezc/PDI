@@ -1,5 +1,5 @@
 /* =============================================================================
-   Lógica pura de los avisos de Planeación y Seguimiento (migración 0287).
+   Lógica pura de los avisos de Planeación y Seguimiento (migraciones 0287 y 0288).
 
    Sin imports ni acceso a Deno: se puede probar con vitest
    (tests/planeacion-seguimiento/avisos.test.ts). La usa index.ts.
@@ -44,6 +44,23 @@ export function etiquetaDias(n: unknown): string {
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
 
+/** «$ 1.234.000» (pesos colombianos) o vacío si no es un número. */
+export function pesos(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? `$ ${Math.round(n).toLocaleString("es-CO")}` : "";
+}
+
+const RESULTADO_VAF: Record<string, string> = { aprobada: "aprobada", aprobada_con_ajustes: "aprobada con ajustes", no_viable: "no viable" };
+
+/** «Avance físico: 40 %. Avance financiero: 10 %.» con lo que dejó la base en datos (fisico, financiero); vacío si no hay. */
+export function textoAvance(d: Record<string, unknown>): string {
+  const num = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+  const fis = num(d.fisico);
+  const fin = num(d.financiero);
+  return [fis !== null ? `Avance físico: ${fis} %.` : "", fin !== null ? `Avance financiero: ${fin} %.` : ""].filter(Boolean).join(" ");
+}
+
 /** El título y el detalle de cada aviso, con lo que dejó la base en ps_avisos.datos. */
 export function redactar(a: Pick<AvisoCola, "plantilla" | "datos">): Redaccion {
   const d = a.datos;
@@ -82,10 +99,23 @@ export function redactar(a: Pick<AvisoCola, "plantilla" | "datos">): Redaccion {
       const titulo = rol === "recibe" ? "Le transfirieron una actividad" : rol === "cede" ? "Su actividad pasó a otra persona" : "Una actividad de su oficina cambió de responsable";
       return salida(titulo, `${base} La asignación pasó ${quien}.${motivo}`);
     }
-    case "c-ps-avance":
-      return salida("Hay un avance por revisar", `${base}${nota ? ` Nota: ${nota}` : ""}`);
-    case "c-ps-validado":
-      return salida("Su avance quedó validado", `${base}${nota ? ` Nota: ${nota}` : ""}`);
+    case "c-ps-avance": {
+      const av = textoAvance(d);
+      return salida("Hay un avance por revisar", `${base}${av ? ` ${av}` : ""}${nota ? ` Nota: ${nota}` : ""}`);
+    }
+    case "c-ps-validado": {
+      const av = textoAvance(d);
+      return salida("Su avance quedó validado", `${base}${av ? ` ${av}` : ""}${nota ? ` Nota del gestor: ${nota}` : ""}`);
+    }
+    case "c-ps-validacion-pendiente": {
+      const n = Math.max(1, Number(d.n) || 1);
+      const lista = limpio(d.actividades, 300);
+      return salida(
+        `Hay ${n} ${plural(n, "avance esperando", "avances esperando")} su revisión`,
+        `${oficina ? `Oficina: ${oficina}. ` : ""}${n} ${plural(n, "avance lleva", "avances llevan")} más del plazo de validación sin respuesta.${lista ? ` Actividades: ${lista}.` : ""}`,
+        { comentario: "" },
+      );
+    }
     case "c-ps-devuelto":
       return salida("Le devolvieron una actividad", `${base}${nota ? ` Nota del gestor: ${nota}` : ""}`);
     case "c-ps-por-vencer": {
@@ -104,6 +134,35 @@ export function redactar(a: Pick<AvisoCola, "plantilla" | "datos">): Redaccion {
     }
     case "c-ps-cumplida":
       return salida("Una actividad quedó hecha", `${base}${nota ? ` Nota: ${nota}` : ""}`);
+    case "c-ps-vaf-evaluar": {
+      const plan = limpio(d.plan, 160) || "un plan";
+      const monto = pesos(d.monto);
+      return salida(
+        "Un plan espera evaluación financiera",
+        `Plan: «${plan}».${oficina ? ` Oficina dueña: ${oficina}.` : ""}${limpio(d.version, 20) ? ` Versión ${limpio(d.version, 20)}.` : ""}${monto ? ` Monto solicitado: ${monto}.` : ""}`,
+        { fecha_limite: "" },
+      );
+    }
+    case "c-ps-vaf-resultado": {
+      const plan = limpio(d.plan, 160) || "su plan";
+      const res = RESULTADO_VAF[limpio(d.resultado, 30)] ?? limpio(d.resultado, 30);
+      const apr = pesos(d.monto_aprobado);
+      const sol = pesos(d.monto_solicitado);
+      return salida(
+        `La VAF evaluó el plan: ${res || "con resultado"}`,
+        `Plan: «${plan}». Resultado: ${res || "sin dato"}.${sol ? ` Monto solicitado: ${sol}.` : ""}${apr ? ` Monto aprobado: ${apr}.` : ""}${nota ? ` Observaciones: ${nota}` : ""}`,
+        { fecha_limite: "" },
+      );
+    }
+    case "c-ps-vaf-alerta": {
+      const plan = limpio(d.plan, 160) || "un plan";
+      const n = Math.max(1, Number(d.n) || 1);
+      return salida(
+        `Alerta de ejecución en «${plan}»`,
+        `La vigilancia del presupuesto encontró ${n} ${plural(n, "alerta", "alertas")}. ${limpio(d.detalle, 600)}`.trim(),
+        { fecha_limite: "", comentario: "" },
+      );
+    }
     default:
       return salida("Novedad en Planeación y Seguimiento", base);
   }

@@ -32,7 +32,8 @@ const fallo = (user: string | null, fn: string, args: string, params: unknown[] 
 const unit = async (code: string, parent: string | null) =>
   (await t.q<{ id: string }>("insert into units (code, name, slug, parent_id) values ($1, $2, $3, $4) returning id", [code, `Oficina ${code}`, code.toLowerCase(), parent]))[0].id;
 const crear = (user: string, u: string, datos: Json, confirmar = false) =>
-  call(user, "ps_actividad_crear", "$1, $2, $3::jsonb, $4", [plan, u, JSON.stringify(datos), confirmar]);
+  // 0288: al crear hay que elegir la conexión con el PDI; estas pruebas de la fase 2 no la usan.
+  call(user, "ps_actividad_crear", "$1, $2, $3::jsonb, $4", [plan, u, JSON.stringify({ pdi: { conexion: "sin_pdi" }, ...datos }), confirmar]);
 const avisos = (act: string | null, plantilla?: string) =>
   t.q<{ destinatario_id: string; plantilla: string; datos: Json }>(
     `select destinatario_id, plantilla, datos from ps_avisos where ($1::uuid is null or actividad_id = $1) and ($2::text is null or plantilla = $2) order by id`, [act, plantilla ?? null]);
@@ -69,7 +70,7 @@ beforeAll(async () => {
   await m(INF, P.ginf, "jefe"); await m(INF, P.colinf, "editor");
   await m(VR2, P.jefevr, "jefe"); await m(VR2, P.hereda, "editor"); await m(VR2, P.override, "jefe"); await m(SUB2, P.override, "editor");
 
-  plan = await call<string>(P.admin, "ps_crear_plan", "'PDIFyT 2027-2035', 2027, 2035");
+  plan = await call<string>(P.admin, "ps_crear_plan", "'PDIFyT 2027-2035', 2027, 2035, $1", [VR2]);
   const fila = (clave: string) => ({ clave, nombre: `Proyecto ${clave}`, pilar: "Pilar A", campus: "Todos", prioridad: "Alto", monto: 1000 });
   const carga = await call<Json>(P.admin, "ps_cargar_matriz", "$1, $2::jsonb, ''", [plan, JSON.stringify(["1", "2", "3", "4"].map(fila))]);
   expect(carga.errores).toEqual([]);
@@ -151,7 +152,7 @@ describe("0287 · crear actividades", () => {
   });
 
   it("no se crea sin versión vigente", async () => {
-    const otro = await call<string>(P.admin, "ps_crear_plan", "'Plan sin vigente', 2030, 2032");
+    const otro = await call<string>(P.admin, "ps_crear_plan", "'Plan sin vigente', 2030, 2032, $1", [VR2]);
     expect(await errorOf(call(P.admin, "ps_actividad_crear", "$1, $2, $3::jsonb", [otro, TIC, JSON.stringify({ titulo: "Sin plan vigente" })]))).toMatch(/versión vigente/);
   });
 });
@@ -196,7 +197,7 @@ describe("0287 · asignar, campus y masiva", () => {
   });
 
   it("la herencia de pertenencia hace asignable a quien es editor de la unidad madre", async () => {
-    const a2 = (await call(P.admin, "ps_actividad_crear", "$1, $2, $3::jsonb", [plan, SUB2, JSON.stringify({ titulo: "En la subunidad" })])).actividad.id;
+    const a2 = (await call(P.admin, "ps_actividad_crear", "$1, $2, $3::jsonb", [plan, SUB2, JSON.stringify({ titulo: "En la subunidad", pdi: { conexion: "sin_pdi" } })])).actividad.id;
     expect(await fallo(P.override, "ps_actividad_asignar", "$1, $2::uuid[]", [a2, [P.hereda]])).toMatch(/Sin permiso/); // en SUB2 solo es colaborador
     expect((await call(P.jefevr, "ps_actividad_asignar", "$1, $2::uuid[]", [a2, [P.hereda]])).ok).toBe(true);    // hereda: editor de la unidad madre
     expect((await call(P.jefevr, "ps_actividad_asignar", "$1, $2::uuid[]", [a2, [P.override]])).ok).toBe(true); // override es editor en SUB2
@@ -290,7 +291,8 @@ describe("0287 · mover entre estados", () => {
 
   it("el gestor pasa a «hecho», avisa a quien la tenía y el colaborador no la reabre", async () => {
     await mover(P.col1, "en_revision");
-    const r = await mover(P.gtic, "hecho");
+    expect(await errorOf(mover(P.gtic, "hecho"))).toMatch(/Cerrar actividad/); // 0288: sin avance validado se cierra con ps_actividad_cerrar
+    const r = await call(P.gtic, "ps_actividad_cerrar", "$1, 'Cierre administrativo de la prueba'", [act]);
     expect(r.actividad.estado).toBe("hecho");
     expect(r.actividad.completada_en).not.toBeNull();
     const cum = await avisos(act, "c-ps-cumplida");
@@ -356,10 +358,10 @@ describe("0287 · editar, checklist, comentar y eliminar", () => {
     const x = (await crear(P.gtic, TIC, { titulo: "Borrar esta actividad" })).actividad.id;
     expect(await fallo(P.col1, "ps_actividad_eliminar", "$1", [x])).toMatch(/Sin permiso/);
     expect(await fallo(P.ginf, "ps_actividad_eliminar", "$1", [x])).toMatch(/no existe/);
-    await t.q("create table public.ps_avances (actividad_id uuid)");
-    await t.q("insert into public.ps_avances values ($1)", [x]);
-    expect(await fallo(P.gtic, "ps_actividad_eliminar", "$1", [x])).toMatch(/avances/);
-    await t.q("drop table public.ps_avances");
+    const y = (await crear(P.gtic, TIC, { titulo: "Con un avance" })).actividad.id;
+    await t.q(`insert into ps_avances (actividad_id, version_id, fecha, av_fisico, nota, reportado_por)
+               select id, version_creacion_id, current_date, 10, 'Avance de la prueba', $2 from ps_actividades where id = $1`, [y, P.col1]);
+    expect(await fallo(P.gtic, "ps_actividad_eliminar", "$1", [y])).toMatch(/avances/);
     const r = await call(P.gtic, "ps_actividad_eliminar", "$1, 'Creada por error'", [x]);
     expect(r.ok).toBe(true);
     expect(await t.q("select 1 from ps_actividades where id = $1", [x])).toHaveLength(0);
@@ -370,7 +372,7 @@ describe("0287 · editar, checklist, comentar y eliminar", () => {
 
 describe("0287 · carga masiva por Excel", () => {
   const cargar = (u: string, unidad: string, filas: unknown[], confirmar = false) =>
-    call(u, "ps_actividades_cargar", "$1, $2::jsonb, null, $3", [unidad, JSON.stringify(filas), confirmar]);
+    call(u, "ps_actividades_cargar", "$1, $2::jsonb, null, $3", [unidad, JSON.stringify(filas.map((f) => ({ pdi: "Sin conexión", ...(f as object) }))), confirmar]);
   const cuenta = async () => (await t.q<{ n: number }>("select count(*)::int n from ps_actividades where oficina_unit_id = $1", [TIC]))[0].n;
 
   it("con errores no crea nada y los informa por fila y campo", async () => {
@@ -437,7 +439,7 @@ describe("0287 · avisos de vencimiento con reloj controlado", () => {
     act = (await crear(P.gtic, TIC, { titulo: "Entrega con plazo", fin: "2030-03-10", responsables: [P.col1] })).actividad.id;
     sin = (await crear(P.gtic, TIC, { titulo: "Sin responsable", fin: "2030-03-10" })).actividad.id;
     hecha = (await crear(P.gtic, TIC, { titulo: "Ya hecha", fin: "2030-03-10", responsables: [P.col1] })).actividad.id;
-    await call(P.gtic, "ps_actividad_mover", "$1, 'hecho'", [hecha]);
+    await call(P.gtic, "ps_actividad_cerrar", "$1, 'Cierre administrativo de la prueba'", [hecha]);
   });
 
   it("por vencer a 7 y 3 días y el día de la fecha; correrla dos veces no duplica", async () => {
@@ -568,14 +570,13 @@ describe("0287 · idempotencia de la migración", () => {
   it("aplicarla otra vez no falla, no pisa plantillas editadas ni duplica filas", async () => {
     await t.q("update correo_templates set subject = 'Asunto editado por la administración' where key = 'c-ps-asignacion'");
     const antes = (await t.q<{ n: number }>("select (select count(*) from ps_actividades)::int + (select count(*) from ps_config)::int n"))[0].n;
-    const sql = readFileSync(join(__dirname, "../../supabase/migrations/0287_planeacion_seguimiento_actividades.sql"), "utf8");
-    await t.db.exec(sql);
-    await t.db.exec(sql);
+    const sql = ["0287_planeacion_seguimiento_actividades.sql", "0288_planeacion_seguimiento_avances.sql", "0289_planeacion_seguimiento_planes.sql", "0290_planeacion_seguimiento_presupuesto.sql"].map((f) => readFileSync(join(__dirname, "../../supabase/migrations", f), "utf8"));
+    for (let i = 0; i < 2; i++) for (const m of sql) await t.db.exec(m);
     const despues = (await t.q<{ n: number }>("select (select count(*) from ps_actividades)::int + (select count(*) from ps_config)::int n"))[0].n;
     expect(despues).toBe(antes);
     const [c] = await t.q<{ subject: string }>("select subject from correo_templates where key = 'c-ps-asignacion'");
     expect(c.subject).toBe("Asunto editado por la administración");
-    expect((await t.q("select 1 from correo_templates where key like 'c-ps-%'"))).toHaveLength(8);
+    expect((await t.q("select 1 from correo_templates where key like 'c-ps-%'"))).toHaveLength(12);
   });
 });
 
@@ -594,7 +595,7 @@ describe("0287 · bitácora solo-anexar y plantillas", () => {
   it("las plantillas c-ps-* existen, son del grupo y usan solo variables conocidas", async () => {
     const rows = await t.q<{ key: string; grp: string; action: string; tipo: string; subject: string; body: string; title: string; active: boolean }>(
       "select key, grp, action, tipo, subject, body, title, active from correo_templates where key like 'c-ps-%' order by key");
-    expect(rows.map((r) => r.key)).toEqual(["c-ps-asignacion", "c-ps-avance", "c-ps-cumplida", "c-ps-devuelto", "c-ps-por-vencer", "c-ps-transferencia", "c-ps-validado", "c-ps-vencida"]);
+    expect(rows.map((r) => r.key)).toEqual(["c-ps-asignacion", "c-ps-avance", "c-ps-cumplida", "c-ps-devuelto", "c-ps-por-vencer", "c-ps-transferencia", "c-ps-vaf-alerta", "c-ps-vaf-evaluar", "c-ps-vaf-resultado", "c-ps-validacion-pendiente", "c-ps-validado", "c-ps-vencida"]);
     const conocidas = new Set(["nombre", "correo", "sede", "rol", "enlace", "modulo", "titulo_aviso", "detalle", "oficina", "fecha_limite", "dias", "comentario", "autor"]);
     for (const r of rows) {
       expect(r).toMatchObject({ grp: "Planeación y Seguimiento", action: "ps", tipo: "aviso", active: true });

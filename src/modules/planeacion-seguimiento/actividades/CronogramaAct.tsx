@@ -94,7 +94,7 @@ export function CronogramaAct() {
                     <div className="ps-gantt__fila" role="row" key={`${g.k}-${a.id}`}>
                       <span role="cell" className="ps-gantt__l">
                         <Link to={ruta("actividad", a.id)} state={DESDE_MODULO}>{a.titulo}</Link>
-                        <em className="ps-gantt__fechas">{a.esHito ? `Hito · ${fecha(a.fin)}` : `${fecha(a.inicio)} a ${fecha(a.fin)}`} · <ChipEstado estado={a.estado} /></em>
+                        <em className="ps-gantt__fechas">{a.esHito ? `Hito · ${fecha(a.fin)}` : `${fecha(a.inicio)} a ${fecha(a.fin)}`} · <ChipEstado estado={a.estado} /> · <span className="ps-gantt__pct">Avance validado {a.avance.fisico} %</span></em>
                       </span>
                       <span role="cell" className="ps-gantt__t ps-gantt__t--meses" aria-hidden="true">
                         {marcas.map((m) => <i key={m.fecha} className="ps-gantt__linea" style={{ left: `${pos(m.fecha)}%` }} />)}
@@ -102,7 +102,7 @@ export function CronogramaAct() {
                         {a.esHito ? (
                           <i className="ps-gantt__hito" data-tono={DEF_ESTADOS[a.estado].tono} style={{ left: `${pos(a.fin!)}%` }} />
                         ) : (
-                          <i className="ps-gantt__barra ps-gantt__barra--act" data-tono={DEF_ESTADOS[a.estado].tono} style={{ left: `${pos(ini)}%`, width: `${Math.max(0.8, pos(sumarDias(a.fin!, 1)) - pos(ini))}%` }} />
+                          <i className="ps-gantt__barra ps-gantt__barra--act" data-tono={DEF_ESTADOS[a.estado].tono} style={{ left: `${pos(ini)}%`, width: `${Math.max(0.8, pos(sumarDias(a.fin!, 1)) - pos(ini))}%` }}><b className="ps-gantt__avance" style={{ width: `${a.avance.fisico}%` }} /></i>
                         )}
                       </span>
                     </div>

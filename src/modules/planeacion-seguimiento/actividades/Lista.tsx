@@ -11,6 +11,7 @@ import { BarraActividades, useDatosActividades } from "./barra";
 import { ordenarLista, type ColumnaLista, type OrdenLista } from "./filtros";
 import { useMoverActividad } from "./hooks";
 import { Banner, ChecklistMini, ChipEstado, ChipPlazo, MenuMover, MensajeRechazo, PilaAvatares, PrioridadAct } from "./partes";
+import { BarraAvance, ChipPdi } from "./partesF3";
 import { SinOficinas } from "./vacios";
 
 const COLUMNAS: { id: ColumnaLista; texto: string }[] = [
@@ -18,6 +19,7 @@ const COLUMNAS: { id: ColumnaLista; texto: string }[] = [
   { id: "linea", texto: "Línea" },
   { id: "responsable", texto: "Responsables" },
   { id: "estado", texto: "Estado" },
+  { id: "avance", texto: "Avance" },
   { id: "fin", texto: "Fecha límite" },
   { id: "prioridad", texto: "Prioridad" },
 ];
@@ -59,10 +61,11 @@ export function Lista() {
             </div>
             {filas.map((a) => (
               <div className="ps-tabla__fila" role="row" key={a.id}>
-                <span role="cell" className="ps-tabla__t"><Link to={ruta("actividad", a.id)} state={DESDE_MODULO}>{a.titulo}</Link><em>{d.f.alcance === "todas" ? `${d.porId.get(a.oficinaId)?.nombre ?? ""} · ` : ""}<ChecklistMini a={a} /></em></span>
+                <span role="cell" className="ps-tabla__t"><Link to={ruta("actividad", a.id)} state={DESDE_MODULO}>{a.titulo}</Link><em>{d.f.alcance === "todas" ? `${d.porId.get(a.oficinaId)?.nombre ?? ""} · ` : ""}<ChecklistMini a={a} /> <ChipPdi pdi={a.pdi} /></em></span>
                 <span role="cell" data-l="Línea">{a.lineaNo ? d.nombreLinea(a.lineaNo) : "Propia de la oficina"}</span>
                 <span role="cell" data-l="Responsables"><PilaAvatares ids={a.asignados} personas={d.personas} /></span>
                 <span role="cell" data-l="Estado"><ChipEstado estado={a.estado} /></span>
+                <span role="cell" data-l="Avance"><BarraAvance avance={a.avance} compacta /></span>
                 <span role="cell" data-l="Fecha límite"><ChipPlazo a={a} hoy={d.hoy} /></span>
                 <span role="cell" data-l="Prioridad"><PrioridadAct valor={a.prioridad} /></span>
                 <span role="cell" className="ps-lista-act__acc"><MenuMover actividad={a} poder={d.poderDe(a.oficinaId)} yo={d.yo} compacto onMover={(estado) => { setRechazo(null); mover.mutate({ id: a.id, estado }, { onError: (e) => setRechazo((e as Error).message) }); }} onRechazo={setRechazo} /></span>

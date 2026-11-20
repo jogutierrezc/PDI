@@ -10,8 +10,11 @@
 
 import type { Unit } from "../../tableros/model";
 import type { Linea } from "../modelo";
+import { PILARES } from "../modelo";
 import type { Actividad, EstadoAct, EventoActividad, PapelOficina, PrioridadAct } from "./modelo";
 import { PRIORIDADES_ACT, sumarDias } from "./modelo";
+import type { Accion, Avance, Comentario, Evidencia, ItemPdi, NivelRiesgo, PilarCatalogo, Riesgo } from "./modeloF3";
+import { SIN_AVANCE } from "./modeloF3";
 
 export const HOY_DEMO = "2027-06-30";
 export const ID_YO = "u-yo";
@@ -124,7 +127,7 @@ export function generarActividades(lineas: readonly Linea[], personas: readonly 
     const creada = sumarDias(ini ?? fin, -45 - Math.floor(r() * 20));
     actividades.push({
       id, oficinaId, lineaNo, titulo, descripcion: r() < 0.5 ? "Actividad de demostración, generada para probar el tablero." : null, estado, prioridad: prio, inicio: ini, fin, esHito: hito, campus: cam,
-      asignados, checklist: items.map((texto, i) => ({ id: `${id}-c${i + 1}`, texto, hecho: i < hechos })), creadaPor: jefe?.id ?? "u-01", creadaEn: `${creada < "2027-01-01" ? "2026-12-15" : creada}T14:00:00Z`, demo: true,
+      asignados, checklist: items.map((texto, i) => ({ id: `${id}-c${i + 1}`, texto, hecho: i < hechos })), pdi: { conexion: "sin_definir", items: [] }, avance: { ...SIN_AVANCE }, creadaPor: jefe?.id ?? "u-01", creadaEn: `${creada < "2027-01-01" ? "2026-12-15" : creada}T14:00:00Z`, demo: true,
     });
     const ev: EventoActividad[] = [{ id: `${id}-e0`, tipo: "creada", por: jefe ? nombre(jefe.id) : "Administración", en: `${creada < "2027-01-01" ? "2026-12-15" : creada}T14:00:00Z`, detalle: "Se creó la actividad." }];
     asignados.forEach((u, i) => ev.push({ id: `${id}-e${i + 1}`, tipo: "asignada", por: jefe ? nombre(jefe.id) : "Administración", en: `${creada < "2027-01-01" ? "2026-12-15" : creada}T14:05:00Z`, detalle: `Se asignó a ${nombre(u)}.`, a: u }));
@@ -159,4 +162,123 @@ export function generarActividades(lineas: readonly Linea[], personas: readonly 
     });
   }
   return { actividades, eventos };
+}
+
+
+/* =============================================================================
+   Fase 3 · catálogo del PDI de EJEMPLO y avances, evidencias, riesgos y comentarios de demostración.
+   El catálogo real sale de `ps_pdi_catalogo` (pilares publicados → áreas → líneas de acción); estos
+   nombres de áreas y líneas son inventados para recorrer la pantalla sin base.
+   ========================================================================== */
+
+const LINEAS_PDI: Record<string, [string, string[]][]> = {
+  P2: [["Infraestructura digital", ["Renovar la red y la conectividad de los campus", "Consolidar los servicios en la nube institucional", "Fortalecer la ciberseguridad"]], ["Sistemas de información", ["Integrar los sistemas académicos y administrativos", "Gobernar los datos institucionales"]]],
+  P3: [["Emprendimiento e innovación", ["Crear espacios de innovación en los campus", "Acompañar los emprendimientos de estudiantes"]], ["Relación con el entorno", ["Alianzas con empresas y gobierno", "Transferencia de conocimiento"]]],
+  P4: [["Planeación y calidad", ["Seguimiento al plan de desarrollo", "Gestión de riesgos institucionales"]], ["Talento humano", ["Cualificación del personal administrativo", "Bienestar laboral"]]],
+  P6: [["Extensión y proyección", ["Programas con comunidades vulnerables", "Sostenibilidad ambiental de los campus", "Cultura y deporte para la comunidad"]]],
+};
+
+export const CATALOGO_PDI_DEMO: PilarCatalogo[] = Object.entries(PILARES).map(([cod, nombre]) => {
+  const n = cod.slice(1);
+  return {
+    pillarId: `pil-${n}`, codigo: cod, nombre,
+    areas: (LINEAS_PDI[cod] ?? []).map(([area, lineas], i) => ({
+      areaId: `area-${n}-${i + 1}`, codigo: `A-${n}.${i + 1}`, nombre: area,
+      lineas: lineas.map((l, j) => ({ lineaId: `la-${n}-${i + 1}-${j + 1}`, codigo: `LA-${n}.${i + 1}.${j + 1}`, nombre: l })),
+    })),
+  };
+});
+
+const hex = (n: number): string => Array.from({ length: 8 }, (_, i) => ((Math.imul(n + i * 7919, 2654435761) >>> 0).toString(16).padStart(8, "0"))).join("");
+
+export interface DatosF3 {
+  avances: Avance[];
+  riesgos: Riesgo[];
+  comentarios: Map<string, Comentario[]>;
+}
+
+/** Les pone conexión con el PDI y avance a las actividades (las modifica) y devuelve los avances, riesgos y comentarios. */
+export function generarF3(actividades: Actividad[], personas: readonly PersonaSemilla[], hoy = HOY_DEMO): DatosF3 {
+  const r = semilla(20270701);
+  const ahora = Date.parse(`${hoy}T12:00:00Z`);
+  const hace = (horas: number) => new Date(ahora - horas * 3_600_000).toISOString();
+  const nombre = (id: string) => personas.find((x) => x.id === id)?.nombre ?? "Alguien";
+  const persona = (id: string) => ({ id, nombre: nombre(id) });
+  const pick = <T,>(a: readonly T[]): T => a[Math.floor(r() * a.length)];
+  const avances: Avance[] = [];
+  const riesgos: Riesgo[] = [];
+  const comentarios = new Map<string, Comentario[]>();
+  let k = 0;
+
+  const item = (p: PilarCatalogo, lineaId: string | null): ItemPdi => {
+    const a = p.areas.find((x) => x.lineas.some((l) => l.lineaId === lineaId));
+    const l = a?.lineas.find((x) => x.lineaId === lineaId);
+    return { pillarId: p.pillarId, pilar: `${p.codigo} ${p.nombre}`, pilarSlug: p.codigo.toLowerCase(), area: a?.nombre ?? null, lineaId, lineaCodigo: l?.codigo ?? null, linea: l?.nombre ?? null };
+  };
+  const evidencia = (a: Actividad, i: number): Evidencia => {
+    const id = `ev-${++k}`;
+    if (i % 2 === 0) return { id, tipo: "enlace", nombre: "Acta de la reunión de seguimiento", url: "https://intranet.demo.udes.test/actas/seguimiento", storagePath: null, mime: null, bytes: null, huella: null, creadaEn: hace(30) };
+    const nom = `informe-${a.id}.pdf`;
+    return { id, tipo: "archivo", nombre: nom, url: null, storagePath: `${a.oficinaId}/${a.id}/${id}-${nom}`, mime: "application/pdf", bytes: 180_000 + Math.floor(r() * 900_000), huella: hex(k), creadaEn: hace(30) };
+  };
+  const avance = (a: Actividad, estado: Avance["estado"], fisico: number, autor: string, revisor: string | null, horas: number, nota: string, notaRev: string | null = null): Avance => {
+    const id = `av-${++k}`;
+    const n = estado === "pendiente" ? 1 + Math.floor(r() * 2) : Math.floor(r() * 3);
+    const reportadoEn = hace(horas);
+    return {
+      id, actividadId: a.id, fecha: reportadoEn.slice(0, 10), fisico, financiero: r() < 0.35 ? Math.min(100, Math.max(0, fisico - 5 + Math.floor(r() * 10))) : null, nota, estado,
+      reportadoPor: persona(autor), reportadoEn, revisadoPor: revisor ? persona(revisor) : null, revisadoEn: revisor ? hace(Math.max(1, horas - 8)) : null, notaRevision: notaRev, vencido: estado === "pendiente" && horas >= 72,
+      evidencias: Array.from({ length: n }, (_, i) => evidencia(a, i)),
+    };
+  };
+
+  for (const a of actividades) {
+    const x = r();
+    if (x < 0.55) {
+      const p = pick(CATALOGO_PDI_DEMO);
+      const lineas = p.areas.flatMap((q) => q.lineas);
+      const items = [r() < 0.65 ? item(p, pick(lineas).lineaId) : item(p, null)];
+      if (r() < 0.25) { const q = pick(CATALOGO_PDI_DEMO.filter((z) => z.pillarId !== p.pillarId)); items.push(item(q, pick(q.areas.flatMap((z) => z.lineas)).lineaId)); }
+      a.pdi = { conexion: "con_pdi", items };
+    } else if (x < 0.75) a.pdi = { conexion: "sin_pdi", items: [] };
+
+    const jefe = personas.find((q) => q.oficina === a.oficinaId && q.papel === "jefe")?.id ?? "u-01";
+    const autor = a.asignados[0] ?? jefe;
+    const revisor = autor === jefe ? "u-01" : jefe;
+    const lista: Avance[] = [];
+    if (a.estado === "hecho") {
+      if (r() < 0.5) lista.push(avance(a, "validado", 45 + Math.floor(r() * 20), autor, revisor, 24 * 20, "Se terminó la primera etapa y se dejó el soporte."));
+      lista.push(avance(a, "validado", 100, autor, revisor, 24 * 6, "La actividad quedó terminada y entregada a quien la solicitó."));
+    } else if (a.estado === "en_revision") {
+      const prev = r() < 0.45 ? 25 + Math.floor(r() * 25) : 0;
+      if (prev) lista.push(avance(a, "validado", prev, autor, revisor, 24 * 12, "Avance de la primera etapa."));
+      lista.push(avance(a, "pendiente", Math.max(prev, 55 + Math.floor(r() * 40)), autor, null, pick([4, 20, 50, 80, 130]), "Se completó lo planeado para el periodo y se adjunta el soporte; queda pendiente la socialización."));
+    } else if (a.estado === "en_curso" || a.estado === "en_riesgo") {
+      if (r() < 0.55) lista.push(avance(a, "validado", 20 + Math.floor(r() * 45), autor, revisor, 24 * (4 + Math.floor(r() * 20)), "Se avanzó según el cronograma; falta la parte de contratación."));
+      if (r() < 0.25) lista.push(avance(a, "devuelto", 60, autor, revisor, 24 * 2, "Se terminó casi todo.", "Falta el soporte de lo que se hizo: adjunte el acta o el informe y vuelva a reportar."));
+    }
+    lista.sort((p, q) => p.reportadoEn.localeCompare(q.reportadoEn));
+    avances.push(...lista);
+
+    if (a.estado === "en_riesgo" || (a.estado !== "por_iniciar" && r() < 0.12)) {
+      const abierto = a.estado === "en_riesgo";
+      const nivel: NivelRiesgo = abierto ? pick(["Crítico", "Alto", "Alto", "Medio"] as const) : "Medio";
+      const id = `rg-${++k}`;
+      const acciones: Accion[] = [
+        { id: `ac-${++k}`, riesgoId: id, texto: "Reunirse con el proveedor para acordar una nueva fecha de entrega", responsableId: autor, vence: sumarDias(hoy, abierto ? 7 : -15), estado: abierto ? "en_curso" : "hecha" },
+        ...(r() < 0.6 ? [{ id: `ac-${++k}`, riesgoId: id, texto: "Pedir recursos adicionales a la Vicerrectoría", responsableId: jefe, vence: sumarDias(hoy, abierto ? -3 : -20), estado: abierto ? ("pendiente" as const) : ("hecha" as const) }] : []),
+      ];
+      riesgos.push({
+        id, actividadId: a.id, titulo: abierto ? "El proveedor puede entregar tarde" : "Retraso en la aprobación del presupuesto", descripcion: "Si no se resuelve, la actividad no se cumple en la fecha prevista y se afectan las siguientes.", nivel, estado: abierto ? "abierto" : "cerrado",
+        mitigacion: "Seguimiento semanal con el proveedor y plan B con otro proveedor.", creadoPor: persona(jefe), creadoEn: hace(24 * 9), cerradoEn: abierto ? null : hace(24 * 3), acciones,
+      });
+    }
+    const c: Comentario[] = [];
+    if (r() < 0.3) c.push({ id: `cm-${++k}`, autor: nombre(autor), tipo: "comentario", texto: "Quedamos pendientes de la respuesta de Compras para seguir.", creadoEn: hace(24 * 5) });
+    if (c.length) comentarios.set(a.id, c);
+
+    const mios = lista.filter((v) => v.estado === "validado").at(-1);
+    a.avance = { fisico: a.estado === "hecho" ? 100 : (mios?.fisico ?? 0), financiero: mios?.financiero ?? null, validadoEn: mios?.revisadoEn ?? null, pendientes: lista.filter((v) => v.estado === "pendiente").length };
+  }
+  return { avances, riesgos, comentarios };
 }

@@ -7,7 +7,7 @@ import { MIN_MOTIVO, avisoAsignacion, avisoTransferencia, destinosPosibles, pode
 const YO = "u-yo";
 const act = (o: Partial<Actividad> = {}): Actividad => ({
   id: "a-1", oficinaId: "of-4", lineaNo: "7", titulo: "Tarea", descripcion: null, estado: "en_curso", prioridad: "Medio", inicio: "2027-03-01", fin: "2027-05-01", esHito: false, campus: "Bucaramanga",
-  asignados: [YO], checklist: [], creadaPor: "u-10", creadaEn: "2027-01-01T00:00:00Z", ...o,
+  asignados: [YO], checklist: [], creadaPor: "u-10", creadaEn: "2027-01-01T00:00:00Z", pdi: { conexion: "sin_definir", items: [] }, avance: { fisico: 0, financiero: null, validadoEn: null, pendientes: 0 }, ...o,
 });
 
 const NIVELES: PsNivel[] = ["none", "lector", "colaborador", "gestor", "aprobador", "admin"];
@@ -120,7 +120,7 @@ describe("plazos", () => {
 describe("validación de la actividad", () => {
   const equipo = [{ id: YO, asignable: true }, { id: "u-11", asignable: true }, { id: "u-14", asignable: false }];
   const ctx = { lineas: ["7", "8"], campus: ["Bucaramanga", "Cúcuta", "Todos"], equipo };
-  const ok = { oficinaId: "of-4", lineaNo: "7", titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alto" as const, campus: "Bucaramanga", asignados: [YO] };
+  const ok = { oficinaId: "of-4", lineaNo: "7", titulo: "Levantar el inventario", descripcion: "", inicio: "2027-02-01", fin: "2027-03-31", esHito: false, prioridad: "Alto" as const, campus: "Bucaramanga", asignados: [YO], pdi: { conexion: "sin_pdi" as const, items: [] } };
 
   it("una actividad completa no tiene errores", () => expect(validarActividad(ok, ctx)).toEqual([]));
   it("actividad propia (sin línea) también vale", () => expect(validarActividad({ ...ok, lineaNo: null }, ctx)).toEqual([]));

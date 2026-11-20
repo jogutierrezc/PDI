@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { enlaceDe, esPlantillaPs, estadoTrasIntento, etiquetaDias, iguales, INTENTOS, redactar } from "../../supabase/functions/planeacion-seguimiento/avisos";
+import { enlaceDe, esPlantillaPs, estadoTrasIntento, etiquetaDias, iguales, INTENTOS, pesos, redactar, textoAvance } from "../../supabase/functions/planeacion-seguimiento/avisos";
 
 const base = { actividad: "Migrar el correo", oficina: "Dirección TIC", linea: "1 · Proyecto uno", campus: "Cúcuta", prioridad: "Alto", fin: "30/06/2027", actor: "Gabriela" };
 
@@ -49,6 +49,42 @@ describe("redacción de los avisos", () => {
     expect(redactar({ plantilla: "c-ps-validado", datos: base }).titulo).toBe("Su avance quedó validado");
     expect(redactar({ plantilla: "c-ps-nueva", datos: {} }).titulo).toBe("Novedad en Planeación y Seguimiento");
     expect(redactar({ plantilla: "c-ps-asignacion", datos: {} }).detalle).toContain("Sin fecha de fin.");
+  });
+
+  it("fase 3: avance y validado llevan el porcentaje; la validación pendiente cuenta los avances", () => {
+    const a = redactar({ plantilla: "c-ps-avance", datos: { ...base, fisico: 40, financiero: 10, nota: "Fase uno lista" } });
+    expect(a.titulo).toBe("Hay un avance por revisar");
+    expect(a.detalle).toContain("Avance físico: 40 %. Avance financiero: 10 %.");
+    expect(a.detalle).toContain("Nota: Fase uno lista");
+    const v = redactar({ plantilla: "c-ps-validado", datos: { ...base, fisico: 100, financiero: null, nota: "Verificado" } });
+    expect(v.detalle).toContain("Avance físico: 100 %.");
+    expect(v.detalle).not.toContain("financiero");
+    expect(v.detalle).toContain("Nota del gestor: Verificado");
+    expect(textoAvance({})).toBe("");
+    const uno = redactar({ plantilla: "c-ps-validacion-pendiente", datos: { oficina: "Dirección TIC", n: 1, actividades: "Migrar el correo" } });
+    expect(uno.titulo).toBe("Hay 1 avance esperando su revisión");
+    expect(uno.detalle).toContain("Oficina: Dirección TIC.");
+    expect(uno.detalle).toContain("Actividades: Migrar el correo.");
+    const varios = redactar({ plantilla: "c-ps-validacion-pendiente", datos: { oficina: "Dirección TIC", n: 3, actividades: "A; B; C" } });
+    expect(varios.titulo).toBe("Hay 3 avances esperando su revisión");
+    expect(esPlantillaPs("c-ps-validacion-pendiente")).toBe(true);
+  });
+
+  it("fase 3B: avisos de la VAF (evaluar, resultado, alerta) sin actividad", () => {
+    const d = { plan: "Plan de TIC", oficina: "Dirección TIC", version: "v1.0", monto: 3500000 };
+    const e = redactar({ plantilla: "c-ps-vaf-evaluar", datos: d });
+    expect(e.titulo).toBe("Un plan espera evaluación financiera");
+    expect(e.detalle).toContain("Plan: «Plan de TIC».");
+    expect(e.detalle).toContain("Oficina dueña: Dirección TIC.");
+    expect(e.detalle).toMatch(/Monto solicitado: \$ 3[.,]500[.,]000\./);
+    const r = redactar({ plantilla: "c-ps-vaf-resultado", datos: { ...d, resultado: "aprobada_con_ajustes", monto_aprobado: 3000000, monto_solicitado: 3500000, nota: "Se recorta equipos" } });
+    expect(r.titulo).toBe("La VAF evaluó el plan: aprobada con ajustes");
+    expect(r.detalle).toContain("Observaciones: Se recorta equipos");
+    const a = redactar({ plantilla: "c-ps-vaf-alerta", datos: { ...d, n: 2, detalle: "La línea 3 supera su presupuesto." } });
+    expect(a.titulo).toBe("Alerta de ejecución en «Plan de TIC»");
+    expect(a.detalle).toContain("2 alertas");
+    expect(pesos("x")).toBe("");
+    expect(esPlantillaPs("c-ps-vaf-alerta")).toBe(true);
   });
 
   it("recorta textos largos y colapsa saltos de línea", () => {

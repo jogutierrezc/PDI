@@ -28,39 +28,14 @@ import { CAMPUS_TODOS } from "../modelo";
 import type { ConflictoCampus, ErrorCargaAct, PersonaRef, PsApiAct, ResultadoAccion } from "./contratoApi";
 import type { Actividad, ActividadDetalle, AvisoPrevio, DatosActividad, EventoActividad, LineaOficina, MiembroEquipo, OficinaVista, PapelOficina, Poder, TipoEvento } from "./modelo";
 import { avisoAsignacion, avisoTransferencia } from "./reglas";
-
-type Fila = Record<string, unknown>;
-const hoyLocal = (): string => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-const falla = (e: { message?: string } | null): Error => new Error(e?.message || "No se pudo completar la operación.");
-const texto = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
-const lista = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
-
-async function miId(): Promise<string | null> {
-  const r = await supabase.auth.getUser();
-  return r.data.user?.id ?? null;
-}
-async function nivel(): Promise<PsNivel> {
-  const r = await supabase.rpc("ps_nivel_actual");
-  if (r.error) throw falla(r.error);
-  return ((r.data as PsNivel | null) ?? "none") as PsNivel;
-}
-async function rpc<T>(nombre: string, args: Record<string, unknown>): Promise<T> {
-  const r = await supabase.rpc(nombre, args);
-  if (r.error) throw falla(r.error);
-  return r.data as T;
-}
-/** Vacía la cola de correos al momento (si no, sale con el cron). No bloquea ni falla la acción. */
-const despacharAvisos = () => {
-  void supabase.functions.invoke("planeacion-seguimiento", { body: { action: "avisos" } }).catch(() => undefined);
-};
+import { columnasPdiExcel } from "./pdi";
+import { avanceActDe, avanceDe, comentarioDe, crearAvancesSupabase, pdiDe, riesgoDe } from "./supabaseAv";
+import { despacharAvisos, falla, hoyLocal, lista, miId, nivel, rpc, texto, type Fila } from "./supabaseComun";
 
 const poderDe = (v: unknown): Poder => (v === "admin" || v === "gestor" ? "gestor" : v === "colaborador" ? "colaborador" : v === "lector" ? "lector" : "ninguno");
 const papelDe = (v: unknown): PapelOficina | null => (v === "jefe" || v === "editor" || v === "visor" ? v : null);
 
-export function crearActividadesSupabase(): PsApiAct {
+export function crearActividadesSupabase(planActivo: () => string | null = () => null): PsApiAct {
   const nombres = new Map<string, PersonaRef>();
   const campusPorId = async () => {
     const r = await supabase.from("campuses").select("id,name");
@@ -79,6 +54,7 @@ export function crearActividadesSupabase(): PsApiAct {
       campus: texto(f.campus) ?? CAMPUS_TODOS, asignados: resp.map((r) => String(r.id)),
       checklist: Array.from({ length: total }, (_, i) => ({ id: `${f.id}-${i}`, texto: "", hecho: i < hechos })),
       creadaPor: String(f.creada_por ?? ""), creadaEn: String(f.creada_en ?? ""),
+      pdi: pdiDe(f.pdi), avance: avanceActDe(f.avance),
     };
   };
   const equipoDe = async (oficinaId: string, yo: string | null): Promise<MiembroEquipo[]> => {
@@ -102,6 +78,8 @@ export function crearActividadesSupabase(): PsApiAct {
   const conflictos = (v: unknown): ConflictoCampus[] =>
     lista<Fila>(v).map((c) => ({ personaId: String(c.perfil_id), nombre: String(c.nombre ?? ""), campusPersona: texto(c.campus_miembro), campusActividad: texto(c.campus_actividad), actividadId: texto(c.actividad_id) ?? undefined }));
   const planId = async (): Promise<string> => {
+    const fijo = planActivo();
+    if (fijo) return fijo;
     const r = await supabase.from("ps_planes").select("id").order("creado_en", { ascending: false }).limit(1);
     if (r.error) throw falla(r.error);
     const f = (r.data as Fila[] | null)?.[0];
@@ -111,9 +89,13 @@ export function crearActividadesSupabase(): PsApiAct {
   const datosCrear = (d: DatosActividad) => ({
     titulo: d.titulo.trim(), descripcion: d.descripcion.trim() || null, linea_clave: d.lineaNo, campus: d.campus === CAMPUS_TODOS ? "" : d.campus, prioridad: d.prioridad,
     inicio: d.esHito ? null : d.inicio, fin: d.fin, es_hito: d.esHito,
+    // Fase 3: `{conexion, items:[{pillar_id, action_line_id}]}`. «sin_definir» no se envía (la base lo deja como estaba).
+    ...(d.pdi.conexion === "sin_definir" ? {} : { pdi: { conexion: d.pdi.conexion, items: d.pdi.items.map((i) => ({ pillar_id: i.pillarId, action_line_id: i.lineaId })) } }),
   });
 
+  const f3 = crearAvancesSupabase(nombres, planActivo);
   return {
+    ...f3,
     hoy: hoyLocal(),
     demo: false,
     async yo() {
@@ -128,7 +110,7 @@ export function crearActividadesSupabase(): PsApiAct {
     async oficinasVisibles() {
       const niv = await nivel();
       const [filas, yo, u] = await Promise.all([
-        rpc<Fila[]>("ps_oficinas_visibles", { p_todas: niv === "admin" }),
+        rpc<Fila[]>("ps_oficinas_visibles", { p_todas: niv === "admin", p_plan: planActivo() }),
         miId(),
         leerUnidades().catch(() => null),
       ]);
@@ -139,7 +121,7 @@ export function crearActividadesSupabase(): PsApiAct {
       });
     },
     async personas() {
-      const ofs = await rpc<Fila[]>("ps_oficinas_visibles", { p_todas: false });
+      const ofs = await rpc<Fila[]>("ps_oficinas_visibles", { p_todas: false, p_plan: planActivo() });
       await Promise.all(ofs.map((o) => equipoDe(String(o.unit_id), null).catch(() => [])));
       return [...nombres.values()];
     },
@@ -147,7 +129,8 @@ export function crearActividadesSupabase(): PsApiAct {
       return equipoDe(oficinaId, await miId());
     },
     async lineasDeOficina(oficinaId) {
-      const plan = await supabase.from("ps_planes").select("version_vigente_id").order("creado_en", { ascending: false }).limit(1);
+      const fijo = planActivo();
+      const plan = await (fijo ? supabase.from("ps_planes").select("version_vigente_id").eq("id", fijo) : supabase.from("ps_planes").select("version_vigente_id").order("creado_en", { ascending: false }).limit(1));
       if (plan.error) throw falla(plan.error);
       const v = (plan.data as Fila[] | null)?.[0]?.version_vigente_id;
       if (!v) return [];
@@ -159,7 +142,7 @@ export function crearActividadesSupabase(): PsApiAct {
       return ((r.data ?? []) as Fila[]).map((f): LineaOficina => ({ no: String(f.clave), nombre: String(f.nombre), monto: f.monto === null || f.monto === undefined ? null : Number(f.monto), campus: f.campus_id ? (campus.get(String(f.campus_id)) ?? "Campus") : CAMPUS_TODOS, prioridad: String(f.prioridad ?? ""), inicio: texto(f.inicio), fin: texto(f.fin), clasif: String(f.clasif ?? "") }));
     },
     async actividades(oficinaIds) {
-      const r = await Promise.all(oficinaIds.map((id) => rpc<{ actividades?: Fila[] }>("ps_actividades_oficina", { p_unit: id, p_filtros: { limite: 1000 } })));
+      const r = await Promise.all(oficinaIds.map((id) => rpc<{ actividades?: Fila[] }>("ps_actividades_oficina", { p_unit: id, p_filtros: { limite: 1000 }, p_plan: planActivo() })));
       return r.flatMap((x) => lista<Fila>(x.actividades).map(actDe));
     },
     async actividad(id): Promise<ActividadDetalle> {
@@ -175,8 +158,19 @@ export function crearActividadesSupabase(): PsApiAct {
           return ev;
         }),
         ...lista<Fila>(d.comentarios).map((c): EventoActividad => ({ id: String(c.id), tipo: (c.tipo === "transferencia" ? "transferida" : c.tipo === "cambio_estado" || c.tipo === "devolucion" ? "estado" : "editada") as TipoEvento, por: String(c.autor ?? "Alguien"), en: String(c.creado_en), detalle: c.tipo === "transferencia" ? "Transfirió la actividad." : c.tipo === "devolucion" ? "Devolvió la actividad." : c.tipo === "comentario" ? "Comentó." : String(c.texto), motivo: c.tipo === "comentario" || c.tipo === "transferencia" || c.tipo === "devolucion" ? texto(c.texto) : null })),
+        ...lista<Fila>(d.avances).flatMap((v): EventoActividad[] => {
+          const av = avanceDe(v, nombres);
+          const ev: EventoActividad[] = [{ id: `${av.id}-r`, tipo: "avance", por: av.reportadoPor.nombre, en: av.reportadoEn, detalle: `Reportó un avance de ${av.fisico} %.`, motivo: av.nota }];
+          if (av.revisadoEn) ev.push({ id: `${av.id}-v`, tipo: "avance", por: av.revisadoPor?.nombre ?? "Gestor", en: av.revisadoEn, detalle: av.estado === "devuelto" ? "Devolvió el avance." : av.autovalidado ? "Cerró la actividad (cierre administrativo autovalidado)." : "Validó el avance.", motivo: av.notaRevision });
+          return ev;
+        }),
       ].sort((a, b) => a.en.localeCompare(b.en));
-      return { actividad, eventos };
+      return {
+        actividad, eventos,
+        avances: lista<Fila>(d.avances).map((a) => avanceDe(a, nombres)),
+        riesgos: lista<Fila>(d.riesgos).map((r) => riesgoDe(r, nombres)),
+        comentarios: lista<Fila>(d.comentarios).map(comentarioDe),
+      };
     },
     async guardarActividad(d, confirmar = false) {
       const equipo = await equipoDe(d.oficinaId, await miId());
@@ -226,9 +220,11 @@ export function crearActividadesSupabase(): PsApiAct {
     async cargarActividades(oficinaId, filas, _archivo, confirmar = false) {
       const equipo = await equipoDe(oficinaId, await miId());
       const correo = (id: string) => equipo.find((m) => m.id === id)?.correo ?? "";
+      const cat = await f3.catalogoPdi();
       const r = await rpc<Fila>("ps_actividades_cargar", {
-        p_unit: oficinaId, p_plan: null, p_confirmar_campus: confirmar,
-        p_filas: filas.map((d) => ({ ...datosCrear(d), linea: d.lineaNo, hito: d.esHito ? "Sí" : "No", responsable: d.asignados.map(correo).filter(Boolean).join(";") })),
+        p_unit: oficinaId, p_plan: planActivo(), p_confirmar_campus: confirmar,
+        // Fase 3: la carga masiva lee las columnas `pdi`, `pilar_pdi` y `linea_pdi` (no el objeto `pdi`).
+        p_filas: filas.map((d) => ({ ...datosCrear(d), ...columnasPdiExcel(d.pdi, cat), linea: d.lineaNo, hito: d.esHito ? "Sí" : "No", responsable: d.asignados.map(correo).filter(Boolean).join(";") })),
       });
       const errores = lista<Fila>(r.errores).map((e): ErrorCargaAct => ({ fila: e.fila === null || e.fila === undefined ? null : Number(e.fila), campo: String(e.campo ?? ""), mensaje: String(e.mensaje ?? ""), campus: e.campo === "responsable" && /campus/i.test(String(e.mensaje ?? "")) }));
       const creadas = Number(r.creadas ?? 0);

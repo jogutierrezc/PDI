@@ -8,7 +8,7 @@ import { SIN_RESPONSABLE } from "./modelo";
 
 const lineas = real as unknown as Linea[];
 const api = (nivel: PsNivel, papel: PapelOficina | "ninguno") => crearActividadesMemoria({ nivel, papel, campus: ["Bucaramanga", "Valledupar", "Cúcuta"], lineas: async () => structuredClone(lineas), espera: async () => {} });
-const nueva = (o: Partial<DatosActividad> = {}): DatosActividad => ({ oficinaId: "of-4", lineaNo: null, titulo: "Probar el adaptador", descripcion: "", inicio: "2027-07-01", fin: "2027-07-31", esHito: false, prioridad: "Medio", campus: "Bucaramanga", asignados: [], ...o });
+const nueva = (o: Partial<DatosActividad> = {}): DatosActividad => ({ oficinaId: "of-4", lineaNo: null, titulo: "Probar el adaptador", descripcion: "", inicio: "2027-07-01", fin: "2027-07-31", esHito: false, prioridad: "Medio", campus: "Bucaramanga", asignados: [], pdi: { conexion: "sin_pdi", items: [] }, ...o });
 
 describe("adaptador en memoria · oficinas por unidad, papel y herencia", () => {
   it("el administrador ve todas las oficinas y opera todo", async () => {
@@ -50,10 +50,13 @@ describe("adaptador en memoria · mover, crear, asignar, transferir", () => {
   it("el gestor mueve a «Hecho»; queda en el historial", async () => {
     const a = api("gestor", "jefe");
     const x = (await a.actividades(["of-4"])).find((v) => v.estado === "en_curso")!;
-    await a.moverActividad(x.id, "hecho");
+    // Contrato F3: sin avance validado no se pasa a «Hecho» a secas; se usa el cierre administrativo.
+    await expect(a.moverActividad(x.id, "hecho")).rejects.toThrow(/cierre administrativo/);
+    await a.cerrarActividad(x.id, "Se entregó y se recibió a satisfacción.");
     const d = await a.actividad(x.id);
     expect(d.actividad.estado).toBe("hecho");
-    expect(d.eventos.at(-1)?.detalle).toMatch(/a «Hecho»/);
+    expect(d.actividad.avance.fisico).toBe(100);
+    expect(d.eventos.at(-1)?.detalle).toMatch(/cierre administrativo/);
   });
   it("el colaborador mueve la suya hasta «En revisión» y se le rechaza «Hecho» y lo ajeno", async () => {
     const a = api("colaborador", "editor");

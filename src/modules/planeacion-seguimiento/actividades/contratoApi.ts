@@ -2,6 +2,7 @@
    Dos implementaciones: memoria.ts (demostración y pruebas) y supabaseAct.ts (PENDIENTE DE CONTRASTAR con CONTRATO-BD-F2). */
 
 import type { Actividad, ActividadDetalle, AvisoPrevio, DatosActividad, EstadoAct, LineaOficina, MiembroEquipo, OficinaVista } from "./modelo";
+import type { Accion, Avance, ConfigAvisos, ConfigOficina, DatosAccion, DatosAvance, DatosRiesgo, EstadoAccion, EstadoRiesgo, Evidencia, NuevaEvidencia, PilarCatalogo, PorValidar, ResultadoLote, ResumenPdi, Riesgo } from "./modeloF3";
 
 export interface PersonaRef {
   id: string;
@@ -68,4 +69,42 @@ export interface PsApiAct {
   agregarItemChecklist(id: string, texto: string): Promise<void>;
   /** Todo o nada: si una fila no pasa, no se crea ninguna. */
   cargarActividades(oficinaId: string, filas: DatosActividad[], nombreArchivo: string, confirmarCampus?: boolean): Promise<ResultadoCargaAct>;
+
+  /* ---------- Fase 3 (CONTRATO-BD-F3.md) ---------- */
+  /** `ps_pdi_catalogo`: pilares publicados → áreas → líneas de acción. */
+  catalogoPdi(): Promise<PilarCatalogo[]>;
+  /** `ps_resumen_pdi_oficina`. */
+  resumenPdi(oficinaId: string): Promise<ResumenPdi>;
+  /** `ps_avance_reportar`: crea el avance `pendiente`, enlaza las evidencias, mueve la actividad a «En revisión» y avisa al gestor. */
+  reportarAvance(actividadId: string, datos: DatosAvance): Promise<{ avance: Avance; avisara: AvisoPrevio[] }>;
+  /** Sube un archivo al bucket privado `ps-evidencias` (`<oficina>/<actividad>/<uuid>-<nombre>`); la huella SHA-256 la calcula el navegador. */
+  subirEvidencia(oficinaId: string, actividadId: string, archivo: File, huella: string): Promise<NuevaEvidencia>;
+  /** URL firmada (corta) de una evidencia de tipo archivo; para un enlace, su propia URL. */
+  urlEvidencia(e: Pick<Evidencia, "tipo" | "url" | "storagePath" | "nombre">): Promise<string>;
+  /** `ps_avance_validar`. `nota` opcional. */
+  validarAvance(id: string, nota?: string): Promise<void>;
+  /** `ps_avance_devolver`: nota de al menos 20 caracteres. */
+  devolverAvance(id: string, nota: string): Promise<void>;
+  /** `ps_avances_validar_lote`: hasta 50, todo o nada. */
+  validarLote(ids: string[]): Promise<ResultadoLote>;
+  /** `ps_actividad_cerrar`: cierre administrativo del gestor (queda auditado). */
+  cerrarActividad(id: string, nota: string): Promise<{ autovalidado: boolean }>;
+  /** `ps_avances_por_validar`: la cola del gestor, la más antigua primero; sin oficina, todas en las que es gestor. */
+  avancesPorValidar(oficinaId?: string | null): Promise<PorValidar[]>;
+  /** `ps_mis_avances`: lo que la persona reportó, con su estado y la nota de revisión. */
+  misAvances(): Promise<Avance[]>;
+  crearRiesgo(actividadId: string, d: DatosRiesgo): Promise<Riesgo>;
+  editarRiesgo(id: string, cambios: Partial<DatosRiesgo> & { estado?: EstadoRiesgo }): Promise<void>;
+  cerrarRiesgo(id: string, nota: string): Promise<void>;
+  crearAccion(riesgoId: string, d: DatosAccion): Promise<Accion>;
+  editarAccion(id: string, cambios: Partial<DatosAccion>): Promise<void>;
+  marcarAccion(id: string, estado: EstadoAccion): Promise<void>;
+  /** `ps_comentar`. */
+  comentar(actividadId: string, texto: string): Promise<void>;
+  /** `ps_config_oficina_leer`. */
+  leerConfigAvisos(oficinaId: string): Promise<ConfigOficina>;
+  /** `ps_config_oficina_guardar`. */
+  guardarConfigAvisos(oficinaId: string, c: ConfigAvisos): Promise<ConfigOficina>;
+  /** `ps_config_oficina_quitar`: vuelve al general. */
+  quitarConfigAvisos(oficinaId: string): Promise<ConfigOficina>;
 }

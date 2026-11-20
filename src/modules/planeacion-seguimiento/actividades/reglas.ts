@@ -15,6 +15,7 @@
 import type { PsNivel } from "../modelo";
 import type { Actividad, AvisoPrevio, DatosActividad, EstadoAct, MiembroEquipo, PapelOficina, Poder } from "./modelo";
 import { DEF_ESTADOS, ESTADOS, PRIORIDADES_ACT, diasEntre } from "./modelo";
+import { validarPdi } from "./pdi";
 
 const RANGO: Record<Poder, number> = { ninguno: 0, lector: 1, colaborador: 2, gestor: 3 };
 const MIN = (a: Poder, b: Poder): Poder => (RANGO[a] <= RANGO[b] ? a : b);
@@ -29,6 +30,7 @@ export function techoDelNivel(nivel: PsNivel): Poder {
       return "colaborador";
     case "lector":
     case "aprobador":
+    case "financiero":
       return "lector";
     default:
       return "ninguno";
@@ -44,7 +46,7 @@ export function techoDelPapel(papel: PapelOficina | null): Poder {
 export function poderEn(nivel: PsNivel, papel: PapelOficina | null): Poder {
   if (nivel === "admin") return "gestor";
   // Contrato de la base: lector y aprobador ven TODAS las oficinas, en lectura, sean o no miembros.
-  if ((nivel === "lector" || nivel === "aprobador") && papel === null) return "lector";
+  if ((nivel === "lector" || nivel === "aprobador" || nivel === "financiero") && papel === null) return "lector";
   return MIN(techoDelNivel(nivel), techoDelPapel(papel));
 }
 
@@ -106,7 +108,7 @@ export interface ErrorActividad {
   campo: string;
   mensaje: string;
   /** Paso del formulario donde está el campo. */
-  paso: "que" | "cuando" | "quien";
+  paso: "que" | "pdi" | "cuando" | "quien";
 }
 
 export interface ContextoValidacion {
@@ -148,6 +150,8 @@ export function validarActividad(d: DatosActividad, ctx: ContextoValidacion): Er
   }
   if (!PRIORIDADES_ACT.some((p) => p === d.prioridad)) e.push({ campo: "act-prioridad", paso: "cuando", mensaje: "Elija la prioridad." });
   if (!ctx.campus.includes(d.campus)) e.push({ campo: "act-campus", paso: "cuando", mensaje: "Elija el campus donde se hace." });
+
+  for (const p of validarPdi(d.pdi, !d.id)) e.push({ campo: p.campo, paso: "pdi", mensaje: p.mensaje });
 
   const ids = new Set(ctx.equipo.filter((m) => m.asignable).map((m) => m.id));
   if (d.asignados.some((id) => !ids.has(id))) e.push({ campo: "act-asignados", paso: "quien", mensaje: "Solo puede asignar a miembros de esta oficina que reciben actividades (los lectores no)." });
@@ -218,4 +222,6 @@ export const ROTULO_AVISO: Record<AvisoPrevio["motivo"], string> = {
   transferencia_sale: "Deja la actividad",
   copia_gestor: "Copia al gestor",
   devolucion: "Se le devuelve la actividad",
+  avance: "Revisa el avance",
+  validado: "Se le avisa que se validó su avance",
 };

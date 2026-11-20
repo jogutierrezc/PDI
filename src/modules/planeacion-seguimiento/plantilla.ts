@@ -13,6 +13,8 @@ import { downloadBlob } from "../admin/traslado/transfer";
 import {
   COLUMNAS, FORMATO_PLAN, HOJA_CONTROL, HOJA_INSTRUCCIONES, HOJA_LINEAS, HOJA_LISTAS, MARCA_EJEMPLO, MAX_LINEAS, VERSION_FORMATO, tituloColumna,
 } from "./columnas";
+import { columnasDeConfig, listaDeConfig, pilaresDeConfig, type ConfigPlan } from "./modeloPlanes";
+import type { Columna } from "./columnas";
 import { ANIO_FIN, ANIO_INI, CAMPUS, CAMPUS_TODOS, CLASIFICACIONES, FUENTES, ORIGENES, PILARES_LISTA, PRIORIDADES, RESULTADOS, aniosDe, type Linea } from "./modelo";
 
 type Fila = (string | number | null)[];
@@ -36,9 +38,9 @@ const siNo = (v: boolean | null): string | null => (v === true ? "Sí" : v === f
 const puntos = (f: number): number => Math.round(f * 100 * 1e6) / 1e6;
 
 /** Una línea como fila de la hoja «Líneas del plan» (en el orden de COLUMNAS). */
-export function filaDeLinea(l: Linea, ejemplo = false): Fila {
+export function filaDeLinea(l: Linea, ejemplo = false, cols: readonly Columna[] = COLUMNAS): Fila {
   const hayPct = Object.values(l.pct).some((v) => v > 0);
-  return COLUMNAS.map((c): string | number | null => {
+  return cols.map((c): string | number | null => {
     if (c.id === "no") return ejemplo ? MARCA_EJEMPLO : l.no;
     if (c.id === "clasif") return l.clasif;
     if (c.id === "nombre") return l.nombre;
@@ -61,13 +63,17 @@ export function filaDeLinea(l: Linea, ejemplo = false): Fila {
   });
 }
 
-function hojaInstrucciones(plan: string): HojaExcel {
+function hojaInstrucciones(plan: string, cols: readonly Columna[] = COLUMNAS, duena?: string | null): HojaExcel {
   const secciones: { titulo: string; filas: [string, string][] }[] = [
     {
       titulo: "1. Qué es este libro",
       filas: [
         ["Para qué sirve", `Es la plantilla para crear la planificación de «${plan}»: una fila por línea (proyecto) del plan, con la misma información de la matriz de priorización y evaluación. Cuando termine, la carga en el portal: Planeación y Seguimiento › Cargar la planificación.`],
         ["Qué NO hace", "Este libro no envía nada. El archivo se lee en su navegador; solo cuando usted confirma el último paso se crea el plan y la versión borrador v1.0. Un borrador no es oficial hasta que el administrador lo publica."],
+        ...(cols === COLUMNAS ? [] : ([
+          ["Columnas de este plan", `Obligatorias: ${cols.filter((c) => c.tipo === "obligatoria").map((c) => c.base).join(", ")}. Opcionales: ${cols.filter((c) => c.tipo !== "obligatoria").map((c) => c.base).join(", ") || "ninguna"}. Las define el plan; las que no aparecen aquí no se piden.`],
+        ] as [string, string][])),
+        ...(duena ? ([["Oficina de cada línea", `Si deja vacía la columna «Oficina responsable» (código o nombre de la unidad), la línea es de la oficina dueña del plan: ${duena}.`]] as [string, string][]) : []),
         ["Qué NO se inventa", "Lo que deje vacío queda vacío. El portal no rellena montos, fechas ni porcentajes. Una línea sin evaluar puede ir sin criterios, fuente, fechas ni porcentajes."],
       ],
     },
@@ -153,6 +159,13 @@ function hojaInstrucciones(plan: string): HojaExcel {
 }
 
 export interface OpcionesPlantilla {
+  /** Fase 3B: la configuración del plan (columnas, listas, pilares). Sin ella, la plantilla del PDIFyT. */
+  config?: ConfigPlan | null;
+  /** Años del plan (columnas «% de inversión»). */
+  anios?: readonly number[];
+  /** Oficina dueña del plan (la que heredan las líneas sin oficina). */
+  oficinaDuena?: string | null;
+  planId?: string;
   /** Nombre del plan (banda de las hojas). */
   plan?: string;
   /** Nombres de las unidades del portal (lista de «Oficina responsable»). */
@@ -172,28 +185,36 @@ export function hojasPlantilla(op: OpcionesPlantilla = {}): HojaExcel[] {
   const campusLista = [...(op.campus ?? CAMPUS), CAMPUS_TODOS];
   const hoy = (op.ahora ?? new Date()).toISOString().slice(0, 10);
   const lineas = op.lineas ?? [];
-  const filas: Fila[] = [...EJEMPLOS.map((l) => filaDeLinea(l, true)), ...lineas.map((l) => filaDeLinea(l))];
+  const cols = op.config ? columnasDeConfig(op.config, op.anios) : (op.anios ? columnasDeConfig(null, op.anios) : COLUMNAS);
+  const lClasif = listaDeConfig(op.config, "clasif");
+  const lPrioridad = listaDeConfig(op.config, "prioridad");
+  const lResultado = listaDeConfig(op.config, "resultado");
+  const lFuente = listaDeConfig(op.config, "fuente");
+  const lPilar = pilaresDeConfig(op.config) ?? PILARES_LISTA;
+  const ejemplosLinea = EJEMPLOS.map((l, i) => ({ ...l, clasif: lClasif[i % lClasif.length] ?? l.clasif, pilar: lPilar[i % lPilar.length] ?? l.pilar, prioridad: lPrioridad[i % lPrioridad.length] ?? l.prioridad, resultado: i === 0 ? (lResultado[0] ?? null) : null, fuente: i === 0 ? (lFuente[0] ?? null) : null }));
+  const filas: Fila[] = [...ejemplosLinea.map((l) => filaDeLinea(l, true, cols)), ...lineas.map((l) => filaDeLinea(l, false, cols))];
   const libres = lineas.length ? 25 : 80;
-  const idx = (id: string) => COLUMNAS.findIndex((c) => c.id === id);
-  const ejemplos = Array.from({ length: EJEMPLOS.length }, (_, f) => COLUMNAS.map((_, c) => ({ fila: f, columna: c, tipo: "bloqueada" as const }))).flat();
-  const listas: Record<number, string[] | { rango: string }> = {
-    [idx("clasif")]: [...CLASIFICACIONES],
+  const idx = (id: string) => cols.findIndex((c) => c.id === id);
+  const ejemplos = Array.from({ length: EJEMPLOS.length }, (_, f) => cols.map((_, c) => ({ fila: f, columna: c, tipo: "bloqueada" as const }))).flat();
+  const listasTodas: Record<number, string[] | { rango: string }> = {
+    [idx("clasif")]: [...lClasif],
     [idx("campus")]: campusLista,
-    [idx("pilar")]: PILARES_LISTA,
-    [idx("prioridad")]: [...PRIORIDADES],
-    [idx("resultado")]: [...RESULTADOS],
-    [idx("fuente")]: [...FUENTES],
+    [idx("pilar")]: lPilar,
+    [idx("prioridad")]: [...lPrioridad],
+    [idx("resultado")]: [...lResultado],
+    [idx("fuente")]: [...lFuente],
   };
-  for (const c of COLUMNAS) if (c.id.startsWith("crit:") || c.id.startsWith("viab:")) listas[idx(c.id)] = ["Sí", "No"];
-  if (oficinas.length) listas[idx("oficina")] = { rango: `'${HOJA_LISTAS}'!$I$2:$I$${oficinas.length + 1}` };
+  const listas: Record<number, string[] | { rango: string }> = Object.fromEntries(Object.entries(listasTodas).filter(([k]) => Number(k) >= 0));
+  for (const c of cols) if (c.id.startsWith("crit:") || c.id.startsWith("viab:")) listas[idx(c.id)] = ["Sí", "No"];
+  if (oficinas.length && idx("oficina") >= 0) listas[idx("oficina")] = { rango: `'${HOJA_LISTAS}'!$I$2:$I$${oficinas.length + 1}` };
 
-  const nListas = Math.max(PILARES_LISTA.length, FUENTES.length, oficinas.length, campusLista.length, 2);
+  const nListas = Math.max(lPilar.length, lFuente.length, lClasif.length, lPrioridad.length, oficinas.length, campusLista.length, 2);
   const filaLista = (i: number): Fila => [
-    CLASIFICACIONES[i] ?? null, campusLista[i] ?? null, PILARES_LISTA[i] ?? null, PRIORIDADES[i] ?? null, RESULTADOS[i] ?? null, FUENTES[i] ?? null,
+    lClasif[i] ?? null, campusLista[i] ?? null, lPilar[i] ?? null, lPrioridad[i] ?? null, lResultado[i] ?? null, lFuente[i] ?? null,
     i === 0 ? "Sí" : i === 1 ? "No" : null, ORIGENES[i] ?? null, oficinas[i] ?? null,
   ];
   return [
-    hojaInstrucciones(plan),
+    hojaInstrucciones(plan, cols, op.oficinaDuena),
     {
       nombre: HOJA_LINEAS,
       banner: {
@@ -201,15 +222,15 @@ export function hojasPlantilla(op: OpcionesPlantilla = {}): HojaExcel[] {
         subtitulo: "Una fila por línea. Amarillo: obligatorio. Azul claro: opcional. Gris: no lo toque.",
         ayuda: `Las dos primeras filas son ejemplos y no se importan. Hasta ${MAX_LINEAS} líneas. Los porcentajes van de 0 a 100 (12 = 12 %). Lo que no sepa, déjelo vacío.`,
       },
-      columnas: COLUMNAS.map((c) => ({ titulo: tituloColumna(c), ancho: c.ancho })),
+      columnas: cols.map((c) => ({ titulo: tituloColumna(c), ancho: c.ancho })),
       filas,
-      tipos: COLUMNAS.map((c) => c.tipo),
+      tipos: cols.map((c) => c.tipo),
       celdas: ejemplos,
       listas,
       filasLibres: libres,
       largos: {
         [idx("nombre")]: { min: 3, max: 300, titulo: "Nombre", ayuda: "Cómo se llama la línea, hasta 300 caracteres.", error: "El nombre debe tener de 3 a 300 caracteres." },
-        [idx("descripcion")]: { min: 0, max: 1000, titulo: "Descripción", ayuda: "Hasta 1.000 caracteres.", error: "La descripción admite hasta 1.000 caracteres." },
+        ...(idx("descripcion") >= 0 ? { [idx("descripcion")]: { min: 0, max: 1000, titulo: "Descripción", ayuda: "Hasta 1.000 caracteres.", error: "La descripción admite hasta 1.000 caracteres." } } : {}),
       },
     },
     {
@@ -228,14 +249,19 @@ export function hojasPlantilla(op: OpcionesPlantilla = {}): HojaExcel[] {
         ["origen", lineas.length ? "plan" : "plantilla"],
         ["plan", plan],
         ["generado", hoy],
-        ["anios", aniosDe().join("-")],
+        ["anios", (op.anios ?? aniosDe()).join("-")],
+        ["plan_id", op.planId ?? ""],
+        ["oficina", op.oficinaDuena ?? ""],
         ["lineas", lineas.length],
       ],
     },
   ];
 }
 
-export const nombreArchivoPlantilla = (lleno = false): string => (lleno ? "planificacion-pdifyt.xlsx" : "plantilla-planificacion.xlsx");
+export const nombreArchivoPlantilla = (lleno = false, plan?: string): string => {
+  const slug = (plan ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+  return slug ? `${lleno ? "planificacion" : "plantilla"}-${slug}.xlsx` : lleno ? "planificacion-pdifyt.xlsx" : "plantilla-planificacion.xlsx";
+};
 
 /** Arma el archivo en memoria (para la descarga y las pruebas). */
 export const construirPlantilla = (op: OpcionesPlantilla = {}): Promise<ArrayBuffer> => construirLibro(hojasPlantilla(op), { logo: op.logo, filasLibres: 0 });
@@ -257,5 +283,5 @@ async function cargarLogo(): Promise<string | undefined> {
 /** Baja la plantilla (vacía, o llena con las líneas que se pasen). */
 export async function descargarPlantilla(op: OpcionesPlantilla = {}): Promise<void> {
   const buffer = await construirPlantilla({ ...op, logo: op.logo ?? (await cargarLogo()) });
-  downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombreArchivoPlantilla(Boolean(op.lineas?.length)));
+  downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombreArchivoPlantilla(Boolean(op.lineas?.length), op.plan));
 }

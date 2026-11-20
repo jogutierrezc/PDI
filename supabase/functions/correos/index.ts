@@ -1717,7 +1717,7 @@ async function avisoDeGestionMaster(request: Request, body: Record<string, unkno
   return json({ ok: true });
 }
 
-/* --- Planeación y Seguimiento (0287): asignación, transferencia, devolución, vencimientos y cumplimiento ------ */
+/* --- Planeación y Seguimiento (0287 y 0288): asignación, transferencia, devolución, vencimientos, cumplimiento, avances y validación ------ */
 
 /** El texto de respaldo si la plantilla c-ps-* no está en la base (sin la migración 0287, o borrada). */
 const PLANTILLA_PS_RESPALDO: Plantilla = {
@@ -1738,6 +1738,17 @@ const PLANTILLA_PS_RESPALDO: Plantilla = {
   nota: "Este aviso lo envía el portal de Planeación.",
   roles: null,
 };
+
+/** Textos de respaldo de las plantillas de la fase 3 (0288) si no están en la base: c-ps-avance, c-ps-validado y c-ps-validacion-pendiente. */
+const RESPALDO_PS: Record<string, { previa: string; boton: string }> = {
+  "c-ps-avance": { previa: "Hay un avance por revisar", boton: "Revisar el avance" },
+  "c-ps-validado": { previa: "Su avance quedó validado", boton: "Ver la actividad" },
+  "c-ps-validacion-pendiente": { previa: "Hay avances por validar", boton: "Revisar los avances" },
+  "c-ps-vaf-evaluar": { previa: "Hay un plan por evaluar", boton: "Evaluar el plan" },
+  "c-ps-vaf-resultado": { previa: "Resultado de la evaluación financiera", boton: "Ver el plan" },
+  "c-ps-vaf-alerta": { previa: "Revise la ejecución del plan", boton: "Ver el presupuesto" },
+};
+const respaldoPs = (clave: string): Plantilla => ({ ...PLANTILLA_PS_RESPALDO, ...(RESPALDO_PS[clave] ?? {}) });
 
 /** Solo la función `planeacion-seguimiento`, con la clave de servicio: arma los valores desde la cola ps_avisos, nunca la persona. */
 async function avisoDePlaneacionSeguimiento(request: Request, body: Record<string, unknown>, url: string, serviceKey: string): Promise<Response> {
@@ -1763,7 +1774,7 @@ async function avisoDePlaneacionSeguimiento(request: Request, body: Record<strin
   const admin = cliente(url, serviceKey);
   const hash = await huella(para, ENV("SEND_EMAIL_HOOK_SECRET") || serviceKey);
   const ctx = await contextoDe(admin, hash, "");
-  const plantilla = plantillaDeFila(ctx?.templates?.[clave], clave) ?? PLANTILLA_PS_RESPALDO;
+  const plantilla = plantillaDeFila(ctx?.templates?.[clave], clave) ?? respaldoPs(clave);
   const sitio = basePublica(typeof body.sitio === "string" ? body.sitio : "", ENV("CORREOS_URL_PUBLICA"), "");
   const salida = await enviar(admin, ctx, {
     tipo: "aviso",

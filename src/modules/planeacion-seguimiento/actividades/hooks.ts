@@ -3,20 +3,27 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { usePsApi } from "../api";
+import { claveDelPlan, usePsApi } from "../api";
 import { usePs } from "../contexto";
 import type { Actividad, DatosActividad, EstadoAct, OficinaVista, Poder } from "./modelo";
 import type { PersonaRef } from "./contratoApi";
+import type { ConfigAvisos, DatosAccion, DatosAvance, DatosRiesgo, EstadoAccion, EstadoRiesgo } from "./modeloF3";
 
+/** Fase 3B: las claves que dependen del plan llevan el plan activo al final (así cambiar de plan nunca mezcla cachés). */
 export const actKeys = {
   todo: ["ps", "act"] as const,
   yo: ["ps", "act", "yo"] as const,
-  oficinas: ["ps", "act", "oficinas"] as const,
-  personas: ["ps", "act", "personas"] as const,
-  equipo: (id: string | null) => ["ps", "act", "equipo", id] as const,
-  lineas: (id: string | null) => ["ps", "act", "lineas", id] as const,
-  lista: (ids: string[]) => ["ps", "act", "lista", [...ids].sort().join(",")] as const,
-  detalle: (id: string | null) => ["ps", "act", "detalle", id] as const,
+  get oficinas() { return ["ps", "act", "oficinas", claveDelPlan()] as const; },
+  get personas() { return ["ps", "act", "personas", claveDelPlan()] as const; },
+  equipo: (id: string | null) => ["ps", "act", "equipo", id, claveDelPlan()] as const,
+  lineas: (id: string | null) => ["ps", "act", "lineas", id, claveDelPlan()] as const,
+  lista: (ids: string[]) => ["ps", "act", "lista", [...ids].sort().join(","), claveDelPlan()] as const,
+  detalle: (id: string | null) => ["ps", "act", "detalle", id, claveDelPlan()] as const,
+  catalogoPdi: ["ps", "act", "pdi", "catalogo"] as const,
+  resumenPdi: (id: string | null) => ["ps", "act", "pdi", "resumen", id, claveDelPlan()] as const,
+  porValidar: (id: string | null) => ["ps", "act", "validar", id ?? "todas", claveDelPlan()] as const,
+  get misAvances() { return ["ps", "act", "mis-avances", claveDelPlan()] as const; },
+  config: (id: string | null) => ["ps", "act", "config", id] as const,
 };
 
 export function useYo() {
@@ -157,4 +164,81 @@ export function useMoverActividad() {
     onError: (_e, _d, ctx) => ctx?.previos.forEach(([k, v]) => qc.setQueryData(k, v)),
     onSettled: () => qc.invalidateQueries({ queryKey: actKeys.todo }),
   });
+}
+
+
+/* ---------- Fase 3 ---------- */
+
+export function useCatalogoPdi() {
+  const api = usePsApi();
+  return useQuery({ queryKey: actKeys.catalogoPdi, queryFn: () => api.catalogoPdi(), staleTime: 300_000, retry: false });
+}
+export function useResumenPdi(oficinaId: string | null) {
+  const api = usePsApi();
+  return useQuery({ queryKey: actKeys.resumenPdi(oficinaId), queryFn: () => api.resumenPdi(oficinaId!), enabled: Boolean(oficinaId), retry: false });
+}
+/** La cola «Por validar» del gestor (de una oficina o de todas en las que lo es). Solo se pide si hay poder de gestor. */
+export function useAvancesPorValidar(oficinaId: string | null, activo = true) {
+  const api = usePsApi();
+  return useQuery({ queryKey: actKeys.porValidar(oficinaId), queryFn: () => api.avancesPorValidar(oficinaId), enabled: activo, retry: false });
+}
+export function useMisAvances() {
+  const api = usePsApi();
+  return useQuery({ queryKey: actKeys.misAvances, queryFn: () => api.misAvances(), retry: false });
+}
+export function useConfigAvisos(oficinaId: string | null) {
+  const api = usePsApi();
+  return useQuery({ queryKey: actKeys.config(oficinaId), queryFn: () => api.leerConfigAvisos(oficinaId!), enabled: Boolean(oficinaId), retry: false });
+}
+
+export function useReportarAvance() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (d: { actividadId: string; datos: DatosAvance }) => api.reportarAvance(d.actividadId, d.datos), onSuccess: inv });
+}
+export function useValidarAvance() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (d: { id: string; nota?: string }) => api.validarAvance(d.id, d.nota), onSuccess: inv });
+}
+export function useDevolverAvance() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (d: { id: string; nota: string }) => api.devolverAvance(d.id, d.nota), onSuccess: inv });
+}
+export function useValidarLote() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (ids: string[]) => api.validarLote(ids), onSuccess: inv });
+}
+export function useCerrarActividad() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (d: { id: string; nota: string }) => api.cerrarActividad(d.id, d.nota), onSuccess: inv });
+}
+export function useRiesgos() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return {
+    crear: useMutation({ mutationFn: (d: { actividadId: string; datos: DatosRiesgo }) => api.crearRiesgo(d.actividadId, d.datos), onSuccess: inv }),
+    editar: useMutation({ mutationFn: (d: { id: string; cambios: Partial<DatosRiesgo> & { estado?: EstadoRiesgo } }) => api.editarRiesgo(d.id, d.cambios), onSuccess: inv }),
+    cerrar: useMutation({ mutationFn: (d: { id: string; nota: string }) => api.cerrarRiesgo(d.id, d.nota), onSuccess: inv }),
+    crearAccion: useMutation({ mutationFn: (d: { riesgoId: string; datos: DatosAccion }) => api.crearAccion(d.riesgoId, d.datos), onSuccess: inv }),
+    marcarAccion: useMutation({ mutationFn: (d: { id: string; estado: EstadoAccion }) => api.marcarAccion(d.id, d.estado), onSuccess: inv }),
+  };
+}
+export function useComentar() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (d: { id: string; texto: string }) => api.comentar(d.id, d.texto), onSuccess: inv });
+}
+export function useGuardarConfigAvisos() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (d: { oficinaId: string; config: ConfigAvisos }) => api.guardarConfigAvisos(d.oficinaId, d.config), onSuccess: inv });
+}
+export function useQuitarConfigAvisos() {
+  const api = usePsApi();
+  const inv = useInvalidar();
+  return useMutation({ mutationFn: (oficinaId: string) => api.quitarConfigAvisos(oficinaId), onSuccess: inv });
 }

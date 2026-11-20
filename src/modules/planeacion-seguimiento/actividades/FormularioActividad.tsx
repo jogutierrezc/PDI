@@ -14,7 +14,10 @@ import { usePs } from "../contexto";
 import { Campo, FormularioPasos, useBorradorLocal, type ErrorCampo } from "../marco/FormularioPasos";
 import { DESDE_MODULO, PaginaCompleta } from "../marco/PaginaCompleta";
 import { CAMPUS_TODOS, fecha, rotuloCampus } from "../modelo";
-import { useAct, useActividad, useEquipo, useGuardarActividad, useLineasOficina } from "./hooks";
+import { useAct, useActividad, useCatalogoPdi, useEquipo, useGuardarActividad, useLineasOficina } from "./hooks";
+import { SELECCION_VACIA, resolverSeleccion, seleccionDe } from "./pdi";
+import { SelectorPdi } from "./SelectorPdi";
+import type { SeleccionPdi } from "./modeloF3";
 import { PRIORIDADES_ACT, type DatosActividad, type PrioridadAct } from "./modelo";
 import { Banner, ConfirmarCampus, VistaPreviaAvisos } from "./partes";
 import type { ConflictoCampus } from "./contratoApi";
@@ -32,9 +35,11 @@ interface Valores {
   prioridad: PrioridadAct;
   campus: string;
   asignados: string[];
+  /** Conexión con el PDI (fase 3): al crear hay que elegir una de las dos. */
+  pdi: SeleccionPdi;
 }
 
-const PASOS = ["que", "cuando", "quien", "revisar"] as const;
+const PASOS = ["que", "pdi", "cuando", "quien", "revisar"] as const;
 
 export function FormularioActividad({ id }: { id?: string }) {
   const [params] = useSearchParams();
@@ -52,8 +57,8 @@ export function FormularioActividad({ id }: { id?: string }) {
 }
 
 function valoresDe(a: NonNullable<ReturnType<typeof useActividad>["data"]>["actividad"] | null, lineaInicial: string | null, campusPorDefecto: string): Valores {
-  if (a) return { titulo: a.titulo, descripcion: a.descripcion ?? "", linea: a.lineaNo ?? "propia", inicio: a.inicio ?? "", fin: a.fin ?? "", esHito: a.esHito, prioridad: a.prioridad, campus: a.campus, asignados: a.asignados };
-  return { titulo: "", descripcion: "", linea: lineaInicial ?? "", inicio: "", fin: "", esHito: false, prioridad: "Medio", campus: campusPorDefecto, asignados: [] };
+  if (a) return { titulo: a.titulo, descripcion: a.descripcion ?? "", linea: a.lineaNo ?? "propia", inicio: a.inicio ?? "", fin: a.fin ?? "", esHito: a.esHito, prioridad: a.prioridad, campus: a.campus, asignados: a.asignados, pdi: seleccionDe(a) };
+  return { titulo: "", descripcion: "", linea: lineaInicial ?? "", inicio: "", fin: "", esHito: false, prioridad: "Medio", campus: campusPorDefecto, asignados: [], pdi: SELECCION_VACIA };
 }
 
 function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; oficinaId: string; inicial: Parameters<typeof valoresDe>[0]; lineaInicial: string | null }) {
@@ -62,6 +67,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
   const oficina = act.porId.get(oficinaId)!;
   const campusQ = useCampus();
   const lineasQ = useLineasOficina(oficinaId);
+  const pdiQ = useCatalogoPdi();
   const equipoQ = useEquipo(oficinaId);
   const guardar = useGuardarActividad();
   const listaCampus = useMemo(() => [...(campusQ.data ?? ["Bucaramanga", "Valledupar", "Cúcuta"]), CAMPUS_TODOS], [campusQ.data]);
@@ -70,7 +76,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
   const [tocados, setTocados] = useState<Record<string, boolean>>({});
   const [hecho, setHecho] = useState<{ id: string; n: number } | null>(null);
   const [conflictos, setConflictos] = useState<ConflictoCampus[]>([]);
-  const { guardado, descartar } = useBorradorLocal<Valores>(id ? `actividad-${id}` : `actividad-nueva-${oficinaId}`, v, setV);
+  const { guardado, descartar } = useBorradorLocal<Valores>(id ? `actividad-${id}` : `actividad-nueva-${oficinaId}`, v, (b) => setV({ ...b, pdi: b.pdi ?? SELECCION_VACIA }));
   const migas = [{ texto: "Planeación y Seguimiento", a: ruta("planificacion") }, { texto: id ? "Editar actividad" : "Crear actividad" }];
   const titulo = id ? "Editar actividad" : "Crear actividad";
   const volver = `${ruta("planificacion")}?oficina=${encodeURIComponent(oficinaId)}`;
@@ -78,7 +84,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
   const lineas = useMemo(() => [...(lineasQ.data ?? [])].sort((a, b) => Number(a.no) - Number(b.no)), [lineasQ.data]);
   const equipo = useMemo(() => equipoQ.data ?? [], [equipoQ.data]);
   const campusSel = v.campus || (listaCampus[0] ?? "");
-  const datos: DatosActividad = { id, oficinaId, lineaNo: v.linea === "propia" ? null : v.linea || "__sin_elegir__", titulo: v.titulo, descripcion: v.descripcion, inicio: v.inicio || null, fin: v.fin || null, esHito: v.esHito, prioridad: v.prioridad, campus: campusSel, asignados: v.asignados };
+  const datos: DatosActividad = { id, oficinaId, lineaNo: v.linea === "propia" ? null : v.linea || "__sin_elegir__", titulo: v.titulo, descripcion: v.descripcion, inicio: v.inicio || null, fin: v.fin || null, esHito: v.esHito, prioridad: v.prioridad, campus: campusSel, asignados: v.asignados, pdi: v.pdi };
   const errores = validarActividad(datos, { lineas: lineas.map((l) => l.no), campus: listaCampus, equipo });
   const porCampo = new Map(errores.map((e) => [e.campo, e.mensaje]));
   const mostrar = (campo: string) => (tocados[campo] ? (porCampo.get(campo) ?? null) : null);
@@ -89,7 +95,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
   const avisos = avisoAsignacion(nuevos, equipo, act.yo);
   const adv = avisosActividad(datos, lineaElegida, act.hoy);
 
-  const validarPaso = (p: "que" | "cuando" | "quien") => (): ErrorCampo[] => {
+  const validarPaso = (p: "que" | "pdi" | "cuando" | "quien") => (): ErrorCampo[] => {
     const e = errores.filter((x) => x.paso === p);
     setTocados((t) => ({ ...t, ...Object.fromEntries(e.map((x) => [x.campo, true])) }));
     return e.map((x) => ({ campo: x.campo, mensaje: x.mensaje }));
@@ -115,7 +121,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
   return (
     <FormularioPasos
       titulo={titulo}
-      subtitulo={`Oficina: ${oficina.nombre}. Cuatro pasos; el borrador se guarda solo en este equipo.`}
+      subtitulo={`Oficina: ${oficina.nombre}. Cinco pasos; el borrador se guarda solo en este equipo.`}
       migas={migas}
       regresarA={volver}
       paso={paso}
@@ -158,6 +164,13 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
         },
         {
           id: PASOS[1],
+          titulo: "Plan de Desarrollo Institucional",
+          descripcion: "Diga si la actividad contribuye al PDI: a qué pilares y líneas de acción, o que no tiene conexión.",
+          validar: validarPaso("pdi"),
+          contenido: <SelectorPdi valor={v.pdi} onCambio={(p) => { poner("pdi", p); }} catalogo={pdiQ.data ?? []} cargando={pdiQ.isPending} error={mostrar("pdi-conexion")} errorBuscar={mostrar("pdi-buscar")} editandoSinDefinir={Boolean(id)} alSalir={salir("pdi-conexion")} />,
+        },
+        {
+          id: PASOS[2],
           titulo: "Cuándo y cuánto",
           descripcion: "Las fechas, si es un hito, la prioridad y el campus donde se hace.",
           validar: validarPaso("cuando"),
@@ -191,7 +204,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
           ),
         },
         {
-          id: PASOS[2],
+          id: PASOS[3],
           titulo: "Quién la hace",
           descripcion: `Asigne a una o varias personas de ${oficina.nombre}. Verá su carga actual para repartir con criterio. También puede dejarla sin responsable y asignarla después.`,
           validar: validarPaso("quien"),
@@ -225,7 +238,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
           ),
         },
         {
-          id: PASOS[3],
+          id: PASOS[4],
           titulo: id ? "Revisar y guardar" : "Revisar y crear",
           descripcion: "Confirme los datos. Aún no se ha guardado nada.",
           contenido: (
@@ -235,6 +248,7 @@ function Interior({ id, oficinaId, inicial, lineaInicial }: { id?: string; ofici
                 <div><dt>Oficina</dt><dd>{oficina.nombre}</dd></div>
                 <div><dt>Línea del plan</dt><dd>{v.linea === "propia" ? "Actividad propia de la oficina" : lineaElegida ? `#${lineaElegida.no} · ${lineaElegida.nombre}` : "—"}</dd></div>
                 <div><dt>Actividad</dt><dd>{v.titulo.trim() || "—"}</dd></div>
+                <div><dt>Plan de Desarrollo Institucional</dt><dd>{v.pdi.conexion === "con_pdi" ? resolverSeleccion(pdiQ.data ?? [], v.pdi).items.map((i) => (i.linea ? `${i.lineaCodigo} ${i.linea}` : `Pilar ${i.pilar}`)).join("; ") || `${v.pdi.items.length} elegidos` : v.pdi.conexion === "sin_pdi" ? "No tiene conexión con el PDI" : "Sin definir"}</dd></div>
                 {v.descripcion.trim() ? <div><dt>Descripción</dt><dd>{v.descripcion.trim()}</dd></div> : null}
                 <div><dt>{v.esHito ? "Hito" : "Fechas"}</dt><dd>{v.esHito ? fecha(v.fin) : `${fecha(v.inicio)} a ${fecha(v.fin)}`}</dd></div>
                 <div><dt>Prioridad y campus</dt><dd>{v.prioridad} · {rotuloCampus(campusSel)}</dd></div>

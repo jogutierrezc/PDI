@@ -32,6 +32,13 @@ import { Planificacion } from "./actividades/Planificacion";
 import { Tablero } from "./actividades/Tablero";
 import { Devolver } from "./actividades/Devolver";
 import { Transferir } from "./actividades/Transferir";
+import { SelectorPlan } from "./SelectorPlan";
+import { TodosLosPlanes } from "./TodosLosPlanes";
+import { Cerrar } from "./actividades/Cerrar";
+import { EditarPlazos } from "./actividades/EditarPlazos";
+import { ReportarAvance } from "./actividades/ReportarAvance";
+import { RevisarAvance, RevisarCola } from "./actividades/Revisar";
+import { RiesgoForm } from "./actividades/RiesgoForm";
 import { PsApiContext, crearApiSupabase, psKeys, usePsApi, type PsApi } from "./api";
 import { Calidad } from "./Calidad";
 import { Cargar } from "./Cargar";
@@ -46,6 +53,7 @@ import { Roles } from "./Roles";
 import { Vacio } from "./Vacio";
 import { Comparar, PublicarVersion, Versiones } from "./Versiones";
 import { puedeAdministrar, type PsNivel } from "./modelo";
+import { puedeVerTodosLosPlanes } from "./modeloPlanes";
 import "./planeacion-seguimiento.css";
 import "./actividades/actividades.css";
 
@@ -82,11 +90,18 @@ export const SECCIONES: Def[] = [
   { id: "importar-actividades", nombre: "Importar la planificación", descripcion: "Plantilla de Excel y creación de las actividades de la oficina" },
   { id: "transferir", nombre: "Transferir actividad", descripcion: "Pasar una actividad a otra persona, con motivo" },
   { id: "devolver", nombre: "Devolver actividad", descripcion: "Devolver una actividad de «En revisión» con una nota" },
+  { id: "planes", nombre: "Todos los planes", descripcion: "El seguimiento de todos los planes: avance, alertas, oficinas y ritmo", riel: true },
+  { id: "plan-editar", nombre: "Editar plan", descripcion: "Datos, oficina dueña, plantilla y pilares del plan" },
+  { id: "reportar", nombre: "Reportar avance", descripcion: "Qué avanzó, evidencias, riesgos y revisar" },
+  { id: "revisar", nombre: "Por validar", descripcion: "Avances que esperan la revisión del gestor" },
+  { id: "cerrar", nombre: "Cerrar la actividad", descripcion: "Cierre administrativo del gestor (queda auditado)" },
+  { id: "riesgo", nombre: "Riesgo", descripcion: "Registrar o editar un riesgo de la actividad" },
+  { id: "plazos-aviso", nombre: "Plazos de aviso de la oficina", descripcion: "Los plazos de aviso propios de una oficina" },
   { id: "avisos", nombre: "Cómo te avisamos", descripcion: "Qué correos llegan y con qué plazo", riel: true },
 ];
 
 /** Secciones que muestran el plan: sin plan o sin versión se reemplazan por el estado vacío guiado. */
-const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "devolver", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
+const NECESITAN_PLAN: Seccion[] = ["planificacion", "tablero", "lista", "mis-tareas", "asignar", "cronograma-act", "actividad", "actividad-nueva", "actividad-editar", "importar-actividades", "transferir", "devolver", "reportar", "revisar", "cerrar", "riesgo", "plazos-aviso", "plan-editar", "resumen", "proyectos", "cronograma", "calidad", "versiones", "publicar", "comparar"];
 
 function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
   const { plan, cargando, error } = usePs();
@@ -110,6 +125,11 @@ function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
     case "importar-actividades": return <ImportarActividades />;
     case "transferir": return id ? <Transferir id={id} /> : <Tablero />;
     case "devolver": return id ? <Devolver id={id} /> : <Tablero />;
+    case "reportar": return id ? <ReportarAvance id={id} /> : <Tablero />;
+    case "revisar": return id ? <RevisarAvance id={id} /> : <RevisarCola />;
+    case "cerrar": return id ? <Cerrar id={id} /> : <Tablero />;
+    case "riesgo": return id ? <RiesgoForm id={id} /> : <Tablero />;
+    case "plazos-aviso": return id ? <EditarPlazos oficinaId={id} /> : <Avisos />;
     case "avisos": return <Avisos />;
     case "resumen": return <Resumen />;
     case "proyectos": return id ? <DetalleLinea id={id} /> : <Proyectos />;
@@ -119,6 +139,8 @@ function Cuerpo({ seccion, id }: { seccion: Seccion; id?: string }) {
     case "roles": return <Roles />;
     case "cargar": return <Cargar />;
     case "crear": return <CrearPlan />;
+    case "plan-editar": return id ? <CrearPlan id={id} /> : <Resumen />;
+    case "planes": return <TodosLosPlanes />;
     case "publicar": return id ? <PublicarVersion id={id} /> : <Versiones />;
     case "comparar": return <Comparar />;
   }
@@ -136,7 +158,7 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
   const completa = !def.riel || ((seccion === "proyectos" || seccion === "mis-tareas") && Boolean(id));
   const ofi = useOficinaActual().oficina;
   const tituloDef = seccion === "planificacion" && ofi ? (ofi.papel !== null ? "Mi planificación" : `Planificación de ${ofi.nombre}`) : def.nombre;
-  const riel = SECCIONES.filter((x) => x.riel && (x.id !== "asignar" || nivel === "gestor" || nivel === "admin"));
+  const riel = SECCIONES.filter((x) => x.riel && (x.id !== "asignar" || nivel === "gestor" || nivel === "admin") && (x.id !== "planes" || puedeVerTodosLosPlanes(nivel)));
   const rotuloPlan = plan ? `${plan.nombre}${plan.version ? ` · ${plan.version.etiqueta}${plan.version.estado === "borrador" ? " (borrador)" : ""}` : ""}` : "Sin plan cargado";
   const cuerpo = <Cuerpo seccion={seccion} id={id} />;
 
@@ -147,7 +169,7 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
           <strong>Planeación y Seguimiento</strong> <span>{rotuloPlan} · modo demostración (solo desarrollo)</span>
           <nav aria-label="Secciones">{riel.map((s) => <button key={s.id} type="button" aria-current={seccion === s.id && !id ? "page" : undefined} onClick={() => ir(ruta(s.id))}>{s.nombre}</button>)}</nav>
         </header>
-        <main className="ps-main"><div className="ps">{cuerpo}</div></main>
+        <main className="ps-main"><div className="ps">{!completa ? <SelectorPlan /> : null}{cuerpo}</div></main>
       </div>
     );
   }
@@ -167,7 +189,7 @@ function Interior({ seccionParam, id, envoltura }: { seccionParam?: string; id?:
         </AdminRail>
       ) : undefined}
     >
-      <TituloComoH2.Provider value={true}><div className="ps">{cuerpo}</div></TituloComoH2.Provider>
+      <TituloComoH2.Provider value={true}><div className="ps">{!completa ? <SelectorPlan /> : null}{cuerpo}</div></TituloComoH2.Provider>
     </AdminShell>
   );
 }

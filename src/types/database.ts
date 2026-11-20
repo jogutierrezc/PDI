@@ -130,7 +130,7 @@ export type GmNivel = "none" | "solicitante" | "revisor" | "gestor";
 /** Cumplimiento de Tipología (0260). */
 export type CtNivel = "none" | "programa" | "vicerrectoria" | "admin";
 /** Planeación y Seguimiento (0286). */
-export type PsNivel = "none" | "lector" | "colaborador" | "gestor" | "aprobador" | "admin";
+export type PsNivel = "none" | "lector" | "colaborador" | "gestor" | "aprobador" | "financiero" | "admin";
 
 export interface AccessRoleReport {
   access_role_id: string;

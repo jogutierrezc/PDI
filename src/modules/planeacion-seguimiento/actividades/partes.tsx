@@ -9,7 +9,8 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { DEF_ESTADOS, ESTADOS, PRIORIDADES_ACT, estadoPlazo, iniciales, progresoChecklist, rangoPrioridad, textoPlazo, type Actividad, type AvisoPrevio, type EstadoAct, type MiembroEquipo, type OficinaVista, type Poder } from "./modelo";
-import { ROTULO_AVISO, destinosPosibles, requiereNotaDevolucion } from "./reglas";
+import { ROTULO_AVISO, destinosPosibles } from "./reglas";
+import { rutaDeMovimiento } from "./reglasF3";
 import type { ConflictoCampus, PersonaRef } from "./contratoApi";
 import { usePs } from "../contexto";
 
@@ -145,16 +146,35 @@ export function AvisoDemo() {
 /* ---------- Menú «Mover a…» ---------- */
 
 /**
+ * Fase 3: a dónde lleva mover una actividad. Colaborador → «En revisión» y gestor → «En revisión» abren el reporte de avance;
+ * gestor → «Hecho» abre la revisión (si hay un avance esperando) o el cierre administrativo; devolver pide una nota.
+ * Devuelve `true` si navegó a una pantalla completa (entonces no se mueve en el momento).
+ */
+export function useIrAMovimiento() {
+  const { ir, ruta } = usePs();
+  return (poder: Poder, a: Pick<Actividad, "id" | "estado" | "avance">, destino: EstadoAct): boolean => {
+    const r = rutaDeMovimiento(poder, a, destino);
+    switch (r.tipo) {
+      case "devolver": ir(`${ruta("devolver", a.id)}?a=${destino}`); return true;
+      case "reportar": ir(ruta("reportar", a.id)); return true;
+      case "revisar": ir(`${ruta("revisar")}?actividad=${encodeURIComponent(a.id)}`); return true;
+      case "cerrar": ir(ruta("cerrar", a.id)); return true;
+      default: return false;
+    }
+  };
+}
+
+/**
  * La alternativa accesible al arrastre: un botón que abre un menú con los cubos. Los que el permiso no deja se
  * muestran con el motivo; elegirlos no hace nada y avisa en línea. No lleva animación (es una acción de teclado).
  */
-export function MenuMover({ actividad, poder, yo, onMover, onRechazo, etiqueta = "Mover a…", compacto = false }: { actividad: Pick<Actividad, "id" | "titulo" | "estado" | "asignados">; poder: Poder; yo: string | null; onMover: (estado: EstadoAct) => void; onRechazo: (motivo: string) => void; etiqueta?: string; compacto?: boolean }) {
+export function MenuMover({ actividad, poder, yo, onMover, onRechazo, etiqueta = "Mover a…", compacto = false }: { actividad: Pick<Actividad, "id" | "titulo" | "estado" | "asignados" | "avance">; poder: Poder; yo: string | null; onMover: (estado: EstadoAct) => void; onRechazo: (motivo: string) => void; etiqueta?: string; compacto?: boolean }) {
   const [abierto, setAbierto] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; arriba: boolean } | null>(null);
   const boton = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLUListElement>(null);
   const id = useId();
-  const { ir, ruta } = usePs();
+  const irA = useIrAMovimiento();
   const opciones = destinosPosibles(poder, actividad, yo);
 
   useLayoutEffect(() => {
@@ -237,15 +257,10 @@ export function MenuMover({ actividad, poder, yo, onMover, onRechazo, etiqueta =
                       onRechazo(decision.motivo);
                       return;
                     }
-                    // Devolver de «En revisión» pide una nota (≥ 20 caracteres): es una pantalla completa.
-                    if (requiereNotaDevolucion(actividad.estado, estado)) {
-                      cerrar(false);
-                      ir(`${ruta("devolver", actividad.id)}?a=${estado}`);
-                      return;
-                    }
-                    // FASE 3: al pasar a «En revisión» (colaborador) o a «Hecho» (gestor), aquí se abrirá el reporte de
-                    // avance a pantalla completa (físico, financiero, nota y evidencia). En la fase 2 se mueve directo.
-                    cerrar();
+                    // Fase 3: reportar avance, revisar, cerrar y devolver son pantallas completas.
+                    cerrar(false);
+                    if (irA(poder, actividad, estado)) return;
+                    boton.current?.focus();
                     onMover(estado);
                   }}
                 >

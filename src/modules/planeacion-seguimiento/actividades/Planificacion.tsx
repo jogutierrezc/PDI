@@ -17,7 +17,10 @@ import { DESDE_MODULO } from "../marco/PaginaCompleta";
 import { useEntradaResumen } from "../movimiento";
 import { Prioridad } from "../partes";
 import { entero, millones1, rotuloCampus } from "../modelo";
-import { useAct, useActividades, useEquipo, useLineasOficina, useOficinaActual } from "./hooks";
+import { useAct, useActividades, useEquipo, useLineasOficina, useOficinaActual, useResumenPdi } from "./hooks";
+import { ColaPorValidar } from "./Revisar";
+import { BarraAvance, ChipPdi } from "./partesF3";
+import { ROTULO_PDI } from "./modeloF3";
 import { DEF_ESTADOS, ESTADOS, ROTULO_PAPEL, ROTULO_PODER, estadoPlazo, resumirActividades, type Actividad } from "./modelo";
 import { AvisoDemo, ChipEstado, ChipPlazo, GlifoEstado, PilaAvatares, SelectorOficina } from "./partes";
 import { explicarPoder, puedeCrear, puedeImportar } from "./reglas";
@@ -29,6 +32,7 @@ function FilaActividad({ a, hoy, personas, ruta }: { a: Actividad; hoy: string; 
       <Link to={ruta} state={DESDE_MODULO} className="ps-fila-act__t">{a.titulo}</Link>
       <ChipEstado estado={a.estado} />
       <ChipPlazo a={a} hoy={hoy} />
+      <BarraAvance avance={a.avance} compacta />
       <PilaAvatares ids={a.asignados} personas={personas} />
     </li>
   );
@@ -42,6 +46,7 @@ export function Planificacion() {
   const lineasQ = useLineasOficina(id);
   const actsQ = useActividades(id ? [id] : []);
   const equipoQ = useEquipo(id);
+  const pdiQ = useResumenPdi(id);
   const raiz = useRef<HTMLDivElement>(null);
   const acts = useMemo(() => actsQ.data ?? [], [actsQ.data]);
   const lineas = useMemo(() => [...(lineasQ.data ?? [])].sort((a, b) => Number(a.no) - Number(b.no)), [lineasQ.data]);
@@ -60,6 +65,8 @@ export function Planificacion() {
   const miOficina = oficina.papel !== null && oficinas.filter((o) => o.papel !== null).length === 1;
   const maxCarga = Math.max(1, ...(equipoQ.data ?? []).map((m) => m.carga.activas));
   const sinActs = acts.length === 0;
+  const avProm = acts.length ? Math.round(acts.reduce((t, x) => t + x.avance.fisico, 0) / acts.length) : 0;
+  const pdi = pdiQ.data;
 
   return (
     <div className="ps-seccion" ref={raiz}>
@@ -108,7 +115,21 @@ export function Planificacion() {
             <div><dt>Vencidas</dt><dd data-cuenta={r.vencidas}>{entero(r.vencidas)}</dd><dd className="ps-kpis__s">{r.vencidas ? "pasó su fecha y no están hechas" : "ninguna"}</dd></div>
             <div><dt>Sin responsable</dt><dd data-cuenta={r.sinResponsable}>{entero(r.sinResponsable)}</dd><dd className="ps-kpis__s">{r.sinResponsable && gestor ? <Link to={`${ruta("asignar")}?oficina=${encodeURIComponent(oficina.id)}`} state={DESDE_MODULO}>asignarlas</Link> : r.sinResponsable ? "las reparte el gestor" : "todas tienen quién"}</dd></div>
             <div><dt>En riesgo</dt><dd data-cuenta={r.porEstado.en_riesgo}>{entero(r.porEstado.en_riesgo)}</dd><dd className="ps-kpis__s">{r.porEstado.en_revision} esperan revisión</dd></div>
+            <div><dt>Avance validado</dt><dd data-cuenta={avProm} data-formato="pct">{avProm} %</dd><dd className="ps-kpis__s">promedio de las actividades</dd></div>
           </dl>
+          {pdi ? (
+            <section className="ps-bloque ps-pdi-resumen" aria-labelledby="ps-pdi-h">
+              <h3 id="ps-pdi-h">Conexión con el Plan de Desarrollo Institucional</h3>
+              <ul className="ps-pdi-cifras">
+                <li><b>{pdi.conPdi}</b> <ChipPdi pdi={{ conexion: "con_pdi", items: [] }} /></li>
+                <li><b>{pdi.sinPdi}</b> {ROTULO_PDI.sin_pdi}</li>
+                <li><b>{pdi.sinDefinir}</b> {ROTULO_PDI.sin_definir}</li>
+              </ul>
+              {pdi.porPilar.length ? <p className="ps-nota">Por pilar: {pdi.porPilar.map((p) => `${p.nombre} (${p.actividades})`).join(" · ")}.</p> : null}
+              {pdi.sinDefinir > 0 && gestor ? <p className="ps-nota"><Icon name="info" size={13} /> Las actividades «sin definir» son anteriores a este dato: edítelas para elegir su conexión. <Link to={`${ruta("lista")}?oficina=${encodeURIComponent(oficina.id)}&pdi=sin_definir`} state={DESDE_MODULO}>Verlas en la lista</Link>.</p> : null}
+            </section>
+          ) : null}
+          {gestor ? <ColaPorValidar oficinaId={oficina.id} titulo="Por validar en esta oficina" nivel={3} /> : null}
           <div className="ps-dos">
             <section className="ps-bloque">
               <h3>Actividades por estado</h3>

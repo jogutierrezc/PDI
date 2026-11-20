@@ -67,6 +67,11 @@ export interface PlanVista {
   nombre: string;
   anioIni: number;
   anioFin: number;
+  /** Fase 3B: descripción, estado, alcance y oficina dueña. */
+  descripcion: string;
+  estado: "activo" | "archivado";
+  alcance: "institucional" | "oficina";
+  oficina: { id: string; nombre: string } | null;
   /** La versión que se muestra: la vigente (publicada) o, si no hay, el borrador. */
   version: VersionResumen | null;
 }
@@ -93,6 +98,8 @@ export interface CargaPlanificacion {
   planId: string;
   lineas: Linea[];
   nombreArchivo: string;
+  /** Oficina del plan, para un plan que aún no la tiene (`p_oficina`; solo el administrador). */
+  oficinaId?: string | null;
 }
 
 /* ---------- Años ---------- */
@@ -129,6 +136,7 @@ export const rotuloNivel: Record<PsNivel, string> = {
   colaborador: "Colaborador",
   gestor: "Gestor de oficina",
   aprobador: "Aprobador",
+  financiero: "Financiero (VAF)",
   admin: "Administrador de planeación",
 };
 

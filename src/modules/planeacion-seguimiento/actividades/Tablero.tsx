@@ -21,8 +21,9 @@ import { agrupar, type Columna } from "./filtros";
 import { useAsignar, useEquipo, useMoverActividad } from "./hooks";
 import { ROTULO_PODER, type Actividad, type EstadoAct, type Poder } from "./modelo";
 import { asentarTarjeta, devolverTarjeta } from "./movimientoAct";
-import { Avatar, Banner, ChecklistMini, ChipEstado, ChipPlazo, GlifoEstado, MenuMover, MensajeRechazo, PilaAvatares, PrioridadAct } from "./partes";
-import { avisoAsignacion, puedeMover, requiereNotaDevolucion } from "./reglas";
+import { Avatar, Banner, ChecklistMini, ChipEstado, ChipPlazo, GlifoEstado, MenuMover, MensajeRechazo, PilaAvatares, PrioridadAct, useIrAMovimiento } from "./partes";
+import { BarraAvance, ChipPdi } from "./partesF3";
+import { avisoAsignacion, puedeMover } from "./reglas";
 import { SinOficinas } from "./vacios";
 import { DEF_ESTADOS } from "./modelo";
 
@@ -44,6 +45,7 @@ export function Tablero() {
   const d = useDatosActividades();
   const { ruta, ir } = usePs();
   const mover = useMoverActividad();
+  const irA = useIrAMovimiento();
   const asignar = useAsignar();
   const equipoQ = useEquipo(d.f.alcance === "mi" ? (d.oficina?.id ?? null) : null);
   const [rechazo, setRechazo] = useState<string | null>(null);
@@ -167,12 +169,11 @@ export function Tablero() {
         devolverTarjeta(el);
         return setRechazo(dec.motivo);
       }
-      if (requiereNotaDevolucion(act.estado, destino as EstadoAct)) {
-        // Devolver pide una nota: pantalla completa.
+      // Fase 3: devolver, reportar avance (colaborador o gestor → «En revisión»), revisar o cerrar (gestor → «Hecho») son pantallas completas.
+      if (irA(poder, act, destino as EstadoAct)) {
         devolverTarjeta(el);
-        return ir(`${ruta("devolver", act.id)}?a=${destino}`);
+        return;
       }
-      // FASE 3: al soltar en «En revisión» (colaborador) o «Hecho» (gestor) se abrirá el reporte de avance a pantalla completa.
       el.style.transform = "";
       asentar.current = { id: act.id, col: destino, rect };
       mover.mutate({ id: act.id, estado: destino as EstadoAct }, { onSuccess: () => setAnuncio(`«${act.titulo}» pasó a ${DEF_ESTADOS[destino as EstadoAct].nombre}.`), onError: (er) => { asentar.current = null; setRechazo((er as Error).message); } });
@@ -225,8 +226,8 @@ export function Tablero() {
       <div className="ps-permisos-nota" role="note">
         <Icon name="shield" size={15} />
         <p>
-          {poderAqui === "gestor" && <>Usted es <strong>gestor</strong> en {d.oficina?.nombre}: mueve cualquier actividad de la oficina, y pasar a «Hecho» lo hace usted directamente.</>}
-          {poderAqui === "colaborador" && <>Usted es <strong>colaborador</strong> en {d.oficina?.nombre}: mueve solo las actividades que tiene asignadas y solo hasta «En revisión».</>}
+          {poderAqui === "gestor" && <>Usted es <strong>gestor</strong> en {d.oficina?.nombre}: mueve cualquier actividad de la oficina; pasar a «Hecho» abre la revisión del avance o el cierre administrativo.</>}
+          {poderAqui === "colaborador" && <>Usted es <strong>colaborador</strong> en {d.oficina?.nombre}: mueve solo las actividades que tiene asignadas; pasar a «En revisión» abre el reporte de avance.</>}
           {poderAqui === "lector" && <>Usted es <strong>lector</strong> en {d.oficina?.nombre}: puede mirar el tablero, no moverlo.</>}
           {poderAqui === "ninguno" && <>No tiene permisos para operar en {d.oficina?.nombre}.</>}
           {poderAqui === null && <>Lo que puede mover depende de su permiso en la oficina de cada actividad.</>}
@@ -289,6 +290,10 @@ function Tarjeta({ a, d, mostrarEstado, arrastrable, detalle, onMover, onRechazo
       <div className="ps-tarjeta__fila">
         <PilaAvatares ids={a.asignados} personas={d.personas} />
         <ChecklistMini a={a} />
+      </div>
+      <div className="ps-tarjeta__fila ps-tarjeta__fila--av">
+        <BarraAvance avance={a.avance} compacta />
+        <ChipPdi pdi={a.pdi} />
       </div>
       <div className="ps-tarjeta__pie">
         {mostrarEstado ? <ChipEstado estado={a.estado} /> : <span />}

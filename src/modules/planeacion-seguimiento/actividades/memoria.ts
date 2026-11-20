@@ -13,7 +13,10 @@ import type { ConflictoCampus, PersonaRef, PsApiAct, ResultadoAccion, ResultadoC
 import type { Actividad, ActividadDetalle, AvisoPrevio, DatosActividad, EstadoAct, EventoActividad, LineaOficina, MiembroEquipo, OficinaVista, PapelOficina } from "./modelo";
 import { DEF_ESTADOS, cargaPorPersona } from "./modelo";
 import { avisoAsignacion, avisoTransferencia, requiereNotaDevolucion, poderEn, puedeAsignar, puedeCrear, puedeImportar, puedeMarcarChecklist, puedeMover, puedeTransferir, validarActividad, validarTransferencia } from "./reglas";
-import { HOY_DEMO, ID_YO, PERSONAS_DEMO, UNIDADES_DEMO, correoDemo, generarActividades, oficinaDeLinea, type PersonaSemilla } from "./semilla";
+import { CATALOGO_PDI_DEMO, HOY_DEMO, ID_YO, PERSONAS_DEMO, UNIDADES_DEMO, correoDemo, generarActividades, generarF3, oficinaDeLinea, type DatosF3, type PersonaSemilla } from "./semilla";
+import { SIN_AVANCE } from "./modeloF3";
+import { crearF3 } from "./memoriaF3";
+import { resolverSeleccion } from "./pdi";
 
 export interface OpcionesActividadesMemoria {
   nivel: PsNivel;
@@ -46,20 +49,20 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
   const nombreDe = (id: string) => (id === yoId ? YO_DEMO.nombre : PERSONAS_DEMO.find((p) => p.id === id)?.nombre ?? "Alguien");
   const correoDe = (id: string) => (id === yoId ? YO_DEMO.correo : correoDemo(nombreDe(id)));
 
-  let estado: Promise<{ acts: Actividad[]; eventos: Map<string, EventoActividad[]>; lineas: Linea[] }> | null = null;
+  let estado: Promise<{ acts: Actividad[]; eventos: Map<string, EventoActividad[]>; lineas: Linea[]; f3: DatosF3 }> | null = null;
   let contador = 0;
   const cargar = () =>
     (estado ??= (async () => {
       const lineas = await op.lineas();
       const g = generarActividades(lineas, personasBase, hoy, op.campus);
       contador = g.actividades.length;
-      return { acts: g.actividades, eventos: g.eventos, lineas };
+      return { acts: g.actividades, eventos: g.eventos, lineas, f3: generarF3(g.actividades, personasBase, hoy) };
     })());
 
   const papelEn = (oficinaId: string): PapelOficina | null => roleAt(unidades, miembros, yoId, oficinaId);
   const poderOf = (oficinaId: string) => poderEn(op.nivel, papelEn(oficinaId));
   // Contrato: lector y aprobador ven todas las oficinas (en lectura); gestor y colaborador, donde tienen pertenencia.
-  const visibles = () => unidades.filter((u) => op.nivel === "admin" || op.nivel === "lector" || op.nivel === "aprobador" || papelEn(u.id) !== null);
+  const visibles = () => unidades.filter((u) => op.nivel === "admin" || op.nivel === "lector" || op.nivel === "aprobador" || op.nivel === "financiero" || papelEn(u.id) !== null);
   const campusDe = new Map(PERSONAS_DEMO.filter((x) => x.campus).map((x) => [x.id, x.campus!]));
 
   const equipoDe = (oficinaId: string, todas: readonly Actividad[]): MiembroEquipo[] => {
@@ -93,14 +96,17 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
     const previa = d.id ? acts.find((x) => x.id === d.id) : undefined;
     const nuevosIds = d.asignados.filter((id) => !previa?.asignados.includes(id));
     // Editar solo suma responsables (contrato: quitar a alguien pide motivo y se hace con «Transferir»).
+    const pdi = resolverSeleccion(CATALOGO_PDI_DEMO, d.pdi);
     const base = { oficinaId: d.oficinaId, lineaNo: d.lineaNo, titulo: d.titulo.trim(), descripcion: d.descripcion.trim() || null, prioridad: d.prioridad, inicio: d.esHito ? null : d.inicio, fin: d.fin, esHito: d.esHito, campus: d.campus, asignados: [...new Set([...(previa?.asignados ?? []), ...d.asignados])] };
     let a: Actividad;
     if (previa) {
-      Object.assign(previa, base);
+      const cambioPdi = previa.pdi.conexion !== pdi.conexion || previa.pdi.items.map((i) => `${i.pillarId}|${i.lineaId}`).join() !== pdi.items.map((i) => `${i.pillarId}|${i.lineaId}`).join();
+      Object.assign(previa, base, { pdi });
       a = previa;
       await registrar(a, { tipo: "editada", detalle: "Se editó la actividad." });
+      if (cambioPdi) await registrar(a, { tipo: "pdi", detalle: pdi.conexion === "con_pdi" ? `Conectó la actividad con el PDI (${pdi.items.length} ${pdi.items.length === 1 ? "elemento" : "elementos"}).` : pdi.conexion === "sin_pdi" ? "Declaró la actividad sin conexión con el PDI." : "Dejó la conexión con el PDI sin definir." });
     } else {
-      a = { id: `a-${++contador}`, estado: "por_iniciar", checklist: [], creadaPor: yoId, creadaEn: new Date().toISOString(), demo: true, ...base };
+      a = { id: `a-${++contador}`, estado: "por_iniciar", checklist: [], creadaPor: yoId, creadaEn: new Date().toISOString(), demo: true, pdi, avance: { ...SIN_AVANCE }, ...base };
       acts.push(a);
       (await cargar()).eventos.set(a.id, [nuevoEvento(a, { tipo: "creada", detalle: "Se creó la actividad." })]);
     }
@@ -115,7 +121,17 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
     equipo: equipoDe(d.oficinaId, acts),
   });
 
+  const f3 = crearF3({
+    hoy, yoId, nivel: op.nivel, espera: op.espera,
+    estado: async () => cargar(),
+    poderOf, visible: (id) => visibles().some((u) => u.id === id), nombreDe,
+    oficinaNombre: (id) => unidades.find((u) => u.id === id)?.name ?? "Oficina",
+    papelDe: (p, o) => roleAt(unidades, miembros, p, o),
+    equipo: equipoDe, registrar,
+  });
+
   return {
+    ...f3,
     hoy,
     demo: true,
     async yo() { await op.espera(); return YO_DEMO; },
@@ -158,7 +174,12 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       await op.espera();
       const a = e.acts.find((x) => x.id === id);
       exigir(Boolean(a) && visibles().some((u) => u.id === a!.oficinaId), "Esa actividad no existe o no puede verla.");
-      return structuredClone({ actividad: a!, eventos: e.eventos.get(id) ?? [] });
+      return structuredClone({
+        actividad: a!, eventos: e.eventos.get(id) ?? [],
+        avances: e.f3.avances.filter((v) => v.actividadId === id).sort((p, q) => q.reportadoEn.localeCompare(p.reportadoEn)),
+        riesgos: e.f3.riesgos.filter((r) => r.actividadId === id).sort((p, q) => q.creadoEn.localeCompare(p.creadoEn)),
+        comentarios: (e.f3.comentarios.get(id) ?? []).slice().sort((p, q) => q.creadoEn.localeCompare(p.creadoEn)),
+      });
     },
     async guardarActividad(d, confirmarCampus = false) {
       const e = await cargar();
@@ -182,6 +203,11 @@ export function crearActividadesMemoria(op: OpcionesActividadesMemoria): PsApiAc
       const de = a!.estado;
       const devuelve = requiereNotaDevolucion(de, destino);
       if (devuelve) exigir(nota.trim().length >= 20, "Devolver una actividad pide una nota de al menos 20 caracteres.");
+      if (destino === "hecho") {
+        // Contrato F3: pasar a «Hecho» exige un avance validado; el gestor que quiere cerrar sin reporte usa «cerrar».
+        const hayValidado = e.f3.avances.some((v) => v.actividadId === a!.id && v.estado === "validado");
+        exigir(hayValidado, "Para dar por hecha una actividad sin avance validado use el cierre administrativo (queda auditado).");
+      }
       a!.estado = destino;
       await registrar(a!, { tipo: "estado", detalle: `${devuelve ? "La devolvió" : "Pasó"} de «${DEF_ESTADOS[de].nombre}» a «${DEF_ESTADOS[destino].nombre}».`, motivo: devuelve ? nota.trim() : null });
     },

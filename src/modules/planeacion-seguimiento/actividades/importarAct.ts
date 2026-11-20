@@ -15,6 +15,8 @@ import { baseDeEncabezado } from "../columnas";
 import { llano } from "../modelo";
 import { ACT_PROPIA, COLUMNAS_ACT, FORMATO_ACT, HOJA_ACTIVIDADES, HOJA_CONTROL_ACT, MARCA_EJEMPLO_ACT, MAX_ACTIVIDADES, MAX_RESPONSABLES, VERSION_FORMATO_ACT, colAct, type CampoAct } from "./columnasAct";
 import { PRIORIDADES_ACT, type DatosActividad, type MiembroEquipo } from "./modelo";
+import type { PilarCatalogo } from "./modeloF3";
+import { leerPdiExcel } from "./pdi";
 import { validarActividad } from "./reglas";
 
 export interface ActividadLeida {
@@ -42,6 +44,8 @@ export interface OpcionesActividades {
   lineas: readonly { no: string; nombre: string }[];
   equipo: readonly Pick<MiembroEquipo, "id" | "nombre" | "correo" | "asignable">[];
   campus: readonly string[];
+  /** Catálogo del PDI (`ps_pdi_catalogo`) para leer `pilar_pdi` y `linea_pdi`. Sin él, solo vale «Sin conexión». */
+  catalogoPdi?: readonly PilarCatalogo[];
 }
 
 const SI = new Set(["si", "s", "1", "verdadero", "true", "x"]);
@@ -175,6 +179,10 @@ export function analizarActividades(hojas: HojaCruda[], op: OpcionesActividades)
       else poner("error", "campus", `El campus «${campusTxt}» no existe en la lista de campus del portal. Elija uno de la lista: ${op.campus.join(", ")}.`);
     }
 
+    // Conexión con el PDI (obligatoria al importar): pdi, pilar_pdi, linea_pdi
+    const pdiLeido = leerPdiExcel(celda("pdi"), celda("pilar_pdi"), celda("linea_pdi"), op.catalogoPdi ?? []);
+    for (const er of pdiLeido.errores) poner("error", er.columna, er.mensaje);
+
     // Responsables (por correo, miembros de la oficina)
     const asignados: string[] = [];
     for (let i = 1; i <= MAX_RESPONSABLES; i++) {
@@ -192,7 +200,7 @@ export function analizarActividades(hojas: HojaCruda[], op: OpcionesActividades)
     // Las reglas del formulario sobre lo ya leído (sin repetir lo que ya se dijo de la misma columna).
     const datos: DatosActividad = {
       oficinaId: op.oficinaId, lineaNo, titulo, descripcion, inicio: esHito ? null : inicio, fin, esHito,
-      prioridad: (prioridad || "") as DatosActividad["prioridad"], campus, asignados,
+      prioridad: (prioridad || "") as DatosActividad["prioridad"], campus, asignados, pdi: pdiLeido.seleccion,
     };
     const colDeCampo: Record<string, CampoAct> = { "act-titulo": "titulo", "act-descripcion": "descripcion", "act-linea": "linea", "act-inicio": "inicio", "act-fin": "fin", "act-prioridad": "prioridad", "act-campus": "campus" };
     for (const e of validarActividad(datos, { lineas: op.lineas.map((l) => l.no), campus: op.campus, equipo: op.equipo })) {

@@ -1,0 +1,24 @@
+Regresar a los proyectos del plan
+Planeación y Seguimiento
+Proyectos del plan
+Enviar a evaluación
+Enviar v1.0 a evaluación VAF
+
+Se revisa el borrador, se publica la versión y se abre la evaluación financiera.
+
+Plan
+PDIFyT 2027-2035
+Proyectos
+75
+Monto solicitado
+$ 133.374 M
+
+El borrador cumple las mismas reglas de la carga Excel.
+
+Qué pasa al enviar
+La versión queda publicada y congelada: no se edita ni se borra.
+Se abre la evaluación de la VAF y se le avisa; los proyectos quedan «Sin evaluar» hasta que se aprueben o rechacen.
+La evaluación no bloquea a las oficinas: pueden planificar actividades mientras tanto.
+Entiendo que una versión publicada no se puede editar.
+Ahora no
+Enviar y publicar

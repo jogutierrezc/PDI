@@ -1,0 +1,249 @@
+/* =============================================================================
+   Exportar gráficas como imagen
+   ========================================================================== */
+
+.od-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--od-board);
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+}
+
+.od-export__icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  color: var(--od-board-muted);
+}
+
+.od-export__option {
+  min-width: 2.75rem;
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  color: var(--od-board-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.od-export__option:disabled {
+  color: var(--od-board-muted);
+  cursor: progress;
+}
+
+.od-export__option:focus-visible {
+  outline: 2px solid var(--od-signal);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-export__option:not(:disabled):hover {
+    color: var(--od-signal-text);
+    background: var(--od-board-raised);
+  }
+}
+
+.od-export__status {
+  padding: 0 var(--space-2);
+  color: var(--od-board-muted);
+  font-size: var(--text-2xs);
+}
+
+/* =============================================================================
+   Acción «CSV» por conjunto (CsvAction)
+   Misma voz que .od-export__option: rótulo de señalética, callada por defecto,
+   ámbar solo al señalarla. Sin relleno ni caja: el relleno ámbar es de la
+   acción principal de la página.
+   ========================================================================== */
+
+/* Pie del marco cuando hay CSV: la fuente a la izquierda, la acción a la derecha.
+   Si falta espacio, la acción baja a su propia línea, alineada a la derecha; lo
+   decide el ancho del marco, nunca el cambio de rótulo (el botón ya reserva el
+   del más largo). */
+.od-frame__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.od-frame__foot .od-frame__source {
+  flex: 1 1 16rem;
+  border-top: 0;
+}
+
+.od-frame__foot .od-csv {
+  margin-inline-start: auto;
+  padding-inline-end: var(--space-3);
+}
+
+.od-csv {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Las dos caras se apilan en la misma celda: la visible y, oculta, la del rótulo
+   más largo («Descargado»), que es la que da el ancho. La visible va pegada a
+   la derecha, donde termina el pie. */
+.od-csv__button {
+  display: inline-grid;
+  align-items: center;
+  justify-items: end;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  /* --ink-secondary y no --ink-muted: es texto, y tiene que llegar a 4,5:1 sobre el blanco. */
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color var(--dur-fast) ease;
+}
+
+.od-csv__face {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.od-csv__face--ghost {
+  visibility: hidden;
+}
+
+.od-csv__label {
+  display: inline-block;
+  min-width: 3.4ch; /* «CSV» y «…» miden lo mismo: el icono no se mueve mientras se prepara */
+}
+
+/* El destello ámbar del volteo (csv-motion.ts) */
+.od-csv__label[data-flap] {
+  color: var(--od-signal-text);
+}
+
+.od-csv__button:disabled {
+  cursor: progress;
+}
+
+.od-csv__button:focus-visible {
+  outline: 2px solid var(--od-signal);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-csv__button:not(:disabled):hover {
+    color: var(--od-signal-text);
+  }
+}
+
+/* Punteros gruesos: 44 px de alto de verdad. Un pseudo-elemento que sobresalga
+   no sirve: .od-frame recorta lo que se sale (overflow: hidden). */
+@media (pointer: coarse) {
+  .od-csv__button {
+    min-block-size: 44px;
+    min-inline-size: 44px;
+  }
+}
+
+/* Estado: se lee en voz alta siempre; solo se ve cuando algo falló. */
+.od-csv__status {
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+}
+
+.od-csv__status[data-state="quiet"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Sin marco: la acción sola, alineada a la derecha al final de un bloque. */
+.od-csv--block {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: var(--space-2);
+}
+
+/* Al imprimir tampoco: un botón no dice nada en papel. Y el pie que solo lo
+   tenía a él (sin fuente) se va entero: si no, queda una franja vacía con su línea. */
+@media print {
+  .od-csv { display: none; }
+  .od-frame__foot[data-export-ignore] { display: none; }
+}
+
+/* Sello de las filas del selector (csv-motion.ts · sellarFilas): un barrido ámbar
+   de izquierda a derecha, que se desvanece. Solo transform y opacity. */
+.od-pick__row[data-sealing] {
+  position: relative;
+}
+
+.od-pick__row[data-sealing]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--od-signal) 28%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  transform: scaleX(var(--od-pick-seal, 0));
+  transform-origin: left center;
+  opacity: calc(1 - var(--od-pick-fade, 0));
+}
+
+/* Sello de procedencia: solo aparece en la imagen exportada. */
+.od-frame__stamp {
+  display: none;
+}
+
+.od-frame[data-exporting] .od-frame__stamp {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  color: var(--od-board-muted);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+/* Lo que no sale en la imagen se oculta antes de medir: si solo se quitara de la
+   copia, las rejillas conservarían sus filas y el contenido se montaría. */
+.od-frame[data-exporting] [data-export-ignore] {
+  display: none !important;
+}
+
+/* En la captura, los marcos desplazables se abren y nada se anima a medias. */
+.od-frame[data-exporting] :is(.od-combo__scroll, .od-table-wrap, [class*="__scroll"]) {
+  overflow: visible !important;
+}
+
+.od-frame[data-exporting] *,
+.od-frame[data-exporting] *::before,
+.od-frame[data-exporting] *::after {
+  animation-delay: 0s !important;
+  animation-duration: 0s !important;
+  transition: none !important;
+}

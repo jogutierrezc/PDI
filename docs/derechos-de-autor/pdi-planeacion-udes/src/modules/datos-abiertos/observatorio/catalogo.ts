@@ -1,0 +1,147 @@
+/* =============================================================================
+   Observatorio público · el catálogo de temas (O2).
+
+   La portada de siempre sigue con la constante OBS_TOPICS (data.ts). Cuando la
+   base tiene observatorios publicados (migraciones 0230–0233), lo que el taller
+   organiza se superpone sin cambiar el aspecto:
+
+     · Observatorio PRINCIPAL: los catorce temas de siempre en su orden, con el
+       nombre, código, resumen, pregunta y fuente que tengan en la base; un tema
+       archivado o movido a otro observatorio sale; los temas nuevos publicados
+       se añaden al final.
+     · Otro observatorio: sus temas publicados y no archivados, por línea.
+
+   Sin migración, sin observatorios publicados o con error de lectura, el
+   catálogo es la constante tal cual: misma lista, mismos datos.
+   ========================================================================== */
+
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "../../../lib/supabase";
+import { useObservatoriosPublicos } from "../../admin/observatorio/publicar/api";
+import type { Linea, Observatorio } from "../../admin/observatorio/publicar/api";
+import { OBS_TOPICS } from "./data";
+import type { ObsTopic } from "./data";
+
+export interface TemaPublico extends ObsTopic {
+  /** Observatorio al que pertenece (null: la constante, sin base). */
+  obsId: string | null;
+  lineaId: string | null;
+  /** Color propio del tema (0248); null: el de su línea. */
+  color: string | null;
+  /** Icono propio del tema (0248); null: el que le toque por defecto. */
+  icono: string | null;
+  /** Foto del tablero (0251); null: color sólido. */
+  imagenUrl: string | null;
+  /** Intensidad y alcance del degradado sobre la foto, y su encuadre (0–100). */
+  degradado: number;
+  alcance: number;
+  encuadreX: number;
+  encuadreY: number;
+  /** Tema nuevo de la base: no tiene cifras de ejemplo, solo lo que publique. */
+  vacio: boolean;
+}
+
+interface FilaTema { slug: string; observatorio_id: string; linea_id: string | null; codigo: string | null; nombre: string | null; resumen: string | null; pregunta: string | null; fuente: string | null; orden: number; archivado: boolean; color?: string | null; icono?: string | null; imagen_url?: string | null; degradado?: number | null; alcance?: number | null; encuadre_x?: number | null; encuadre_y?: number | null }
+
+const APARIENCIA_BASE = { icono: null, imagenUrl: null, degradado: 92, alcance: 62, encuadreX: 50, encuadreY: 50 } as const;
+
+const ESTATICOS = new Map(OBS_TOPICS.map((t) => [t.slug, t]));
+const estaticoComoTema = (t: ObsTopic): TemaPublico => ({ ...t, obsId: null, lineaId: null, color: null, ...APARIENCIA_BASE, vacio: false });
+
+function useTemasPublicos() {
+  return useQuery({
+    queryKey: ["obs-temas-publicos"],
+    staleTime: 60_000,
+    queryFn: async (): Promise<FilaTema[]> => {
+      const columnas = "slug,observatorio_id,linea_id,codigo,nombre,resumen,pregunta,fuente,orden,archivado";
+      const conImagen = await supabase.from("obs_topics").select(`${columnas},color,icono,imagen_url,degradado,alcance,encuadre_x,encuadre_y`).eq("status", "publicado");
+      // Antes de la migración 0251 no existen las columnas de imagen: se lee sin ellas (tablero de color sólido).
+      const conColor = conImagen.error ? await supabase.from("obs_topics").select(`${columnas},color,icono`).eq("status", "publicado") : conImagen;
+      // Antes de la migración 0248 no existen color ni icono: se lee sin ellos.
+      const r = conColor.error ? await supabase.from("obs_topics").select(columnas).eq("status", "publicado") : conColor;
+      return r.error ? [] : (r.data as unknown as FilaTema[]);
+    },
+  });
+}
+
+function aTema(fila: FilaTema, lineas: Linea[], indice: number): TemaPublico {
+  const base = ESTATICOS.get(fila.slug);
+  const linea = lineas.find((l) => l.id === fila.linea_id);
+  const nombre = fila.nombre?.trim() || base?.name || fila.slug;
+  const sinDatos: Pick<ObsTopic, "headline" | "series" | "share" | "table"> = {
+    headline: { label: "", value: 0, unit: "" },
+    series: { title: "", unit: "", points: [] },
+    share: { title: "", unit: "", items: [] },
+    table: { title: "", columns: [], rows: [] },
+  };
+  return {
+    ...(base ?? sinDatos),
+    slug: fila.slug,
+    code: fila.codigo?.trim() || base?.code || nombre.slice(0, 2).toUpperCase(),
+    name: nombre,
+    summary: fila.resumen?.trim() || base?.summary || fila.pregunta?.trim() || "",
+    question: fila.pregunta?.trim() || base?.question || `¿Qué muestra ${nombre}?`,
+    source: fila.fuente?.trim() || base?.source || "",
+    line: linea?.numero ?? base?.line ?? (indice % 11) + 1,
+    obsId: fila.observatorio_id,
+    lineaId: fila.linea_id,
+    color: fila.color ?? null,
+    icono: fila.icono ?? null,
+    imagenUrl: fila.imagen_url?.trim() || null,
+    degradado: fila.degradado ?? APARIENCIA_BASE.degradado,
+    alcance: fila.alcance ?? APARIENCIA_BASE.alcance,
+    encuadreX: fila.encuadre_x ?? APARIENCIA_BASE.encuadreX,
+    encuadreY: fila.encuadre_y ?? APARIENCIA_BASE.encuadreY,
+    vacio: !base,
+  };
+}
+
+export function useCatalogo() {
+  const obs = useObservatoriosPublicos();
+  const filas = useTemasPublicos();
+  return useMemo(() => {
+    const observatorios: Observatorio[] = obs.data?.observatorios ?? [];
+    const lineas: Linea[] = obs.data?.lineas ?? [];
+    const rows = filas.data ?? [];
+    const principal = observatorios.find((o) => o.principal);
+    const porSlug = new Map(rows.map((r) => [r.slug, r]));
+    const porObs = new Map<string, TemaPublico[]>();
+
+    for (const o of observatorios) {
+      const propias = rows.filter((r) => r.observatorio_id === o.id && !r.archivado);
+      const lista: TemaPublico[] = [];
+      if (o.principal) {
+        for (const t of OBS_TOPICS) {
+          const fila = porSlug.get(t.slug);
+          if (!fila) lista.push({ ...estaticoComoTema(t), obsId: o.id });
+          else if (fila.observatorio_id === o.id && !fila.archivado) lista.push(aTema(fila, lineas, lista.length));
+        }
+        for (const f of propias.filter((r) => !ESTATICOS.has(r.slug)).sort((a, b) => a.orden - b.orden)) lista.push(aTema(f, lineas, lista.length));
+      } else {
+        const orden = new Map(lineas.filter((l) => l.observatorio_id === o.id).map((l) => [l.id, l.orden]));
+        for (const f of [...propias].sort((a, b) => (orden.get(a.linea_id ?? "") ?? 999) - (orden.get(b.linea_id ?? "") ?? 999) || a.orden - b.orden)) lista.push(aTema(f, lineas, lista.length));
+      }
+      porObs.set(o.id, lista);
+    }
+
+    const delPrincipal = principal ? porObs.get(principal.id) : undefined;
+    const lista = delPrincipal && delPrincipal.length > 0 ? delPrincipal : OBS_TOPICS.map(estaticoComoTema);
+    const todos = new Map<string, TemaPublico>();
+    for (const l of porObs.values()) for (const t of l) todos.set(t.slug, t);
+    for (const t of OBS_TOPICS) if (!todos.has(t.slug) && !porSlug.get(t.slug)?.archivado) todos.set(t.slug, estaticoComoTema(t));
+
+    return {
+      /** Los temas del observatorio principal (o la constante). */
+      principal: lista,
+      porObs,
+      observatorios,
+      lineas,
+      /** Un tema por su enlace, de cualquier observatorio publicado. */
+      buscar: (slug: string | undefined) => (slug ? todos.get(slug) : undefined),
+      /** La lista (con orden) a la que pertenece un tema: la de su observatorio. */
+      listaDe: (t: TemaPublico) => (t.obsId ? porObs.get(t.obsId) ?? lista : lista),
+      cargando: obs.isPending || filas.isPending,
+    };
+  }, [obs.data, obs.isPending, filas.data, filas.isPending]);
+}

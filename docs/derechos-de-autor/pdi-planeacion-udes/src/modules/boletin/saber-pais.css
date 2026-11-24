@@ -1,0 +1,60 @@
+/* =============================================================================
+   Boletín · Saber PRO frente al país (saber-pais.tsx).
+   Milímetros y la paleta fija del papel: --bol-div-* (azul sobre el país,
+   terracota bajo el país). Sin movimiento.
+   ========================================================================== */
+
+.bol-pais__figure { margin: 0 0 2.5mm; }
+
+.bol-pais__figure figcaption {
+  margin-bottom: 1mm;
+  color: var(--bol-ink-2);
+  font-size: 2.4mm;
+}
+
+.bol-pais__band,
+.bol-pais__evo {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.bol-pais__band { margin: 0 0 1.5mm; }
+
+.bol-pais__name { fill: var(--bol-ink-2); font-size: 2.3px; }
+.bol-pais__name--strong { fill: var(--bol-navy); font-weight: 800; }
+
+.bol-pais__ghost {
+  stroke: var(--bol-ink);
+  stroke-width: 0.35;
+  stroke-dasharray: 0.7 0.5;
+}
+
+.bol-pais__dot {
+  fill: var(--bol-navy);
+  stroke: #ffffff;
+  stroke-width: 0.3;
+}
+
+.bol-pais__dot[data-few] {
+  fill: #ffffff;
+  stroke: var(--bol-navy);
+  stroke-width: 0.4;
+}
+
+.bol-pais__gap { fill: var(--bol-ink-2); font-size: 2.3px; font-weight: 700; }
+.bol-pais__gap[data-few] { font-style: italic; font-weight: 600; }
+
+.bol-pais__hatch { stroke: var(--bol-ink-3); stroke-width: 0.25; opacity: 0.5; }
+
+.bol-pais__line { stroke: var(--bol-ink-3); stroke-width: 0.3; opacity: 0.8; stroke-linejoin: round; }
+.bol-pais__line--focus { stroke: var(--bol-navy); stroke-width: 0.7; opacity: 1; stroke-linecap: round; }
+.bol-pais__zero { stroke: var(--bol-ink); stroke-width: 0.4; }
+
+.bol-pais__close {
+  margin: 0 0 2.5mm;
+  color: var(--bol-ink-2);
+  font-size: 2.4mm;
+  line-height: 1.35;
+}
+
+.bol-pais__close b { color: var(--bol-navy); }

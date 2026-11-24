@@ -1,0 +1,285 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0 
+Financiero: En revisión de la VAF
+
+Todos los planes
+Financiación y presupuesto
+
+La VAF evalúa lo financiero de cada plan y vigila el presupuesto y su ejecución. La evaluación no bloquea a las oficinas: pueden crear actividades y reportar avances mientras tanto. Usted evalúa y registra.
+
+Por evaluar
+Solicitado vs aprobado
+Presupuesto
+Alertas
+Configuración
+Solicitado vs aprobado · PDIFyT 2027-2035
+
+Lo que pidieron las oficinas frente a lo que aprobó la VAF, proyecto por proyecto. Un proyecto sin evaluar todavía no suma a lo aprobado.
+
+Solicitado
+$ 133.374 M
+75 proyectos · lo que pidieron las oficinas
+Aprobado
+$ 78.036 M
+63 proyectos · 59 % de lo solicitado
+Rechazado
+$ 0 M
+0 proyectos · monto que se había solicitado
+Sin evaluar
+$ 55.337 M
+12 proyectos · esperan a la VAF
+
+Solicitado
+Aprobado
+
+Por pilar
+P2 · Ambiente tecnológico · 27
+Solicitado $ 29.331 M
+Aprobado $ 25.305 M
+P3 · Entorno emprendedor · 1
+Solicitado $ 3.000 M
+Aprobado $ 3.000 M
+P4 · Gobernanza para el buen gobierno · 44
+Solicitado $ 92.646 M
+Aprobado $ 41.334 M
+P6 · Apropiación social · 3
+Solicitado $ 8.397 M
+Aprobado $ 8.397 M
+Por campus
+Bucaramanga · 37
+Solicitado $ 72.530 M
+Aprobado $ 22.635 M
+Valledupar · 16
+Solicitado $ 26.844 M
+Aprobado $ 22.313 M
+Todos los campus · 8
+Solicitado $ 24.466 M
+Aprobado $ 24.466 M
+Cúcuta · 14
+Solicitado $ 9.533 M
+Aprobado $ 8.621 M
+Por oficina
+Sin oficina · 75
+Solicitado $ 133.374 M
+Aprobado $ 78.036 M
+Por año
+
+Solo proyectos aprobados: son los que traen distribución anual.
+
+2027 · 46
+Solicitado $ 15.969 M
+Aprobado $ 15.969 M
+2028 · 44
+Solicitado $ 12.120 M
+Aprobado $ 12.120 M
+2029 · 40
+Solicitado $ 16.225 M
+Aprobado $ 16.225 M
+2030 · 31
+Solicitado $ 8.078 M
+Aprobado $ 8.078 M
+2031 · 33
+Solicitado $ 8.692 M
+Aprobado $ 8.692 M
+2032 · 31
+Solicitado $ 6.958 M
+Aprobado $ 6.958 M
+2033 · 29
+Solicitado $ 3.709 M
+Aprobado $ 3.709 M
+2034 · 26
+Solicitado $ 3.200 M
+Aprobado $ 3.200 M
+2035 · 26
+Solicitado $ 3.073 M
+Aprobado $ 3.073 M
+Proyectos (75)
+Buscar un proyecto
+Estado
+Todos
+Sin evaluar
+Aprobado
+Rechazado
+Proyectos con el monto solicitado, el aprobado y la diferencia
+Proyecto	Estado	Solicitado	Aprobado	Diferencia
+#1 Infraestructura para la docencia	
+Aprobado	$ 6.971 M	$ 6.971 M	$ 0 M
+#2 Infraestructura de usuario final	
+Aprobado	$ 6.381 M	$ 6.381 M	$ 0 M
+#3 Servicios tecnológicos	
+Aprobado	$ 5.421 M	$ 5.421 M	$ 0 M
+#4 IA, analítica, datos y tecnologías emergentes	
+Aprobado	$ 2.211 M	$ 2.211 M	$ 0 M
+#5 Procesamiento y almacenamiento	
+Aprobado	$ 1.111 M	$ 1.111 M	$ 0 M
+#6 Redes y conectividad	
+Aprobado	$ 343 M	$ 343 M	$ 0 M
+#7 Seguridad de la infraestructura tecnológica	
+Aprobado	$ 565 M	$ 565 M	$ 0 M
+#8 Plataformas institucionales	
+Aprobado	$ 1.459 M	$ 1.459 M	$ 0 M
+#9 Computación de alto rendimiento	
+Sin evaluar	$ 1.845 M	—	
+Sin evaluar
+—
+#10 Observatorio de tendencias y vigilancia tecnológica	
+Sin evaluar	$ 2.150 M	—	
+Sin evaluar
+—
+#11 Remodelación Clínica	
+Aprobado	$ 350 M	$ 350 M	$ 0 M
+#12 Adecuación sala de juegos + materiales didácticos	
+Aprobado	$ 7 M	$ 7 M	$ 0 M
+#13 Actualización y reubicación cabina de radio + equipos audiovisuales	
+Aprobado	$ 30 M	$ 30 M	$ 0 M
+#14 Gestión de disponibilidad de oficinas	
+Aprobado	$ 10 M	$ 10 M	$ 0 M
+#15 Adecuación consultorio empresarial + recursos bibliográficos	
+Aprobado	$ 15 M	$ 15 M	$ 0 M
+#16 Modernización agencia Élite Inhouse + equipos MAC + software	
+Aprobado	$ 30 M	$ 30 M	$ 0 M
+#17 Gestionar espacio físico para laboratorios AVD y Estimulación Sensorial	
+Aprobado	$ 150 M	$ 150 M	$ 0 M
+#18 Adecuación de múltiples laboratorios	
+Aprobado	$ 382 M	$ 382 M	$ 0 M
+#19 Adecuaciones locativas de salones	
+Aprobado	$ 700 M	$ 700 M	$ 0 M
+#20 Adecuación de instalaciones + equipos	
+Aprobado	$ 60 M	$ 60 M	$ 0 M
+#21 Renovación de laboratorios de habla, voz, audición y lenguaje	
+Aprobado	$ 150 M	$ 150 M	$ 0 M
+#22 Actualización de laboratorios de Análisis del Movimiento	
+Aprobado	$ 12 M	$ 12 M	$ 0 M
+#23 Mantenimiento laboratorio simulación + adecuación espacios profesores	
+Aprobado	$ 58 M	$ 58 M	$ 0 M
+#24 Infraestructura académica con aulas activas y laboratorios flexibles, preparada	
+Aprobado	$ 8.000 M	$ 8.000 M	$ 0 M
+#25 Conexión vial estratégica entre parqueaderos, zonas deportivas y equipamientos i	
+Aprobado	$ 2.500 M	$ 2.500 M	$ 0 M
+#26 Conexión directa entre el campus académico y las zonas deportivas y culturales	
+Aprobado	$ 1.500 M	$ 1.500 M	$ 0 M
+#27 Reingeniería del ingreso institucional con mayor seguridad y eficiencia operativ	
+Sin evaluar	$ 3.500 M	—	
+Sin evaluar
+—
+#28 Escenario multipropósito para eventos académicos y culturales de gran formato	
+Sin evaluar	$ 20.000 M	—	
+Sin evaluar
+—
+#29 Equipamiento deportivo y cultural de aforo masivo y uso multifuncional	
+Sin evaluar	$ 10.000 M	—	
+Sin evaluar
+—
+#30 Alojamiento con ambientes de estudio, conectividad y servicios complementarios	
+Sin evaluar	$ 12.000 M	—	
+Sin evaluar
+—
+#31 Centro de Desarrollo Tecnológico consolidado en 2025 (Acuerdo 009), orientado	
+Aprobado	$ 3.000 M	$ 3.000 M	$ 0 M
+#32 Reposición de redes de media tensión y sistema de medida	
+Aprobado	$ 350 M	$ 350 M	$ 0 M
+#33 Reposición de redes hidraulicas	
+Aprobado	$ 300 M	$ 300 M	$ 0 M
+#34 Implementación de redes contraincendio generales	
+Aprobado	$ 550 M	$ 550 M	$ 0 M
+#35 Reposición de equipos de transporte vertical	
+Sin evaluar	$ 400 M	—	
+Sin evaluar
+—
+#36 Instalación de aire acondicionado aulas chibcha	
+Aprobado	$ 1.100 M	$ 1.100 M	$ 0 M
+#37 Actualización arquitectónica de fachadas de salones chibcha	
+Aprobado	$ 600 M	$ 600 M	$ 0 M
+#38 Reposición de pisos y cielo raso aulas	
+Aprobado	$ 600 M	$ 600 M	$ 0 M
+#39 Reposición de equipos de climatización	
+Aprobado	$ 450 M	$ 450 M	$ 0 M
+#40 Actualización arquitectonica de la biblioteca	
+Aprobado	$ 400 M	$ 400 M	$ 0 M
+#41 Actualizaciones estructurales ( Vulnerabilidad sísmica y diseños de reforzamient	
+Aprobado	$ 400 M	$ 400 M	$ 0 M
+#42 Expansión de los sistemas solares Fotovoltaicos	
+Aprobado	$ 600 M	$ 600 M	$ 0 M
+#43 Adecuación del laboratorio	
+Aprobado	$ 135 M	$ 135 M	$ 0 M
+#44 Garantizar recursos físicos y tecnológicos	
+Sin evaluar	$ 522 M	—	
+Sin evaluar
+—
+#45 Plan prospectivo de internacionalización	
+Sin evaluar	$ 389 M	—	
+Sin evaluar
+—
+#46 Mantenimiento, dotación y modernización de laboratorios	
+Aprobado	$ 29 M	$ 29 M	$ 0 M
+#47 Adecuar puestos de trabajo	
+Aprobado	$ 6,6 M	$ 6,6 M	$ 0 M
+#48 Renovación del borde institucional para reforzar identidad, iluminación y acceso	
+Aprobado	$ 600 M	$ 600 M	$ 0 M
+#49 Optimización de flujos, señalización e infraestructura vial interna	
+Aprobado	$ 350 M	$ 350 M	$ 0 M
+#50 Construcción de subestación y planta de emergencia sede Bari	
+Aprobado	$ 550 M	$ 550 M	$ 0 M
+#51 Adecuaciones de oficinas de la sede Bari y consolidación del área adminsitrativa	
+Aprobado	$ 4.800 M	$ 4.800 M	$ 0 M
+#52 Reposición de sistema de climatización bloque Arhuaco	
+Aprobado	$ 600 M	$ 600 M	$ 0 M
+#53 Instalación de respaldo energético de la sede principal	
+Aprobado	$ 400 M	$ 400 M	$ 0 M
+#54 Construcción de estructura e Instalación de equipo ascensor para el bloque motil	
+Aprobado	$ 450 M	$ 450 M	$ 0 M
+#55 Ampliación sistema contraincendios	
+Aprobado	$ 300 M	$ 300 M	$ 0 M
+#56 Expansión de sistemas solares fotovoltaicos	
+Aprobado	$ 400 M	$ 400 M	$ 0 M
+#57 Elaborar plan estratégico para laboratorio de simulación	
+Aprobado	$ 8,1 M	$ 8,1 M	$ 0 M
+#58 Garantizar disponibilidad de espacios físicos y dotación	
+Aprobado	$ 15 M	$ 15 M	$ 0 M
+#59 Adecuación espacios grandes animales	
+Aprobado	$ 9,8 M	$ 9,8 M	$ 0 M
+#60 Socializar infraestructura disponible y ajustes razonables	
+Sin evaluar	$ 9,1 M	—	
+Sin evaluar
+—
+#61 Socializar infraestructura existente	
+Sin evaluar	$ 21 M	—	
+Sin evaluar
+—
+#62 Construcción de nuevo bloque académico-administrativo	
+Sin evaluar	$ 4.500 M	—	
+Sin evaluar
+—
+#63 Compra de predio para expansión futura del campus	
+Aprobado	$ 1.500 M	$ 1.500 M	$ 0 M
+#64 Compra predio de centro de conciliación	
+Aprobado	$ 1.500 M	$ 1.500 M	$ 0 M
+#65 Compra predio de la clínica veterinaria	
+Aprobado	$ 1.500 M	$ 1.500 M	$ 0 M
+#66 Sistema de respaldo eléctrico para sede Kankuamo	
+Aprobado	$ 350 M	$ 350 M	$ 0 M
+#67 Sistema de transporte vertical para bloque Kankuamo	
+Aprobado	$ 380 M	$ 380 M	$ 0 M
+#68 Restauración fachada Kankuamo	
+Aprobado	$ 150 M	$ 150 M	$ 0 M
+#69 Construcción en lote contiguo a la casona	
+Aprobado	$ 3.500 M	$ 3.500 M	$ 0 M
+#70 Construcción Facultad ciencias de la salud en San Vicente	
+Aprobado	$ 9.500 M	$ 9.500 M	$ 0 M
+#71 Espacio de prácticas Finca de Veterinaria	
+Aprobado	$ 3.500 M	$ 3.500 M	$ 0 M
+#72 Expansión de sistemas solares fotovoltaicos	
+Aprobado	$ 400 M	$ 400 M	$ 0 M
+#73 Seguridad física y campus	
+Aprobado	$ 80 M	$ 80 M	$ 0 M
+#74 Seguridad física y campus	
+Aprobado	$ 110 M	$ 110 M	$ 0 M
+#75 Seguridad física y campus	
+Aprobado	$ 140 M	$ 140 M	$ 0 M
+
+Ver todos los planes

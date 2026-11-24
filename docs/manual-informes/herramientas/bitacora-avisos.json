@@ -1,0 +1,514 @@
+{
+ "vacio": {
+  "avisos": [
+   "«01 Resumen ejecutivo»: no hay texto para importar.",
+   "«03 Objetivos y metas 2026»: 2 filas de ejemplo se omitieron.",
+   "«04 Criterios», fila 5: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 6: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 7: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 8: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 9: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 10: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 11: falta «¿Reporta aquí?».",
+   "«04 Resultados por dimensión est»: 2 filas de ejemplo se omitieron.",
+   "«06 Puntos críticos y acciones d», fila 5: falta «Punto crítico» y «Acción» y «Tiempo».",
+   "«06 Puntos críticos y acciones d», fila 6: falta «Punto crítico» y «Acción» y «Tiempo».",
+   "«07 Logros destacados»: una fila de ejemplo se omitió.",
+   "«09 Conclusiones»: no hay texto para importar."
+  ],
+  "totales": {
+   "listas": 0,
+   "conAviso": 9,
+   "sinImportar": 8
+  },
+  "resumen": "2 filas agregadas al final en 5 secciones.",
+  "hojas": 11,
+  "secciones": [
+   "s2",
+   "s3",
+   "s4",
+   "s6",
+   "s7"
+  ],
+  "contenidos": {
+   "s2": {
+    "alineacion": [],
+    "pilares": []
+   },
+   "s3": {
+    "metas": []
+   },
+   "s4": {
+    "criterios_reporta": [],
+    "indicadores": []
+   },
+   "s6": {
+    "filas": [
+     [
+      "Extensión",
+      "",
+      "",
+      "",
+      ""
+     ],
+     [
+      "Internacionalización",
+      "",
+      "",
+      "",
+      ""
+     ]
+    ]
+   },
+   "s7": {
+    "logros": []
+   }
+  }
+ },
+ "lleno_agregar": {
+  "resumen": "29 filas agregadas al final en 7 secciones.",
+  "totales": {
+   "listas": 30,
+   "conAviso": 0,
+   "sinImportar": 11
+  },
+  "secciones": [
+   {
+    "t": "Resumen ejecutivo",
+    "ag": 1,
+    "comp": 0,
+    "om": 0,
+    "li": 1
+   },
+   {
+    "t": "Alineación estratégica con el PDI",
+    "ag": 3,
+    "comp": 0,
+    "om": 0,
+    "li": 3
+   },
+   {
+    "t": "Objetivos y metas 2026",
+    "ag": 3,
+    "comp": 0,
+    "om": 0,
+    "li": 3
+   },
+   {
+    "t": "Resultados por dimensión estratégica",
+    "ag": 17,
+    "comp": 0,
+    "om": 0,
+    "li": 17
+   },
+   {
+    "t": "Puntos críticos y acciones de mejora",
+    "ag": 2,
+    "comp": 0,
+    "om": 0,
+    "li": 2
+   },
+   {
+    "t": "Logros destacados",
+    "ag": 2,
+    "comp": 0,
+    "om": 0,
+    "li": 2
+   },
+   {
+    "t": "Evidencias y fuentes de verificación",
+    "ag": 0,
+    "comp": 0,
+    "om": 1,
+    "li": 1
+   },
+   {
+    "t": "Conclusiones",
+    "ag": 1,
+    "comp": 0,
+    "om": 0,
+    "li": 1
+   }
+  ]
+ },
+ "lleno_vacios": {
+  "resumen": "29 filas puestas donde faltaban en 7 secciones.",
+  "totales": {
+   "listas": 30,
+   "conAviso": 0,
+   "sinImportar": 11
+  },
+  "secciones": [
+   {
+    "t": "Resumen ejecutivo",
+    "ag": 1,
+    "comp": 0,
+    "om": 0,
+    "li": 1
+   },
+   {
+    "t": "Alineación estratégica con el PDI",
+    "ag": 3,
+    "comp": 0,
+    "om": 0,
+    "li": 3
+   },
+   {
+    "t": "Objetivos y metas 2026",
+    "ag": 3,
+    "comp": 0,
+    "om": 0,
+    "li": 3
+   },
+   {
+    "t": "Resultados por dimensión estratégica",
+    "ag": 17,
+    "comp": 0,
+    "om": 0,
+    "li": 17
+   },
+   {
+    "t": "Puntos críticos y acciones de mejora",
+    "ag": 2,
+    "comp": 0,
+    "om": 0,
+    "li": 2
+   },
+   {
+    "t": "Logros destacados",
+    "ag": 2,
+    "comp": 0,
+    "om": 0,
+    "li": 2
+   },
+   {
+    "t": "Evidencias y fuentes de verificación",
+    "ag": 0,
+    "comp": 0,
+    "om": 1,
+    "li": 1
+   },
+   {
+    "t": "Conclusiones",
+    "ag": 1,
+    "comp": 0,
+    "om": 0,
+    "li": 1
+   }
+  ]
+ },
+ "lleno_reemplazar": {
+  "resumen": "29 filas en lugar de lo anterior en 7 secciones.",
+  "totales": {
+   "listas": 30,
+   "conAviso": 0,
+   "sinImportar": 11
+  },
+  "secciones": [
+   {
+    "t": "Resumen ejecutivo",
+    "ag": 1,
+    "comp": 0,
+    "om": 0,
+    "li": 1
+   },
+   {
+    "t": "Alineación estratégica con el PDI",
+    "ag": 3,
+    "comp": 0,
+    "om": 0,
+    "li": 3
+   },
+   {
+    "t": "Objetivos y metas 2026",
+    "ag": 3,
+    "comp": 0,
+    "om": 0,
+    "li": 3
+   },
+   {
+    "t": "Resultados por dimensión estratégica",
+    "ag": 17,
+    "comp": 0,
+    "om": 0,
+    "li": 17
+   },
+   {
+    "t": "Puntos críticos y acciones de mejora",
+    "ag": 2,
+    "comp": 0,
+    "om": 0,
+    "li": 2
+   },
+   {
+    "t": "Logros destacados",
+    "ag": 2,
+    "comp": 0,
+    "om": 0,
+    "li": 2
+   },
+   {
+    "t": "Evidencias y fuentes de verificación",
+    "ag": 0,
+    "comp": 0,
+    "om": 1,
+    "li": 1
+   },
+   {
+    "t": "Conclusiones",
+    "ag": 1,
+    "comp": 0,
+    "om": 0,
+    "li": 1
+   }
+  ]
+ },
+ "lleno_sobre_lleno": {
+  "resumen": "0 filas agregadas al final en 1 sección.",
+  "secciones": [
+   {
+    "t": "Resumen ejecutivo",
+    "ag": 0,
+    "om": 1
+   },
+   {
+    "t": "Alineación estratégica con el PDI",
+    "ag": 0,
+    "om": 3
+   },
+   {
+    "t": "Objetivos y metas 2026",
+    "ag": 0,
+    "om": 3
+   },
+   {
+    "t": "Resultados por dimensión estratégica",
+    "ag": 0,
+    "om": 10
+   },
+   {
+    "t": "Puntos críticos y acciones de mejora",
+    "ag": 0,
+    "om": 2
+   },
+   {
+    "t": "Logros destacados",
+    "ag": 0,
+    "om": 2
+   },
+   {
+    "t": "Evidencias y fuentes de verificación",
+    "ag": 0,
+    "om": 1
+   },
+   {
+    "t": "Conclusiones",
+    "ag": 0,
+    "om": 1
+   }
+  ]
+ },
+ "equipo_Informe_Gestion_2026_A_coordinacion-de-extension.xlsx": {
+  "hojas": [
+   "07 Logros destacados"
+  ],
+  "equipo": "Coordinación de extensión",
+  "avisos": [
+   "«07 Logros destacados»: una fila de ejemplo se omitió."
+  ]
+ },
+ "equipo_Informe_Gestion_2026_A_direccion-de-programa.xlsx": {
+  "hojas": [
+   "02 Alineación estratégica con e",
+   "03 Objetivos y metas 2026",
+   "06 Puntos críticos y acciones d"
+  ],
+  "equipo": "Dirección de programa",
+  "avisos": [
+   "«03 Objetivos y metas 2026»: 2 filas de ejemplo se omitieron.",
+   "«06 Puntos críticos y acciones d», fila 5: falta «Punto crítico» y «Acción» y «Tiempo».",
+   "«06 Puntos críticos y acciones d», fila 6: falta «Punto crítico» y «Acción» y «Tiempo»."
+  ]
+ },
+ "equipo_Informe_Gestion_2026_A_quien-lidera-el-informe.xlsx": {
+  "hojas": [
+   "01 Resumen ejecutivo",
+   "05 Síntesis de resultados insti",
+   "09 Conclusiones",
+   "10 Anexos"
+  ],
+  "equipo": "Quien lidera el informe",
+  "avisos": [
+   "«01 Resumen ejecutivo»: no hay texto para importar.",
+   "«09 Conclusiones»: no hay texto para importar."
+  ]
+ },
+ "equipo_Informe_Gestion_2026_A_secretaria-academica.xlsx": {
+  "hojas": [
+   "04 Criterios",
+   "04 Resultados por dimensión est",
+   "08 Evidencias y fuentes de veri"
+  ],
+  "equipo": "Secretaría académica",
+  "avisos": [
+   "«04 Criterios», fila 5: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 6: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 7: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 8: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 9: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 10: falta «¿Reporta aquí?».",
+   "«04 Criterios», fila 11: falta «¿Reporta aquí?».",
+   "«04 Resultados por dimensión est»: 2 filas de ejemplo se omitieron."
+  ]
+ },
+ "errores": {
+  "avisos": [
+   "«02 Alineación estratégica con e», fila 10: el pilar «9. Pilar que no existe en el plan» no es uno del Plan de Desarrollo; se omitió.",
+   "«03 Objetivos y metas 2026», fila 8: «cuatro» no es un número en Programado.",
+   "«03 Objetivos y metas 2026», fila 9: falta «Programado».",
+   "«04 Criterios», fila 6: «Tal vez» no es Sí ni No; se omitió.",
+   "«04 Resultados por dimensión est», «Artículos en revistas indexadas»: falta la cifra actual.",
+   "«04 Resultados por dimensión est», «Ahorro en contratación»: falta la meta.",
+   "«04 Resultados por dimensión est», «Feria de servicios a la comunidad»: falta la descripción de la acción, qué se ha hecho con la acción.",
+   "«04 Resultados por dimensión est»: 1 fila sin Tipo se tomó como cifra.",
+   "«04 Resultados por dimensión est», fila 15: el criterio «Criterio que no existe» no existe; se creó como criterio propio de la unidad.",
+   "«04 Resultados por dimensión est», fila 16: sin nombre de indicador, se omitió.",
+   "«04 Resultados por dimensión est», fila 17: «doce» no es un número en Cifra actual.",
+   "«04 Resultados por dimensión est», fila 18: el pilar «Pilar de prueba» no es uno del Plan de Desarrollo; quedó sin pilar.",
+   "«06 Puntos críticos y acciones d», fila 8: falta «Acción».",
+   "«06 Puntos críticos y acciones d»: 1 fila tiene una dimensión que no es ninguna de las conocidas; se importó como texto libre.",
+   "«07 Logros destacados», fila 7: «abc» no es un número de anexo; quedó vacío.",
+   "«07 Logros destacados», fila 8: falta «Contexto y resultado».",
+   "«Mis soportes», fila 8: sin enlace https://. Los archivos se suben desde la sección de evidencias; se omitió.",
+   "«Mis soportes», fila 9: sin enlace https://. Los archivos se suben desde la sección de evidencias; se omitió.",
+   "«09 Conclusiones»: no hay texto para importar."
+  ],
+  "totales": {
+   "listas": 35,
+   "conAviso": 7,
+   "sinImportar": 16
+  },
+  "resumen": "40 filas agregadas al final en 6 secciones.",
+  "soportes": {
+   "origen": "encabezados",
+   "nivel": "reconocida",
+   "puntaje": 0.98
+  },
+  "propuestas": [
+   {
+    "hoja": "01 Resumen ejecutivo",
+    "destino": "s1",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "02 Alineación estratégica con e",
+    "destino": "s2",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "03 Objetivos y metas 2026",
+    "destino": "s3",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "04 Criterios",
+    "destino": "s4:crit",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "04 Resultados por dimensión est",
+    "destino": "s4",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "05 Síntesis de resultados insti",
+    "destino": null,
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "06 Puntos críticos y acciones d",
+    "destino": "s6",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "07 Logros destacados",
+    "destino": "s7",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "Mis soportes",
+    "destino": "s8",
+    "origen": "encabezados",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "09 Conclusiones",
+    "destino": "s9",
+    "origen": "control",
+    "nivel": "reconocida"
+   },
+   {
+    "hoja": "10 Anexos",
+    "destino": null,
+    "origen": "control",
+    "nivel": "reconocida"
+   }
+  ]
+ },
+ "otro": {
+  "error": "Este libro es del informe de «Facultad de Salud», ciclo 2026, plantilla A y no corresponde a este informe. Descargue el libro desde este informe y vuelva a intentarlo."
+ },
+ "huella": [
+  "La estructura del informe cambió desde que se descargó este libro (secciones o columnas). Revise la clasificación antes de aplicar."
+ ],
+ "noEsLibro": {
+  "error": "Este archivo no es un libro de informe de gestión.",
+  "avisos": []
+ },
+ "otroCiclo": {
+  "error": "Este libro es de otro ciclo (2025). Descargue uno nuevo desde este informe.",
+  "avisos": []
+ },
+ "otraPlantilla": {
+  "error": "Este libro es de la plantilla B y el informe usa la A.",
+  "avisos": []
+ },
+ "enviado": "El informe ya se envió: no admite cambios. Pida que lo devuelvan para modificaciones.",
+ "filas_puntos": {
+  "filas": [
+   [
+    "Extensión",
+    "Ejemplo: punto crítico (borre esta fila)",
+    "Ejemplo: acción (borre esta fila)",
+    "Ejemplo: tiempo (borre esta fila)",
+    "Ejemplo: recursos (borre esta fila)"
+   ],
+   [
+    "Internacionalización",
+    "Ejemplo: punto crítico (borre esta fila)",
+    "Ejemplo: acción (borre esta fila)",
+    "Ejemplo: tiempo (borre esta fila)",
+    "Ejemplo: recursos (borre esta fila)"
+   ]
+  ],
+  "avisos": []
+ },
+ "filas_logros": {
+  "filas": [
+   [
+    "Ejemplo: primera convocatoria interna con pares internacionales (borre esta fila)",
+    "Qué se hizo, con quién, qué cambió y en qué cifra se nota.",
+    "1"
+   ]
+  ],
+  "avisos": []
+ }
+}

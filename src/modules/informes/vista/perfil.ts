@@ -78,14 +78,64 @@ export const MAX_FIRMAS = 3;
 /* ---------- Color de acento ---------------------------------------------------- */
 
 export const MARINO = "#072b58";
-export const ACENTO_BASE = "#1f5fbf";
+export const ACENTO_BASE = "#014c97";
 
-/** Los tres acentos sugeridos, de la paleta del boletín. Todos superan 4,5:1 con texto blanco. */
-export const ACENTOS_SUGERIDOS: { hex: string; nombre: string }[] = [
-  { hex: "#1f5fbf", nombre: "Azul institucional" },
-  { hex: "#072b58", nombre: "Azul marino" },
-  { hex: "#0b7481", nombre: "Verde azulado" },
+/** Azul y arena institucionales: los dos colores por defecto de toda unidad que no es una facultad. */
+export const AZUL_UDES = "#014c97";
+export const ARENA_UDES = "#cea284";
+
+export interface AcentoSugerido {
+  hex: string;
+  nombre: string;
+}
+
+/** El color que identifica a cada facultad (y a UDES TEC). `clave` se busca en el nombre de la unidad, sin tildes. */
+export const FACULTADES: { clave: RegExp; nombre: string; hex: string }[] = [
+  { clave: /ciencias medicas|ciencias de la salud/, nombre: "Ciencias Médicas y de la Salud", hex: "#43bfeb" },
+  { clave: /facultad de ingenieri|ingenierias y tecnologias/, nombre: "Ingenierías y Tecnologías", hex: "#dd3e9d" },
+  { clave: /ciencias naturales/, nombre: "Ciencias Naturales", hex: "#d6c105" },
+  { clave: /agricolas|veterinari/, nombre: "Ciencias Agrícolas y Veterinarias", hex: "#43ac38" },
+  { clave: /udes\s*tec|\btec\b/, nombre: "UDES TEC", hex: "#9071b0" },
+  { clave: /ciencias sociales/, nombre: "Ciencias Sociales", hex: "#eb5a6c" },
+  { clave: /economicas|administrativas|contables/, nombre: "Ciencias Económicas, Administrativas y Contables", hex: "#f28a30" },
 ];
+
+/** Escala institucional: parte del azul y la arena y los extiende en tonos hermanos, de oscuro a claro. */
+export const ACENTOS_INSTITUCIONALES: AcentoSugerido[] = [
+  { hex: AZUL_UDES, nombre: "Azul UDES" },
+  { hex: ARENA_UDES, nombre: "Arena UDES" },
+  { hex: "#072b58", nombre: "Azul marino" },
+  { hex: "#2166d6", nombre: "Azul medio" },
+  { hex: "#0b7481", nombre: "Verde azulado" },
+  { hex: "#7f5f3f", nombre: "Tierra" },
+  { hex: "#a4471f", nombre: "Terracota" },
+  { hex: "#6b3fa0", nombre: "Ciruela" },
+];
+
+const sinMarcas = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** La facultad a la que corresponde el nombre de una unidad (o de su facultad madre), si se reconoce. */
+export function facultadDe(...nombres: (string | null | undefined)[]): { nombre: string; hex: string } | null {
+  for (const n of nombres) {
+    if (!n) continue;
+    const t = sinMarcas(n);
+    const f = FACULTADES.find((x) => x.clave.test(t));
+    if (f) return { nombre: f.nombre, hex: f.hex };
+  }
+  return null;
+}
+
+/** Acento de partida de una unidad: el de su facultad, o el azul UDES. */
+export const acentoPorDefecto = (nombre: string, linaje: string[] = []): string => facultadDe(nombre, ...linaje)?.hex ?? AZUL_UDES;
+
+/** Los acentos que se ofrecen a una unidad: primero el de su facultad (si es de una), luego la escala institucional. */
+export function acentosParaUnidad(nombre: string, linaje: string[] = []): { facultad: AcentoSugerido | null; institucionales: AcentoSugerido[] } {
+  const f = facultadDe(nombre, ...linaje);
+  return { facultad: f ? { hex: f.hex, nombre: `Facultad de ${f.nombre}` } : null, institucionales: ACENTOS_INSTITUCIONALES };
+}
+
+/** Compatibilidad: la lista plana de la escala institucional. */
+export const ACENTOS_SUGERIDOS = ACENTOS_INSTITUCIONALES;
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -246,13 +296,14 @@ export function normalizarContacto(raw: unknown): Contacto {
 export const hayContacto = (c: Contacto): boolean => Boolean(c.correo || c.telefono || c.direccion || c.web);
 
 /** El perfil de la unidad a partir de la fila de la base (o de nada). Nunca lanza. */
-export function normalizarPerfil(raw: unknown, nombreUnidad: string): PerfilOficina {
+/** `linaje`: nombres de las unidades de las que cuelga (un programa hereda el color de su facultad). */
+export function normalizarPerfil(raw: unknown, nombreUnidad: string, linaje: string[] = []): PerfilOficina {
   const o = objeto(raw);
   const nombre = texto(nombreUnidad, LIMITES.unidad * 2) || "Unidad";
   return {
     nombre,
     monograma: normalizarMonograma(o.monograma) || monogramaPorDefecto(nombre),
-    acento: normalizarHex(o.acento) ?? ACENTO_BASE,
+    acento: normalizarHex(o.acento) ?? acentoPorDefecto(nombre, linaje),
     logoRuta: texto(o.logo_ruta ?? o.logoRuta, LIMITES.ruta),
     contacto: normalizarContacto(o.contacto),
     pie: texto(o.pie, LIMITES.pie),
@@ -304,6 +355,8 @@ export interface PortadaDiseno {
   ciclo: string;
   fondo: FondoPortada;
   foto: FotoPortada | null;
+  /** Imagen elegida de la Galería Institucional (ruta en el bucket informe-galeria); vacío usa la foto de siempre. */
+  galeria: string;
   alineacionFoto: AlineacionFoto;
   tamano: TamanoTitulo;
   alineacion: AlineacionTexto;
@@ -357,6 +410,7 @@ export function disenoPorDefecto(base: BaseDiseno): DisenoInforme {
       ciclo: texto(base.nombreCiclo, LIMITES.ciclo),
       fondo: "foto",
       foto: null,
+      galeria: "",
       alineacionFoto: "centro",
       tamano: 1,
       alineacion: "izq",
@@ -410,6 +464,7 @@ export function normalizarDiseno(raw: unknown, base: BaseDiseno): DisenoInforme 
       ciclo: typeof p.ciclo === "string" ? texto(p.ciclo, LIMITES.ciclo) : d.portada.ciclo,
       fondo,
       foto,
+      galeria: texto(p.galeria, LIMITES.ruta),
       alineacionFoto: unoDe<AlineacionFoto>(p.alineacionFoto as AlineacionFoto, ["arriba", "centro", "abajo"], "centro"),
       tamano: unoDe<TamanoTitulo>(Number(p.tamano) as TamanoTitulo, [0, 1, 2], 1),
       alineacion: unoDe<AlineacionTexto>(p.alineacion as AlineacionTexto, ["izq", "centro"], "izq"),

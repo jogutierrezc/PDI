@@ -1,0 +1,121 @@
+Regresar
+Planeación y Seguimiento
+Financiación y presupuesto
+Línea
+Línea #2
+
+Infraestructura de usuario final
+
+Registrar un movimiento
+Financiación: Aprobada
+Último movimiento: 2 jun 2027
+Solicitado
+$ 6,4 MM
+$ 6.381.938.079
+lo que pidió la oficina
+Aprobado
+$ 909 M
+$ 909.400.000
+presupuesto del año
+Modificado
+$ 0
+$ 0
+adiciones y reducciones
+Vigente
+$ 909 M
+$ 909.400.000
+aprobado + modificado
+Comprometido
+$ 1,1 MM
+$ 1.136.800.000
+Ejecutado
+$ 1,1 MM
+$ 1.109.500.000
+Pagado
+$ 999 M
+$ 998.500.000
+Disponible
+−$ 227 M
+−$ 227.400.000
+vigente − lo mayor entre comprometido y ejecutado
+% de ejecución
+122 %
+ejecutado ÷ vigente
+Ejecución
+122 %
+Avance físico
+0 %
+
+Desviación: +122 puntos (ejecuta más de lo que avanza)
+
+Por año
+Presupuesto de la línea por año
+Año	Aprobado	Modificado	Vigente	Comprometido	Ejecutado	Pagado
+2027	$ 909 M
+$ 909.400.000
+	$ 0
+$ 0
+	$ 909 M
+$ 909.400.000
+	$ 1,1 MM
+$ 1.136.800.000
+	$ 1,1 MM
+$ 1.109.500.000
+	$ 999 M
+$ 998.500.000
+Financiación aprobada por la VAF
+
+Lo que la VAF aprueba para esta línea en cada año. Si el libro no tiene un «aprobado» del año, esto es lo que cuenta como aprobado.
+
+Financiación por año
+Año	Estado	Monto aprobado	Fuente	Nota	
+Acción
+
+2027	
+Aprobada	$ 909 M
+$ 909.400.000
+	Presupuesto ordinario institucional	—	Cambiar
+2028	
+Sin evaluar	—	—	—	Evaluar
+2029	
+Sin evaluar	—	—	—	Evaluar
+2030	
+Sin evaluar	—	—	—	Evaluar
+2031	
+Sin evaluar	—	—	—	Evaluar
+2032	
+Sin evaluar	—	—	—	Evaluar
+2033	
+Sin evaluar	—	—	—	Evaluar
+2034	
+Sin evaluar	—	—	—	Evaluar
+2035	
+Sin evaluar	—	—	—	Evaluar
+Libro de movimientos
+
+Solo se agrega: un movimiento no se edita ni se borra; se anula con otro que lo referencia y queda en el libro.
+
+2 jun 2027
+Pagado · 2027 · RP-1009 · Presupuesto ordinario institucional
+$ 999 M
+$ 998.500.000
+Anular
+el movimiento del 2 jun 2027
+11 may 2027
+Ejecutado · 2027 · RP-1008 · Presupuesto ordinario institucional
+$ 1,1 MM
+$ 1.109.500.000
+Anular
+el movimiento del 11 may 2027
+12 mar 2027
+Comprometido · 2027 · RP-1007 · Presupuesto ordinario institucional
+$ 1,1 MM
+$ 1.136.800.000
+Anular
+el movimiento del 12 mar 2027
+20 ene 2027
+Aprobado · 2027 · RP-1006 · Presupuesto ordinario institucional
+$ 909 M
+$ 909.400.000
+Anular
+el movimiento del 20 ene 2027

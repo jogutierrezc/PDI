@@ -1,0 +1,80 @@
+Regresar
+Planeación y Seguimiento
+Cargar la planificación
+Cargar la planificación
+
+Plan «PDIFyT 2027-2035». Cuatro pasos: el archivo se lee en su navegador y nada sale de él hasta el último.
+
+Descargar la plantilla y elegir el archivo
+(hecho)
+2
+Revisar lo leído
+(paso actual)
+3
+Corregir
+(pendiente)
+4
+Crear la versión borrador
+(pendiente)
+Revisar lo leído
+
+Esto es lo que encontró el portal en su archivo. Aún no se ha creado nada.
+
+Líneas listas
+5
+Con errores
+0
+no se importan
+Inversión total
+$ 3.570 M
+Evaluadas
+0 / 5
+Por campus
+Bucaramanga
+$ 1.250 M · 1
+Valledupar
+$ 620 M · 1
+Cúcuta
+$ 830 M · 1
+Todos los campus
+$ 870 M · 2
+Por prioridad
+Crítico
+$ 1.250 M · 1
+Alto
+$ 1.310 M · 2
+Medio
+$ 620 M · 1
+Largo plazo
+$ 390 M · 1
+Vista previa
+N.º
+Nombre
+Campus
+Monto
+#1
+Adecuación de aulas del campus principal
+Bucaramanga
+$ 1.250 M
+#2
+Renovación de equipos de cómputo de laboratorios
+Cúcuta
+$ 830 M
+#3
+Licencias de software académico
+Todos los campus
+$ 480 M
+#4
+Cubierta del escenario deportivo
+Valledupar
+$ 620 M
+#5
+Red inalámbrica de los tres campus
+Todos los campus
+$ 390 M
+
+Se ignoraron 2 filas de ejemplo.
+
+El borrador se guarda solo en este equipo.
+Atrás
+Seguir

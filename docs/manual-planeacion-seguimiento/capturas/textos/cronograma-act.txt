@@ -1,0 +1,217 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0
+
+Crear un plan
+Mi oficina
+Todas
+Solo las mías
+Plan de Desarrollo (PDI)
+Todas
+Con PDI
+Sin conexión con el PDI
+PDI sin definir
+Pilar
+Todos los pilares
+P2 Ambiente tecnológico
+P3 Entorno emprendedor
+P4 Gobernanza para el buen gobierno
+P6 Apropiación social
+Oficina
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Ver por
+Persona
+Oficina
+Actividad
+feb 27
+mar 27
+abr 27
+may 27
+jun 27
+jul 27
+ago 27
+sep 27
+oct 27
+nov 27
+Camilo Rojas · 7 actividades
+Definir el alcance y los criterios de «infraestructura para la docencia»
+14 feb 2027 a 16 may 2027 ·
+Hecho
+·
+Avance validado 100 %
+Definir el alcance y los criterios de «redes y conectividad»
+4 mar 2027 a 5 jun 2027 ·
+En curso
+·
+Avance validado 34 %
+Levantar el diagnóstico de ia, analítica, datos y tecnologías emergentes
+30 abr 2027 a 5 ago 2027 ·
+En riesgo
+·
+Avance validado 42 %
+Definir el alcance y los criterios de «plataformas institucionales»
+10 may 2027 a 29 jun 2027 ·
+Hecho
+·
+Avance validado 100 %
+Entregar el informe de cierre de procesamiento y almacenamiento
+Hito · 30 jun 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Preparar los estudios previos de seguridad de la infraestructura tecnológica
+1 jul 2027 a 8 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de ia, analítica, datos y tecnologías emergentes
+Hito · 15 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Diana Cárdenas · 7 actividades
+Definir el alcance y los criterios de «servicios tecnológicos»
+3 feb 2027 a 13 may 2027 ·
+Hecho
+·
+Avance validado 100 %
+Definir el alcance y los criterios de «ia, analítica, datos y tecnologías emergentes»
+5 abr 2027 a 9 may 2027 ·
+Hecho
+·
+Avance validado 100 %
+Levantar el diagnóstico de servicios tecnológicos
+14 may 2027 a 27 jun 2027 ·
+Hecho
+·
+Avance validado 100 %
+Levantar el diagnóstico de redes y conectividad
+30 may 2027 a 1 ago 2027 ·
+En curso
+·
+Avance validado 0 %
+Levantar el diagnóstico de seguridad de la infraestructura tecnológica
+31 may 2027 a 8 jul 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de procesamiento y almacenamiento
+Hito · 30 jun 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de servicios tecnológicos
+Hito · 21 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Iván Quiroga · 3 actividades
+Reunión mensual de seguimiento de la oficina
+29 may 2027 a 25 jun 2027 ·
+En revisión
+·
+Avance validado 0 %
+Definir el alcance y los criterios de «infraestructura de usuario final»
+14 jun 2027 a 16 jul 2027 ·
+En curso
+·
+Avance validado 0 %
+Preparar el informe de gestión del semestre
+23 jul 2027 a 12 ago 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Mariana Solano · 4 actividades
+Definir el alcance y los criterios de «seguridad de la infraestructura tecnológica»
+19 abr 2027 a 1 jun 2027 ·
+Hecho
+·
+Avance validado 100 %
+Preparar los estudios previos de servicios tecnológicos
+23 jun 2027 a 10 ago 2027 ·
+En revisión
+·
+Avance validado 43 %
+Preparar el informe de gestión del semestre
+23 jul 2027 a 12 ago 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de seguridad de la infraestructura tecnológica
+Hito · 19 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Valentina Sarmiento · 6 actividades
+Definir el alcance y los criterios de «infraestructura para la docencia»
+14 feb 2027 a 16 may 2027 ·
+Hecho
+·
+Avance validado 100 %
+Entregar el informe de cierre de infraestructura para la docencia
+Hito · 25 jun 2027 ·
+En revisión
+·
+Avance validado 28 %
+Preparar los estudios previos de seguridad de la infraestructura tecnológica
+1 jul 2027 a 8 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de plataformas institucionales
+Hito · 9 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de ia, analítica, datos y tecnologías emergentes
+Hito · 15 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de seguridad de la infraestructura tecnológica
+Hito · 19 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Sin responsable · 6 actividades
+Definir el alcance y los criterios de «procesamiento y almacenamiento»
+25 feb 2027 a 5 jun 2027 ·
+Hecho
+·
+Avance validado 100 %
+Levantar el diagnóstico de plataformas institucionales
+21 jun 2027 a 8 ago 2027 ·
+En curso
+·
+Avance validado 59 %
+Actualizar el inventario de la oficina
+27 jun 2027 a 21 jul 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Levantar el diagnóstico de infraestructura de usuario final
+17 jul 2027 a 28 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de redes y conectividad
+Hito · 6 sep 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Entregar el informe de cierre de infraestructura de usuario final
+Hito · 20 oct 2027 ·
+Por iniciar
+·
+Avance validado 0 %
+Por iniciar
+En curso
+En riesgo
+En revisión
+Hecho
+Hoy (30 jun 2027)

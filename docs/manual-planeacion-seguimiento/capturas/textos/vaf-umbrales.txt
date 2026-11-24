@@ -1,0 +1,22 @@
+Regresar
+Planeación y Seguimiento
+Financiación y presupuesto
+Umbrales
+Umbrales de vigilancia
+
+«PDIFyT 2027-2035»: cuándo la ejecución del presupuesto dispara una alerta.
+
+Desviación entre ejecución y avance físico (puntos)
+
+De 1 a 100. Si el % de ejecución se aparta del avance físico validado más de esto, hay alerta (por 15: ejecuta o avanza 15 puntos más de lo otro).
+
+Sobreejecución (% del presupuesto vigente)
+
+De 50 a 300. Alerta urgente si lo ejecutado pasa de este porcentaje del vigente (100 = el presupuesto completo).
+
+Meses sin movimientos
+
+De 1 a 24. Alerta si una línea con presupuesto lleva tanto tiempo sin movimientos.
+
+Volver a los de siempre
+Guardar los umbrales

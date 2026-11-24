@@ -1,0 +1,332 @@
+/* =============================================================================
+   Hoja de cálculo de la intranet (DataGrid). Solo tokens.
+
+   Colores de celda con sentido y leyenda: amarillo pálido se escribe, gris
+   está bloqueada, rojo tiene error. El error además se dice en la barra de
+   estado y en el título de la celda: nunca solo con color.
+   ========================================================================== */
+
+.dg {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.dg__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dg__tools,
+.dg__save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dg__tools .button-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.dg__errors {
+  color: var(--status-risk) !important;
+  border-color: color-mix(in srgb, var(--status-risk) 45%, var(--line)) !important;
+}
+
+.dg__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+
+.dg__filter:focus-within {
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+.dg__filter input {
+  width: 14rem;
+  max-width: 50vw;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: var(--text-sm);
+}
+
+.dg__muted,
+.dg__legend {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.dg__empty {
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.dg__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--status-risk);
+  background: var(--status-risk-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.dg__swatch {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin: 0 var(--space-1) -0.1rem var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+}
+
+.dg__swatch:first-child {
+  margin-left: 0;
+}
+
+.dg__swatch--edit {
+  background: color-mix(in srgb, var(--od-signal) 16%, var(--surface));
+}
+
+.dg__swatch--lock {
+  background: var(--surface-3);
+}
+
+.dg__swatch--error {
+  background: var(--status-risk-soft);
+  border-color: var(--status-risk);
+}
+
+/* --- La rejilla: se desplaza en los dos ejes dentro de su marco ----------------- */
+
+.dg__grid {
+  max-height: min(70vh, calc(100vh - 14rem));
+  min-height: 12rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  outline: none;
+  scrollbar-width: auto;
+  scrollbar-color: var(--line-strong) var(--surface-2);
+}
+
+.dg__grid:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.dg__grid::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.dg__grid::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+
+.dg__grid::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid var(--surface-2);
+  border-radius: var(--radius-pill);
+}
+
+.dg__grid table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.dg__grid th,
+.dg__grid td {
+  height: 2.1rem;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.dg__grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.dg__grid thead th[data-colactive] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--brand-blue);
+}
+
+.dg__grid [data-numeric] {
+  text-align: right;
+}
+
+.dg__rownum {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  color: var(--ink-faint);
+  background: var(--surface-3) !important;
+  font-size: var(--text-xs);
+  text-align: center !important;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dg__grid thead .dg__rownum {
+  z-index: 5;
+  cursor: default;
+}
+
+.dg__grid tbody tr[data-rowactive] .dg__rownum {
+  color: var(--ink);
+  box-shadow: inset -2px 0 0 var(--brand-blue);
+}
+
+/* Columnas fijas: se quedan a la izquierda al desplazarse. */
+.dg__grid [data-frozen] {
+  position: sticky;
+  z-index: 1;
+}
+
+.dg__grid thead [data-frozen] {
+  z-index: 4;
+}
+
+.dg__grid [data-frozen-last] {
+  box-shadow: 4px 0 6px -4px rgba(13, 28, 49, 0.25);
+}
+
+.dg__grid tbody td {
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  cursor: default;
+}
+
+.dg__grid tbody td[data-editable] {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--od-signal) 12%, var(--surface));
+  cursor: cell;
+}
+
+.dg__grid tbody td[data-inrange] {
+  background: color-mix(in srgb, var(--brand-blue) 14%, var(--surface));
+}
+
+.dg__grid tbody td[data-error] {
+  color: var(--ink);
+  background: var(--status-risk-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-risk) 60%, transparent);
+}
+
+.dg__grid tbody td[data-active] {
+  box-shadow: inset 0 0 0 2px var(--brand-blue);
+}
+
+.dg__grid tbody td[data-active][data-error] {
+  box-shadow: inset 0 0 0 2px var(--status-risk);
+}
+
+.dg__grid tbody tr[data-dirty] .dg__rownum {
+  color: var(--brand-blue);
+  font-weight: 800;
+}
+
+.dg__grid tbody tr[data-dirty] .dg__rownum::after {
+  content: " •";
+}
+
+.dg__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dg__input {
+  width: 100%;
+  height: 1.8rem;
+  padding: 0 var(--space-1);
+  color: var(--ink);
+  background: var(--surface);
+  border: 0;
+  outline: 2px solid var(--brand-blue);
+  font: inherit;
+}
+
+.dg__issues {
+  font-size: var(--text-xs);
+}
+
+.dg__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 700;
+}
+
+.dg__note--ok {
+  color: var(--status-done);
+}
+
+.dg__note--warn {
+  color: var(--status-pending);
+}
+
+.dg__note--bad {
+  color: var(--status-risk);
+}
+
+.dg__note--muted {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.dg__status {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dg__status[data-error] {
+  color: var(--status-risk);
+  font-weight: 600;
+}
+
+@media (max-width: 40rem) {
+  .dg__filter input {
+    width: 9rem;
+  }
+}

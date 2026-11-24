@@ -1,0 +1,333 @@
+Informes Institucionales
+Informes Institucionales · 2026
+Mi informe
+Panel
+Tablero del ciclo
+Mi informe
+Revisión
+3
+Consolidador
+Capacitación de Pilo
+Estructuras
+Vista del informe
+Guía con Pilo
+Ver el informe de
+Elija una unidad…
+Facultad de Ciencias de la Salud · Plantilla A · Enviado
+Facultad de Ciencias Económicas · Plantilla A · Devuelto
+Facultad de Derecho · Plantilla A · Aprobado
+Facultad de Ingeniería · Plantilla A · Borrador
+Oficina de Bibliotecas · Informe de oficina de apoyo · Enviado
+Rectoría de Campus Bucaramanga · Plantilla C · Borrador
+Vicerrectoría Académica · Plantilla B · Borrador
+Vicerrectoría de Extensión · Plantilla B · Aprobado
+Vicerrectoría de Investigación · Plantilla B · Enviado
+Administración ve los 9 informes del ciclo, solo para leerlos. Escribe quien trabaja en la unidad; Al enviar, el informe queda aprobado; Planeación lo puede devolver en Revisión.
+PLANTILLA A · DECANATURA
+Facultad de Ingeniería ?
+Informe 2026 · Administración: solo lectura
+◐
+Borrador
+7 de 10 listas
+Las cifras siguen en vivo hasta que envíe.
+Vista del informe en papel
+Libro de Excel
+?
+1
+Resumen ejecutivo
+Lista
+2
+Alineación estratégica con el PDI
+Lista
+3
+Objetivos y metas 2026
+Lista
+4
+Resultados por dimensión estratégica
+En curso
+5
+Puntos críticos y acciones de mejora
+Lista
+6
+Logros destacados
+Lista
+7
+Evidencias y fuentes de verificación
+Lista
+8
+Conclusiones
+Sin empezar
+9
+Reconocimientos externos
+Sin empezar
+10
+Anexos
+Lista
+?
+Enviar
+Solo el Gestor de la unidad o Planeación envían el informe.
+Se habilita cuando las 10 secciones estén listas (van 7).
+SECCIÓN 1 DE 10
+Resumen ejecutivo ?
+Lista
+
+Lo escribe la unidad · 1 a 3 párrafos.
+
+APORTE
+1 a 3 párrafos
+67 palabras · mínimo 25
+ASÍ SE LEERÁ, CON LAS CIFRAS VIVAS
+Durante 2026 la Facultad de Ingeniería llegó a 2.851 estudiantes, con una retención de primer semestre de 80,2 % y 27 % de profesores con doctorado. Los 8 grupos de investigación categorizados y los 21 semilleros activos sostuvieron la producción académica, mientras que la ejecución presupuestal cerró en 92 %.
+
+El año deja como reto principal reducir la deserción en los primeros semestres y consolidar la oferta nocturna de Sistemas.
+Controles ?
+✓
+Bien:
+Extensión adecuada (67 palabras)
+✓
+Bien:
+Sin frases de ejemplo de la plantilla
+✓
+Bien:
+Las cifras del texto están enlazadas a su fuente
+✓
+Bien:
+Cifras en vivo hasta que envíe. Corte de referencia: 31 de dic de 2026
+Datos que puede consultar ?
+UDES en Cifras
+Cifras del periodo con su fuente y corte
+Abrir UDES en Cifras
+Plan de Desarrollo
+Pilares, proyectos y su avance
+Abrir el portal de implementación
+Pilo
+Pregunte de dónde sale una cifra o pida comparar con otra unidad.
+Preguntar a Pilo
+FACULTAD DE INGENIERÍA
+Libro de Excel
+Cerrar
+
+Todo el informe en un solo libro, para compartirlo con su equipo o con otras oficinas, recoger la información y cargarla de vuelta.
+
+1 · Exportar
+2 · Importar
+libro-demo.xlsx
+11 hojas · 34 filas
+Libro del sistema · reconocido
+Cargar otro
+QUÉ HOJA VA A QUÉ SECCIÓN
+01 Resumen ejecutivo
+1 filas · 2 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Texto de la sección → Texto de la sección
+Por _Control · 100 %
+02 Alineación estratégica con e
+4 filas · 4 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Pilar del PDI → Pilar del PDI
+Articula con su unidad → Articula con su unidad
+Aporte de la unidad → Aporte de la unidad
+Por _Control · 100 %
+03 Objetivos y metas 2026
+3 filas · 4 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Objetivo o meta anual → Objetivo o meta anual
+Programado → Programado
+Alcanzado → Alcanzado
+Por _Control · 100 %
+04 Criterios
+8 filas · 3 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Criterio → Criterio
+¿Reporta aquí? → ¿Reporta aquí?
+Por _Control · 100 %
+04 Resultados por dimensión est
+6 filas · 18 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Criterio → Criterio
+Indicador → Indicador
+Unidad → Unidad
+Qué es mejor → Qué es mejor
+Año anterior → Año anterior
+Cifra actual → Cifra actual
+Meta → Meta
+Fuente → Fuente
+Nota → Nota
+Tipo → Tipo
+Descripción de la acción → Descripción de la acción
+Qué se ha hecho → Qué se ha hecho
+Finalización → Finalización
+Proyección (texto) → Proyección (texto)
+Proyección (número) → Proyección (número)
+Pilar del PDI → Pilar del PDI
+N.º de anexos → N.º de anexos
+Por _Control · 100 %
+05 Puntos críticos y acciones d
+2 filas · 5 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Dimensión → Dimensión
+Punto crítico → Punto crítico
+Acción → Acción
+Tiempo → Tiempo
+Recursos → Recursos
+Por _Control · 100 %
+06 Logros destacados
+2 filas · 3 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Logro → Logro
+Contexto y resultado → Contexto y resultado
+N.º de anexo → N.º de anexo
+Por _Control · 100 %
+07 Evidencias y fuentes de veri
+3 filas · 4 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+N.º → N.º
+Documento → Documento
+Descripción → Descripción
+Enlace → Enlace
+Por _Control · 100 %
+08 Conclusiones
+1 filas · 2 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Texto de la sección → Texto de la sección
+Por _Control · 100 %
+09 Reconocimientos externos
+1 filas · 2 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+No importar esta hoja
+Texto → Texto de la sección
+Revisar · 45 %
+Otra sección puntúa igual: confirme.
+10 Anexos
+3 filas · 3 columnas
+Resumen ejecutivo
+Alineación estratégica con el PDI
+Objetivos y metas 2026
+Resultados por dimensión estratégica
+Resultados por dimensión estratégica · criterios
+Puntos críticos y acciones de mejora
+Logros destacados
+Evidencias y fuentes de verificación
+Conclusiones
+Reconocimientos externos
+Solo referencia: no se importa
+Referencia
+REVISIÓN
+20
+filas listas
+5
+con aviso
+10
+sin importar
+8 avisos
+CÓMO APLICAR
+Agregar al final
+Suma lo del libro a lo que ya está escrito. Lo que ya existe no se toca.
+Llenar solo lo vacío
+Completa las celdas que están vacías en el informe y suma las filas que no existen. Nada de lo escrito se cambia.
+Reemplazar la sección
+Lo del libro queda en lugar de lo que había en cada sección importada.
+QUIÉN APORTA ESTE LIBRO
+
+Su papel no permite escribir en este informe.
+
+Aplicar al informe

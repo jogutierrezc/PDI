@@ -1,0 +1,70 @@
+Regresar a los proyectos del plan
+Planeación y Seguimiento
+Proyectos del plan
+Agregar proyecto
+Agregar proyecto
+
+Se agrega al borrador del plan; se enumera solo.
+
+Nombre del proyecto (obligatorio)
+
+Qué se quiere hacer, en una frase.
+
+Descripción
+
+Opcional. Qué incluye y para qué. 0/1000
+
+Campus (obligatorio)
+Elija uno…
+Bucaramanga
+Valledupar
+Cúcuta
+Todos los campus
+Pilar (obligatorio)
+
+Los pilares de este plan.
+
+Elija uno…
+P2. Ambiente tecnológico
+P3. Entorno emprendedor
+P4. Gobernanza para el buen gobierno
+P6. Apropiación social
+Monto solicitado (pesos) (obligatorio)
+
+Solo el número. Equivale a —.
+
+Prioridad (obligatorio)
+Elija una…
+Crítico
+Alto
+Medio
+Largo plazo
+Oficina responsable
+
+La que lo ejecuta y reporta su avance.
+
+Sin asignar
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Fuente de financiación
+Sin definir
+Presupuesto ordinario institucional
+Crédito bancario
+Financiación mixta
+Leasign financiero
+Otra fuente
+Clasificación
+Sin clasificar
+PLF
+IFT
+IFT-LOG
+
+La evaluación (criterios, viabilidades, fechas y distribución anual) la hace la VAF cuando el plan se envía; aquí solo se registra lo que la oficina solicita.
+
+Guardado hace un momento en este equipo
+Cancelar
+Agregar el proyecto

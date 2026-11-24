@@ -19,7 +19,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { actorDe, nombreRol } from "../../rankings/reporte/envio";
 import { congelado } from "../cifras-vivas";
-import { useDisenoInforme, useGuardarDiseno, useGuardarPerfil, usePerfilUnidad, usePilares, useUrlImagen } from "../datos";
+import { BUCKET_GALERIA, useUnidades, useDisenoInforme, useGuardarDiseno, useGuardarPerfil, usePerfilUnidad, usePilares, useUrlImagen } from "../datos";
 import { puedeEditar } from "../estados";
 import type { CicloRow, InstanciaRow, RequisitoRow, UnidadRef } from "../types";
 import { Aviso as AvisoError, Cargando, Vacio, fmtFecha, mensajeDe } from "../ui/comunes";
@@ -72,6 +72,19 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
   const m = useModeloInforme(inst, ciclo, requisitos, plan.acciones, plan.actividades);
   const pilares = usePilares();
   const perfilQ = usePerfilUnidad(unidad.id);
+  const todas = useUnidades();
+  // Nombres de los ancestros (programa → facultad → vicerrectoría): de ahí sale el color de la facultad.
+  const linaje = useMemo(() => {
+    const porId = new Map((todas.data ?? []).map((u) => [u.id, u]));
+    const nombres: string[] = [];
+    for (let id = unidad.parent_id, n = 0; id && n < 8; n++) {
+      const u = porId.get(id);
+      if (!u) break;
+      nombres.push(u.name);
+      id = u.parent_id;
+    }
+    return nombres;
+  }, [todas.data, unidad.parent_id]);
   const disenoQ = useDisenoInforme(inst.id);
   const guardarDiseno = useGuardarDiseno();
   const guardarPerfil = useGuardarPerfil();
@@ -88,7 +101,7 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
   const puedePerfil = actor === "planeacion" || actor === "jefe";
   const falta = Boolean(perfilQ.data?.falta || disenoQ.data?.falta);
 
-  const perfilBD = useMemo(() => normalizarPerfil(perfilQ.data?.fila, unidad.name), [perfilQ.data, unidad.name]);
+  const perfilBD = useMemo(() => normalizarPerfil(perfilQ.data?.fila, unidad.name, linaje), [perfilQ.data, unidad.name, linaje]);
   const disenoBD = useMemo(() => normalizarDiseno(disenoQ.data?.fila, { unidad: unidad.name, anio: ciclo.anio, nombreCiclo: ciclo.nombre }), [disenoQ.data, unidad.name, ciclo.anio, ciclo.nombre]);
   const perfil = perfilLocal ?? perfilBD;
   const diseno = disenoLocal ?? disenoBD;
@@ -104,7 +117,9 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
   const { medida, resultado, midiendo } = useLibro(unidades, diseno.papel, listo);
 
   const escudo = useUrlImagen(perfil.logoRuta);
-  const foto = useUrlImagen(diseno.portada.fondo === "propia" ? diseno.portada.foto?.ruta : null);
+  const propia = useUrlImagen(diseno.portada.fondo === "propia" ? diseno.portada.foto?.ruta : null);
+  const galeria = useUrlImagen(diseno.portada.fondo === "foto" ? diseno.portada.galeria : null, BUCKET_GALERIA);
+  const foto = diseno.portada.fondo === "foto" ? galeria : propia;
   const ctx = useMemo<ContextoHoja>(
     () => ({
       papel: diseno.papel,
@@ -226,6 +241,7 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
           portada={diseno.portada}
           perfil={perfil}
           unidadId={unidad.id}
+          linaje={linaje}
           puedeDiseno={puedeDiseno}
           puedePerfil={puedePerfil}
           guardando={guardando}

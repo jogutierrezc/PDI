@@ -1,0 +1,48 @@
+Regresar
+Planeación y Seguimiento
+Financiación y presupuesto
+Línea
+Registrar un movimiento
+Registrar un movimiento
+
+Línea #2 · vigente $ 909 M
+$ 909.400.000
+ · ejecutado $ 1,1 MM
+$ 1.109.500.000
+
+Tipo de movimiento (obligatorio)
+
+Elija qué se registra.
+
+Elija una opción…
+Aprobado
+Modificación
+Comprometido
+Ejecutado
+Pagado
+Año (obligatorio)
+2027
+2028
+2029
+2030
+2031
+2032
+2033
+2034
+2035
+Fecha del movimiento (obligatorio)
+
+No puede ser futura.
+
+Monto (pesos) (obligatorio)
+
+Solo el número. Equivale a —.
+
+Referencia
+
+Opcional: RP, contrato u orden.
+
+Fuente
+Nota
+El libro solo se agrega: no se edita ni se borra.
+Registrar el movimiento

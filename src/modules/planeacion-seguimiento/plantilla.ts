@@ -111,7 +111,7 @@ function hojaInstrucciones(plan: string, cols: readonly Columna[] = COLUMNAS, du
       titulo: "4. Qué significa cada lista (hoja oculta «Listas»)",
       filas: [
         ["Prioridad", "Crítico: sin esto no se opera. Alto: condiciona la calidad. Medio: mejora permanencia, movilidad o imagen. Largo plazo: expansión condicionada a crecimiento de matrícula y viabilidad."],
-        ["Clasificación", "PLF: planta física. IFT: infraestructura tecnológica. IFT-LOG: infraestructura tecnológica y logística asociada."],
+        ["Clasificación", "PLF: planta física. IFT: infraestructura tecnológica. IFT-LOG: infraestructura tecnológica y logística asociada. IFT-LAB: equipos y tecnología de laboratorios."],
         ["Campus", "Bucaramanga, Valledupar y Cúcuta son campus de la Universidad; «Todos» es una línea transversal."],
       ],
     },

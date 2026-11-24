@@ -1,0 +1,80 @@
+Regresar
+Planeación y Seguimiento
+Crear plan
+Crear plan
+
+Cada plan tiene su oficina dueña, su plantilla y sus pilares. Después se agregan los proyectos uno a uno o se cargan desde Excel.
+
+Datos del plan
+(hecho)
+Oficina dueña y alcance
+(hecho)
+3
+Plantilla de carga
+(paso actual)
+4
+Pilares del plan
+(pendiente)
+5
+Revisar y crear
+(pendiente)
+Plantilla de carga
+
+Qué columnas lleva el Excel de este plan y cuáles son obligatorias. «N.º» y «Nombre» siempre lo son.
+
+N.º
+clave de la línea; no se repite
+Siempre obligatoria
+Clasificación
+PLF, IFT o IFT-LOG
+Obligatoria
+Nombre
+hasta 300 caracteres
+Siempre obligatoria
+Descripción
+hasta 1.000 caracteres
+Obligatoria
+Campus
+elija de la lista
+Obligatoria
+Pilar
+elija de la lista
+Obligatoria
+Monto
+en pesos, solo el número
+Obligatoria
+Prioridad
+elija de la lista
+Obligatoria
+Resultado de la evaluación
+vacío si aún no se evalúa
+Obligatoria
+Fuente de financiación
+elija de la lista
+Obligatoria
+Fecha de inicio
+AAAA-MM-DD
+Obligatoria
+Fecha de fin
+AAAA-MM-DD
+Obligatoria
+Origen
+de dónde viene la línea
+Obligatoria
+Oficina responsable
+elija de la lista
+Obligatoria
+
+ Siempre se ofrecen, como opcionales, los criterios de priorización, las viabilidades, el «% de inversión» de cada año y el correo del gestor: no se configuran.
+
+Listas del plan
+
+Una opción por línea. Son las que se ofrecen como lista desplegable en el Excel y las que valida el importador.
+
+Clasificación
+Prioridad
+Resultado de la evaluación
+Fuente de financiación
+Guardado hace un momento en este equipo
+Atrás
+Siguiente

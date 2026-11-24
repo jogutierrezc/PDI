@@ -1,0 +1,120 @@
+Informes Institucionales
+Informes Institucionales · 2026
+Estructuras
+Panel
+Tablero del ciclo
+Mi informe
+Revisión
+3
+Consolidador
+Capacitación de Pilo
+Estructuras
+Vista del informe
+Estructuras
+
+Las plantillas A–D vienen de Planeación y no se editan. Las propias las arma usted.
+
+PLANTILLAS A–D
+Plantilla A
+Decanatura
+Plantilla B
+Vicerrectoría u oficina
+Plantilla C
+Rectoría de campus
+Plantilla D
+Rectoría General
+ESTRUCTURAS PROPIAS
+Informe de oficina de apoyo
+X1 · Oficina de apoyo
+Informe de centro de investigación
+X2 · Centro o instituto · inactiva
+Partir de
+En blanco (estructura mínima)
+Plantilla A · Decanatura
+Plantilla B · Vicerrectoría u oficina
+Plantilla C · Rectoría de campus
+Plantilla D · Rectoría General
+Nueva estructura
+ESTRUCTURA PROPIA · X2
+Informe de centro de investigación
+Nombre
+Quién la diligencia
+A quién se envía
+Descripción
+Activa: se ofrece al abrir informes
+Secciones del informe
+
+En el orden en que aparecen. «Evidencias y fuentes de verificación» es obligatoria y los anexos van siempre al final.
+
+1
+Texto
+Alineación estratégica
+Objetivos y metas
+Resultados y evidencias
+Síntesis
+Tabla de filas
+Logros e innovaciones
+Subir
+Bajar
+Quitar
+La oficina escribe un texto (resumen, introducción, conclusiones…).
+Extensión esperada
+Mínimo de palabras
+2
+Texto
+Alineación estratégica
+Objetivos y metas
+Resultados y evidencias
+Síntesis
+Tabla de filas
+Logros e innovaciones
+Subir
+Bajar
+Quitar
+La oficina elige a qué criterios reporta; indicadores con cifras o acciones.
+Dimensiones a las que puede reportar
+Gestión académica
+Gestión profesoral
+Calidad y oferta
+Investigación
+Extensión e internacionalización
+Gestión administrativa y financiera
+3
+Texto
+Alineación estratégica
+Objetivos y metas
+Resultados y evidencias
+Síntesis
+Tabla de filas
+Logros e innovaciones
+Anexos
+Subir
+Bajar
+Quitar
+Se arma sola con los archivos cargados.
+Tipo de la sección nueva
+Texto
+Alineación estratégica
+Objetivos y metas
+Resultados y evidencias
+Síntesis
+Tabla de filas
+Logros e innovaciones
+Evidencias y fuentes de verificación
+Agregar sección
+
+La oficina escribe un texto (resumen, introducción, conclusiones…).
+
+Antes de guardar:
+Toda estructura lleva «Evidencias y fuentes de verificación»: sin ella no se puede enviar el informe.
+Guardar cambios
+Duplicar
+Eliminar
+Sin cambios por guardar.
+¿Quién puede usarla?
+
+Sirve para una plantilla pensada para una oficina concreta (por ejemplo, Planeación Institucional) o para una general. Aplica a los informes que se abran desde ahora.
+
+Todas las oficinas
+Solo estas oficinas
+Guardar quién la usa

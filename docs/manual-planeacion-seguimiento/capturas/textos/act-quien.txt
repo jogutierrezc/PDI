@@ -1,0 +1,47 @@
+Regresar
+Planeación y Seguimiento
+Crear actividad
+Crear actividad
+
+Oficina: Tecnología e Infraestructura TI. Cinco pasos; el borrador se guarda solo en este equipo.
+
+Qué se va a hacer
+(hecho)
+Plan de Desarrollo Institucional
+(hecho)
+Cuándo y cuánto
+(hecho)
+4
+Quién la hace
+(paso actual)
+5
+Revisar y crear
+(pendiente)
+Quién la hace
+
+Asigne a una o varias personas de Tecnología e Infraestructura TI. Verá su carga actual para repartir con criterio. También puede dejarla sin responsable y asignarla después.
+
+Equipo de la oficina
+Mariana Solano (usted)
+mariana.solano@demo.udes.test
+3 activas
+Diana Cárdenas
+diana.cardenas@demo.udes.test
+4 activas
+Camilo Rojas
+camilo.rojas@demo.udes.test
+5 activas · 1 vencida
+Iván Quiroga
+ivan.quiroga@demo.udes.test
+3 activas · 1 vencida
+Valentina Sarmiento
+valentina.sarmiento@demo.udes.test
+5 activas · 1 vencida
+
+Natalia Prada: lector de la oficina; no recibe actividades.
+
+No se avisará a nadie por correo: no hay responsables.
+
+Guardado hace un momento en este equipo
+Atrás
+Siguiente

@@ -922,15 +922,91 @@ export function useSubirImagenPortada() {
 }
 
 /** Dirección temporal (una hora) de una imagen del bucket privado; una ruta que empieza por «/» es un archivo público del portal. */
-export function useUrlImagen(ruta: string | null | undefined) {
+export function useUrlImagen(ruta: string | null | undefined, bucket: string = BUCKET_PORTADAS) {
   return useQuery({
-    queryKey: CLAVES_VISTA.imagen(ruta ?? ""),
+    queryKey: bucket === BUCKET_PORTADAS ? CLAVES_VISTA.imagen(ruta ?? "") : [...CLAVES_VISTA.imagen(ruta ?? ""), bucket],
     enabled: Boolean(ruta) && !ruta?.startsWith("/"),
     retry: false,
     staleTime: 50 * 60_000,
     queryFn: async (): Promise<string | null> => {
-      const r = await supabase.storage.from(BUCKET_PORTADAS).createSignedUrl(ruta ?? "", 3600);
+      const r = await supabase.storage.from(bucket).createSignedUrl(ruta ?? "", 3600);
       return r.error || !r.data ? null : r.data.signedUrl;
     },
+  });
+}
+
+/* ---------- Galería Institucional (migración 0292) ---------- */
+
+export const BUCKET_GALERIA = "informe-galeria";
+
+export interface ImagenGaleria {
+  id: string;
+  ruta: string;
+  titulo: string;
+  activa: boolean;
+  orden: number;
+}
+
+const CLAVE_GALERIA = ["informes", "galeria"] as const;
+
+/** Las imágenes aprobadas. Sin la migración 0292 la galería queda vacía y la portada usa la foto de siempre. */
+export function useGaleria() {
+  return useQuery({
+    queryKey: CLAVE_GALERIA,
+    retry: false,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<ImagenGaleria[]> => {
+      const r = await supabase.from("informe_galeria").select("id, ruta, titulo, activa, orden").order("orden").order("created_at", { ascending: false });
+      if (r.error) {
+        if (falta(r.error)) return [];
+        throw new Error(r.error.message ?? "Error de la base de datos");
+      }
+      return (r.data ?? []) as ImagenGaleria[];
+    },
+  });
+}
+
+/** Solo el administrador: sube la imagen al bucket y la registra en el catálogo. */
+export function useSubirAGaleria() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { archivo: File; titulo: string }) => {
+      if (!TIPOS_PORTADA.includes(p.archivo.type)) throw new Error("La imagen debe ser JPG, PNG o WebP.");
+      const { comprimirImagen } = await import("../udrive/ui/navegador");
+      const archivo = await comprimirImagen(p.archivo);
+      if (archivo.size > MAX_PORTADA) throw new Error(`«${p.archivo.name}» pesa más de 5 MB incluso comprimida.`);
+      const ruta = `${Date.now()}-${nombreSeguro(archivo.name)}`;
+      const subida = await supabase.storage.from(BUCKET_GALERIA).upload(ruta, archivo, { contentType: archivo.type || undefined, upsert: false });
+      if (subida.error) throw new Error(/bucket not found/i.test(subida.error.message) ? "Falta aplicar la migración 0292 (Galería Institucional)." : `No se pudo subir la imagen: ${subida.error.message}`);
+      const r = await supabase.from("informe_galeria").insert({ ruta, titulo: p.titulo.trim().slice(0, 80) });
+      if (r.error) {
+        await supabase.storage.from(BUCKET_GALERIA).remove([ruta]);
+        throw new Error(r.error.message ?? "No se pudo registrar la imagen.");
+      }
+    },
+    onSuccess: () => void cliente.invalidateQueries({ queryKey: CLAVE_GALERIA }),
+  });
+}
+
+export function useCambiarGaleria() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { id: string; cambios: Partial<Pick<ImagenGaleria, "titulo" | "activa" | "orden">> }) => {
+      const r = await supabase.from("informe_galeria").update(p.cambios).eq("id", p.id);
+      if (r.error) throw new Error(r.error.message ?? "No se pudo guardar.");
+    },
+    onSuccess: () => void cliente.invalidateQueries({ queryKey: CLAVE_GALERIA }),
+  });
+}
+
+export function useQuitarDeGaleria() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (img: ImagenGaleria) => {
+      const r = await supabase.from("informe_galeria").delete().eq("id", img.id);
+      if (r.error) throw new Error(r.error.message ?? "No se pudo quitar.");
+      await supabase.storage.from(BUCKET_GALERIA).remove([img.ruta]);
+    },
+    onSuccess: () => void cliente.invalidateQueries({ queryKey: CLAVE_GALERIA }),
   });
 }

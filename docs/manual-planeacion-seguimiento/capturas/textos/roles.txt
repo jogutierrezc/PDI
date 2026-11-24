@@ -1,0 +1,93 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0 
+Financiero: En revisión de la VAF
+
+Todos los planes
+Editar el plan
+Crear un plan
+Financiación y presupuesto
+
+Quién ve y quién puede hacer qué. El nivel sale del rol de acceso de la persona (Usuarios y roles › Planeación y Seguimiento), no de la capacidad general. Su nivel: Administrador de planeación.
+
+El nivel «Financiero (VAF)» se asigna por persona mediante un rol de acceso (por ejemplo «Director VAF»); el administrador también opera todo lo financiero para revisar y probar.
+
+Capacidad	Administrador de planeación	Aprobador	Financiero (VAF)	Gestor de oficina	Colaborador	Lector o directivo
+Ver resumen y seguimiento	● Sí	● Sí	● Sí	● Sí	● Sí	● Sí
+Ver todos los planes y la pantalla «Todos los planes»	● Sí	● Sí	● Sí	— No	— No	● Sí
+Crear planes y cargar o publicar sus versiones	● Sí	— No	— No	◐ Con límite
+Planes de su oficina
+	— No	— No
+Solicitar cambios al plan	● Sí	— No	— No	◐ Con límite
+Solo proyectos de su oficina
+	— No	— No
+Aprobar, devolver o rechazar solicitudes	— No	◐ Con límite
+Nunca la propia
+	— No	— No	— No	— No
+Asignar actividades	◐ Con límite
+A personas de la oficina de la actividad
+	— No	— No	◐ Con límite
+Solo a su oficina
+	— No	— No
+Crear actividades, riesgos y acciones	● Sí	— No	— No	◐ Con límite
+Su oficina
+	— No	— No
+Mover actividades entre cubos	● Sí	— No	— No	◐ Con límite
+Las de su oficina
+	◐ Con límite
+Las suyas, hasta «En revisión»
+	— No
+Reportar avance con evidencia	● Sí	— No	— No	◐ Con límite
+Su oficina
+	◐ Con límite
+Las asignadas
+	— No
+Validar un avance y pasar a Hecho	◐ Con límite
+Respaldo del gestor; nunca el propio
+	— No	— No	◐ Con límite
+Nunca el propio
+	— No	— No
+Aprobar o rechazar proyectos (evaluarlos)	◐ Con límite
+Para revisar y probar
+	— No	● Sí	— No	— No	— No
+Agregar, editar o eliminar proyectos del borrador y enviarlos a la VAF	● Sí	— No	— No	◐ Con límite
+Planes de su oficina
+	— No	— No
+Asignar la oficina responsable de los proyectos	● Sí	— No	— No	— No	— No	— No
+Evaluar la financiación de planes y líneas	◐ Con límite
+Para revisar y probar
+	— No	● Sí	— No	— No	— No
+Registrar, anular o cargar la ejecución del presupuesto	◐ Con límite
+Para revisar y probar
+	— No	● Sí	— No	— No	— No
+Ver el presupuesto y sus alertas	● Sí	● Sí	● Sí	◐ Con límite
+Solo las líneas de su oficina
+	◐ Con límite
+Solo las líneas de su oficina
+	● Sí
+Comentar	● Sí	● Sí	— No	● Sí	● Sí	— No
+Ver y copiar la bitácora completa	● Sí	● Sí	● Sí	◐ Con límite
+Su oficina
+	— No	— No
+Reglas que no se negocian
+
+Las hace cumplir la base de datos, no la pantalla.
+
+Nadie aprueba lo propio
+Ni una solicitud de cambio ni un avance reportado por uno mismo.
+La ejecución del presupuesto la registra solo la VAF
+Las oficinas ven el presupuesto de sus líneas, en lectura. Lo registrado no se edita: se anula con otro movimiento.
+La evaluación financiera no bloquea
+Las oficinas operan mientras la VAF evalúa; el estado financiero queda a la vista en cada plan y línea.
+Un gestor solo asigna a su oficina
+La base rechaza una asignación a alguien de otra oficina, aunque el navegador la permita.
+Lo publicado no se edita
+Una versión publicada y un corte cerrado quedan congelados. Para cambiar se abre un borrador.
+Cada reporte guarda su versión
+El seguimiento apunta a la versión vigente y conserva a cuál pertenecía cada avance.
+La bitácora solo se añade
+Sin editar ni borrar: es el registro para auditoría.

@@ -1,0 +1,44 @@
+Regresar
+Planeación y Seguimiento
+Crear plan
+Crear plan
+
+Cada plan tiene su oficina dueña, su plantilla y sus pilares. Después se agregan los proyectos uno a uno o se cargan desde Excel.
+
+Datos del plan
+(hecho)
+2
+Oficina dueña y alcance
+(paso actual)
+3
+Plantilla de carga
+(pendiente)
+4
+Pilares del plan
+(pendiente)
+5
+Revisar y crear
+(pendiente)
+Oficina dueña y alcance
+
+Todo plan apunta a una oficina: la que responde por él. Las líneas sin oficina propia heredan esta.
+
+Oficina dueña del plan (obligatorio)
+
+Elija la oficina responsable. Es obligatoria.
+
+Elija una oficina…
+Bienestar Universitario
+Compras y Contratación
+Infraestructura y Planta Física
+Planeación Institucional
+Tecnología e Infraestructura TI
+Vicerrectoría Administrativa y Financiera
+Alcance del plan
+De una oficina
+Lo opera la oficina dueña. No necesita aprobación de Planeación; queda en borrador hasta publicar su primera versión.
+Institucional
+Reparte líneas entre varias oficinas, como el PDIFyT.
+Guardado hace un momento en este equipo
+Atrás
+Siguiente

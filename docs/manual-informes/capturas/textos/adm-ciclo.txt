@@ -1,0 +1,529 @@
+Informes Institucionales
+Informes Institucionales · 2026
+Tablero del ciclo
+Panel
+Tablero del ciclo
+Mi informe
+Revisión
+3
+Consolidador
+Capacitación de Pilo
+Estructuras
+Vista del informe
+CICLO 2026
+Informe de gestión 2026 ?
+Año
+2026
+2025
+
+Fecha límite 15 de dic de 2026 · corte de las cifras 31 de dic de 2026. Las unidades escriben mientras el ciclo esté abierto.
+
+Año
+Nombre
+Fecha límite
+Corte de las cifras
+Estado
+En preparación
+Abierto
+Cerrado
+Guardar el ciclo
+Preparar el ciclo siguiente
+Entrega por unidad ?
+
+Fecha límite 15 de dic de 2026. 9 de 13 informes abiertos.
+
+57 %
+avance general
+2 informes llevan evidencias
+4
+○ Sin abrir
+3
+◐ Borrador
+3
+◉ Enviado
+1
+↺ Devuelto
+2
+● Aprobado
+Buscar unidad
+Estado
+Todos
+Sin abrir
+Borrador
+Enviado
+Devuelto
+Aprobado
+Tipo de unidad
+Todos
+Facultad
+Oficina
+Rectoria
+Vicerrectoria
+13 unidades
+Con la plantilla que muestra cada fila.
+Abrir los 4 que faltan
+Facultad de Ingeniería
+Facultad · Plantilla A · Decanatura
+◐
+Borrador
+5 de 10 secciones · con evidencias
+JB
+LM
+Julián Ejemplo Barrera y 1 más
+Responsables
+Ver
+Vista del informe
+Facultad de Ciencias de la Salud
+Facultad · Plantilla A · Decanatura
+◉
+Enviado
+10 de 10 secciones · con evidencias
+JB
+Julián Ejemplo Barrera
+Responsables
+Revisar
+Vista del informe
+Facultad de Derecho
+Facultad · Plantilla A · Decanatura
+●
+Aprobado
+10 de 10 secciones
+Nadie escribe aún
+Responsables
+Revisar
+Vista del informe
+Facultad de Ciencias Económicas
+Facultad · Plantilla A · Decanatura
+↺
+Devuelto
+10 de 10 secciones
+Nadie escribe aún
+Responsables
+Ver
+Vista del informe
+Facultad de Educación
+Facultad
+Plantilla A · Decanatura
+Plantilla B · Vicerrectoría u oficina
+Plantilla C · Rectoría de campus
+Plantilla D · Rectoría General
+○
+Sin iniciar
+Sin abrir
+Nadie escribe aún
+Responsables
+Abrir
+Vicerrectoría Académica
+Vicerrectoria · Plantilla B · Vicerrectoría u oficina
+◐
+Borrador
+4 de 9 secciones
+Nadie escribe aún
+Responsables
+Ver
+Vista del informe
+Vicerrectoría de Investigación
+Vicerrectoria · Plantilla B · Vicerrectoría u oficina
+◉
+Enviado
+11 de 9 secciones
+Nadie escribe aún
+Responsables
+Revisar
+Vista del informe
+Vicerrectoría de Extensión
+Vicerrectoria · Plantilla B · Vicerrectoría u oficina
+●
+Aprobado
+11 de 9 secciones
+Nadie escribe aún
+Responsables
+Revisar
+Vista del informe
+Vicerrectoría Administrativa y Financiera
+Vicerrectoria
+Plantilla A · Decanatura
+Plantilla B · Vicerrectoría u oficina
+Plantilla C · Rectoría de campus
+Plantilla D · Rectoría General
+○
+Sin iniciar
+Sin abrir
+Nadie escribe aún
+Responsables
+Abrir
+Oficina de Bibliotecas
+Oficina · Informe de oficina de apoyo
+◉
+Enviado
+11 de 7 secciones
+Nadie escribe aún
+Responsables
+Revisar
+Vista del informe
+Rectoría de Campus Bucaramanga
+Rectoria · Plantilla C · Rectoría de campus
+◐
+Borrador
+4 de 9 secciones
+Nadie escribe aún
+Responsables
+Ver
+Vista del informe
+Rectoría de Campus Cúcuta
+Rectoria
+Plantilla A · Decanatura
+Plantilla B · Vicerrectoría u oficina
+Plantilla C · Rectoría de campus
+Plantilla D · Rectoría General
+○
+Sin iniciar
+Sin abrir
+Nadie escribe aún
+Responsables
+Abrir
+Rectoría General
+Rectoria
+Plantilla A · Decanatura
+Plantilla B · Vicerrectoría u oficina
+Plantilla C · Rectoría de campus
+Plantilla D · Rectoría General
+○
+Sin iniciar
+Sin abrir
+Nadie escribe aún
+Responsables
+Abrir
+La estructura de cada informe
+
+Elija qué secciones lleva cada plantilla en este ciclo. «Solo lectura» deja la sección como la dejó Planeación: la unidad la ve, no la cambia y cuenta como lista. Con el ciclo abierto o cerrado solo se activan, desactivan o se cambia la edición.
+
+A · Decanatura
+B · Vicerrectoría u oficina
+C · Rectoría de campus
+D · Rectoría General
+Informe de oficina de apoyo
+Informe de centro de investigación
+1
+Texto
+Activa
+La unidad edita
+Subir
+Bajar
+2
+Alineación con el PDI
+Activa
+La unidad edita
+Subir
+Bajar
+3
+Objetivos y metas
+Activa
+La unidad edita
+Subir
+Bajar
+4
+Resultados
+Activa
+La unidad edita
+Subir
+Bajar
+5
+Síntesis
+Activa
+La unidad edita
+Subir
+Bajar
+6
+Tabla de filas
+Activa
+La unidad edita
+Subir
+Bajar
+7
+Logros
+Activa
+La unidad edita
+Subir
+Bajar
+8
+Evidencias
+Activa
+Obligatoria en todo informe
+La unidad edita
+Subir
+Bajar
+9
+Texto
+Activa
+La unidad edita
+Subir
+Bajar
+10
+Libre
+Activa
+La unidad edita
+Mín.
+Subir
+Bajar
+Eliminar
+11
+Anexos
+Activa
+La unidad edita
+Subir
+Bajar
++ Agregar una sección libre
+Solo con el ciclo en preparación.
+Restablecer a la plantilla
+Los datos que pide cada tipo de unidad
+
+Defina, por plantilla, el dato, su fuente y la condición. Las unidades los ven ya listados en «Resultados por dimensión» y escriben su cifra actual, meta y justificación. «Justificar» es obligatorio para enviar; «Sugerido» aparece pero no bloquea; «No pedir» no se muestra.
+
+A · Decanatura
+B · Vicerrectoría u oficina
+C · Rectoría de campus
+D · Rectoría General
+X1 · Oficina de apoyo
+X2 · Centro o instituto
+2
+deben justificarse
+1
+sugeridos
+0
+no se piden
+DATO	FUENTE	CRITERIO Y UNIDAD	CONDICIÓN	
+ORDEN Y QUITAR
+
+	
+Manual
+Excel
+UDES en Cifras
+PDI
+	
+Sin criterio
+Extensión
+Internacionalización
+Investigación
+Enseñanza
+Gestión administrativa y financiera
+Acciones estratégicas
+Permanencia y graduación
+Internacionalización del currículo
+Conteo
+%
+pp
+$
+Más es mejor
+Menos es mejor
+	
+Justificar
+Sugerido
+No pedir
+	
+Subir
+Bajar
+Quitar
+
+	
+Manual
+Excel
+UDES en Cifras
+PDI
+	
+Sin criterio
+Extensión
+Internacionalización
+Investigación
+Enseñanza
+Gestión administrativa y financiera
+Acciones estratégicas
+Permanencia y graduación
+Internacionalización del currículo
+Conteo
+%
+pp
+$
+Más es mejor
+Menos es mejor
+	
+Justificar
+Sugerido
+No pedir
+	
+Subir
+Bajar
+Quitar
+
+	
+Manual
+Excel
+UDES en Cifras
+PDI
+	
+Sin criterio
+Extensión
+Internacionalización
+Investigación
+Enseñanza
+Gestión administrativa y financiera
+Acciones estratégicas
+Permanencia y graduación
+Internacionalización del currículo
+Conteo
+%
+pp
+$
+Más es mejor
+Menos es mejor
+	
+Justificar
+Sugerido
+No pedir
+	
+Subir
+Bajar
+Quitar
++ Añadir dato
+Guardar los datos
+Copiar de la plantilla B
+Copiar de la plantilla C
+Copiar de la plantilla D
+Copiar de la plantilla X1
+Copiar de la plantilla X2
+Las 14 cifras automáticas
+UDES en Cifras y PDI no están alimentando datos, y el envío exige justificar las cifras marcadas «Justificar». Si la plantilla A va a reportar todo a mano, pase esas cifras a «No pedir».
+Pasar las 14 cifras automáticas a «No pedir»
+Bajar Excel (las cuatro plantillas)
+Subir Excel
+Qué datos debe justificar cada unidad ?
+
+Para la plantilla a (decanatura). Lo que marque como «Justificar» aparece bloqueado en el informe de cada unidad, con una línea de explicación obligatoria.
+
+A · Decanatura
+B · Vicerrectoría u oficina
+C · Rectoría de campus
+D · Rectoría General
+X1 · Oficina de apoyo
+X2 · Centro o instituto
+6
+deben justificarse
+6
+sugeridos
+2
+no se piden
+DATO	FUENTE	CONDICIÓN
+Gestión académica
+Matrícula total	UDES en Cifras · Matrícula	
+Justificar
+Sugerido
+No pedir
+
+Deserción anual	UDES en Cifras · SPADIES	
+Justificar
+Sugerido
+No pedir
+
+Retención de primer semestre	UDES en Cifras · Permanencia	
+Justificar
+Sugerido
+No pedir
+
+Saber PRO · promedio global	UDES en Cifras · Saber PRO	
+Justificar
+Sugerido
+No pedir
+
+Gestión profesoral
+Profesores con doctorado	UDES en Cifras · Profesorado	
+Justificar
+Sugerido
+No pedir
+
+Evaluación docente	UDES en Cifras · Evaluación	
+Justificar
+Sugerido
+No pedir
+
+Calidad y oferta
+Registros calificados vigentes	UDES en Cifras · Oferta	
+Justificar
+Sugerido
+No pedir
+
+Registros en trámite	Oferta de programas · SACES	
+Justificar
+Sugerido
+No pedir
+
+Investigación
+Grupos categorizados	UDES en Cifras · Minciencias	
+Justificar
+Sugerido
+No pedir
+
+Semilleros activos	UDES en Cifras · Semilleros	
+Justificar
+Sugerido
+No pedir
+
+Productos de nuevo conocimiento	UDES en Cifras · Producción	
+Justificar
+Sugerido
+No pedir
+
+Extensión
+Convenios activos	UDES en Cifras · Convenios	
+Justificar
+Sugerido
+No pedir
+
+Proyectos de extensión	UDES en Cifras · Extensión	
+Justificar
+Sugerido
+No pedir
+
+Gestión administrativa y financiera
+Ejecución presupuestal	Vicerrectoría Administrativa y Financiera	
+Justificar
+Sugerido
+No pedir
+Los datos libres
+
+Cada unidad puede sumar sus propios datos sin salirse del plan de diseño.
+
+Datos propios por sección
+−
+3
++
+Exigir fuente en cada dato propio
+Exigir un pilar del PDI vinculado
+Criterios de Resultados por dimensión
+
+Los seis criterios base (Gestión académica, profesoral, calidad, investigación, extensión y financiera) siempre están. Aquí crea otros para todas las unidades y decide sobre los que ellas sugieren.
+
+Sugeridos por las unidades (1)
+Egresados y empleabilidad
+Sugerido por Facultad de Ingeniería
+Rige desde
+Aprobar
+Rechazar
+Aprobados (2)
+Permanencia y graduación · Decanatura · rige ya
+Archivar
+Borrar
+Internacionalización del currículo · todas las plantillas · rige ya
+Archivar
+Borrar
+Crear un criterio
+Nombre
+Para qué sirve (opcional)
+Decanatura
+Vicerrectoría u oficina
+Rectoría de campus
+Rectoría General
+Oficina de apoyo
+Centro o instituto
+Sin marcar: todas.
+Rige desde
+Crear criterio

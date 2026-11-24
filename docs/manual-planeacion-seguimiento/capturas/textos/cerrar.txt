@@ -1,0 +1,23 @@
+Regresar
+Planeación y Seguimiento
+Actividad
+Cerrar la actividad
+Cerrar la actividad
+
+«Entregar el informe de cierre de infraestructura para la docencia» pasa a «Hecha»
+
+En revisión
+28 %
+1 por validar
+Esto queda auditado. El cierre administrativo registra un avance de cierre validado al 100 % con su nombre y su nota, y es la única excepción a la regla de que nadie valida lo propio. El cierre siempre queda marcado como «autovalidado» para que se pueda revisar después.
+ Hay un avance esperando revisión. Lo normal es revisarlo: así queda validado por otra persona. Si cierra aquí, lo que reportaron otros se valida y lo suyo queda reemplazado por el cierre.
+Por qué la cierra (obligatorio)
+
+Qué se entregó o por qué se da por cumplida. Al menos 10 caracteres (lleva 0).
+
+Entiendo que el cierre queda auditado con mi nombre, la fecha y esta nota.
+
+¿Prefiere que lo valide otra persona? Reporte un avance: lo revisará otro gestor.
+
+Nada se guarda hasta que confirme.
+Cerrar la actividad

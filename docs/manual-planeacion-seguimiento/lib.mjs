@@ -44,8 +44,11 @@ export function pilo(mood, texto, nombre = "Pilo dice") {
 export function step(n, titulo, texto, cls = "") {
   return `<div class="step ${cls}"><span class="dot">${n}</span><div><div class="h3">${titulo}</div>${texto ? `<p>${texto}</p>` : ""}</div></div>`;
 }
-export const steps = (arr, { start = 1, two = false, c = false } = {}) =>
-  blk(`<div class="steps${two ? " two" : ""}">${arr.map((s, i) => step(start + i, s[0], s[1], c ? "c" : "")).join("")}</div>`);
+export const steps = (arr, { start = 1, two = false, c = false } = {}) => {
+  const items = arr.map((s, i) => step(start + i, s[0], s[1], c ? "c" : ""));
+  const wrap = (it) => `<div class="blk"><div class="steps${two ? " two" : ""}">${it.join("")}</div></div>`;
+  return { html: wrap(items), split: two ? undefined : { items, wrap, sel: ".steps > .step" } };
+};
 
 export function tbl(head, rows, cls = "", widths) {
   const cg = widths ? `<colgroup>${widths.map((w) => `<col style="width:${w}">`).join("")}</colgroup>` : "";
@@ -70,22 +73,22 @@ export function flujo(filas) {
 // shot: f = nombre de la captura (imagenes/<f>.jpg), url = ruta que se ve en la barra, marks = true (usa marcas.json) o lista [[n,x,y]],
 // maxh = alto máximo en px de página, w = ancho en px (por defecto el de la columna).
 export const missing = [];
-export function shot({ f, url, alt, maxh = 520, w, marks = true, miss }) {
+export function shot({ f, url, alt, maxh = 520, w, marks = true, miss, cut = false, keep = true }) {
   const file = path.join(here, "imagenes", f + ".jpg");
   const info = MARCAS[f];
   const ok = fs.existsSync(file) && info;
   const ratio = info?.ratio || 0.6;
-  const W = Math.min(w || 704, Math.floor((Math.max(Math.min(maxh, 640), 520) - 30) / ratio));
+  const W = w ? w : Math.min(704, Math.floor((Math.max(Math.min(maxh, 640), 520) - 30) / ratio));
   let inner;
   if (ok) {
     const ms = marks === true ? info.ms : marks || [];
-    inner = `<div class="shot-img${Math.abs(ratio - 0.7093) < 0.001 || Math.abs(ratio - 0.7627) < 0.001 ? " cut" : ""}"><img src="imagenes/${f}.jpg" alt="${alt}">${ms.map(([n, x, y]) => `<span class="dot" style="left:${Math.max(x, 2.6)}%;top:${Math.max(y, 1.5)}%">${n}</span>`).join("")}</div>`;
+    inner = `<div class="shot-img${cut || Math.abs(ratio - 0.7093) < 0.001 || Math.abs(ratio - 0.7627) < 0.001 ? " cut" : ""}"><img src="imagenes/${f}.jpg" alt="${alt}">${ms.map(([n, x, y]) => `<span class="dot" style="left:${Math.max(x, 2.6)}%;top:${Math.max(y, 1.5)}%">${n}</span>`).join("")}</div>`;
   } else {
     missing.push(`${f}: ${miss || alt}`);
     inner = `<div class="shot-miss" style="min-height:${miss ? 170 : 140}px">[CAPTURA PENDIENTE · ${miss || alt}]</div>`;
   }
   const mk = (w) => `<div class="blk"><figure class="shot" style="width:${w}px"><div class="shot-bar"><span class="shot-url">${PORTAL}${url}</span></div>${inner}</figure></div>`;
-  return { html: mk(W), shot: true, keep: true, fit: ok ? { ratio, W, mk } : null };
+  return { html: mk(W), shot: true, keep, fit: ok ? { ratio, W, mk } : null };
 }
 
 // Dos capturas lado a lado (vistas de conjunto; el texto fino no se lee, importa la forma).

@@ -1,0 +1,222 @@
+{
+ "xls-anexos": {
+  "ms": [],
+  "ratio": 0.2178
+ },
+ "xls-conclusiones": {
+  "ms": [],
+  "ratio": 0.2695
+ },
+ "xls-control-oculta": {
+  "ms": [],
+  "ratio": 0.5764
+ },
+ "xls-criterios": {
+  "ms": [],
+  "ratio": 0.4797
+ },
+ "xls-datos-requeridos": {
+  "ms": [],
+  "ratio": 0.2454
+ },
+ "xls-equipo-control-oculta": {
+  "ms": [],
+  "ratio": 0.4291
+ },
+ "xls-equipo-direccion": {
+  "ms": [],
+  "ratio": 0.6017
+ },
+ "xls-equipo-extension": {
+  "ms": [],
+  "ratio": 0.6017
+ },
+ "xls-equipo-lidera": {
+  "ms": [],
+  "ratio": 0.6017
+ },
+ "xls-equipo-secretaria-resultados": {
+  "ms": [],
+  "ratio": 0.2765
+ },
+ "xls-equipo-secretaria": {
+  "ms": [],
+  "ratio": 0.6017
+ },
+ "xls-errores-avisos": {
+  "ms": [],
+  "ratio": 0.5518
+ },
+ "xls-errores-clasificacion": {
+  "ms": [],
+  "ratio": 0.4313
+ },
+ "xls-errores-conclusiones": {
+  "ms": [],
+  "ratio": 0.2695
+ },
+ "xls-errores-criterios": {
+  "ms": [],
+  "ratio": 0.5008
+ },
+ "xls-errores-evidencias": {
+  "ms": [],
+  "ratio": 0.4008
+ },
+ "xls-errores-logros": {
+  "ms": [],
+  "ratio": 0.3966
+ },
+ "xls-errores-metas": {
+  "ms": [],
+  "ratio": 0.4008
+ },
+ "xls-errores-pdi": {
+  "ms": [],
+  "ratio": 0.478
+ },
+ "xls-errores-puntos-criticos": {
+  "ms": [],
+  "ratio": 0.3941
+ },
+ "xls-errores-resultados-a": {
+  "ms": [],
+  "ratio": 0.4991
+ },
+ "xls-errores-resultados-b": {
+  "ms": [],
+  "ratio": 0.5479
+ },
+ "xls-evidencias": {
+  "ms": [],
+  "ratio": 0.3017
+ },
+ "xls-instrucciones": {
+  "ms": [],
+  "ratio": 0.5822
+ },
+ "xls-listas-oculta": {
+  "ms": [],
+  "ratio": 0.2458
+ },
+ "xls-lleno-anexos": {
+  "ms": [],
+  "ratio": 0.2771
+ },
+ "xls-lleno-criterios": {
+  "ms": [],
+  "ratio": 0.4814
+ },
+ "xls-lleno-evidencias": {
+  "ms": [],
+  "ratio": 0.361
+ },
+ "xls-lleno-logros": {
+  "ms": [],
+  "ratio": 0.3568
+ },
+ "xls-lleno-metas": {
+  "ms": [],
+  "ratio": 0.361
+ },
+ "xls-lleno-pdi": {
+  "ms": [],
+  "ratio": 0.478
+ },
+ "xls-lleno-puntos-criticos": {
+  "ms": [],
+  "ratio": 0.3577
+ },
+ "xls-lleno-resultados-a": {
+  "ms": [],
+  "ratio": 0.4243
+ },
+ "xls-lleno-resultados-b": {
+  "ms": [],
+  "ratio": 0.4905
+ },
+ "xls-lleno-resumen": {
+  "ms": [],
+  "ratio": 0.3161
+ },
+ "xls-lleno-sintesis": {
+  "ms": [],
+  "ratio": 0.3364
+ },
+ "xls-logros": {
+  "ms": [],
+  "ratio": 0.3373
+ },
+ "xls-metas": {
+  "ms": [],
+  "ratio": 0.3568
+ },
+ "xls-otro-informe-error": {
+  "ms": [],
+  "ratio": 0.1808
+ },
+ "xls-otro-informe-portada": {
+  "ms": [],
+  "ratio": 0.5822
+ },
+ "xls-pdi": {
+  "ms": [],
+  "ratio": 0.4458
+ },
+ "xls-plantilla-logros": {
+  "ms": [],
+  "ratio": 0.122
+ },
+ "xls-plantilla-metas": {
+  "ms": [],
+  "ratio": 0.1415
+ },
+ "xls-plantilla-puntos-criticos-ayuda": {
+  "ms": [],
+  "ratio": 0.2155
+ },
+ "xls-plantilla-puntos-criticos": {
+  "ms": [],
+  "ratio": 0.2347
+ },
+ "xls-plantilla-resultados-acciones": {
+  "ms": [],
+  "ratio": 0.1289
+ },
+ "xls-plantilla-resultados-cifras-a": {
+  "ms": [],
+  "ratio": 0.1501
+ },
+ "xls-plantilla-resultados-criterios": {
+  "ms": [],
+  "ratio": 0.282
+ },
+ "xls-plantilla-resultados-pilares": {
+  "ms": [],
+  "ratio": 0.259
+ },
+ "xls-plantilla-retos": {
+  "ms": [],
+  "ratio": 0.1415
+ },
+ "xls-puntos-criticos": {
+  "ms": [],
+  "ratio": 0.3283
+ },
+ "xls-resultados-a": {
+  "ms": [],
+  "ratio": 0.2765
+ },
+ "xls-resultados-b": {
+  "ms": [],
+  "ratio": 0.3523
+ },
+ "xls-resumen": {
+  "ms": [],
+  "ratio": 0.2695
+ },
+ "xls-sintesis": {
+  "ms": [],
+  "ratio": 0.2542
+ }
+}

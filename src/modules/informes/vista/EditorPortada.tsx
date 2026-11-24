@@ -4,7 +4,8 @@
    Pocos controles y buenos valores por defecto: composición (cinco, iguales
    para todas las oficinas), textos con su límite, fondo, color de acento
    (tres de la paleta o uno libre con la prueba de contraste), alineación,
-   tamaño del título, monograma y escudo. En la composición con foto, la
+   tamaño del título, monograma y escudo. El acento parte del color de la facultad
+   (o del azul y la arena UDES) y el fondo elige de la Galería Institucional. En la composición con foto, la
    oficina sube su imagen y la encuadra: arrastrarla, zoom y alinear el
    recorte arriba, al centro o abajo. A la derecha, la portada tal como saldrá.
 
@@ -15,16 +16,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
-import { MAX_PORTADA, useSubirImagenPortada, useUrlImagen } from "../datos";
+import { BUCKET_GALERIA, MAX_PORTADA, useSubirImagenPortada, useUrlImagen } from "../datos";
+import { SelectorGaleria } from "./Galeria";
 import { Escalado } from "./Escalado";
 import { PaginaPortada, estiloFoto } from "./Hoja";
 import type { ContextoHoja } from "./Hoja";
 import { CampoTexto, Segmentado } from "./controles";
 import {
-  ACENTOS_SUGERIDOS,
   COMPOSICIONES,
   LIMITES,
   PAPELES,
+  acentosParaUnidad,
   evaluarAcento,
   monogramaPorDefecto,
   normalizarHex,
@@ -127,6 +129,15 @@ export function Encuadre({ url, foto, aspecto, onChange }: { url: string; foto: 
 
 /* ---------- El editor ---------- */
 
+function Muestra({ a, actual, onElegir }: { a: { hex: string; nombre: string }; actual: string; onElegir: (hex: string) => void }) {
+  return (
+    <label title={`${a.nombre} · ${a.hex.toUpperCase()}`}>
+      <input type="radio" name="vi-acento" checked={actual === a.hex} onChange={() => onElegir(a.hex)} aria-label={`${a.nombre}, ${a.hex.toUpperCase()}`} />
+      <i style={{ background: a.hex }} />
+    </label>
+  );
+}
+
 export interface PropsEditorPortada {
   ctx: ContextoHoja;
   portada: PortadaDiseno;
@@ -134,13 +145,15 @@ export interface PropsEditorPortada {
   unidadId: string;
   puedeDiseno: boolean;
   puedePerfil: boolean;
+  /** Nombres de las unidades de las que cuelga la unidad: un programa toma el color de su facultad. */
+  linaje?: string[];
   guardando: boolean;
   aviso: Aviso | null;
   onGuardar: (portada: PortadaDiseno, perfil: PerfilOficina) => void;
   onCerrar: () => void;
 }
 
-export function EditorPortada({ ctx, portada: inicial, perfil: perfilInicial, unidadId, puedeDiseno, puedePerfil, guardando, aviso, onGuardar, onCerrar }: PropsEditorPortada) {
+export function EditorPortada({ ctx, portada: inicial, perfil: perfilInicial, unidadId, puedeDiseno, puedePerfil, linaje, guardando, aviso, onGuardar, onCerrar }: PropsEditorPortada) {
   const [p, setP] = useState(inicial);
   const [perfil, setPerfil] = useState(perfilInicial);
   const [error, setError] = useState("");
@@ -153,7 +166,9 @@ export function EditorPortada({ ctx, portada: inicial, perfil: perfilInicial, un
   const acento = useMemo(() => evaluarAcento(perfil.acento), [perfil.acento]);
   const remotaFoto = useUrlImagen(p.foto?.ruta);
   const remotaEscudo = useUrlImagen(perfil.logoRuta);
-  const fotoUrl = p.foto ? (locales[p.foto.ruta] ?? remotaFoto.data ?? null) : null;
+  const remotaGaleria = useUrlImagen(p.fondo === "foto" ? p.galeria : null, BUCKET_GALERIA);
+  const fotoUrl = p.fondo === "foto" ? (remotaGaleria.data ?? null) : p.foto ? (locales[p.foto.ruta] ?? remotaFoto.data ?? null) : null;
+  const acentos = useMemo(() => acentosParaUnidad(perfil.nombre, linaje), [perfil.nombre, linaje]);
   const escudoUrl = perfil.logoRuta ? (locales[perfil.logoRuta] ?? remotaEscudo.data ?? null) : null;
   const medidas = PAPELES[ctx.papel];
   const aspecto = `${medidas.ancho} / ${Math.round(medidas.alto * 0.42 * 10) / 10}`;
@@ -232,7 +247,7 @@ export function EditorPortada({ ctx, portada: inicial, perfil: perfilInicial, un
           valor={comp.conFoto ? p.fondo : "color"}
           deshabilitado={!puedeDiseno || !comp.conFoto}
           opciones={[
-            { id: "foto", texto: "Foto institucional" },
+            { id: "foto", texto: "Galería Institucional" },
             { id: "color", texto: "Color" },
             { id: "propia", texto: "Imagen propia" },
           ]}
@@ -243,16 +258,18 @@ export function EditorPortada({ ctx, portada: inicial, perfil: perfilInicial, un
         />
         {!comp.conFoto && <p className="vi-hint">El fondo con foto es de la composición «Foto superior».</p>}
 
+        {comp.conFoto && p.fondo === "foto" && <SelectorGaleria valor={p.galeria} deshabilitado={!puedeDiseno} onElegir={(ruta) => cambiar({ galeria: ruta })} />}
+
         {comp.conFoto && puedeDiseno && (
           <fieldset>
-            <legend>Imagen de la portada</legend>
+            <legend>Imagen propia</legend>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
               <button type="button" className="inf-btn inf-btn--sm" disabled={subir.isPending} onClick={() => inputFoto.current?.click()}>
                 {subir.isPending ? "Subiendo…" : p.foto ? "Cambiar la imagen" : "Subir una imagen"}
               </button>
               {p.foto && (
                 <button type="button" className="inf-btn inf-btn--sm inf-btn--ghost" onClick={() => cambiar({ foto: null, fondo: "foto" })}>
-                  Quitar y usar la foto institucional
+                  Quitar y volver a la Galería Institucional
                 </button>
               )}
               <input ref={inputFoto} type="file" accept="image/png,image/jpeg,image/webp" hidden aria-label="Subir imagen de portada" onChange={(e) => { void subirImagen(e.target.files?.[0], "foto"); e.target.value = ""; }} />
@@ -285,13 +302,25 @@ export function EditorPortada({ ctx, portada: inicial, perfil: perfilInicial, un
 
         <fieldset disabled={!puedePerfil}>
           <legend id="vi-acento">Color de acento</legend>
-          <div className="vi-sw" role="radiogroup" aria-labelledby="vi-acento">
-            {ACENTOS_SUGERIDOS.map((a) => (
-              <label key={a.hex} title={a.nombre}>
-                <input type="radio" name="vi-acento" checked={acento.hex === a.hex} onChange={() => cambiarPerfil({ acento: a.hex })} aria-label={a.nombre} />
-                <i style={{ background: a.hex }} />
-              </label>
-            ))}
+          <div role="radiogroup" aria-labelledby="vi-acento" className="vi-sw-grupos">
+            {acentos.facultad && (
+              <div className="vi-sw-grupo">
+                <span className="vi-sw-tit">Su facultad</span>
+                <div className="vi-sw">
+                  <Muestra a={acentos.facultad} actual={acento.hex} onElegir={(hex) => cambiarPerfil({ acento: hex })} />
+                </div>
+              </div>
+            )}
+            <div className="vi-sw-grupo">
+              <span className="vi-sw-tit">Institucionales</span>
+              <div className="vi-sw">
+                {acentos.institucionales.map((a) => (
+                  <Muestra key={a.hex} a={a} actual={acento.hex} onElegir={(hex) => cambiarPerfil({ acento: hex })} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="vi-sw">
             <span className="vi-libre">
               <input
                 type="color"

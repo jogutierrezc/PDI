@@ -1,0 +1,55 @@
+Regresar
+Planeación y Seguimiento
+Importar la planificación
+Importar la planificación de la oficina
+
+Cuatro pasos para crear de una vez las actividades de Tecnología e Infraestructura TI. El archivo se lee en su navegador y nada sale de él hasta el último paso.
+
+Descargar la plantilla y elegir el archivo
+(hecho)
+2
+Revisar lo leído
+(paso actual)
+3
+Corregir
+(pendiente)
+4
+Crear las actividades
+(pendiente)
+Revisar lo leído
+
+Esto es lo que encontró el portal en su archivo. Aún no se ha creado nada.
+
+Actividades listas
+3
+Con errores
+0
+no se importan
+Sin responsable
+0
+se asignan después
+Hitos
+1
+Vista previa
+Actividad
+Línea
+Fecha de fin
+Responsables
+Levantar el inventario de aulas de ingeniería
+#1
+30 ago 2027
+Camilo Rojas
+Definir el catálogo de equipos de usuario final
+#2
+15 sep 2027
+Iván Quiroga
+Entregar el informe semestral de la oficina
+Propia
+10 dic 2027
+Mariana Solano
+
+Se ignoraron 2 filas de ejemplo.
+
+El borrador se guarda solo en este equipo.
+Atrás
+Seguir

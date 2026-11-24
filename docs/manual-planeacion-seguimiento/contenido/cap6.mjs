@@ -11,6 +11,7 @@ export default {
       ["Una actividad está por vencer", "A las personas asignadas; si no hay, a los gestores.", "7 días antes, 3 días antes y el mismo día de la fecha límite (los plazos de la oficina). Solo si no está hecha, y sin repetirse el mismo día."],
       ["Una actividad venció", "A las personas asignadas; copia al gestor.", "Cada día después de la fecha límite, hasta 3 avisos. El gestor recibe copia una vez, pasado el plazo de su oficina (la base parte de 24 horas; «Cómo te avisamos» muestra el vigente)."],
       ["Le pasaron o le quitaron una actividad", "A quien recibe, a quien cede y, en copia, a los gestores.", "Al transferir. Incluye el motivo, de al menos 20 caracteres."],
+      ["Una actividad aporta a un proyecto de su oficina", "A los gestores de la oficina dueña del proyecto, menos a quien crea la actividad.", "Al crear una actividad (también por Excel) vinculada a un proyecto de otra oficina."],
       ["Reportaron un avance", "A los gestores de la oficina, menos al autor.", "Cuando un colaborador (o un gestor) reporta. Dice quién, de qué actividad y cuánto avanzó."],
       ["Hay avances esperando su revisión", "Al gestor, un aviso por oficina.", "Cuando un avance pasa 72 horas sin revisar (plazo de la oficina), una sola vez por conjunto de avances."],
       ["Validaron su avance", "A quien lo reportó.", "Cuando el gestor lo valida. Dice cuánto quedó validado."],

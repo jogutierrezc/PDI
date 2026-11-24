@@ -1,0 +1,38 @@
+Regresar
+Planeación y Seguimiento
+Crear plan
+Crear plan
+
+Cada plan tiene su oficina dueña, su plantilla y sus pilares. Después se agregan los proyectos uno a uno o se cargan desde Excel.
+
+1
+Datos del plan
+(paso actual)
+2
+Oficina dueña y alcance
+(pendiente)
+3
+Plantilla de carga
+(pendiente)
+4
+Pilares del plan
+(pendiente)
+5
+Revisar y crear
+(pendiente)
+Datos del plan
+
+Cómo se llama, qué años cubre y para qué sirve.
+
+Nombre del plan (obligatorio)
+
+Por ejemplo: PDIFyT 2027-2035 o Plan de Tecnología 2027-2029.
+
+Año inicial (obligatorio)
+Año final (obligatorio)
+Descripción
+
+Opcional. 0/2000
+
+Guardado hace un momento en este equipo
+Siguiente

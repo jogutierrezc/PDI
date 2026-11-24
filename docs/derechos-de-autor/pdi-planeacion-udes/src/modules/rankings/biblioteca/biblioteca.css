@@ -1,0 +1,380 @@
+/* =============================================================================
+   Biblioteca de evidencias de THE Impact. Se apoya en las piezas rk-rep-* del
+   reporte (tarjetas, botones, pastillas, filtros) y solo agrega lo propio:
+   el árbol del ZIP, el avance y la lista de archivos. Solo tokens.
+   ========================================================================== */
+
+.rk-bib-caja {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* --- Árbol del ZIP ------------------------------------------------------- */
+
+.rk-bib-arbol {
+  max-height: 22rem;
+  padding: var(--space-2) var(--space-3);
+  overflow: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overscroll-behavior: contain;
+}
+
+.rk-bib-rama > summary {
+  display: block;
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.rk-bib-rama > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rk-bib-rama > summary:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 1px;
+}
+
+.rk-bib-hijos {
+  margin-left: var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--line);
+}
+
+.rk-bib-nodo {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-1) var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.rk-bib-nodo-ic {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: var(--brand-blue-soft);
+  stroke: var(--brand-blue);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.rk-bib-rama[open] > summary .rk-bib-nodo-ic {
+  fill: var(--surface);
+}
+
+.rk-bib-nodo-n {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.rk-bib-nodo-c {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rk-bib-rama > summary:hover .rk-bib-nodo {
+    background: var(--surface-3);
+    border-radius: var(--radius-sm);
+  }
+}
+
+.rk-bib-avisos summary {
+  cursor: pointer;
+  color: var(--ink-secondary);
+  font-weight: 600;
+}
+
+/* --- Avance de la subida -------------------------------------------------- */
+
+.rk-bib-avance {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.rk-bib-avance .rk-rep-barra {
+  height: 8px;
+}
+
+.rk-bib-conteo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* --- Filtros y lote ------------------------------------------------------- */
+
+.rk-bib-cuenta {
+  margin-left: var(--space-1);
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.rk-bib-buscar {
+  flex: 1 1 16rem;
+}
+
+.rk-bib-buscar .rk-rep-input {
+  width: 100%;
+}
+
+.rk-bib-lote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+/* --- Lista de archivos ---------------------------------------------------- */
+
+.rk-bib-lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.rk-bib-fila {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rk-bib-fila:last-child {
+  border-bottom: 0;
+}
+
+.rk-bib-fila.is-abierta {
+  background: var(--surface-2);
+}
+
+.rk-bib-fila-l {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.25fr) minmax(0, 1.4fr) 6.5rem 6.5rem auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+}
+
+.rk-bib-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand-blue);
+}
+
+.rk-bib-archivo {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.rk-bib-ext {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2.6rem;
+  height: 1.75rem;
+  color: var(--brand-navy);
+  background: var(--surface-3);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.rk-bib-nombre {
+  display: grid;
+  min-width: 0;
+}
+
+.rk-bib-nombre b {
+  font-size: var(--text-sm);
+}
+
+.rk-bib-nombre small {
+  font-size: var(--text-xs);
+}
+
+.rk-bib-prop {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.rk-bib-prop-t {
+  min-width: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.rk-bib-ods {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.rk-bib-puntaje {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 2rem;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.rk-bib-puntaje.is-alto {
+  color: var(--status-done);
+  background: var(--status-done-soft);
+}
+
+.rk-bib-puntaje.is-medio {
+  color: var(--status-pending);
+  background: var(--status-pending-soft);
+}
+
+.rk-bib-puntaje.is-bajo {
+  color: var(--ink-muted);
+  background: var(--surface-3);
+}
+
+/* --- Detalle -------------------------------------------------------------- */
+
+.rk-bib-detalle {
+  margin: 0 var(--space-3) var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.rk-bib-fila-l > .rk-rep-pill {
+  justify-self: start;
+}
+
+.rk-bib-detalle-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.rk-bib-propuestas {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rk-bib-propuesta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.rk-bib-propuesta.is-elegida {
+  background: var(--brand-blue-soft);
+  border-color: var(--brand-blue);
+}
+
+.rk-bib-propuesta input {
+  margin-top: 3px;
+  accent-color: var(--brand-blue);
+}
+
+.rk-bib-propuesta-c {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .rk-bib-fila-l {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  }
+  .rk-bib-ods {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .rk-bib-fila-l {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: var(--space-2);
+  }
+  .rk-bib-prop {
+    grid-column: 2 / -1;
+    flex-wrap: wrap;
+  }
+  .rk-bib-fila-l > .rk-rep-pill {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .rk-bib-fila-l > .rk-rep-btn {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .rk-bib-detalle {
+    margin: 0 var(--space-2) var(--space-2);
+  }
+  .rk-bib-detalle-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+  .rk-bib-lote > * {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rk-bib-propuesta,
+  .rk-bib-nodo-ic {
+    transition: none;
+  }
+}
+
+/* Que nada empuje la tarjeta en pantallas angostas. */
+.rk-bib-lista,
+.rk-bib-lote,
+.rk-bib-arbol,
+.rk-bib-avance {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rk-bib-lote .rk-rep-select,
+.rk-bib-lote .rk-rep-btn {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.rk-bib .rk-rep-filtros .rk-rep-select {
+  max-width: 100%;
+}

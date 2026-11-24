@@ -1,0 +1,36 @@
+Regresar
+Planeación y Seguimiento
+Cargar la planificación
+Cargar la planificación
+
+Plan «PDIFyT 2027-2035». Cuatro pasos: el archivo se lee en su navegador y nada sale de él hasta el último.
+
+1
+Descargar la plantilla y elegir el archivo
+(paso actual)
+2
+Revisar lo leído
+(pendiente)
+3
+Corregir
+(pendiente)
+4
+Crear la versión borrador
+(pendiente)
+Descargar la plantilla y elegir el archivo
+
+Baje la plantilla, llénela con las líneas del plan y elíjala aquí.
+
+1. La plantilla
+
+Trae las instrucciones campo por campo, listas desplegables (campus, pilar, prioridad, fuente, oficina) y colores: amarillo es obligatorio, azul claro es opcional y gris no se toca. Las dos primeras filas son ejemplos y no se importan.
+
+Descargar la plantilla de Excel
+2. Su archivo
+
+Libro de Excel (.xlsx) de hasta 5 MB y 300 líneas. Las fórmulas se ignoran. El archivo no sale de su navegador hasta el último paso.
+
+Elegir el archivo
+Ningún archivo elegido
+El borrador se guarda solo en este equipo.
+Revisar lo leído

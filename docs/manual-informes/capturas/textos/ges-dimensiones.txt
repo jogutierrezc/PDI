@@ -1,0 +1,342 @@
+Informes Institucionales
+Informes Institucionales · 2026
+Mi informe
+Panel
+Mi informe
+Vista del informe
+Guía con Pilo
+PLANTILLA A · DECANATURA
+Facultad de Ingeniería ?
+Informe 2026 · su papel: Gestor
+◐
+Borrador
+7 de 10 listas
+Las cifras siguen en vivo hasta que envíe.
+Vista del informe en papel
+Libro de Excel
+?
+1
+Resumen ejecutivo
+Lista
+2
+Alineación estratégica con el PDI
+Lista
+3
+Objetivos y metas 2026
+Lista
+4
+Resultados por dimensión estratégica
+En curso
+5
+Puntos críticos y acciones de mejora
+Lista
+6
+Logros destacados
+Lista
+7
+Evidencias y fuentes de verificación
+Lista
+8
+Conclusiones
+Sin empezar
+9
+Reconocimientos externos
+Sin empezar
+10
+Anexos
+Lista
+?
+Enviar
+Se habilita cuando las 10 secciones estén listas (van 7).
+SECCIÓN 4 DE 10
+Resultados por dimensión estratégica ?
+En curso
+
+Las cifras vienen solas; usted explica lo que no se ve en ellas.
+
+APORTE
+Indicadores que escribe la unidad: cifra actual, anterior y meta. El estado se calcula solo.
+¿A qué criterios reporta su oficina?
+
+Es opcional: marque solo los que aplican. Cada criterio marcado abre su formulario de indicadores y acciones; los demás no le exigen nada.
+
+Extensión
+Criterio base
+Internacionalización
+Criterio base
+Investigación
+Lo pide Planeación
+Enseñanza
+Lo pide Planeación
+Gestión administrativa y financiera
+Lo pide Planeación
+Acciones estratégicas
+Criterio base
+Permanencia y graduación
+Aprobado por Planeación
+Internacionalización del currículo
+Aprobado por Planeación
+Un criterio propio para su informe
+Crear criterio
+Lo usa ya en este informe. Si le sirve a otras unidades, sugiéralo a Planeación y se aprueba para el siguiente ciclo.
+Importar Excel
+Descargar plantilla
+Bajar lo escrito
+LO QUE PIDE PLANEACIÓN 3
+DATO
+UNIDAD
+MEJOR
+ANTERIOR
+ACTUAL
+META
+ESTADO
+Estudiantes en prácticas profesionales
+
+
+Lo pide Planeación
+Manual · Coordinación de Prácticas · Enseñanza
+Conteo
+Más
+◐
+Parcial
+91,4 % de la meta
+
+Alcanzó 91,4 % de la meta (Parcial) y mejoró 25,5 % frente al periodo anterior (de 51 a 64).
+
+Fuente propia de la unidad
+Justificación (obligatoria)
+Respaldo: evidencias y tablas o gráficas de UDrive (1)
+Evidencias (anexos) que respaldan esto
+Anexo 1 · Resolución de acreditación Ingeniería Industrial.pdf
+Anexo 2 · Acta de inauguración del laboratorio.pdf
+Anexo 3 · Tablero de permanencia 2026
+Tablas y gráficas de UDrive · se actualizan mientras el informe está en borrador
++ Agregar una tabla o gráfica de UDrive
+Abrir UDrive para crear una
+Egresados vinculados laboralmente
+
+
+Lo pide Planeación
+Excel · Encuesta de seguimiento a egresados · Enseñanza
+%
+Más
+◐
+Parcial
+97,6 % de la meta
+
+Alcanzó 97,6 % de la meta (Parcial) y mejoró 6,4 % frente al periodo anterior (de 78 % a 83 %).
+
+Fuente propia de la unidad
+Justificación (obligatoria)
+Respaldo: evidencias y tablas o gráficas de UDrive (opcional)
+Publicaciones indexadas del año
+
+
+Sugerido por Planeación
+UDES en Cifras · UDES en Cifras · Producción · Investigación
+Conteo
+Más
+Sin meta
+
+Falta la cifra actual.
+
+Fuente propia de la unidad
+Justificación
+Respaldo: evidencias y tablas o gráficas de UDrive (opcional)
+INVESTIGACIÓN
+INDICADOR
+UNIDAD
+MEJOR
+ANTERIOR
+ACTUAL
+META
+ESTADO
+QUITAR
+Conteo
+%
+pp
+$
+Más
+Menos
+◐
+Parcial
+84,4 % de la meta
+Detalle
+Quitar
+
+Alcanzó 84,4 % de la meta (Parcial) y empeoró 7,3 % frente al periodo anterior (de 41 a 38).
+
+Se conecta con el pilar del PDI
+Ninguno (no se conecta)
+P1. Formación personalizada
+P2. Investigación con impacto
+P3. Proyección e internacionalización
+P4. Sostenibilidad institucional
+Respaldo: evidencias y tablas o gráficas de UDrive (opcional)
++ Añadir cifra
++ Añadir acción
+ENSEÑANZA
+INDICADOR
+UNIDAD
+MEJOR
+ANTERIOR
+ACTUAL
+META
+ESTADO
+QUITAR
+Conteo
+%
+pp
+$
+Más
+Menos
+◐
+Parcial
+93,3 % de la meta
+Detalle
+Quitar
+
+Alcanzó 93,3 % de la meta (Parcial) y mejoró 35,5 % frente al periodo anterior (de 310 a 420).
+
+Se conecta con el pilar del PDI
+Ninguno (no se conecta)
+P1. Formación personalizada
+P2. Investigación con impacto
+P3. Proyección e internacionalización
+P4. Sostenibilidad institucional
+Respaldo: evidencias y tablas o gráficas de UDrive (1)
+Evidencias (anexos) que respaldan esto
+Anexo 1 · Resolución de acreditación Ingeniería Industrial.pdf
+Anexo 2 · Acta de inauguración del laboratorio.pdf
+Anexo 3 · Tablero de permanencia 2026
+Tablas y gráficas de UDrive · se actualizan mientras el informe está en borrador
++ Agregar una tabla o gráfica de UDrive
+Abrir UDrive para crear una
+Completa
+ACCIÓN
+Quitar
+Nombre de la acción
+Descripción de la acción
+Qué se ha hecho con la acción
+Cuándo se plantea su finalización
+Proyecciones (texto)
+Proyecciones (número)
+Unidad
+Sin unidad
+%
+pp
+$
+Se conecta con el pilar del PDI
+Ninguno (no se conecta)
+P1. Formación personalizada
+P2. Investigación con impacto
+P3. Proyección e internacionalización
+P4. Sostenibilidad institucional
+Respaldo: evidencias y tablas o gráficas de UDrive (opcional)
++ Añadir cifra
++ Añadir acción
+GESTIÓN ADMINISTRATIVA Y FINANCIERA
+INDICADOR
+UNIDAD
+MEJOR
+ANTERIOR
+ACTUAL
+META
+ESTADO
+QUITAR
+Conteo
+%
+pp
+$
+Más
+Menos
+◐
+Parcial
+96,8 % de la meta
+Detalle
+Quitar
+
+Alcanzó 96,8 % de la meta (Parcial) y mejoró 4,5 % frente al periodo anterior (de 88 % a 92 %).
+
+Se conecta con el pilar del PDI
+Ninguno (no se conecta)
+P1. Formación personalizada
+P2. Investigación con impacto
+P3. Proyección e internacionalización
+P4. Sostenibilidad institucional
+Respaldo: evidencias y tablas o gráficas de UDrive (opcional)
++ Añadir cifra
++ Añadir acción
+Conectar indicadores de UDES en Cifras o del PDI (opcional)
+APORTE
+Logros y lo que las cifras no cuentan
+Insertar una cifra viva…
+Matrícula total (2.851)
+Deserción anual (8,6 %)
+Retención de primer semestre (80,2 %)
+Saber PRO · promedio global (155)
+Profesores con doctorado (27 %)
+Evaluación docente (4,3)
+Registros calificados vigentes (14)
+Grupos categorizados (8)
+Semilleros activos (21)
+Convenios activos (35)
+Ejecución presupuestal (92 %)
+Prácticas en laboratorios externos (64)
+Egresados empleados a los 6 meses (83 %)
+Estudiantes en prácticas profesionales (64)
+Egresados vinculados laboralmente (83 %)
+Estudiantes con tutoría de pares (420)
+Artículos en revistas indexadas (38)
+Ejecución del presupuesto de laboratorios (92 %)
+Metas con resultado (3)
+Metas cumplidas o superadas (0)
+Indicadores reportados (18)
+Indicadores que cumplen o superan la meta (1)
+Indicadores que cumplen o superan la meta (%) (6 %)
+Indicadores rezagados (0)
+Indicadores que mejoraron frente al periodo anterior (17)
+Insertar
+La cifra queda como vínculo: si la fuente cambia, el texto cambia.
+0 palabras
+Pilo redacta un borrador
+ASÍ SE LEERÁ, CON LAS CIFRAS VIVAS
+Escriba o inserte una cifra.
+Tablas y gráficas de UDrive · se actualizan mientras el informe está en borrador
++ Agregar una tabla o gráfica de UDrive
+Abrir UDrive para crear una
+Controles ?
+✓
+Bien:
+3 indicadores escritos con su estado calculado
+✓
+Bien:
+1 acción descrita
+✓
+Bien:
+Los 3 datos que pide Planeación están respondidos
+!
+Revisar:
+4 cifras que pide Planeación aún sin justificación
+✓
+Bien:
+Cada cifra tiene su fuente
+✓
+Bien:
+Sin frases de ejemplo de la plantilla
+✓
+Bien:
+Las cifras del texto están enlazadas a su fuente
+✓
+Bien:
+Cifras en vivo hasta que envíe. Corte de referencia: 31 de dic de 2026
+Datos que puede consultar ?
+UDES en Cifras
+Cifras del periodo con su fuente y corte
+Abrir UDES en Cifras
+Plan de Desarrollo
+Pilares, proyectos y su avance
+Abrir el portal de implementación
+Pilo
+Pregunte de dónde sale una cifra o pida comparar con otra unidad.
+Preguntar a Pilo

@@ -1,0 +1,105 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0 
+Financiero: En revisión de la VAF
+
+Todos los planes
+Editar el plan
+Crear un plan
+Financiación y presupuesto
+
+Los avisos de las actividades llegan a su correo institucional. Los envía el servidor, no esta pantalla: aquí solo se explica cuáles hay y cuándo salen. Cuando usted asigna o transfiere, la pantalla le muestra antes a quién se le va a avisar.
+
+Plazos de Tecnología e Infraestructura TI
+
+Esta oficina usa los plazos generales.
+
+Oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Origen
+General
+Aviso antes del vencimiento
+7 días antes, 3 días antes, el mismo día
+Avisos de vencida
+Hasta 3, uno por día
+Copia al gestor de una actividad vencida
+Después de 48 horas
+Plazo para validar un avance
+72 horas; pasado ese plazo el avance se marca «plazo vencido» y se avisa al gestor
+Los avisos por vencimiento
+Activos
+Cambiar los plazos de esta oficina
+Le asignaron una actividad
+A quién le llega
+La persona que recibe la actividad
+Cuándo
+Al momento de asignarla
+Qué dice
+Dice qué actividad es, de qué línea del plan, la fecha límite y quién la asignó. No se avisa a quien asigna.
+Una actividad está por vencer
+A quién le llega
+Las personas asignadas
+Cuándo
+7 días antes, 3 días antes, el mismo día de la fecha límite · plazo de la oficina
+Qué dice
+Solo si la actividad no está hecha. No se repite el mismo aviso el mismo día.
+Una actividad venció
+A quién le llega
+Las personas asignadas y el gestor de la oficina
+Cuándo
+Cada día después de la fecha límite, hasta 3 avisos · plazo de la oficina
+Qué dice
+A las personas asignadas. El gestor de la oficina recibe copia pasadas 48 horas de vencida.
+Le pasaron o le quitaron una actividad
+A quién le llega
+La persona que la recibe, la que la deja y, en copia, el gestor
+Cuándo
+Al momento de transferirla
+Qué dice
+Incluye el motivo que escribió el gestor (de al menos 20 caracteres), que también queda en el historial.
+Reportaron un avance
+A quién le llega
+El gestor de la oficina
+Cuándo
+Cuando un colaborador (o un gestor) reporta un avance
+Qué dice
+Dice quién lo reportó, de qué actividad y cuánto avanzó; lleva a la pantalla de revisión.
+Hay avances esperando su revisión
+A quién le llega
+El gestor de la oficina
+Cuándo
+Cuando un avance pasa 72 horas sin revisarse (una sola vez por avance) · plazo de la oficina
+Qué dice
+«Hay N avances esperando tu revisión». Lleva a la cola «Por validar».
+Validaron su avance
+A quién le llega
+La persona que lo reportó
+Cuándo
+Cuando el gestor valida el avance
+Qué dice
+Dice cuánto quedó validado. Si llegó al 100 %, la actividad quedó «Hecha».
+Le devolvieron un avance
+A quién le llega
+La persona que lo reportó
+Cuándo
+Cuando el gestor devuelve el avance
+Qué dice
+Incluye la nota del gestor (de al menos 20 caracteres): qué corregir antes de volver a reportar.
+Una actividad se cumplió
+A quién le llega
+El gestor de la oficina y las personas asignadas
+Cuándo
+Cuando pasa a «Hecho» (por un avance validado al 100 % o por el cierre del gestor)
+Qué dice
+Un resumen: quién la hizo y si cerró a tiempo. No se avisa a quien la cerró.
+
+Si un aviso no le llega, revise la carpeta de correo no deseado y que su correo en Usuarios sea el institucional.

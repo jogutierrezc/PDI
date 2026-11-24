@@ -1,0 +1,315 @@
+/* =============================================================================
+   Presupuesto · estilos propios
+
+   Todo lo de esta hoja son cifras de dinero, y las cifras de dinero se leen
+   comparándolas en vertical: `tabular-nums` en cada una y alineación a la
+   derecha en las tablas. Sin eso, "1.240.000.000" y "980.000.000" no se pueden
+   ordenar de un vistazo aunque estén una encima de otra.
+   ========================================================================== */
+
+/* --- El aviso de que esto no se publica ---------------------------------------
+   Va arriba del todo y no en letra pequeña al pie: quien entra aquí necesita
+   saber, antes de leer una cifra, que está en la parte cerrada del portal.
+   ---------------------------------------------------------------------------- */
+
+.budget-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--brand-blue);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.budget-privacy svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--brand-blue);
+}
+
+.budget-privacy b {
+  color: var(--ink);
+}
+
+/* --- Las tres cifras del plan -------------------------------------------------- */
+
+.budget-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-4);
+}
+
+.budget-tile {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-5) var(--space-6);
+}
+
+.budget-tile__label {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.budget-tile__value {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-tile__hint {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+/* --- Tablas de cifras ---------------------------------------------------------- */
+
+.budget-table-wrap {
+  /* Seis columnas de importes no caben en un portátil estrecho. Se desplaza la
+     tabla, no la página. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.budget-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.budget-table th,
+.budget-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* La primera columna es el nombre, no una cifra: se lee de izquierda a derecha. */
+.budget-table th:first-child,
+.budget-table td:first-child,
+.budget-table tbody th[scope="row"] {
+  text-align: left;
+}
+
+.budget-table thead th {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.budget-table tbody th[scope="row"] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Un año sin reportar: se atenúa pero no se esconde. El hueco es el dato —dice
+   qué falta por reportar— y ocultarlo lo haría invisible justo para quien tiene
+   que rellenarlo. */
+.budget-table tr.is-empty td,
+.budget-table tr.is-empty th {
+  color: var(--ink-faint);
+}
+
+.budget-note {
+  max-width: 22rem;
+  white-space: normal;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.budget-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.budget-swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+}
+
+/* --- Proyecto a proyecto -------------------------------------------------------- */
+
+.budget-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.budget-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.budget-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.budget-card__head:hover {
+  background: var(--surface-2);
+}
+
+.budget-card__title {
+  display: grid;
+  gap: 2px;
+  min-width: 12rem;
+  flex: 1;
+}
+
+.budget-card__title strong {
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+.budget-card__title small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.budget-card__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
+.budget-card__figures > span {
+  display: grid;
+  gap: 2px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.budget-card__figures small {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.budget-card__rate {
+  color: var(--brand-blue) !important;
+}
+
+.budget-card__body {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.budget-card__body h3 {
+  margin-bottom: var(--space-3);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.budget-years {
+  overflow-x: auto;
+}
+
+/* --- Las acciones que ejecutan el presupuesto ----------------------------------- */
+
+.budget-action-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.budget-action-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.budget-action__name {
+  display: grid;
+  gap: 2px;
+  min-width: 12rem;
+  flex: 1;
+}
+
+.budget-action__name strong {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.budget-action__name small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.budget-action__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 9rem;
+}
+
+.budget-action__progress .progress-track {
+  flex: 1;
+}
+
+.budget-action__progress b {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 48rem) {
+  .budget-card__figures {
+    gap: var(--space-4);
+  }
+
+  .budget-card__figures > span {
+    text-align: left;
+  }
+}

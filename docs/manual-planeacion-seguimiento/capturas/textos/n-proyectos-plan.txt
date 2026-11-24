@@ -1,0 +1,696 @@
+Regresar a proyectos
+Planeación y Seguimiento
+Proyectos del plan
+Proyectos del plan
+
+«PDIFyT 2027-2035» · borrador v1.0
+
+Agregar proyecto
+
+Agregue, edite o elimine los proyectos del borrador. Cuando estén todos, envíelos a evaluación de la VAF: se publica la versión y se abre la evaluación financiera. También puede cargarlos desde Excel.
+
+Proyectos
+75
+Monto solicitado
+$ 133.374 M
+Proyecto
+Campus
+Prioridad
+Solicitado
+Acciones
+Infraestructura para la docencia
+#1 · IFT · P2
+Todos los campus
+Alto
+$ 6.971 M
+Editar
+el proyecto 1
+Eliminar
+el proyecto 1
+Infraestructura de usuario final
+#2 · IFT · P2
+Todos los campus
+Alto
+$ 6.381 M
+Editar
+el proyecto 2
+Eliminar
+el proyecto 2
+Servicios tecnológicos
+#3 · IFT · P2
+Todos los campus
+Alto
+$ 5.421 M
+Editar
+el proyecto 3
+Eliminar
+el proyecto 3
+IA, analítica, datos y tecnologías emergentes
+#4 · IFT · P2
+Todos los campus
+Alto
+$ 2.211 M
+Editar
+el proyecto 4
+Eliminar
+el proyecto 4
+Procesamiento y almacenamiento
+#5 · IFT · P2
+Todos los campus
+Crítico
+$ 1.111 M
+Editar
+el proyecto 5
+Eliminar
+el proyecto 5
+Redes y conectividad
+#6 · IFT · P2
+Todos los campus
+Crítico
+$ 343 M
+Editar
+el proyecto 6
+Eliminar
+el proyecto 6
+Seguridad de la infraestructura tecnológica
+#7 · IFT · P2
+Todos los campus
+Crítico
+$ 565 M
+Editar
+el proyecto 7
+Eliminar
+el proyecto 7
+Plataformas institucionales
+#8 · IFT · P2
+Todos los campus
+Alto
+$ 1.459 M
+Editar
+el proyecto 8
+Eliminar
+el proyecto 8
+Computación de alto rendimiento
+#9 · IFT · P2
+Bucaramanga
+Largo plazo
+$ 1.845 M
+Editar
+el proyecto 9
+Eliminar
+el proyecto 9
+Observatorio de tendencias y vigilancia tecnológica
+#10 · IFT · P2
+Bucaramanga
+Largo plazo
+$ 2.150 M
+Editar
+el proyecto 10
+Eliminar
+el proyecto 10
+Remodelación Clínica
+#11 · PLF · P4
+Bucaramanga
+Medio
+$ 350 M
+Editar
+el proyecto 11
+Eliminar
+el proyecto 11
+Adecuación sala de juegos + materiales didácticos
+#12 · PLF · P2
+Bucaramanga
+Crítico
+$ 7 M
+Editar
+el proyecto 12
+Eliminar
+el proyecto 12
+Actualización y reubicación cabina de radio + equipos audiovisuales
+#13 · PLF · P2
+Bucaramanga
+Medio
+$ 30 M
+Editar
+el proyecto 13
+Eliminar
+el proyecto 13
+Gestión de disponibilidad de oficinas
+#14 · PLF · P4
+Bucaramanga
+Medio
+$ 10 M
+Editar
+el proyecto 14
+Eliminar
+el proyecto 14
+Adecuación consultorio empresarial + recursos bibliográficos
+#15 · PLF · P6
+Bucaramanga
+Medio
+$ 15 M
+Editar
+el proyecto 15
+Eliminar
+el proyecto 15
+Modernización agencia Élite Inhouse + equipos MAC + software
+#16 · PLF · P2
+Bucaramanga
+Medio
+$ 30 M
+Editar
+el proyecto 16
+Eliminar
+el proyecto 16
+Gestionar espacio físico para laboratorios AVD y Estimulación Sensorial
+#17 · PLF · P2
+Bucaramanga
+Medio
+$ 150 M
+Editar
+el proyecto 17
+Eliminar
+el proyecto 17
+Adecuación de múltiples laboratorios
+#18 · PLF · P6
+Bucaramanga
+Medio
+$ 382 M
+Editar
+el proyecto 18
+Eliminar
+el proyecto 18
+Adecuaciones locativas de salones
+#19 · PLF · P4
+Bucaramanga
+Medio
+$ 700 M
+Editar
+el proyecto 19
+Eliminar
+el proyecto 19
+Adecuación de instalaciones + equipos
+#20 · PLF · P2
+Bucaramanga
+Medio
+$ 60 M
+Editar
+el proyecto 20
+Eliminar
+el proyecto 20
+Renovación de laboratorios de habla, voz, audición y lenguaje
+#21 · PLF · P2
+Bucaramanga
+Medio
+$ 150 M
+Editar
+el proyecto 21
+Eliminar
+el proyecto 21
+Actualización de laboratorios de Análisis del Movimiento
+#22 · PLF · P2
+Bucaramanga
+Medio
+$ 12 M
+Editar
+el proyecto 22
+Eliminar
+el proyecto 22
+Mantenimiento laboratorio simulación + adecuación espacios profesores
+#23 · PLF · P4
+Bucaramanga
+Medio
+$ 58 M
+Editar
+el proyecto 23
+Eliminar
+el proyecto 23
+Infraestructura académica con aulas activas y laboratorios flexibles, preparada para ampliaciones futuras
+#24 · PLF · P6
+Bucaramanga
+Alto
+$ 8.000 M
+Editar
+el proyecto 24
+Eliminar
+el proyecto 24
+Conexión vial estratégica entre parqueaderos, zonas deportivas y equipamientos institucionales
+#25 · PLF · P4
+Bucaramanga
+Alto
+$ 2.500 M
+Editar
+el proyecto 25
+Eliminar
+el proyecto 25
+Conexión directa entre el campus académico y las zonas deportivas y culturales
+#26 · PLF · P4
+Bucaramanga
+Alto
+$ 1.500 M
+Editar
+el proyecto 26
+Eliminar
+el proyecto 26
+Reingeniería del ingreso institucional con mayor seguridad y eficiencia operativa
+#27 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 3.500 M
+Editar
+el proyecto 27
+Eliminar
+el proyecto 27
+Escenario multipropósito para eventos académicos y culturales de gran formato
+#28 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 20.000 M
+Editar
+el proyecto 28
+Eliminar
+el proyecto 28
+Equipamiento deportivo y cultural de aforo masivo y uso multifuncional
+#29 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 10.000 M
+Editar
+el proyecto 29
+Eliminar
+el proyecto 29
+Alojamiento con ambientes de estudio, conectividad y servicios complementarios
+#30 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 12.000 M
+Editar
+el proyecto 30
+Eliminar
+el proyecto 30
+Centro de Desarrollo Tecnológico consolidado en 2025 (Acuerdo 009), orientado
+#31 · PLF · P3
+Bucaramanga
+Alto
+$ 3.000 M
+Editar
+el proyecto 31
+Eliminar
+el proyecto 31
+Reposición de redes de media tensión y sistema de medida
+#32 · PLF · P4
+Bucaramanga
+Crítico
+$ 350 M
+Editar
+el proyecto 32
+Eliminar
+el proyecto 32
+Reposición de redes hidraulicas
+#33 · PLF · P4
+Bucaramanga
+Alto
+$ 300 M
+Editar
+el proyecto 33
+Eliminar
+el proyecto 33
+Implementación de redes contraincendio generales
+#34 · PLF · P4
+Bucaramanga
+Crítico
+$ 550 M
+Editar
+el proyecto 34
+Eliminar
+el proyecto 34
+Reposición de equipos de transporte vertical
+#35 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 400 M
+Editar
+el proyecto 35
+Eliminar
+el proyecto 35
+Instalación de aire acondicionado aulas chibcha
+#36 · PLF · P4
+Bucaramanga
+Medio
+$ 1.100 M
+Editar
+el proyecto 36
+Eliminar
+el proyecto 36
+Actualización arquitectónica de fachadas de salones chibcha
+#37 · PLF · P4
+Bucaramanga
+Medio
+$ 600 M
+Editar
+el proyecto 37
+Eliminar
+el proyecto 37
+Reposición de pisos y cielo raso aulas
+#38 · PLF · P4
+Bucaramanga
+Medio
+$ 600 M
+Editar
+el proyecto 38
+Eliminar
+el proyecto 38
+Reposición de equipos de climatización
+#39 · PLF · P4
+Bucaramanga
+Medio
+$ 450 M
+Editar
+el proyecto 39
+Eliminar
+el proyecto 39
+Actualización arquitectonica de la biblioteca
+#40 · PLF · P4
+Bucaramanga
+Alto
+$ 400 M
+Editar
+el proyecto 40
+Eliminar
+el proyecto 40
+Actualizaciones estructurales ( Vulnerabilidad sísmica y diseños de reforzamiento) No incluye obras
+#41 · PLF · P4
+Bucaramanga
+Alto
+$ 400 M
+Editar
+el proyecto 41
+Eliminar
+el proyecto 41
+Expansión de los sistemas solares Fotovoltaicos
+#42 · PLF · P4
+Bucaramanga
+Alto
+$ 600 M
+Editar
+el proyecto 42
+Eliminar
+el proyecto 42
+Adecuación del laboratorio
+#43 · PLF · P4
+Cúcuta
+Medio
+$ 135 M
+Editar
+el proyecto 43
+Eliminar
+el proyecto 43
+Garantizar recursos físicos y tecnológicos
+#44 · PLF · P4
+Cúcuta
+Largo plazo
+$ 522 M
+Editar
+el proyecto 44
+Eliminar
+el proyecto 44
+Plan prospectivo de internacionalización
+#45 · PLF · P4
+Cúcuta
+Largo plazo
+$ 389 M
+Editar
+el proyecto 45
+Eliminar
+el proyecto 45
+Mantenimiento, dotación y modernización de laboratorios
+#46 · PLF · P2
+Cúcuta
+Medio
+$ 29 M
+Editar
+el proyecto 46
+Eliminar
+el proyecto 46
+Adecuar puestos de trabajo
+#47 · PLF · P2
+Cúcuta
+Medio
+$ 6,6 M
+Editar
+el proyecto 47
+Eliminar
+el proyecto 47
+Renovación del borde institucional para reforzar identidad, iluminación y accesos
+#48 · PLF · P4
+Cúcuta
+Alto
+$ 600 M
+Editar
+el proyecto 48
+Eliminar
+el proyecto 48
+Optimización de flujos, señalización e infraestructura vial interna
+#49 · PLF · P4
+Cúcuta
+Crítico
+$ 350 M
+Editar
+el proyecto 49
+Eliminar
+el proyecto 49
+Construcción de subestación y planta de emergencia sede Bari
+#50 · PLF · P4
+Cúcuta
+Alto
+$ 550 M
+Editar
+el proyecto 50
+Eliminar
+el proyecto 50
+Adecuaciones de oficinas de la sede Bari y consolidación del área adminsitrativa
+#51 · PLF · P4
+Cúcuta
+Alto
+$ 4.800 M
+Editar
+el proyecto 51
+Eliminar
+el proyecto 51
+Reposición de sistema de climatización bloque Arhuaco
+#52 · PLF · P4
+Cúcuta
+Crítico
+$ 600 M
+Editar
+el proyecto 52
+Eliminar
+el proyecto 52
+Instalación de respaldo energético de la sede principal
+#53 · PLF · P4
+Cúcuta
+Crítico
+$ 400 M
+Editar
+el proyecto 53
+Eliminar
+el proyecto 53
+Construcción de estructura e Instalación de equipo ascensor para el bloque motilón
+#54 · PLF · P4
+Cúcuta
+Alto
+$ 450 M
+Editar
+el proyecto 54
+Eliminar
+el proyecto 54
+Ampliación sistema contraincendios
+#55 · PLF · P4
+Cúcuta
+Alto
+$ 300 M
+Editar
+el proyecto 55
+Eliminar
+el proyecto 55
+Expansión de sistemas solares fotovoltaicos
+#56 · PLF · P4
+Cúcuta
+Crítico
+$ 400 M
+Editar
+el proyecto 56
+Eliminar
+el proyecto 56
+Elaborar plan estratégico para laboratorio de simulación
+#57 · PLF · P2
+Valledupar
+Medio
+$ 8,1 M
+Editar
+el proyecto 57
+Eliminar
+el proyecto 57
+Garantizar disponibilidad de espacios físicos y dotación
+#58 · PLF · P2
+Valledupar
+Medio
+$ 15 M
+Editar
+el proyecto 58
+Eliminar
+el proyecto 58
+Adecuación espacios grandes animales
+#59 · PLF · P2
+Valledupar
+Medio
+$ 9,8 M
+Editar
+el proyecto 59
+Eliminar
+el proyecto 59
+Socializar infraestructura disponible y ajustes razonables
+#60 · PLF · P2
+Valledupar
+Largo plazo
+$ 9,1 M
+Editar
+el proyecto 60
+Eliminar
+el proyecto 60
+Socializar infraestructura existente
+#61 · PLF · P2
+Valledupar
+Largo plazo
+$ 21 M
+Editar
+el proyecto 61
+Eliminar
+el proyecto 61
+Construcción de nuevo bloque académico-administrativo
+#62 · PLF · P4
+Valledupar
+Largo plazo
+$ 4.500 M
+Editar
+el proyecto 62
+Eliminar
+el proyecto 62
+Compra de predio para expansión futura del campus
+#63 · PLF · P4
+Valledupar
+Crítico
+$ 1.500 M
+Editar
+el proyecto 63
+Eliminar
+el proyecto 63
+Compra predio de centro de conciliación
+#64 · PLF · P4
+Valledupar
+Alto
+$ 1.500 M
+Editar
+el proyecto 64
+Eliminar
+el proyecto 64
+Compra predio de la clínica veterinaria
+#65 · PLF · P4
+Valledupar
+Crítico
+$ 1.500 M
+Editar
+el proyecto 65
+Eliminar
+el proyecto 65
+Sistema de respaldo eléctrico para sede Kankuamo
+#66 · PLF · P4
+Valledupar
+Crítico
+$ 350 M
+Editar
+el proyecto 66
+Eliminar
+el proyecto 66
+Sistema de transporte vertical para bloque Kankuamo
+#67 · PLF · P4
+Valledupar
+Crítico
+$ 380 M
+Editar
+el proyecto 67
+Eliminar
+el proyecto 67
+Restauración fachada Kankuamo
+#68 · PLF · P4
+Valledupar
+Crítico
+$ 150 M
+Editar
+el proyecto 68
+Eliminar
+el proyecto 68
+Construcción en lote contiguo a la casona
+#69 · PLF · P4
+Valledupar
+Alto
+$ 3.500 M
+Editar
+el proyecto 69
+Eliminar
+el proyecto 69
+Construcción Facultad ciencias de la salud en San Vicente
+#70 · PLF · P4
+Valledupar
+Alto
+$ 9.500 M
+Editar
+el proyecto 70
+Eliminar
+el proyecto 70
+Espacio de prácticas Finca de Veterinaria
+#71 · PLF · P4
+Valledupar
+Medio
+$ 3.500 M
+Editar
+el proyecto 71
+Eliminar
+el proyecto 71
+Expansión de sistemas solares fotovoltaicos
+#72 · PLF · P4
+Valledupar
+Alto
+$ 400 M
+Editar
+el proyecto 72
+Eliminar
+el proyecto 72
+Seguridad física y campus
+#73 · IFT-LOG · P2
+Bucaramanga
+Alto
+$ 80 M
+Editar
+el proyecto 73
+Eliminar
+el proyecto 73
+Seguridad física y campus
+#74 · IFT-LOG · P2
+Bucaramanga
+Alto
+$ 110 M
+Editar
+el proyecto 74
+Eliminar
+el proyecto 74
+Seguridad física y campus
+#75 · IFT-LOG · P2
+Bucaramanga
+Crítico
+$ 140 M
+Editar
+el proyecto 75
+Eliminar
+el proyecto 75
+Enviar a evaluación VAF / Publicar versión

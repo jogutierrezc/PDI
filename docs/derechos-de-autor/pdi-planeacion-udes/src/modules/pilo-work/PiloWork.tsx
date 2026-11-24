@@ -1,0 +1,584 @@
+/* =============================================================================
+   Pilo at Work · la PWA de escritorio (/work).
+
+   Puerta (sesión + ROL) y espacio de trabajo. Sin rol no se entra: la puerta pregunta
+   a pw_mi_rol() y las políticas RLS de las tablas pw_* repiten la regla en el servidor,
+   así que ocultar un botón nunca es la única defensa. «Administración» (roles, memoria
+   colectiva y arquitectura) se muestra solo a rol admin y sus rutas no abren para los demás.
+
+   Movimiento (skills impeccable / emil / animate): entradas ≤ 300 ms con expo.out, la
+   salida más corta que la entrada, solo transform y opacidad (más clip-path en la cortina
+   de entrada, que nace de Pilo); prefers-reduced-motion deja el cambio sin animación; la
+   paleta Ctrl K y lo que dispara el teclado no animan.
+   ========================================================================== */
+
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import gsap from "gsap";
+import { supabase } from "../../lib/supabase";
+import { movimientoReducido } from "../rankings/movimiento";
+import { Acceso } from "./Acceso";
+import { leerPerfil, miRol, ROL_ETIQUETA, SUPABASE_URL } from "./api";
+import type { Perfil, Rol } from "./api";
+import { registrarWorker } from "./push";
+import { Cara, IC, iniciales, Logo, MOOD, useDialogo, useToastState, WorkProvider } from "./ui";
+import type { Avisar, ModeloUsado, WorkCtx } from "./ui";
+import { PerfilDialogo } from "./vistas/Perfil";
+import type { PerfilPw } from "./vistas/Perfil";
+import "./work.css";
+
+const Inicio = lazy(() => import("./vistas/Inicio").then((m) => ({ default: m.Inicio })));
+const Chat = lazy(() => import("./vistas/Chat").then((m) => ({ default: m.Chat })));
+const Cowork = lazy(() => import("./vistas/Cowork").then((m) => ({ default: m.Cowork })));
+const Datos = lazy(() => import("./vistas/Datos").then((m) => ({ default: m.Datos })));
+const Archivos = lazy(() => import("./vistas/Archivos").then((m) => ({ default: m.Archivos })));
+const Correo = lazy(() => import("./vistas/Correo").then((m) => ({ default: m.Correo })));
+const Agenda = lazy(() => import("./vistas/Agenda").then((m) => ({ default: m.Agenda })));
+const Skills = lazy(() => import("./vistas/Skills").then((m) => ({ default: m.Skills })));
+const Memoria = lazy(() => import("./vistas/Memoria").then((m) => ({ default: m.Memoria })));
+const Equipos = lazy(() => import("./vistas/Equipos").then((m) => ({ default: m.Equipos })));
+const Conectores = lazy(() => import("./vistas/Conectores").then((m) => ({ default: m.Conectores })));
+const AdmRoles = lazy(() => import("./vistas/AdmRoles").then((m) => ({ default: m.AdmRoles })));
+const AdmMemoria = lazy(() => import("./vistas/AdmMemoria").then((m) => ({ default: m.AdmMemoria })));
+const Arquitectura = lazy(() => import("./vistas/Arquitectura").then((m) => ({ default: m.Arquitectura })));
+const MicrosoftRetorno = lazy(() => import("./vistas/Conectores").then((m) => ({ default: m.MicrosoftRetorno })));
+
+interface Item {
+  ruta: string;
+  titulo: string;
+  icono: ReactNode;
+  solo?: "admin" | "correo";
+  /** Función global de pw_config que la administración puede apagar. */
+  funcion?: string;
+}
+const GRUPOS: { nombre: string; items: Item[] }[] = [
+  { nombre: "Panel", items: [{ ruta: "", titulo: "Inicio", icono: IC.home }] },
+  {
+    nombre: "Trabajo",
+    items: [
+      { ruta: "chat", titulo: "Chat", icono: IC.chat, funcion: "chat" },
+      { ruta: "cowork", titulo: "Cowork", icono: IC.cow, funcion: "cowork" },
+      { ruta: "agenda", titulo: "Mi agenda", icono: IC.cal, funcion: "agenda" },
+      { ruta: "equipos", titulo: "Pilo for Teams", icono: IC.team, funcion: "equipos" },
+    ],
+  },
+  {
+    nombre: "Mis fuentes",
+    items: [
+      { ruta: "correo", titulo: "Correo", icono: IC.mail, funcion: "correo" },
+      { ruta: "archivos", titulo: "Archivos", icono: IC.cloud, funcion: "archivos" },
+      { ruta: "datos", titulo: "Datos en este equipo", icono: IC.data, funcion: "datos" },
+    ],
+  },
+  {
+    nombre: "Aprendizaje",
+    items: [
+      { ruta: "skills", titulo: "Mis skills", icono: IC.spark },
+      { ruta: "memoria", titulo: "Memoria", icono: IC.mem },
+    ],
+  },
+  { nombre: "Sistema", items: [{ ruta: "conectores", titulo: "Conectores", icono: IC.plug }] },
+  {
+    nombre: "Administración",
+    items: [
+      { ruta: "admin/memoria", titulo: "Memoria colectiva", icono: IC.mem, solo: "admin" },
+      { ruta: "admin/roles", titulo: "Acceso y roles", icono: IC.key, solo: "admin" },
+      { ruta: "admin/arquitectura", titulo: "Cómo está construido", icono: IC.arch, solo: "admin" },
+    ],
+  },
+];
+
+const temaInicial = (): "light" | "dark" => {
+  try {
+    const g = localStorage.getItem("pilo-work-tema");
+    if (g === "light" || g === "dark") return g;
+  } catch {
+    /* sin almacenamiento */
+  }
+  return typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
+
+type Estado = { fase: "cargando" } | { fase: "acceso"; inicial?: "verif" | "ms" } | { fase: "dentro"; perfil: Perfil };
+
+export function PiloWork() {
+  const [estado, setEstado] = useState<Estado>({ fase: "cargando" });
+  const [tema, setTema] = useState<"light" | "dark">(temaInicial);
+  const [curtain, setCurtain] = useState(false);
+  const { msg, on, toast } = useToastState();
+  const cortina = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const raiz = document.documentElement;
+    const previo = raiz.getAttribute("data-theme");
+    raiz.setAttribute("data-theme", tema);
+    try {
+      localStorage.setItem("pilo-work-tema", tema);
+    } catch {
+      /* sin almacenamiento */
+    }
+    // Al salir de /work el portal recupera su propio tema, no el de Pilo at Work.
+    return () => {
+      if (previo) raiz.setAttribute("data-theme", previo);
+      else raiz.removeAttribute("data-theme");
+    };
+  }, [tema]);
+
+  useEffect(() => {
+    registrarWorker();
+    const titulo = document.title;
+    document.title = "Pilo at Work";
+    return () => {
+      document.title = titulo;
+    };
+  }, []);
+
+  /* Al abrir: si ya hay sesión y rol, directo adentro; si vuelve de Microsoft, se sigue su camino. */
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const volviendo = new URLSearchParams(window.location.search).get("ms") === "1";
+      const { data } = await supabase.auth.getSession();
+      if (!vivo) return;
+      if (!data.session) return setEstado({ fase: "acceso" });
+      if (volviendo) {
+        window.history.replaceState(null, "", "/work");
+        return setEstado({ fase: "acceso", inicial: "ms" });
+      }
+      const rol = await miRol();
+      if (!vivo) return;
+      if (!rol) return setEstado({ fase: "acceso", inicial: "verif" });
+      const perfil = await leerPerfil(rol);
+      if (vivo) setEstado(perfil ? { fase: "dentro", perfil } : { fase: "acceso" });
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange((evento) => {
+      if (evento === "SIGNED_OUT") setEstado({ fase: "acceso" });
+    });
+    return () => {
+      vivo = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const alternarTema = () => setTema((t) => (t === "dark" ? "light" : "dark"));
+
+  /* La cortina que se abre desde Pilo al entrar al espacio. */
+  const entrar = async (rol: Rol) => {
+    const perfil = await leerPerfil(rol);
+    if (!perfil) return toast("No se pudo abrir su perfil. Intente de nuevo.");
+    if (movimientoReducido()) return setEstado({ fase: "dentro", perfil });
+    setCurtain(true);
+    requestAnimationFrame(() => {
+      const c = cortina.current;
+      if (!c) return setEstado({ fase: "dentro", perfil });
+      gsap.set(c, { clipPath: "circle(0% at 50% 50%)" });
+      gsap.to(c, {
+        clipPath: "circle(150% at 50% 50%)",
+        duration: 0.5,
+        ease: "power3.in",
+        onComplete: () => {
+          setEstado({ fase: "dentro", perfil });
+          gsap.to(c, { clipPath: "circle(0% at 50% 50%)", duration: 0.7, ease: "power3.inOut", onComplete: () => setCurtain(false) });
+        },
+      });
+      // Pase lo que pase, la cortina nunca deja la pantalla tapada.
+      setTimeout(() => setCurtain(false), 2600);
+    });
+  };
+
+  return (
+    <div className="pwk" data-tema={tema}>
+      <div className="frame">
+        {estado.fase === "cargando" && (
+          <div className="screen" style={{ display: "grid", placeItems: "center" }}>
+            <img src={MOOD.piensa} alt="Cargando Pilo at Work" width={96} height={96} />
+          </div>
+        )}
+        {estado.fase === "acceso" && <Acceso onListo={entrar} aviso={toast} tema={tema} onTema={alternarTema} inicial={estado.inicial} />}
+        {estado.fase === "dentro" && <Espacio perfil={estado.perfil} tema={tema} onTema={alternarTema} toast={toast} />}
+        {curtain && (
+          <div className="curtain" ref={cortina}>
+            <img src={MOOD.feliz} alt="" />
+          </div>
+        )}
+        <div className={`toast${on ? " on" : ""}`} role="status">
+          {msg}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------------------------------------- */
+
+function Espacio({ perfil, tema, onTema, toast }: { perfil: Perfil; tema: string; onTema: () => void; toast: (m: string) => void }) {
+  const navigate = useNavigate();
+  const loc = useLocation();
+  const esAdmin = perfil.rol === "admin";
+  const conCorreo = perfil.rol !== "colaborador";
+  const [filas, setFilas] = useState(0);
+  const [pedido, setPedido] = useState("");
+  const [esquema, setEsquema] = useState<unknown>(null);
+  const [avisosApp, setAvisosApp] = useState(true);
+  const [notifs, setNotifs] = useState<(Avisar & { id: number })[]>([]);
+  const [pal, setPal] = useState(false);
+  const [versionNav, setVersionNav] = useState(0);
+  const [funciones, setFunciones] = useState<Record<string, boolean>>({});
+  const [subidaMaxMb, setSubidaMaxMb] = useState(100);
+  const [perfilPw, setPerfilPw] = useState<Partial<PerfilPw> | null>(null);
+  const [perfilAbierto, setPerfilAbierto] = useState<{ x: number; y: number } | null | false>(false);
+  const [modelo, setModelo] = useState<ModeloUsado | null>(null);
+  const [plegado, setPlegado] = useState(() => {
+    try {
+      return localStorage.getItem("pilo-work-riel") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const app = useRef<HTMLElement>(null);
+  const [pendientes, setPendientes] = useState(0);
+  const idN = useRef(0);
+
+  const ir = useCallback((ruta: string) => navigate(`/work${ruta ? `/${ruta.replace(/^\/+/, "")}` : ""}`), [navigate]);
+  const aviso = useCallback((a: Avisar) => {
+    const id = ++idN.current;
+    setNotifs((n) => [...n, { ...a, id }]);
+    setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 9000);
+  }, []);
+
+  /* Funciones habilitadas por la administración (pw_config) y el nombre del perfil. Si pw_config aún no existe, todo queda encendido. */
+  const cargarPerfil = useCallback(async () => {
+    const { data } = await supabase.from("pw_perfiles").select("nombre, usar_en_respuestas").eq("user_id", perfil.userId).maybeSingle();
+    setPerfilPw((data as Partial<PerfilPw> | null) ?? null);
+  }, [perfil.userId]);
+  useEffect(() => {
+    void supabase.rpc("pw_config_publica").then(({ data, error }) => {
+      const fila = Array.isArray(data) ? data[0] : data;
+      if (error || !fila) return;
+      setFunciones((fila.funciones as Record<string, boolean>) ?? {});
+      setSubidaMaxMb(Number(fila.subida_max_mb) || 100);
+    });
+    void cargarPerfil();
+  }, [cargarPerfil]);
+
+  /* Propuestas por revisar (solo administración). */
+  useEffect(() => {
+    if (!esAdmin) return;
+    void supabase
+      .from("pw_propuestas")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "pendiente")
+      .then(({ count }) => setPendientes(count ?? 0));
+  }, [esAdmin, versionNav, loc.pathname]);
+
+  /* Aviso dentro de la app: reuniones que empiezan pronto, mientras la app está abierta. */
+  useEffect(() => {
+    if (!avisosApp) return;
+    const avisadas = new Set<string>();
+    const revisar = async () => {
+      const { data } = await supabase
+        .from("pw_recordatorios")
+        .select("id, titulo, inicia_en, avisar_min, url")
+        .gt("inicia_en", new Date(Date.now() - 60_000).toISOString())
+        .lt("inicia_en", new Date(Date.now() + 61 * 60_000).toISOString())
+        .limit(20);
+      for (const r of data ?? []) {
+        const falta = (new Date(r.inicia_en as string).getTime() - Date.now()) / 60000;
+        if (falta <= (r.avisar_min as number) && !avisadas.has(r.id as string)) {
+          avisadas.add(r.id as string);
+          aviso({ t: `Empieza en ${Math.max(1, Math.round(falta))} minutos`, b: r.titulo as string, ir: String(r.url ?? "/work/agenda").replace(/^\/work\/?/, "") });
+        }
+      }
+    };
+    void revisar();
+    const iv = setInterval(() => void revisar(), 60_000);
+    return () => clearInterval(iv);
+  }, [avisosApp, aviso]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pilo-work-riel", plegado ? "1" : "0");
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, [plegado]);
+
+  /* Plegar el riel; con el teclado (Ctrl B) el cambio es instantáneo. */
+  const alternarRiel = useCallback((instantaneo = false) => {
+    const a = app.current;
+    if (instantaneo && a) {
+      a.dataset.inst = "1";
+      requestAnimationFrame(() => requestAnimationFrame(() => a.removeAttribute("data-inst")));
+    }
+    setPlegado((p) => !p);
+  }, []);
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "b") return;
+      if ((e.target as HTMLElement | null)?.isContentEditable) return;
+      e.preventDefault();
+      alternarRiel(true);
+    };
+    document.addEventListener("keydown", f);
+    return () => document.removeEventListener("keydown", f);
+  }, [alternarRiel]);
+
+  /* Paleta Ctrl K. */
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPal((p) => !p);
+      } else if (e.key === "Escape") setPal(false);
+    };
+    document.addEventListener("keydown", f);
+    return () => document.removeEventListener("keydown", f);
+  }, []);
+
+  const nombreMostrar = (perfilPw?.nombre || perfil.nombre).trim() || perfil.nombre;
+  const abrirPerfil = useCallback(() => {
+    const a = document.activeElement as HTMLElement | null;
+    const r = a?.getBoundingClientRect();
+    setPerfilAbierto(r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null);
+  }, []);
+  const ctx: WorkCtx = useMemo(
+    () => ({ perfil, esAdmin, conCorreo, toast, aviso, ir, filas, setFilas, pedido, setPedido, esquema, setEsquema, avisosApp, setAvisosApp, refrescarNav: () => setVersionNav((v) => v + 1), funciones, subidaMaxMb, abrirPerfil, nombreMostrar, modelo, setModelo }),
+    [perfil, esAdmin, conCorreo, toast, aviso, ir, filas, pedido, esquema, avisosApp, funciones, subidaMaxMb, abrirPerfil, nombreMostrar, modelo],
+  );
+
+  const grupos = GRUPOS.map((g) => ({ ...g, items: g.items.filter((i) => (i.solo === "admin" ? esAdmin : true) && (!i.funcion || funciones[i.funcion] !== false)) })).filter((g) => g.items.length);
+  const actual = loc.pathname.replace(/^\/work\/?/, "").replace(/\/+$/, "");
+  const titulo = grupos.flatMap((g) => g.items).find((i) => i.ruta === actual)?.titulo ?? (actual.startsWith("microsoft") ? "Microsoft 365" : "Pilo at Work");
+
+  /* El indicador que se desliza entre secciones (no se anima si lo pidió el teclado). */
+  const nav = useRef<HTMLElement>(null);
+  const ind = useRef<HTMLSpanElement>(null);
+  const primera = useRef(true);
+  const plegadoAntes = useRef(plegado);
+  useEffect(() => {
+    const b = nav.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    const i = ind.current;
+    if (!b || !i) return;
+    const cambioRiel = plegadoAntes.current !== plegado;
+    plegadoAntes.current = plegado;
+    if (primera.current || cambioRiel || movimientoReducido()) {
+      gsap.set(i, { y: b.offsetTop, height: b.offsetHeight, opacity: 1 });
+      primera.current = false;
+    } else gsap.to(i, { y: b.offsetTop, height: b.offsetHeight, duration: 0.26, ease: "expo.out", overwrite: true });
+  }, [actual, versionNav, esAdmin, plegado]);
+
+  /* La vista entra con un fundido corto. */
+  const vista = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const v = vista.current;
+    if (v && !movimientoReducido()) gsap.fromTo(v, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.26, ease: "expo.out", clearProps: "opacity,transform" });
+  }, [actual]);
+
+  return (
+    <WorkProvider value={ctx}>
+      <section className="screen" id="app" ref={app} data-plegado={plegado ? "1" : undefined} aria-label="Espacio de trabajo">
+        <aside className="rail">
+          <div className="rail__brand">
+            {plegado ? <Cara mood="feliz" /> : <Logo alto={24} />}
+            <div className="rail__txt">
+              <b>Pilo at Work</b>
+              <small>{perfil.dependencia || "Universidad de Santander"}</small>
+            </div>
+          </div>
+          <nav className="rail__nav" ref={nav} aria-label="Secciones">
+            <span data-ind ref={ind} aria-hidden="true" />
+            {grupos.map((g) => (
+              <div key={g.nombre} style={{ display: "contents" }}>
+                <h3>{g.nombre}</h3>
+                {g.items.map((i) => {
+                  const cuenta = i.ruta === "admin/memoria" ? pendientes : 0;
+                  return (
+                    <button
+                      key={i.ruta}
+                      type="button"
+                      className="nav"
+                      aria-current={actual === i.ruta ? "page" : undefined}
+                      aria-label={cuenta > 0 ? `${i.titulo}, ${cuenta} por revisar` : i.titulo}
+                      title={plegado ? i.titulo : undefined}
+                      onClick={() => ir(i.ruta)}
+                    >
+                      {i.icono}
+                      <span>{i.titulo}</span>
+                      {cuenta > 0 && <em>{cuenta}</em>}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+          <div className="rail__fold">
+            <button
+              type="button"
+              className="nav"
+              aria-expanded={!plegado}
+              aria-label={plegado ? "Desplegar el menú lateral" : "Plegar el menú lateral"}
+              title={`${plegado ? "Desplegar" : "Plegar"} el menú (Ctrl B)`}
+              onClick={() => alternarRiel()}
+            >
+              {IC.panel}
+              <span>{plegado ? "Desplegar menú" : "Plegar menú"}</span>
+            </button>
+          </div>
+          <div className="rail__me">
+            <button type="button" className="rail__perfil" onClick={abrirPerfil} aria-label={`Mi perfil: ${nombreMostrar}`} title={plegado ? `${nombreMostrar} · ${ROL_ETIQUETA[perfil.rol]} · Mi perfil` : "Mi perfil"} disabled={funciones.perfil === false}>
+              <span className="avatar">{iniciales(nombreMostrar) || "?"}</span>
+              <span className="rail__who">
+                <b>{nombreMostrar}</b>
+                <small>{ROL_ETIQUETA[perfil.rol]}</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="tbtn rail__out"
+              aria-label="Salir"
+              title="Salir"
+              onClick={async () => {
+                await supabase.auth.signOut();
+              }}
+            >
+              {IC.out}
+              <span>Salir</span>
+            </button>
+          </div>
+        </aside>
+        <div className="main">
+          <header className="top">
+            <h1>{titulo}</h1>
+            <span className="sp" />
+            <span className="chip local" title="Los archivos de este equipo se revisan aquí; la IA solo recibe lo que usted aprueba">
+              <i />
+              <span>Datos locales · {filas} filas enviadas</span>
+            </span>
+            <span className="chip" title={modelo ? `${modelo.modelo}${modelo.conmutado ? ` · se usó el modelo de apoyo (${modelo.motivo || "el principal no respondió a tiempo"})` : ""} · ${modelo.ms} ms hasta el primer fragmento` : "Aún no hay una respuesta en esta sesión. Pilo usa Mistral y, si hace falta más capacidad o no responde a tiempo, NVIDIA."}>
+              <i style={{ background: modelo?.conmutado ? "var(--warn)" : "var(--blue)" }} />
+              {modelo ? `${modelo.proveedor === "nvidia" ? (modelo.conmutado ? "NVIDIA (apoyo)" : "NVIDIA") : "Mistral"}${modelo.nivel === "capacidad" ? " · capacidad" : ""}` : "Mistral"}
+            </span>
+            <button type="button" className="tbtn" onClick={onTema} aria-label="Cambiar entre tema claro y oscuro">
+              Tema {tema === "dark" ? "oscuro" : "claro"}
+            </button>
+            <button type="button" className="tbtn" onClick={() => setPal(true)}>
+              Buscar o ir a… <span className="kbd">Ctrl K</span>
+            </button>
+          </header>
+          <div className="view" ref={vista}>
+            <Suspense fallback={<div className="pad muted">Cargando…</div>}>
+              <Routes>
+                <Route index element={<Inicio />} />
+                <Route path="chat" element={<Chat />} />
+                <Route path="cowork" element={<Cowork />} />
+                <Route path="datos" element={<Datos />} />
+                <Route path="correo" element={<Correo />} />
+                <Route path="archivos" element={<Archivos />} />
+                <Route path="agenda" element={<Agenda />} />
+                <Route path="skills" element={<Skills />} />
+                <Route path="memoria" element={<Memoria />} />
+                <Route path="equipos" element={<Equipos />} />
+                <Route path="conectores" element={<Conectores />} />
+                <Route path="microsoft" element={<MicrosoftRetorno />} />
+                {/* Solo administración: la ruta no abre para los demás (y la base tampoco entrega los datos). */}
+                <Route path="admin/memoria" element={esAdmin ? <AdmMemoria /> : <Navigate to="/work" replace />} />
+                <Route path="admin/roles" element={esAdmin ? <AdmRoles /> : <Navigate to="/work" replace />} />
+                <Route path="admin/arquitectura" element={esAdmin ? <Arquitectura /> : <Navigate to="/work" replace />} />
+                <Route path="*" element={<Navigate to="/work" replace />} />
+              </Routes>
+            </Suspense>
+          </div>
+        </div>
+        <div className="notifs" aria-live="polite">
+          {notifs.map((n) => (
+            <div className="nt" key={n.id}>
+              <Cara mood="feliz" />
+              <div>
+                <b>{n.t}</b>
+                <p>{n.b}</p>
+                <div className="nt__a">
+                  <button
+                    type="button"
+                    className="btn sm primary"
+                    onClick={() => {
+                      setNotifs((x) => x.filter((y) => y.id !== n.id));
+                      if (n.ir != null) ir(n.ir);
+                    }}
+                  >
+                    {n.ir != null ? "Abrir" : "Entendido"}
+                  </button>
+                  <button type="button" className="btn sm" onClick={() => setNotifs((x) => x.filter((y) => y.id !== n.id))}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+              <span className="nt__app">Pilo at Work · ahora</span>
+            </div>
+          ))}
+        </div>
+        {pal && <Paleta grupos={grupos} cerrar={() => setPal(false)} ir={ir} setPedido={setPedido} perfil={funciones.perfil !== false ? abrirPerfil : undefined} />}
+        {perfilAbierto !== false && (
+          <PerfilDialogo
+            userId={perfil.userId}
+            nombreBase={perfil.nombre}
+            dependenciaBase={perfil.dependencia}
+            origen={perfilAbierto}
+            onCerrar={() => setPerfilAbierto(false)}
+            onGuardado={(p) => setPerfilPw(p)}
+          />
+        )}
+      </section>
+    </WorkProvider>
+  );
+}
+
+function Paleta({ grupos, cerrar, ir, setPedido, perfil }: { grupos: { items: Item[] }[]; cerrar: () => void; ir: (r: string) => void; setPedido: (q: string) => void; perfil?: () => void }) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(0);
+  const opciones = useMemo(() => {
+    const o: [string, () => void][] = grupos.flatMap((g) => g.items).map((i) => [`Ir a ${i.titulo}`, () => ir(i.ruta)] as [string, () => void]);
+    if (perfil) o.push(["Abrir Mi perfil", perfil]);
+    if (q.trim().length > 2) o.push([`Pedir a Pilo: ${q.trim()}`, () => { setPedido(q.trim()); ir("chat"); }]);
+    return o.filter((x) => x[0].toLowerCase().includes(q.toLowerCase()) || x[0].startsWith("Pedir"));
+  }, [grupos, q, ir, setPedido, perfil]);
+  const caja = useDialogo(cerrar);
+  const usar = (i: number) => {
+    const o = opciones[i];
+    if (!o) return;
+    cerrar();
+    o[1]();
+  };
+  return (
+    <div className="pal" onClick={(e) => e.target === e.currentTarget && cerrar()}>
+      <div className="pal__box" role="dialog" aria-modal="true" aria-label="Buscar o ir a" ref={caja}>
+        <input
+          value={q}
+          placeholder="Ir a una sección o pedir algo a Pilo"
+          aria-label="Buscar"
+          onChange={(e) => {
+            setQ(e.target.value);
+            setSel(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              setSel((s) => Math.min(opciones.length - 1, s + 1));
+              e.preventDefault();
+            } else if (e.key === "ArrowUp") {
+              setSel((s) => Math.max(0, s - 1));
+              e.preventDefault();
+            } else if (e.key === "Enter") usar(sel);
+          }}
+        />
+        <div>
+          {opciones.map((o, i) => (
+            <button key={o[0]} type="button" className={i === sel ? "on" : ""} onClick={() => usar(i)}>
+              {o[0]}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export { SUPABASE_URL };

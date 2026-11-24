@@ -1,0 +1,43 @@
+Regresar
+Planeación y Seguimiento
+Importar la planificación
+Importar la planificación de la oficina
+
+Cuatro pasos para crear de una vez las actividades de Tecnología e Infraestructura TI. El archivo se lee en su navegador y nada sale de él hasta el último paso.
+
+1
+Descargar la plantilla y elegir el archivo
+(paso actual)
+2
+Revisar lo leído
+(pendiente)
+3
+Corregir
+(pendiente)
+4
+Crear las actividades
+(pendiente)
+Descargar la plantilla y elegir el archivo
+
+Baje la plantilla de su oficina, llénela y elíjala aquí.
+
+0. La oficina
+
+Oficina
+Tecnología e Infraestructura TI
+
+La plantilla lleva las líneas y los correos de esta oficina en sus listas desplegables.
+
+1. La plantilla
+
+Trae las instrucciones columna por columna, listas desplegables (línea del plan, responsable por correo, prioridad, campus) y colores: amarillo es obligatorio, azul claro es opcional y gris no se toca. Las dos primeras filas son ejemplos y no se importan.
+
+Descargar la plantilla de Excel
+2. Su archivo
+
+Libro de Excel (.xlsx) de hasta 5 MB y 300 actividades. Las fórmulas se ignoran. Un gestor solo asigna a personas de su oficina: los responsables se identifican por su correo.
+
+Elegir el archivo
+Ningún archivo elegido
+El borrador se guarda solo en este equipo.
+Revisar lo leído

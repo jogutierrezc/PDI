@@ -1,0 +1,218 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0 
+Financiero: En revisión de la VAF
+
+Todos los planes
+Financiación y presupuesto
+
+La VAF evalúa lo financiero de cada plan y vigila el presupuesto y su ejecución. La evaluación no bloquea a las oficinas: pueden crear actividades y reportar avances mientras tanto. Usted evalúa y registra.
+
+Por evaluar
+Solicitado vs aprobado
+Presupuesto
+Alertas
+Configuración
+Este plan
+Todos los planes
+Severidad
+Todas
+Urgente (6)
+Atención (39)
+Aviso (13)
+Oficina
+Todas
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Umbrales de «PDIFyT 2027-2035»
+Ejecución sobre el avance físico
+Alerta si pasa de 15 puntos (en cualquier sentido)
+Sobreejecución
+Alerta si lo ejecutado pasa del 100 % del vigente
+Sin movimientos
+Alerta si una línea con presupuesto lleva 3 meses o más sin movimientos
+Cambiar los umbrales
+Urgente · Sobreejecución. La línea 2 supera su presupuesto vigente: ejecutado $ 1,1 MM de $ 909 M.
+Abrir la línea
+2 de PDIFyT 2027-2035
+Urgente · Sobreejecución. La línea 16 supera su presupuesto vigente: ejecutado $ 3,9 M de $ 3,2 M.
+Abrir la línea
+16 de PDIFyT 2027-2035
+Urgente · Sobreejecución. La línea 30 supera su presupuesto vigente: ejecutado $ 13,9 MM de $ 11,4 MM.
+Abrir la línea
+30 de PDIFyT 2027-2035
+Urgente · Sobreejecución. La línea 44 supera su presupuesto vigente: ejecutado $ 606 M de $ 497 M.
+Abrir la línea
+44 de PDIFyT 2027-2035
+Urgente · Sobreejecución. La línea 58 supera su presupuesto vigente: ejecutado $ 2,1 M de $ 1,7 M.
+Abrir la línea
+58 de PDIFyT 2027-2035
+Urgente · Sobreejecución. La línea 72 supera su presupuesto vigente: ejecutado $ 464 M de $ 380 M.
+Abrir la línea
+72 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 2 ejecuta 122 puntos más de lo que avanza físicamente.
+Abrir la línea
+2 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 3 ejecuta 19,2 puntos más de lo que avanza físicamente.
+Abrir la línea
+3 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 6 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+6 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 11 ejecuta 44,9 puntos más de lo que avanza físicamente.
+Abrir la línea
+11 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 13 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+13 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 15 ejecuta 50 puntos más de lo que avanza físicamente.
+Abrir la línea
+15 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 16 ejecuta 21,9 puntos más de lo que avanza físicamente.
+Abrir la línea
+16 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 17 ejecuta 41,2 puntos más de lo que avanza físicamente.
+Abrir la línea
+17 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 20 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+20 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 22 ejecuta 37,9 puntos más de lo que avanza físicamente.
+Abrir la línea
+22 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 23 ejecuta 45,2 puntos más de lo que avanza físicamente.
+Abrir la línea
+23 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 24 ejecuta 60 puntos más de lo que avanza físicamente.
+Abrir la línea
+24 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 25 ejecuta 30 puntos más de lo que avanza físicamente.
+Abrir la línea
+25 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 27 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+27 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 32 ejecuta 27 puntos más de lo que avanza físicamente.
+Abrir la línea
+32 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 34 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+34 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 36 ejecuta 45 puntos más de lo que avanza físicamente.
+Abrir la línea
+36 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 37 ejecuta 45 puntos más de lo que avanza físicamente.
+Abrir la línea
+37 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 38 ejecuta 59,7 puntos más de lo que avanza físicamente.
+Abrir la línea
+38 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 39 ejecuta 29 puntos más de lo que avanza físicamente.
+Abrir la línea
+39 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 41 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+41 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 43 ejecuta 39,8 puntos más de lo que avanza físicamente.
+Abrir la línea
+43 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 48 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+48 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 50 ejecuta 45 puntos más de lo que avanza físicamente.
+Abrir la línea
+50 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 52 ejecuta 46,7 puntos más de lo que avanza físicamente.
+Abrir la línea
+52 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 53 ejecuta 45 puntos más de lo que avanza físicamente.
+Abrir la línea
+53 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 55 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+55 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 58 ejecuta 98,5 puntos más de lo que avanza físicamente.
+Abrir la línea
+58 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 59 ejecuta 44,7 puntos más de lo que avanza físicamente.
+Abrir la línea
+59 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 62 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+62 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 64 ejecuta 45 puntos más de lo que avanza físicamente.
+Abrir la línea
+64 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 65 ejecuta 37,3 puntos más de lo que avanza físicamente.
+Abrir la línea
+65 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 66 ejecuta 80 puntos más de lo que avanza físicamente.
+Abrir la línea
+66 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 67 ejecuta 45 puntos más de lo que avanza físicamente.
+Abrir la línea
+67 de PDIFyT 2027-2035
+Atención · Sin movimientos. La línea 69 tiene presupuesto aprobado y lleva 3 meses o más sin movimientos.
+Abrir la línea
+69 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 71 ejecuta 50 puntos más de lo que avanza físicamente.
+Abrir la línea
+71 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 72 ejecuta 109,2 puntos más de lo que avanza físicamente.
+Abrir la línea
+72 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 73 ejecuta 80 puntos más de lo que avanza físicamente.
+Abrir la línea
+73 de PDIFyT 2027-2035
+Atención · Ejecuta más de lo que avanza. La línea 74 ejecuta 45,1 puntos más de lo que avanza físicamente.
+Abrir la línea
+74 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 7 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+7 de PDIFyT 2027-2035
+Aviso · Avanza más de lo que ejecuta. La línea 13 avanza 33.3 puntos más de lo que ejecuta: posible rezago de registro.
+Abrir la línea
+13 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 14 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+14 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 21 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+21 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 28 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+28 de PDIFyT 2027-2035
+Aviso · Avanza más de lo que ejecuta. La línea 34 avanza 61.3 puntos más de lo que ejecuta: posible rezago de registro.
+Abrir la línea
+34 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 35 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+35 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 42 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+42 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 49 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+49 de PDIFyT 2027-2035
+Aviso · Avanza más de lo que ejecuta. La línea 55 avanza 15.3 puntos más de lo que ejecuta: posible rezago de registro.
+Abrir la línea
+55 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 56 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+56 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 63 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+63 de PDIFyT 2027-2035
+Aviso · Sin evaluar por la VAF. La línea 70 aún no tiene evaluación de financiación de la VAF.
+Abrir la línea
+70 de PDIFyT 2027-2035
+
+Ver todos los planes

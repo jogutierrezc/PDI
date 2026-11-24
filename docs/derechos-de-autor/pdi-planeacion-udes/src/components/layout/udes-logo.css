@@ -1,0 +1,35 @@
+/* Logo de la UDES: la versión azul sobre claro, la versión clara sobre oscuro. Sin placa. */
+
+.udes-logo {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+}
+
+.udes-logo img {
+  display: block;
+  height: var(--logo-h, 36px);
+  width: auto;
+  max-width: none;
+}
+
+.udes-logo__dark {
+  display: none !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .udes-logo__light {
+    display: none !important;
+  }
+  :root:not([data-theme="light"]) .udes-logo__dark {
+    display: block !important;
+  }
+}
+
+:root[data-theme="dark"] .udes-logo__light {
+  display: none !important;
+}
+
+:root[data-theme="dark"] .udes-logo__dark {
+  display: block !important;
+}

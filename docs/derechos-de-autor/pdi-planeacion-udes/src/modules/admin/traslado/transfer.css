@@ -1,0 +1,295 @@
+/* =============================================================================
+   Traslado de datos
+   ========================================================================== */
+
+.transfer-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1 1 24rem;
+}
+
+.transfer-head h2 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+}
+
+.transfer-head p {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.transfer-step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--brand-blue);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.transfer-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  color: var(--status-risk);
+  background: var(--status-risk-soft);
+  border: 1px solid color-mix(in srgb, var(--status-risk) 28%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.transfer-alert svg {
+  flex: none;
+  margin-top: 0.15em;
+}
+
+/* --- Progreso --------------------------------------------------------------- */
+
+.transfer-progress {
+  position: sticky;
+  top: calc(var(--admin-topbar-h, 0px) + var(--space-2));
+  z-index: 2;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.transfer-progress__label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.transfer-progress__bar {
+  height: 0.5rem;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+}
+
+.transfer-progress__bar i {
+  display: block;
+  height: 100%;
+  background: var(--brand-blue);
+  border-radius: inherit;
+  transition: width var(--dur-base) ease;
+}
+
+.transfer-progress small {
+  color: var(--status-pending);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* --- Origen ----------------------------------------------------------------- */
+
+.transfer-tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-self: start;
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+
+.transfer-tabs button {
+  padding: var(--space-2) var(--space-4);
+  color: var(--ink-secondary);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.transfer-tabs button[aria-selected="true"] {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.transfer-actions small {
+  margin-right: auto;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.transfer-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  cursor: pointer;
+}
+
+.transfer-check input {
+  flex: none;
+  margin-top: 0.2em;
+}
+
+.transfer-check--danger {
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  background: var(--status-risk-soft);
+  border: 1px solid color-mix(in srgb, var(--status-risk) 28%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+/* --- Revisión ----------------------------------------------------------------- */
+
+.transfer-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.transfer-stats > div {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  border-left: 1px solid var(--line-faint);
+}
+
+.transfer-stats > div:first-child {
+  border-left: 0;
+}
+
+.transfer-stats dt {
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.transfer-stats dd {
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.transfer-stats small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.transfer-warnings {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-7);
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.transfer-warnings:empty {
+  display: none;
+}
+
+.transfer-warnings code,
+.transfer-table code,
+.transfer-muted code,
+.transfer-head code {
+  overflow-wrap: anywhere;
+}
+
+.transfer-block {
+  display: block;
+  margin-top: var(--space-2);
+  white-space: pre-wrap;
+}
+
+.transfer-muted {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.transfer-details summary {
+  color: var(--brand-blue);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.transfer-details[open] summary {
+  margin-bottom: var(--space-3);
+}
+
+.transfer-details {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.transfer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.transfer-table th,
+.transfer-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--line-faint);
+}
+
+.transfer-table th {
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.transfer-table td:not(:first-child),
+.transfer-table th:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.transfer-table small {
+  color: var(--ink-muted);
+}

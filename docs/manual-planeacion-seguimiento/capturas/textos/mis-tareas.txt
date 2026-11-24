@@ -1,0 +1,249 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0
+
+Avances devueltos
+1
+
+El gestor pidió correcciones. Léalas y reporte el avance de nuevo desde la actividad.
+
+60 % físico · 58 % financiero
+Devuelto
+
+Se terminó casi todo.
+
+Reportó Mariana Solano · avance del 28 jun 2027 · revisó Héctor Mantilla el 28 jun 2027
+
+Nota de la revisión: Falta el soporte de lo que se hizo: adjunte el acta o el informe y vuelva a reportar.
+Acta de la reunión de seguimiento
+https://intranet.demo.udes.test/actas/seguimiento
+Abrir enlace
+Abrir la actividad
+Vencidas
+2
+Definir el alcance y los criterios de «actualización de laboratorios de análisis del movimiento»
+Infraestructura y Planta Física · línea #22
+En riesgo
+Venció hace 30 días
+Medio
+1/3
+25 %
+Mover a…
+Definir el alcance y los criterios de «adecuar puestos de trabajo»
+Infraestructura y Planta Física · línea #47
+En revisión
+Venció hace 7 días
+Bajo
+0/3
+0 %
+1 por validar
+Mover a…
+Próximas (14 días)
+2
+Levantar el diagnóstico de actualización y reubicación cabina de radio + equipos a…
+Infraestructura y Planta Física · línea #13
+En curso
+Vence en 3 días
+Medio
+2/3
+0 %
+Mover a…
+Levantar el diagnóstico de adecuación espacios grandes animales
+Infraestructura y Planta Física · línea #59
+En curso
+Vence en 7 días
+Medio
+0/3
+41 %
+Mover a…
+Más adelante
+19
+Entregar el informe de cierre de actualización y reubicación cabina de radio + equipos a…
+Infraestructura y Planta Física · línea #13
+Por iniciar
+Hito · En plazo
+Medio
+0 %
+Mover a…
+Definir el alcance y los criterios de «adecuaciones locativas de salones»
+Infraestructura y Planta Física · línea #19
+En riesgo
+En plazo
+Medio
+3/3
+0 %
+Mover a…
+Preparar los estudios previos de servicios tecnológicos
+Tecnología e Infraestructura TI · línea #3
+En revisión
+En plazo
+Alto
+0/2
+43 %
+1 por validar
+Mover a…
+Preparar el informe de gestión del semestre
+Tecnología e Infraestructura TI · propia de la oficina
+Por iniciar
+En plazo
+Alto
+0/2
+0 %
+Mover a…
+Preparar los estudios previos de garantizar disponibilidad de espacios físicos y dotación
+Infraestructura y Planta Física · línea #58
+Por iniciar
+En plazo
+Bajo
+0/2
+0 %
+Mover a…
+Levantar el diagnóstico de actualización de laboratorios de análisis del movimiento
+Infraestructura y Planta Física · línea #22
+Por iniciar
+En plazo
+Medio
+0/3
+0 %
+Mover a…
+Preparar los estudios previos de implementación de redes contraincendio generales
+Infraestructura y Planta Física · línea #34
+En curso
+En plazo
+Alto
+0/2
+45 %
+Mover a…
+Entregar el informe de cierre de seguridad de la infraestructura tecnológica
+Tecnología e Infraestructura TI · línea #7
+Por iniciar
+Hito · En plazo
+Crítico
+0 %
+Mover a…
+Entregar el informe de cierre de implementación de redes contraincendio generales
+Infraestructura y Planta Física · línea #34
+Por iniciar
+Hito · En plazo
+Crítico
+0 %
+Mover a…
+Entregar el informe de cierre de adecuar puestos de trabajo
+Infraestructura y Planta Física · línea #47
+Por iniciar
+Hito · En plazo
+Medio
+0 %
+Mover a…
+Levantar el diagnóstico de sistema de transporte vertical para bloque kankuamo
+Infraestructura y Planta Física · línea #67
+Por iniciar
+En plazo
+Crítico
+0/3
+0 %
+Mover a…
+Levantar el diagnóstico de remodelación clínica
+Infraestructura y Planta Física · línea #11
+Por iniciar
+En plazo
+Medio
+0/3
+0 %
+Mover a…
+Entregar el informe de cierre de gestión de disponibilidad de oficinas
+Infraestructura y Planta Física · línea #14
+Por iniciar
+Hito · En plazo
+Bajo
+0 %
+Mover a…
+Entregar el informe de cierre de instalación de respaldo energético de la sede principal
+Infraestructura y Planta Física · línea #53
+Por iniciar
+Hito · En plazo
+Crítico
+0 %
+Mover a…
+Entregar el informe de cierre de remodelación clínica
+Infraestructura y Planta Física · línea #11
+Por iniciar
+Hito · En plazo
+Medio
+0 %
+Mover a…
+Entregar el informe de cierre de seguridad física y campus
+Infraestructura y Planta Física · línea #74
+Por iniciar
+Hito · En plazo
+Alto
+0 %
+Mover a…
+Preparar los estudios previos de actualización arquitectónica de fachadas de salones chi…
+Infraestructura y Planta Física · línea #37
+Por iniciar
+En plazo
+Medio
+0/2
+0 %
+Mover a…
+Levantar el diagnóstico de reposición de pisos y cielo raso aulas
+Infraestructura y Planta Física · línea #38
+Por iniciar
+En plazo
+Bajo
+0/3
+0 %
+Mover a…
+Entregar el informe de cierre de reposición de pisos y cielo raso aulas
+Infraestructura y Planta Física · línea #38
+En curso
+Hito · En plazo
+Medio
+61 %
+Mover a…
+Hechas
+5
+Definir el alcance y los criterios de «seguridad física y campus»
+Infraestructura y Planta Física · línea #75
+Hecho
+Cumplida
+Crítico
+3/3
+100 %
+Mover a…
+Definir el alcance y los criterios de «seguridad de la infraestructura tecnológica»
+Tecnología e Infraestructura TI · línea #7
+Hecho
+Cumplida
+Crítico
+3/3
+100 %
+Mover a…
+Levantar el diagnóstico de implementación de redes contraincendio generales
+Infraestructura y Planta Física · línea #34
+Hecho
+Cumplida
+Crítico
+3/3
+100 %
+Mover a…
+Entregar el informe de cierre de centro de desarrollo tecnológico consolidado en 2025 (a…
+Infraestructura y Planta Física · línea #31
+Hecho
+Hito · Cumplida
+Medio
+100 %
+Mover a…
+Definir el alcance y los criterios de «garantizar disponibilidad de espacios físicos y dotación»
+Infraestructura y Planta Física · línea #58
+Hecho
+Cumplida
+Medio
+3/3
+100 %
+Mover a…

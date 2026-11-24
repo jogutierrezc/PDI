@@ -67,7 +67,7 @@ for (const cap of CAPS) {
     // grupo: encabezados con lo que sigue
     const grupo = [b];
     let j = i;
-    while (mine[j].keep && mine[j + 1] && !mine[j + 1].pb) { grupo.push(mine[j + 1]); j++; }
+    while (mine[j].keep && mine[j + 1] && !mine[j + 1].pb && !(mine[j].shot && (mine[j + 1].h2 || mine[j + 1].shot))) { grupo.push(mine[j + 1]); j++; }
     const ult = grupo[grupo.length - 1];
     const minUlt = ult.split && ult.split.h.length > 3 ? ult.split.over + ult.split.h[0] + ult.split.h[1] : ult.h;
     const gh = grupo.reduce((s, x) => s + x.h, 0) + GAP * (grupo.length - 1);
@@ -84,7 +84,7 @@ for (const cap of CAPS) {
       const need = ghx() - libre(cur);
       let ok = false;
       if (sh && cur.blocks.length) { const w = Math.floor(sh.fit.W - need / sh.fit.ratio); if (w >= sh.fit.W * 0.72) { sh.html = sh.fit.mk(w); sh.h -= (sh.fit.W - w) * sh.fit.ratio; sh.fit.W = w; ok = true; } }
-      if (!ok && sh && grupo.length > 1 && cur.h < CAP_H * 0.72) {
+      if (!ok && sh && grupo[0] === sh && grupo.length > 1 && cur.h < CAP_H * 0.72) {
         // la captura va en esta página y lo que sigue pasa a la siguiente
         for (const x of grupo) {
           const lib = () => lim(cur) - cur.h - (cur.blocks.length ? GAP : 0);
@@ -98,7 +98,7 @@ for (const cap of CAPS) {
       if (!ok) nueva();
     }
     if (ghx() > libre(cur) && sh) { const need = ghx() - libre(cur); const w = Math.floor(sh.fit.W - need / sh.fit.ratio); if (w >= sh.fit.W * 0.72) { sh.html = sh.fit.mk(w); sh.h -= (sh.fit.W - w) * sh.fit.ratio; sh.fit.W = w; } }
-    if (ghx() > libre(cur) && !(ult.split && ult.split.h.length > 3)) warn.push(`Bloque demasiado alto (${Math.round(ghx())} px) en ${cap.nombre}: ${grupo[0].html.slice(0, 80)}`);
+    if (ghx() > libre(cur) && !(ult.split && ult.split.h.length > 3)) warn.push(`Bloque demasiado alto (${Math.round(ghx())} px) en ${cap.nombre}: ${grupo.map((x) => Math.round(x.h) + ":" + (x.html.match(/alt="([^"]{0,40})/) || x.html.slice(0, 40))[1]).join(" + ")}`);
     for (const x of grupo.slice(0, -1)) poner(x, x.h);
     // el último puede dividirse por filas
     if (ult.split && ult.split.h.length > 3) {
@@ -138,7 +138,7 @@ function marco(n, c, inner, { shot = false, extra = "" } = {}) {
       <div class="run-r"><span>${chLabel(c)}</span></div></div>
     ${c.tab === false ? "" : `<div class="tab${left ? " l" : ""}" style="top:${tabTop}px">${c.n}</div>`}
     <div class="body${shot ? " fnb" : ""}">${inner}</div>
-    ${shot ? `<div class="fn">Las capturas usan datos de demostración: nombres, oficinas, cifras y fechas son ficticios. El encabezado azul de la demostración es más simple que el de la intranet.</div>` : ""}
+    ${shot ? `<div class="fn">Las capturas son del modo de demostración: nombres, oficinas, cifras y fechas son ficticios.</div>` : ""}
     <div class="foot${left ? " l" : ""}"><span>Edición ${DOC.ed} · ${DOC.edicion}</span><span>${folio}</span></div>
     ${extra}</section>`;
 }
@@ -164,14 +164,21 @@ sheets.push(`<section class="pg" id="p1" style="background:var(--navy-deep)">
 // Contenido (2 páginas): se reparte por altura
 const tocRows = [];
 for (const t of toc) {
-  tocRows.push({ h: 44, html: `<div class="toc-ch"><span>${fls(String(t.c.n).padStart(2, "0"), "d", 20)}</span><span class="t">${t.c.nombre}</span><span class="p">${t.pg}</span></div>` });
-  for (const s of t.subs) tocRows.push({ h: 20, html: `<div class="toc-s"><span></span><span class="dl"><span>${s.title}</span><i></i></span><span class="p">${s.pg}</span></div>` });
+  tocRows.push({ h: 46, html: `<div class="toc-ch"><span>${fls(String(t.c.n).padStart(2, "0"), "d", 20)}</span><span class="t">${t.c.nombre}</span><span class="p">${t.pg}</span></div>` });
+  for (const s of t.subs) tocRows.push({ h: 17, html: `<div class="toc-s"><span></span><span class="dl"><span>${s.title}</span><i></i></span><span class="p">${s.pg}</span></div>` });
 }
 const tocPages = [[], []];
-{ let h = 0, k = 0; for (const r of tocRows) { if (h + r.h > 740 && k === 0 && r.html.includes("toc-ch")) { k = 1; h = 0; } if (h + r.h > 780 && k === 0) { k = 1; h = 0; } tocPages[k].push(r.html); h += r.h; } }
+{
+  // por capítulo completo: una página (capacidades en px de cuerpo) no parte un capítulo
+  const caps = []; let cur = null;
+  for (const r of tocRows) { if (r.html.includes("toc-ch")) { cur = { h: 0, rows: [] }; caps.push(cur); } cur.h += r.h; cur.rows.push(r.html); }
+  const cap = [700, 850]; let k = 0, h = 0;
+  for (const c of caps) { if (h + c.h > cap[k] && k < 1) { k++; h = 0; } tocPages[k].push(...c.rows); h += c.h; }
+}
 const tc = { n: 0, nombre: "Contenido", ruta: "contenido", tab: false };
 sheets.push(marco(2, tc, `<div class="blk"><h1 class="h1">Contenido</h1></div><div class="blk lead">Diez capítulos. Busque el suyo por su papel: administrador, gestor de oficina, colaborador o financiero. Los capítulos 0 y 1 son para todos.</div><div>${tocPages[0].join("")}</div>`));
 sheets.push(marco(3, tc, `<div>${tocPages[1].join("")}</div>`));
+
 // Capítulos
 for (const p of pages) {
   const inner = (p.first ? openBlock(p.cap) : "") + p.blocks.map((b) => b.html).join("");

@@ -1,0 +1,231 @@
+/* =============================================================================
+   Carga del libro por campus. Solo tokens.
+   ========================================================================== */
+
+.import-step {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-7);
+  margin-bottom: var(--space-5);
+}
+
+.import-step > header {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.import-step h2 {
+  font-size: var(--text-lg);
+}
+
+.import-step > header p,
+.import-empty {
+  margin-top: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.import-step code {
+  padding: 1px 5px;
+  background: var(--surface-3);
+  border-radius: var(--radius-xs);
+  font-size: 0.9em;
+}
+
+.import-step__number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  color: var(--ink-on-accent);
+  background: var(--brand-navy);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+/* --- Selector de archivo ---------------------------------------------------- */
+
+.import-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  color: var(--brand-blue);
+  background: var(--surface-2);
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--dur-base) ease, background-color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .import-drop:hover {
+    background: var(--brand-blue-soft);
+    border-color: var(--brand-blue);
+  }
+}
+
+.import-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.import-drop:focus-within {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+/* --- Cifras de la revisión -------------------------------------------------- */
+
+.import-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.import-figures dt {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.import-figures dd {
+  margin: var(--space-2) 0 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1;
+}
+
+/* --- Lo que impide guardar, y lo que solo avisa ------------------------------ */
+
+.import-blockers,
+.import-warnings {
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.import-blockers {
+  color: var(--ink);
+  background: var(--status-risk-soft);
+  border: 1px solid color-mix(in srgb, var(--status-risk) 30%, transparent);
+}
+
+.import-warnings {
+  background: var(--status-pending-soft);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 28%, transparent);
+}
+
+.import-blockers strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--status-risk);
+}
+
+.import-blockers ul,
+.import-warnings ul {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-left: var(--space-5);
+  list-style: disc;
+  color: var(--ink-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* --- Vista previa y lotes ---------------------------------------------------- */
+
+.import-preview {
+  width: 100%;
+  font-size: var(--text-xs);
+}
+
+.import-preview th,
+.import-preview td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--line-faint);
+  vertical-align: top;
+}
+
+.import-preview thead th {
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.import-preview td {
+  color: var(--ink-secondary);
+}
+
+.import-preview__more {
+  margin-top: var(--space-3);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+}
+
+/* --- Publicar ---------------------------------------------------------------- */
+
+.import-publish {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-5);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.import-publish span {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.import-publish small {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+}
+
+.import-step .button-primary,
+.import-step .button-secondary {
+  justify-self: start;
+}
+
+.import-done h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--status-done);
+}
+
+.import-done ul {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.import-done strong {
+  display: block;
+  color: var(--ink);
+}

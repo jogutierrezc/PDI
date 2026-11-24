@@ -160,7 +160,8 @@ export function estiloFoto(x: number, y: number, zoom: number): CSSProperties {
 function FotoSuperior({ portada, url }: { portada: PortadaDiseno; url: string | null }) {
   // Imagen propia con su encuadre; foto institucional con la alineación elegida.
   const propia = portada.fondo === "propia" && portada.foto && url;
-  const fuente = propia ? url : portada.fondo === "foto" ? FOTO_PORTADA : null;
+  // Galería Institucional: la imagen aprobada que se eligió (url firmada) o, sin elegir o mientras llega, la de siempre.
+  const fuente = propia ? url : portada.fondo === "foto" ? (portada.galeria && url ? url : portada.galeria?.startsWith("/") ? portada.galeria : FOTO_PORTADA) : null;
   const estilo = propia ? estiloFoto(portada.foto!.x, portada.foto!.y, portada.foto!.zoom) : estiloFoto(50, YDE[portada.alineacionFoto], 1);
   return <div className="vi-foto vi-c1-ph">{fuente ? <img src={fuente} alt="" style={estilo} /> : null}</div>;
 }

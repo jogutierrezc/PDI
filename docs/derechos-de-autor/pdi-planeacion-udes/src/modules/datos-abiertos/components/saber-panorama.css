@@ -1,0 +1,569 @@
+/* =============================================================================
+   Saber PRO frente al país (SaberPanorama).
+
+   Dos bandas sobre el mismo eje de puntos y, en «Evolución», seis pequeños
+   múltiplos de la brecha. Todo sale de los tokens del tablero (--od-board-*,
+   --od-div-*, --od-series-1), así que claro y oscuro salen solos.
+
+   Movimiento: solo CSS. Al entrar en pantalla (data-armed) las marcas del país
+   recorren su pista, las barras de la UDES crecen desde la marca del país y la
+   línea de la evolución se dibuja con stroke-dashoffset. Cambiar de año o de
+   campus mueve las marcas en 260 ms. Con data-still o movimiento reducido, el
+   estado final desde el primer cuadro.
+   ========================================================================== */
+
+.od-pano {
+  --pano-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  display: grid;
+  gap: var(--space-5);
+  color: var(--od-board-ink);
+}
+
+/* --- Controles ------------------------------------------------------------------- */
+
+.od-pano__bar,
+.od-pano__ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+}
+
+.od-pano__bar { justify-content: space-between; }
+.od-pano__ctl { min-width: 0; }
+.od-pano__ctl--hl { padding-top: var(--space-1); }
+
+.od-pano__name {
+  color: var(--od-board-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-pano__years {
+  display: flex;
+  gap: var(--space-1);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.od-pano__chip,
+.od-pano__seg button {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  color: var(--od-board-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--od-board-raised);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+
+.od-pano__chip:active,
+.od-pano__seg button:active { transform: scale(0.97); }
+
+.od-pano__chip[aria-checked="true"],
+.od-pano__seg button[aria-checked="true"] {
+  color: var(--od-signal-ink);
+  background: var(--od-signal);
+}
+
+.od-pano__chip[data-partial]::after {
+  content: "•";
+  margin-left: 0.2em;
+  color: var(--od-div-neg-2);
+}
+
+.od-pano__chip:focus-visible,
+.od-pano__seg button:focus-visible,
+.od-pano__lab:focus-visible,
+.od-pano__row:focus-visible,
+.od-pano__table summary:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+.od-pano__seg {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: 2px;
+  background: var(--od-board-raised);
+  border-radius: var(--radius-xs);
+}
+
+.od-pano__seg button { background: transparent; }
+
+@media (hover: hover) and (pointer: fine) {
+  .od-pano__chip:hover,
+  .od-pano__seg button:hover { color: var(--od-board-ink); }
+}
+
+/* --- Bandas ---------------------------------------------------------------------- */
+
+.od-pano__band {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--od-board-line);
+}
+
+.od-pano__band:first-of-type { border-top: 0; padding-top: 0; }
+
+.od-pano__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.od-pano__head h3 {
+  margin: 0;
+  font-size: var(--text-lg, 1.125rem);
+  line-height: 1.2;
+}
+
+.od-pano__head p {
+  max-width: 62ch;
+  margin: var(--space-1) 0 0;
+  color: var(--od-board-muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+/* Tres carriles: etiqueta | pista | cifra. */
+.od-pano__axis,
+.od-pano__row {
+  display: grid;
+  grid-template-columns: 12.5rem minmax(0, 1fr) 9.5rem;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.od-pano__axis {
+  color: var(--od-board-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-pano__ticks {
+  position: relative;
+  height: 1rem;
+}
+
+.od-pano__ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.od-pano__axis--evo .od-pano__years {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 0 12px;
+  overflow: visible;
+  text-align: center;
+}
+
+.od-pano__rows {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-pano__row {
+  min-height: 3.1rem;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-xs);
+  transition: opacity 200ms ease, background-color 160ms ease;
+}
+
+.od-pano__row[data-active] { background: color-mix(in srgb, var(--od-board-raised) 70%, transparent); }
+.od-pano__row[data-low] { opacity: 0.72; }
+.od-pano__row[data-kind="empty"] .od-pano__lab { color: var(--od-board-muted); }
+
+/* --- Etiquetas --------------------------------------------------------------------- */
+
+.od-pano__lab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--od-board-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+}
+
+button.od-pano__lab { cursor: pointer; }
+button.od-pano__lab[aria-pressed="true"] .od-pano__code { color: var(--od-signal-ink); background: var(--od-signal); }
+
+.od-pano__lab small {
+  display: block;
+  color: var(--od-board-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.od-pano__code {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  color: var(--od-flap-ink);
+  font-family: var(--font-sign);
+  font-stretch: var(--sign-stretch);
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: var(--od-flap);
+  border-radius: 0.2rem;
+}
+
+/* --- Pista y marcas ------------------------------------------------------------------ */
+
+.od-pano__trk {
+  position: relative;
+  height: 1.9rem;
+  background: linear-gradient(var(--od-board-line), var(--od-board-line)) center / 100% 1px no-repeat;
+}
+
+.od-pano__trk[data-empty] {
+  background: repeating-linear-gradient(135deg, transparent 0 5px, var(--od-board-line-strong) 5px 6px);
+  border-radius: 3px;
+}
+
+.od-pano__none {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--od-board-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.od-pano__none span { padding: 0 var(--space-2); background: var(--od-board); }
+
+.od-pano__stem {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--od-board-line-strong);
+  transform-origin: left center;
+}
+
+.od-pano__sq {
+  position: absolute;
+  top: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin: -0.4rem 0 0 -0.4rem;
+  background: var(--od-board-ink);
+  border-radius: 2px;
+  transition: left 260ms var(--pano-ease);
+}
+
+.od-pano__ghost {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 0;
+  border-left: 2px dotted var(--od-board-ink);
+  opacity: 0.7;
+  transition: left 260ms var(--pano-ease);
+}
+
+.od-pano__bar-fill {
+  position: absolute;
+  top: 50%;
+  height: 0.7rem;
+  margin-top: -0.35rem;
+  border-radius: 2px;
+  transition: left 260ms var(--pano-ease), width 260ms var(--pano-ease), background-color 200ms ease;
+}
+
+.od-pano__dot {
+  position: absolute;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  background: var(--od-series-1);
+  border: 2px solid var(--od-board);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--od-series-1);
+  transition: left 260ms var(--pano-ease);
+}
+
+.od-pano__dot[data-few] {
+  background: var(--od-board);
+  border: 2px dashed var(--od-series-1);
+  box-shadow: none;
+}
+
+/* --- Cifras ------------------------------------------------------------------------------ */
+
+.od-pano__val {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.od-pano__sub {
+  display: grid;
+  gap: 1px;
+  color: var(--od-board-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-pano__gap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--od-board-ink);
+  font-weight: 700;
+}
+
+.od-pano__gap svg {
+  flex: none;
+  width: 0.65rem;
+  height: 0.65rem;
+  fill: var(--od-board-muted);
+}
+
+.od-pano__gap[data-tone="up"] svg { fill: var(--od-div-pos-2); }
+.od-pano__gap[data-tone="down"] svg { fill: var(--od-div-neg-2); }
+.od-pano__gap[data-few] { font-style: italic; }
+
+.od-pano__cl {
+  color: var(--od-board-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.od-pano__cl b { color: var(--od-board-ink); }
+
+/* --- Evolución --------------------------------------------------------------------------- */
+
+.od-pano__row--evo {
+  grid-template-columns: 10.5rem minmax(0, 1fr) 13rem;
+  align-items: start;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--od-board-line);
+}
+
+.od-pano__evo-chart { min-width: 0; }
+.od-pano__evo-chart svg { display: block; max-width: 100%; overflow: visible; }
+
+.od-pano__close {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* --- Lectura, leyenda, pie -------------------------------------------------------------------- */
+
+.od-pano__read {
+  min-height: 2.6em;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--od-board-ink);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  background: var(--od-board-raised);
+  border-radius: var(--radius-xs);
+}
+
+.od-pano__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  color: var(--od-board-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  list-style: none;
+}
+
+.od-pano__legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.od-pano__legend i { flex: none; width: 0.85rem; height: 0.85rem; border-radius: 3px; }
+.od-pano__legend .k-sq { background: var(--od-board-ink); border-radius: 2px; }
+.od-pano__legend .k-dot { background: var(--od-series-1); border-radius: 50%; }
+.od-pano__legend .k-ghost { width: 0; border-left: 2px dotted var(--od-board-ink); border-radius: 0; }
+.od-pano__legend .k-mid { border: 1px solid var(--od-board-line-strong); }
+.od-pano__legend .k-few { border: 2px dashed var(--od-series-1); border-radius: 50%; }
+.od-pano__legend .k-hatch { background: repeating-linear-gradient(135deg, transparent 0 3px, var(--od-board-line-strong) 3px 4px); }
+.od-pano__legend .k-yr::after { content: "•"; color: var(--od-div-neg-2); }
+.od-pano__legend .k-line { height: 3px; background: var(--od-series-1); border-radius: 2px; }
+.od-pano__legend .k-faint { height: 2px; background: var(--od-board-muted); opacity: 0.6; }
+.od-pano__legend .k-zero { height: 2px; background: var(--od-board-ink); }
+
+.od-pano__foot {
+  max-width: 78ch;
+  margin: 0;
+  color: var(--od-board-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* --- Tabla equivalente -------------------------------------------------------------------- */
+
+.od-pano__table summary {
+  width: fit-content;
+  color: var(--od-board-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.od-pano__tblwrap {
+  max-height: 28rem;
+  margin-top: var(--space-3);
+  overflow: auto;
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+}
+
+.od-pano__tblwrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-pano__tblwrap caption {
+  padding: var(--space-2) var(--space-3);
+  color: var(--od-board-muted);
+  text-align: left;
+}
+
+.od-pano__tblwrap th,
+.od-pano__tblwrap td {
+  padding: var(--space-1) var(--space-3);
+  text-align: left;
+  white-space: nowrap;
+  border-top: 1px solid var(--od-board-line);
+}
+
+.od-pano__tblwrap .num { text-align: right; }
+.od-pano__tblwrap thead th { position: sticky; top: 0; background: var(--od-board-raised); }
+
+/* --- Entrada: una sola vez, al llegar a pantalla -------------------------------------------- */
+
+@keyframes od-pano-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes od-pano-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes od-pano-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes od-pano-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.od-pano:not([data-still]) .od-pano__stem,
+.od-pano:not([data-still]) .od-pano__bar-fill { transform: scaleX(0); }
+.od-pano:not([data-still]) .od-pano__dot,
+.od-pano:not([data-still]) .od-pano__ghost,
+.od-pano:not([data-still]) .od-pano__sq { opacity: 0; }
+
+.od-pano[data-armed]:not([data-still]) .od-pano__stem,
+.od-pano[data-armed]:not([data-still]) .od-pano__bar-fill {
+  animation: od-pano-grow 540ms var(--pano-ease) var(--delay, 0ms) both;
+}
+
+.od-pano[data-armed]:not([data-still]) .od-pano__dot,
+.od-pano[data-armed]:not([data-still]) .od-pano__ghost,
+.od-pano[data-armed]:not([data-still]) .od-pano__sq {
+  animation: od-pano-fade 300ms ease-out var(--delay, 0ms) both;
+}
+
+.od-pano[data-armed]:not([data-still]) .od-pano__row > .od-pano__lab {
+  animation: od-pano-rise 250ms var(--pano-ease) var(--delay, 0ms) both;
+}
+
+/* La evolución se dibuja solo la primera vez que se abre (data-play). */
+.od-pano__rows[data-play][data-armed] .od-pano__line {
+  stroke-dasharray: 1;
+  animation: od-pano-draw 700ms var(--pano-ease) var(--delay, 0ms) both;
+}
+
+.od-pano__rows[data-play][data-armed] .od-pano__pt,
+.od-pano__rows[data-play][data-armed] .od-pano__area {
+  animation: od-pano-fade 300ms ease-out calc(var(--delay, 0ms) + 650ms) both;
+}
+
+.od-pano__rows[data-play][data-armed] .od-pano__close > * {
+  animation: od-pano-rise 250ms var(--pano-ease) calc(var(--delay, 0ms) + 550ms) both;
+}
+
+.od-pano__rows[data-play]:not([data-armed]) .od-pano__line { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.od-pano__rows[data-play]:not([data-armed]) .od-pano__pt,
+.od-pano__rows[data-play]:not([data-armed]) .od-pano__area,
+.od-pano__rows[data-play]:not([data-armed]) .od-pano__close > * { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .od-pano *,
+  .od-pano *::before,
+  .od-pano *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .od-pano .od-pano__stem,
+  .od-pano .od-pano__bar-fill { transform: none !important; }
+  .od-pano .od-pano__dot,
+  .od-pano .od-pano__ghost,
+  .od-pano .od-pano__sq,
+  .od-pano .od-pano__pt,
+  .od-pano .od-pano__area,
+  .od-pano .od-pano__close > * { opacity: 1 !important; }
+  .od-pano .od-pano__line { stroke-dashoffset: 0 !important; }
+}
+
+/* --- Angosto: cada fila pasa a dos líneas ------------------------------------------------------ */
+
+@media (max-width: 720px) {
+  .od-pano__axis > :first-child,
+  .od-pano__axis > :last-child { display: none; }
+
+  .od-pano__axis,
+  .od-pano__row,
+  .od-pano__row--evo {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .od-pano__axis { grid-template-columns: minmax(0, 1fr); }
+
+  .od-pano__row .od-pano__trk,
+  .od-pano__row .od-pano__evo-chart { grid-column: 1 / -1; grid-row: 2; }
+
+  .od-pano__row--evo .od-pano__close { grid-column: 1 / -1; grid-row: 3; }
+  .od-pano__row--evo .od-pano__lab { grid-column: 1 / -1; }
+
+  .od-pano__val {
+    grid-column: 2;
+    grid-row: 1;
+    justify-items: end;
+    text-align: right;
+  }
+
+  .od-pano__row:not(.od-pano__row--evo) .od-pano__val { grid-template-columns: auto; }
+}

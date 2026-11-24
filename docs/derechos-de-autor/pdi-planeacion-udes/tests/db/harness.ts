@@ -1,0 +1,96 @@
+/* =============================================================================
+   Arnés de pruebas de base de datos.
+
+   Levanta un Postgres en memoria (PGlite), le pone lo mínimo de Supabase
+   (supabase-stub.sql), aplica TODAS las migraciones en orden —las mismas que
+   se aplican en el proyecto real— y, si se pide, las semillas de prueba.
+
+   `asUser` corre un bloque con la sesión de una persona: rol authenticated y
+   su id en request.jwt.claim.sub, igual que PostgREST. Así las políticas RLS
+   se prueban de verdad y no con el dueño de las tablas, que se las salta.
+   ========================================================================== */
+
+import { PGlite } from "@electric-sql/pglite";
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { readFileSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const ROOT = resolve(__dirname, "../..");
+const MIGRATIONS = join(ROOT, "supabase/migrations");
+
+export const PEOPLE = {
+  admin: "00000000-0000-4000-a000-000000000001",
+  director: "00000000-0000-4000-a000-000000000002",
+  reportante: "00000000-0000-4000-a000-000000000003",
+  decano: "00000000-0000-4000-a000-000000000004",
+  vi: "00000000-0000-4000-a000-000000000005",
+  ve: "00000000-0000-4000-a000-000000000006",
+  vx: "00000000-0000-4000-a000-000000000007",
+  otroDirector: "00000000-0000-4000-a000-000000000008",
+} as const;
+
+export const UNITS = {
+  facultad: "00000000-0000-4000-b000-000000000010",
+  programaA: "00000000-0000-4000-b000-000000000011",
+  programaB: "00000000-0000-4000-b000-000000000012",
+  maestria: "00000000-0000-4000-b000-000000000013",
+  programaZ: "00000000-0000-4000-b000-000000000021",
+} as const;
+
+export type Query = <T = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<T[]>;
+
+export interface TestDb {
+  db: PGlite;
+  /** Consulta como dueño de las tablas (se salta RLS). */
+  q: Query;
+  /** Un bloque con la sesión de una persona. Se revierte al final, salvo con `commit`. */
+  asUser: <T>(userId: string | null, work: (q: Query) => Promise<T>, options?: { commit?: boolean }) => Promise<T>;
+  close: () => Promise<void>;
+}
+
+/**
+ * `before`: aplica solo las migraciones anteriores a ese número («0121» deja la
+ * base como estaba antes de 0121). Sirve para comparar una función antes y
+ * después de una migración, o para sembrar algo y aplicarla después.
+ */
+export async function createTestDb({ seed = true, before = "" }: { seed?: boolean; before?: string } = {}): Promise<TestDb> {
+  const db = new PGlite({ extensions: { pgcrypto } });
+  await db.exec(readFileSync(join(ROOT, "tests/db/supabase-stub.sql"), "utf8"));
+
+  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql") && (!before || f.slice(0, before.length) < before)).sort()) {
+    try {
+      await db.exec(readFileSync(join(MIGRATIONS, file), "utf8"));
+    } catch (error) {
+      throw new Error(`La migración ${file} falló: ${(error as Error).message}`);
+    }
+  }
+  if (seed) await db.exec(readFileSync(join(ROOT, "supabase/seed/estructura_prueba.sql"), "utf8"));
+
+  const q: Query = async (sql, params) => (await db.query(sql, params)).rows as never;
+
+  const asUser: TestDb["asUser"] = async (userId, work, options = {}) => {
+    await db.exec("begin");
+    let ok = false;
+    try {
+      await db.exec(userId ? "set local role authenticated" : "set local role anon");
+      await db.query("select set_config('request.jwt.claim.sub', $1, true)", [userId ?? ""]);
+      const result = await work(q);
+      ok = true;
+      return result;
+    } finally {
+      await db.exec(ok && options.commit ? "commit" : "rollback");
+    }
+  };
+
+  return { db, q, asUser, close: () => db.close() };
+}
+
+/** El mensaje de error de una promesa que se espera que falle. */
+export async function errorOf(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (error) {
+    return (error as Error).message;
+  }
+  throw new Error("Se esperaba un error y la operación terminó bien.");
+}

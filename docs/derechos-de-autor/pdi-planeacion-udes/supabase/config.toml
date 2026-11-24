@@ -1,0 +1,86 @@
+# Configuración local de Supabase CLI.
+# Sustituye project_id por la referencia de tu proyecto (Project Settings → General).
+project_id = "pdi-udes"
+
+[functions.admin-users]
+# La función comprueba la sesión por su cuenta: necesita recibir la cabecera
+# Authorization tal cual, sin que la plataforma la valide antes.
+verify_jwt = false
+
+[functions.pilo-ia]
+# Mr. Pilo con IA también atiende a visitantes sin sesión cuando un portal está
+# en «Público»: la función identifica a quien pregunta y aplica la audiencia de
+# cada portal por su cuenta.
+verify_jwt = false
+
+[functions.sync-facultades]
+# Admite dos formas de identificarse —la sesión del portal o la cabecera
+# x-sync-token de un cron— y las comprueba por su cuenta. Validar antes un JWT
+# que en el segundo caso nunca llega haría fallar la sincronización automática.
+verify_jwt = false
+
+[functions.pilo-cuentas]
+# Registro e ingreso de los Usuarios de Pilo: quien llama aún no tiene sesión.
+# La función valida por su cuenta cada acción y limita los intentos.
+verify_jwt = false
+
+[functions.pilo-clases]
+# «Mis clases» (beta): la función comprueba por su cuenta que quien llama tenga
+# una cuenta de Pilo activa de estudiante o de profesor. No guarda nada de Moodle.
+verify_jwt = false
+
+[functions.pilo-carnet]
+# El carnet digital: la función comprueba por su cuenta que quien llama tenga una cuenta de Pilo
+# activa (y, para verificar el carnet de otra persona, que sea profesor). Nada del carnet se guarda aquí.
+verify_jwt = false
+
+[functions.pilo-genesis]
+# «Mis notas» (beta): la función comprueba por su cuenta que quien llama tenga
+# una cuenta de Pilo activa de estudiante. No guarda nada de Génesis.
+verify_jwt = false
+
+[functions.correos]
+# La llama el servidor de cuentas (gancho «Send Email»), que no trae sesión sino
+# una firma: la función la comprueba por su cuenta. Las acciones de la intranet
+# («probar», «prueba») exigen la sesión de alguien de la administración.
+verify_jwt = false
+
+[functions.noticias-ods]
+# El recolector de noticias de UDES Sostenible. Lo llama la intranet (sesión de Planeación o administración)
+# y una tarea diaria con el encabezado x-noticias-cron: la función comprueba por su cuenta cada camino.
+verify_jwt = false
+
+[functions.noticias-pilo]
+# Mr. Pilo lee y clasifica las noticias del recolector (0144). Solo la intranet (sesión de Planeación
+# o administración): la función comprueba la sesión por su cuenta y lee el proveedor de Pilo de la base.
+verify_jwt = false
+
+[functions.pilo-rankingsod]
+# Mr. Pilo arma los informes ODS (0145): plan, párrafos con citas verificadas, evidencia por indicador
+# de THE y fichas de fotos. Solo la intranet (sesión de Planeación o administración): la función
+# comprueba la sesión por su cuenta y lee el proveedor de Pilo de la base.
+verify_jwt = false
+
+[functions.pilo-alertas]
+# La capa de emergencias de Pilo. La llaman Aluna (webhook firmado con x-aluna-firma),
+# pg_cron (encabezado x-pilo-cron) y la intranet (sesión de la administración):
+# la función comprueba por su cuenta cada camino.
+verify_jwt = false
+
+[functions.pilo-informes]
+# Mr. Pilo redacta y aprende en los informes de gestión (0153): borradores con cifras enlazadas [[clave]],
+# mejora de textos, corpus de estilo con lo aprobado y los informes 2025. Solo la intranet (sesión de
+# Planeación, la administración o quien diligencia el informe): la función comprueba la sesión y los papeles.
+verify_jwt = false
+
+[functions.int-contactos]
+# La cara pública de «Contactos» de Internacionalización: una persona invitada, sin cuenta,
+# comparte contactos académicos o de empleadores por un enlace con token. La función valida
+# por su cuenta el token, la sesión por persona y el tope de peticiones por IP.
+verify_jwt = false
+
+[functions.conv-firma]
+# Firma electrónica de convenios (0258). Los firmantes externos no tienen cuenta: el token del enlace, el código de
+# 6 dígitos y la sesión corta se validan dentro de la función. Las acciones internas comprueban la sesión
+# y los permisos (int_puede_crear / int_ve_modulo); «vencer» exige el secreto CONV_FIRMA_CRON o la clave de servicio.
+verify_jwt = false

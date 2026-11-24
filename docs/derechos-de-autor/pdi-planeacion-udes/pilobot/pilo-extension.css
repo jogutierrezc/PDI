@@ -1,0 +1,141 @@
+/* ─── pilo-extension.css ─────────────────────────────────────────────────────
+   Estilos adicionales sobre pilo.css original.
+   No modifica las reglas existentes — solo añade.
+   =========================================================================== */
+
+/* ── Variante vicerrectoría: escena en índigo en lugar de marino ─────────── */
+.pilo[data-actor="vicerectoria"] {
+  --pilo-stage:      hsl(250 45% 18%);
+  --pilo-stage-ink:  hsl(250 30% 96%);
+  --pilo-stage-muted:hsl(250 20% 68%);
+  --pilo-stage-line: hsl(250 35% 26%);
+  --pilo-accent:     hsl(45 90% 55%);
+  --pilo-accent-ink: hsl(250 50% 14%);
+}
+
+/* Botón en modo vicerrectoría (tono diferente al de programa) */
+.pilo-btn[data-actor="vicerectoria"] {
+  background: var(--pilo-stage, hsl(250 45% 18%));
+}
+
+/* ── Panel de alertas institucionales (sidebar paso 3) ─────────────────── */
+.pilo__inst-alerts {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--pilo-stage-ink) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pilo-stage-ink) 18%, transparent);
+  border-radius: var(--radius-md);
+}
+
+.pilo__inst-alerts-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  color: var(--pilo-accent);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.pilo__inst-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  color: var(--pilo-stage-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  border-top: 0.5px solid color-mix(in srgb, var(--pilo-stage-ink) 12%, transparent);
+}
+
+.pilo__inst-alert[data-severity="critica"] { color: hsl(10 90% 75%); }
+.pilo__inst-alert[data-severity="importante"] { color: hsl(45 90% 72%); }
+
+.pilo__inst-alert-cna {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--pilo-accent) 18%, transparent);
+  border-radius: var(--radius-pill);
+  color: var(--pilo-accent);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+}
+
+/* ── PickRow: badges de mandatory, need-severity y origin ─────────────── */
+.pilo-pick__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.pilo-pick__badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pilo-pick__badge--mandatory {
+  color: color-mix(in srgb, var(--brand-blue) 80%, var(--ink));
+  background: color-mix(in srgb, var(--brand-blue) 14%, var(--surface));
+}
+
+.pilo-pick__badge--critica {
+  color: hsl(10 80% 35%);
+  background: hsl(10 90% 94%);
+}
+
+.pilo-pick__badge--importante {
+  color: hsl(38 80% 30%);
+  background: hsl(45 90% 92%);
+}
+
+.pilo-pick__badge--own {
+  color: color-mix(in srgb, var(--brand-teal) 70%, var(--ink));
+  background: color-mix(in srgb, var(--brand-teal) 14%, var(--surface));
+}
+
+/* Mandatorio: la fila no puede apagarse */
+.pilo-pick[data-mandatory] {
+  cursor: default;
+  opacity: 1 !important;
+}
+
+.pilo-pick[data-mandatory] input {
+  accent-color: var(--brand-blue);
+  pointer-events: none;
+}
+
+/* Needs críticos en la lista */
+.pilo-pick[data-need="critica"] {
+  background: hsl(10 90% 98%);
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-color-scheme: dark) {
+  .pilo-pick[data-need="critica"]  { background: hsl(10 40% 14%); }
+  .pilo-pick__badge--critica       { color: hsl(10 90% 72%);   background: hsl(10 50% 22%); }
+  .pilo-pick__badge--importante    { color: hsl(45 90% 72%);   background: hsl(45 40% 20%); }
+}
+
+/* ── PILO_GOALS con metas exclusivas de vice (fondo distinto) ─────────── */
+.pilo-tile[data-fn="vicerectoria-only"] {
+  border: 1.5px dashed color-mix(in srgb, var(--brand-blue) 50%, transparent);
+}
+
+/* ── Responsivo: en vice el sidebar puede ser más ancho ────────────────── */
+@media (min-width: 1100px) {
+  .pilo[data-actor="vicerectoria"] {
+    grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  }
+}
+
+/* ── Modos de movimiento reducido (heredado del css original) ────────────  */
+@media (prefers-reduced-motion: reduce) {
+  .pilo[data-actor="vicerectoria"] { animation: pilo-fade var(--dur-base) linear both; }
+}

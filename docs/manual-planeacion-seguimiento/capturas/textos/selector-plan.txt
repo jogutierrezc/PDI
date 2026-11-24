@@ -1,0 +1,318 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0 
+Financiero: En revisión de la VAF
+
+Todos los planes
+Editar el plan
+Crear un plan
+Financiación y presupuesto
+Filtros
+
+Mostrando 75 de 75 líneas · $ 133.374 M
+
+Líneas
+75
+de 75 en la versión v1.0
+Inversión del plan
+$ 133.374 M
+M = millones de pesos
+Evaluadas
+63 / 75
+12 sin evaluar
+Sin evaluar
+$ 55.337 M
+41 % de la inversión
+Con oficina responsable
+0 / 75
+0 % de las líneas
+Estado de la evaluación
+
+63 de 75 líneas evaluadas y aprobadas
+
+Aprobadas
+63 · $ 78.036 M
+Sin evaluar
+12 · $ 55.337 M
+Peso de lo no evaluado
+41 % de la inversión
+
+Las líneas sin evaluar no tienen fechas ni distribución anual: se diligencian cuando se evalúen. Se aplica lo definido en el Plan Operativo del PDIFyT.
+
+Cobertura de oficina
+
+Qué líneas ya tienen una oficina responsable. Sin ella no habrá seguimiento por oficina (fase 2).
+
+Oficina responsable
+Líneas
+Inversión
+Sin oficina asignada
+75
+$ 133.374 M
+
+La matriz no trae responsables. Se asignan con la columna «Oficina responsable» de la plantilla (Cargar la planificación).
+
+Inversión por año
+
+Monto de la línea × su porcentaje programado cada año.
+
+15.969
+2027
+20 %
+12.120
+2028
+16 %
+16.226
+2029
+21 %
+8.078
+2030
+10 %
+8.693
+2031
+11 %
+6.958
+2032
+9 %
+3.709
+2033
+5 %
+3.201
+2034
+4 %
+3.074
+2035
+4 %
+
+Millones de pesos (M). Solo líneas evaluadas: las 12 sin evaluar aún no tienen distribución anual.
+
+Por prioridad
+75
+líneas
+Crítico
+16
+$ 8.697 M
+Alto
+24
+$ 60.936 M
+Medio
+23
+$ 8.403 M
+Largo plazo
+12
+$ 55.337 M
+Por pilar
+P2 · Ambiente tecnológico
+$ 29.331 M · 27
+P3 · Entorno emprendedor
+$ 3.000 M · 1
+P4 · Gobernanza para el buen gobierno
+$ 92.646 M · 44
+P6 · Apropiación social
+$ 8.397 M · 3
+Por campus
+Bucaramanga
+$ 72.530 M · 37
+Valledupar
+$ 26.844 M · 16
+Cúcuta
+$ 9.533 M · 14
+Todos los campus
+$ 24.466 M · 8
+Por fuente de financiación
+Sin definir
+$ 55.337 M · 12
+Crédito bancario
+$ 31.411 M · 8
+Financiación mixta
+$ 23.303 M · 7
+Presupuesto ordinario institucional
+$ 21.398 M · 44
+Leasign financiero
+$ 1.893 M · 3
+Otra fuente
+$ 30 M · 1
+Cronograma 2027-2035
+
+Las 14 líneas de mayor inversión con fechas. El plan completo está en Cronograma.
+
+Línea
+2027
+2028
+2029
+2030
+2031
+2032
+2033
+2034
+2035
+#24 Infraestructura académica con aulas activas y laboratorios flexibles, preparada para ampliaciones futuras.
+#1 Infraestructura para la docencia
+#2 Infraestructura de usuario final
+#3 Servicios tecnológicos
+#51 Adecuaciones de oficinas de la sede Bari y consolidación del área adminsitrativa.
+#31 Centro de Desarrollo Tecnológico consolidado en 2025 (Acuerdo 009), orientado
+#4 IA, analítica, datos y tecnologías emergentes
+#63 Compra de predio para expansión futura del campus.
+#69 Construcción en lote contiguo a la casona
+#64 Compra predio de centro de conciliación
+#70 Construcción Facultad ciencias de la salud en San Vicente
+#25 Conexión vial estratégica entre parqueaderos, zonas deportivas y equipamientos institucionales.
+#26 Conexión directa entre el campus académico y las zonas deportivas y culturales.
+#71 Espacio de prácticas Finca de Veterinaria
+P2 Ambiente tecnológico
+P3 Entorno emprendedor
+P4 Gobernanza para el buen gobierno
+P6 Apropiación social
+
+12 líneas sin fechas (sin evaluar) no aparecen en el cronograma.
+
+Mayor inversión
+Línea
+Campus
+Prioridad
+Monto
+Evaluación
+Escenario multipropósito para eventos académicos y culturales de gran formato
+#28 · PLF
+Bucaramanga
+Largo plazo
+$ 20.000 M
+◆
+Sin evaluar
+Alojamiento con ambientes de estudio, conectividad y servicios complementarios
+#30 · PLF
+Bucaramanga
+Largo plazo
+$ 12.000 M
+◆
+Sin evaluar
+Equipamiento deportivo y cultural de aforo masivo y uso multifuncional
+#29 · PLF
+Bucaramanga
+Largo plazo
+$ 10.000 M
+◆
+Sin evaluar
+Construcción Facultad ciencias de la salud en San Vicente
+#70 · PLF
+Valledupar
+Alto
+$ 9.500 M
+●
+Evaluada
+Infraestructura académica con aulas activas y laboratorios flexibles, preparada para ampliaciones futuras
+#24 · PLF
+Bucaramanga
+Alto
+$ 8.000 M
+●
+Evaluada
+Infraestructura para la docencia
+#1 · IFT
+Todos los campus
+Alto
+$ 6.971 M
+●
+Evaluada
+Infraestructura de usuario final
+#2 · IFT
+Todos los campus
+Alto
+$ 6.381 M
+●
+Evaluada
+Servicios tecnológicos
+#3 · IFT
+Todos los campus
+Alto
+$ 5.421 M
+●
+Evaluada
+Solicitado vs aprobado · PDIFyT 2027-2035
+
+Lo que pidieron las oficinas frente a lo que aprobó la VAF, proyecto por proyecto. Un proyecto sin evaluar todavía no suma a lo aprobado.
+
+Solicitado
+$ 133.374 M
+75 proyectos · lo que pidieron las oficinas
+Aprobado
+$ 78.036 M
+63 proyectos · 59 % de lo solicitado
+Rechazado
+$ 0 M
+0 proyectos · monto que se había solicitado
+Sin evaluar
+$ 55.337 M
+12 proyectos · esperan a la VAF
+
+Solicitado
+Aprobado
+
+Por pilar
+P2 · Ambiente tecnológico · 27
+Solicitado $ 29.331 M
+Aprobado $ 25.305 M
+P3 · Entorno emprendedor · 1
+Solicitado $ 3.000 M
+Aprobado $ 3.000 M
+P4 · Gobernanza para el buen gobierno · 44
+Solicitado $ 92.646 M
+Aprobado $ 41.334 M
+P6 · Apropiación social · 3
+Solicitado $ 8.397 M
+Aprobado $ 8.397 M
+Por campus
+Bucaramanga · 37
+Solicitado $ 72.530 M
+Aprobado $ 22.635 M
+Valledupar · 16
+Solicitado $ 26.844 M
+Aprobado $ 22.313 M
+Todos los campus · 8
+Solicitado $ 24.466 M
+Aprobado $ 24.466 M
+Cúcuta · 14
+Solicitado $ 9.533 M
+Aprobado $ 8.621 M
+Por oficina
+Sin oficina · 75
+Solicitado $ 133.374 M
+Aprobado $ 78.036 M
+Por año
+
+Solo proyectos aprobados: son los que traen distribución anual.
+
+2027 · 46
+Solicitado $ 15.969 M
+Aprobado $ 15.969 M
+2028 · 44
+Solicitado $ 12.120 M
+Aprobado $ 12.120 M
+2029 · 40
+Solicitado $ 16.225 M
+Aprobado $ 16.225 M
+2030 · 31
+Solicitado $ 8.078 M
+Aprobado $ 8.078 M
+2031 · 33
+Solicitado $ 8.692 M
+Aprobado $ 8.692 M
+2032 · 31
+Solicitado $ 6.958 M
+Aprobado $ 6.958 M
+2033 · 29
+Solicitado $ 3.709 M
+Aprobado $ 3.709 M
+2034 · 26
+Solicitado $ 3.200 M
+Aprobado $ 3.200 M
+2035 · 26
+Solicitado $ 3.073 M
+Aprobado $ 3.073 M
+
+La tabla de proyectos con la diferencia de cada uno está en Financiación y presupuesto › Solicitado vs aprobado.

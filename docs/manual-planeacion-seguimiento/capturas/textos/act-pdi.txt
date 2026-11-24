@@ -1,0 +1,54 @@
+Regresar
+Planeación y Seguimiento
+Crear actividad
+Crear actividad
+
+Oficina: Tecnología e Infraestructura TI. Cinco pasos; el borrador se guarda solo en este equipo.
+
+Qué se va a hacer
+(hecho)
+2
+Plan de Desarrollo Institucional
+(paso actual)
+3
+Cuándo y cuánto
+(pendiente)
+4
+Quién la hace
+(pendiente)
+5
+Revisar y crear
+(pendiente)
+Plan de Desarrollo Institucional
+
+Diga si la actividad contribuye al PDI: a qué pilares y líneas de acción, o que no tiene conexión.
+
+¿Esta actividad se relaciona con el Plan de Desarrollo Institucional? (obligatorio)
+Esta actividad se conecta con el PDI
+Elija uno o varios pilares o líneas de acción.
+No tiene conexión con el PDI
+Es una actividad de la operación de la oficina.
+Buscar un pilar o una línea de acción
+
+1 de 12 elegidos.
+
+Pilar completo
+P2 Ambiente tecnológico
+Quitar
+P2 Ambiente tecnológico
+1 elegido
+Todo el pilar P2
+La actividad se conecta con el pilar, sin una línea concreta.
+A-2.1 · Infraestructura digital
+LA-2.1.1 Renovar la red y la conectividad de los campus
+LA-2.1.2 Consolidar los servicios en la nube institucional
+LA-2.1.3 Fortalecer la ciberseguridad
+A-2.2 · Sistemas de información
+LA-2.2.1 Integrar los sistemas académicos y administrativos
+LA-2.2.2 Gobernar los datos institucionales
+P3 Entorno emprendedor
+P4 Gobernanza para el buen gobierno
+P6 Apropiación social
+Guardado hace un momento en este equipo
+Atrás
+Siguiente

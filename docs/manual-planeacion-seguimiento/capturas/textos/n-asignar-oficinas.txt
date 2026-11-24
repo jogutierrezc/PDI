@@ -1,0 +1,942 @@
+Regresar a proyectos
+Planeación y Seguimiento
+Asignar oficinas
+Asignar oficinas a los proyectos
+
+«PDIFyT 2027-2035»: la oficina responsable decide quién planifica y reporta cada proyecto.
+
+75 de 75 proyectos siguen sin oficina responsable. Sin ella, nadie les planifica actividades.
+
+Buscar por nombre o número
+Pilar
+Todos
+P2 · Ambiente tecnológico
+P3 · Entorno emprendedor
+P4 · Gobernanza para el buen gobierno
+P6 · Apropiación social
+Campus
+Todos
+Bucaramanga
+Cúcuta
+Todos los campus
+Valledupar
+Solo sin oficina
+
+75 proyectos
+
+0 seleccionados
+Asignar a
+Elija una oficina…
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Asignar a los proyectos
+Quitar la oficina
+Seleccionar todos los proyectos que se ven
+Proyecto
+Campus
+Monto
+Oficina responsable
+Seleccionar el proyecto 1
+Infraestructura para la docencia
+#1 · IFT · P2
+Todos los campus
+$ 6.971 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 2
+Infraestructura de usuario final
+#2 · IFT · P2
+Todos los campus
+$ 6.381 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 3
+Servicios tecnológicos
+#3 · IFT · P2
+Todos los campus
+$ 5.421 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 4
+IA, analítica, datos y tecnologías emergentes
+#4 · IFT · P2
+Todos los campus
+$ 2.211 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 5
+Procesamiento y almacenamiento
+#5 · IFT · P2
+Todos los campus
+$ 1.111 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 6
+Redes y conectividad
+#6 · IFT · P2
+Todos los campus
+$ 343 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 7
+Seguridad de la infraestructura tecnológica
+#7 · IFT · P2
+Todos los campus
+$ 565 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 8
+Plataformas institucionales
+#8 · IFT · P2
+Todos los campus
+$ 1.459 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 9
+Computación de alto rendimiento
+#9 · IFT · P2
+Bucaramanga
+$ 1.845 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 10
+Observatorio de tendencias y vigilancia tecnológica
+#10 · IFT · P2
+Bucaramanga
+$ 2.150 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 11
+Remodelación Clínica
+#11 · PLF · P4
+Bucaramanga
+$ 350 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 12
+Adecuación sala de juegos + materiales didácticos
+#12 · PLF · P2
+Bucaramanga
+$ 7 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 13
+Actualización y reubicación cabina de radio + equipos audiovisuales
+#13 · PLF · P2
+Bucaramanga
+$ 30 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 14
+Gestión de disponibilidad de oficinas
+#14 · PLF · P4
+Bucaramanga
+$ 10 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 15
+Adecuación consultorio empresarial + recursos bibliográficos
+#15 · PLF · P6
+Bucaramanga
+$ 15 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 16
+Modernización agencia Élite Inhouse + equipos MAC + software
+#16 · PLF · P2
+Bucaramanga
+$ 30 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 17
+Gestionar espacio físico para laboratorios AVD y Estimulación Sensorial
+#17 · PLF · P2
+Bucaramanga
+$ 150 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 18
+Adecuación de múltiples laboratorios
+#18 · PLF · P6
+Bucaramanga
+$ 382 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 19
+Adecuaciones locativas de salones
+#19 · PLF · P4
+Bucaramanga
+$ 700 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 20
+Adecuación de instalaciones + equipos
+#20 · PLF · P2
+Bucaramanga
+$ 60 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 21
+Renovación de laboratorios de habla, voz, audición y lenguaje
+#21 · PLF · P2
+Bucaramanga
+$ 150 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 22
+Actualización de laboratorios de Análisis del Movimiento
+#22 · PLF · P2
+Bucaramanga
+$ 12 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 23
+Mantenimiento laboratorio simulación + adecuación espacios profesores
+#23 · PLF · P4
+Bucaramanga
+$ 58 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 24
+Infraestructura académica con aulas activas y laboratorios flexibles, preparada para ampliaciones futuras
+#24 · PLF · P6
+Bucaramanga
+$ 8.000 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 25
+Conexión vial estratégica entre parqueaderos, zonas deportivas y equipamientos institucionales
+#25 · PLF · P4
+Bucaramanga
+$ 2.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 26
+Conexión directa entre el campus académico y las zonas deportivas y culturales
+#26 · PLF · P4
+Bucaramanga
+$ 1.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 27
+Reingeniería del ingreso institucional con mayor seguridad y eficiencia operativa
+#27 · PLF · P4
+Bucaramanga
+$ 3.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 28
+Escenario multipropósito para eventos académicos y culturales de gran formato
+#28 · PLF · P4
+Bucaramanga
+$ 20.000 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 29
+Equipamiento deportivo y cultural de aforo masivo y uso multifuncional
+#29 · PLF · P4
+Bucaramanga
+$ 10.000 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 30
+Alojamiento con ambientes de estudio, conectividad y servicios complementarios
+#30 · PLF · P4
+Bucaramanga
+$ 12.000 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 31
+Centro de Desarrollo Tecnológico consolidado en 2025 (Acuerdo 009), orientado
+#31 · PLF · P3
+Bucaramanga
+$ 3.000 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 32
+Reposición de redes de media tensión y sistema de medida
+#32 · PLF · P4
+Bucaramanga
+$ 350 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 33
+Reposición de redes hidraulicas
+#33 · PLF · P4
+Bucaramanga
+$ 300 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 34
+Implementación de redes contraincendio generales
+#34 · PLF · P4
+Bucaramanga
+$ 550 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 35
+Reposición de equipos de transporte vertical
+#35 · PLF · P4
+Bucaramanga
+$ 400 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 36
+Instalación de aire acondicionado aulas chibcha
+#36 · PLF · P4
+Bucaramanga
+$ 1.100 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 37
+Actualización arquitectónica de fachadas de salones chibcha
+#37 · PLF · P4
+Bucaramanga
+$ 600 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 38
+Reposición de pisos y cielo raso aulas
+#38 · PLF · P4
+Bucaramanga
+$ 600 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 39
+Reposición de equipos de climatización
+#39 · PLF · P4
+Bucaramanga
+$ 450 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 40
+Actualización arquitectonica de la biblioteca
+#40 · PLF · P4
+Bucaramanga
+$ 400 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 41
+Actualizaciones estructurales ( Vulnerabilidad sísmica y diseños de reforzamiento) No incluye obras
+#41 · PLF · P4
+Bucaramanga
+$ 400 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 42
+Expansión de los sistemas solares Fotovoltaicos
+#42 · PLF · P4
+Bucaramanga
+$ 600 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 43
+Adecuación del laboratorio
+#43 · PLF · P4
+Cúcuta
+$ 135 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 44
+Garantizar recursos físicos y tecnológicos
+#44 · PLF · P4
+Cúcuta
+$ 522 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 45
+Plan prospectivo de internacionalización
+#45 · PLF · P4
+Cúcuta
+$ 389 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 46
+Mantenimiento, dotación y modernización de laboratorios
+#46 · PLF · P2
+Cúcuta
+$ 29 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 47
+Adecuar puestos de trabajo
+#47 · PLF · P2
+Cúcuta
+$ 6,6 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 48
+Renovación del borde institucional para reforzar identidad, iluminación y accesos
+#48 · PLF · P4
+Cúcuta
+$ 600 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 49
+Optimización de flujos, señalización e infraestructura vial interna
+#49 · PLF · P4
+Cúcuta
+$ 350 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 50
+Construcción de subestación y planta de emergencia sede Bari
+#50 · PLF · P4
+Cúcuta
+$ 550 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 51
+Adecuaciones de oficinas de la sede Bari y consolidación del área adminsitrativa
+#51 · PLF · P4
+Cúcuta
+$ 4.800 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 52
+Reposición de sistema de climatización bloque Arhuaco
+#52 · PLF · P4
+Cúcuta
+$ 600 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 53
+Instalación de respaldo energético de la sede principal
+#53 · PLF · P4
+Cúcuta
+$ 400 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 54
+Construcción de estructura e Instalación de equipo ascensor para el bloque motilón
+#54 · PLF · P4
+Cúcuta
+$ 450 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 55
+Ampliación sistema contraincendios
+#55 · PLF · P4
+Cúcuta
+$ 300 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 56
+Expansión de sistemas solares fotovoltaicos
+#56 · PLF · P4
+Cúcuta
+$ 400 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 57
+Elaborar plan estratégico para laboratorio de simulación
+#57 · PLF · P2
+Valledupar
+$ 8,1 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 58
+Garantizar disponibilidad de espacios físicos y dotación
+#58 · PLF · P2
+Valledupar
+$ 15 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 59
+Adecuación espacios grandes animales
+#59 · PLF · P2
+Valledupar
+$ 9,8 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 60
+Socializar infraestructura disponible y ajustes razonables
+#60 · PLF · P2
+Valledupar
+$ 9,1 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 61
+Socializar infraestructura existente
+#61 · PLF · P2
+Valledupar
+$ 21 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 62
+Construcción de nuevo bloque académico-administrativo
+#62 · PLF · P4
+Valledupar
+$ 4.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 63
+Compra de predio para expansión futura del campus
+#63 · PLF · P4
+Valledupar
+$ 1.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 64
+Compra predio de centro de conciliación
+#64 · PLF · P4
+Valledupar
+$ 1.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 65
+Compra predio de la clínica veterinaria
+#65 · PLF · P4
+Valledupar
+$ 1.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 66
+Sistema de respaldo eléctrico para sede Kankuamo
+#66 · PLF · P4
+Valledupar
+$ 350 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 67
+Sistema de transporte vertical para bloque Kankuamo
+#67 · PLF · P4
+Valledupar
+$ 380 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 68
+Restauración fachada Kankuamo
+#68 · PLF · P4
+Valledupar
+$ 150 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 69
+Construcción en lote contiguo a la casona
+#69 · PLF · P4
+Valledupar
+$ 3.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 70
+Construcción Facultad ciencias de la salud en San Vicente
+#70 · PLF · P4
+Valledupar
+$ 9.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 71
+Espacio de prácticas Finca de Veterinaria
+#71 · PLF · P4
+Valledupar
+$ 3.500 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 72
+Expansión de sistemas solares fotovoltaicos
+#72 · PLF · P4
+Valledupar
+$ 400 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 73
+Seguridad física y campus
+#73 · IFT-LOG · P2
+Bucaramanga
+$ 80 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 74
+Seguridad física y campus
+#74 · IFT-LOG · P2
+Bucaramanga
+$ 110 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Seleccionar el proyecto 75
+Seguridad física y campus
+#75 · IFT-LOG · P2
+Bucaramanga
+$ 140 M
+Sin oficina
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario

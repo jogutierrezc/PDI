@@ -13,7 +13,7 @@ export type { PsNivel };
 export const CAMPUS = ["Bucaramanga", "Valledupar", "Cúcuta"] as const;
 export const CAMPUS_TODOS = "Todos";
 export const CAMPUS_LISTA: readonly string[] = [...CAMPUS, CAMPUS_TODOS];
-export const CLASIFICACIONES = ["PLF", "IFT", "IFT-LOG"] as const;
+export const CLASIFICACIONES = ["PLF", "IFT", "IFT-LOG", "IFT-LAB"] as const;
 export const PRIORIDADES = ["Crítico", "Alto", "Medio", "Largo plazo"] as const;
 export type Prioridad = (typeof PRIORIDADES)[number];
 

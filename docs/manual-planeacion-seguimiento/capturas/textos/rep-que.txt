@@ -1,0 +1,47 @@
+Regresar
+Planeación y Seguimiento
+Actividad
+Reportar avance
+Reportar avance
+
+«Levantar el diagnóstico de actualización y reubicación cabina de radio + equipos a…» · 
+En curso · avance validado hasta ahora: 0 %
+
+1
+Qué avanzó
+(paso actual)
+2
+Evidencias
+(pendiente)
+3
+Riesgos
+(pendiente)
+4
+Revisar y enviar
+(pendiente)
+Qué avanzó
+
+El avance de la actividad hasta hoy, con una nota que le sirva al gestor para validarlo.
+
+Avance físico (obligatorio)
+
+Cuánto del trabajo está hecho, de 0 a 100 %.
+
+−5
+%
++5
+25 %
+50 %
+75 %
+100 %
+Esta actividad tiene ejecución financiera (opcional; si no aplica, déjelo sin marcar)
+Fecha del avance (obligatorio)
+
+El día al que corresponde. No puede ser futura.
+
+Qué se hizo (obligatorio)
+
+Cuente lo que se avanzó desde el último reporte. Al menos 10 caracteres (lleva 0; máximo 2000).
+
+Guardado hace un momento en este equipo
+Siguiente

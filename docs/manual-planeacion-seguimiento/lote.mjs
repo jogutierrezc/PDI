@@ -22,8 +22,10 @@ for (const c of LISTA) {
     { const hh = await p.evaluate(() => document.documentElement.scrollHeight); await p.setViewportSize({ width: w, height: Math.min(Math.max(hh, c.h || 900), 5000) }); await p.waitForTimeout(400); }
     const raiz = c.nav ? "body" : ".ps-main";
     const caja = await p.evaluate((sel) => { const e = document.querySelector(sel); const r = e.getBoundingClientRect(); const ps = document.querySelector(".ps"); const pb = ps ? ps.getBoundingClientRect().bottom + scrollY : r.bottom + scrollY; return { x: 0, y: r.top + scrollY, w: innerWidth, h: sel === "body" ? r.height : Math.min(r.height, pb - (r.top + scrollY) + 28) }; }, raiz);
-    const h = Math.min(caja.h, c.maxH || 900);
-    const clip = { x: 0, y: c.nav ? 0 : caja.y, width: caja.w, height: h };
+    let y0 = c.nav ? 0 : caja.y;
+    if (c.desde) { y0 = await p.evaluate((s) => { const e = (() => { try { return document.querySelector(s); } catch { return null; } })() || [...document.querySelectorAll("h2,h3")].find((x) => x.textContent.includes(s)); return e.getBoundingClientRect().top + scrollY - 10; }, c.desde); }
+    const h = Math.min(c.desde ? caja.y + caja.h - y0 : caja.h, c.maxH || 900);
+    const clip = { x: 0, y: y0, width: caja.w, height: h };
     await p.screenshot({ path: path.join(here, "capturas", c.n + ".png"), fullPage: true, clip });
     const ms = [];
     for (const [num, loc, dx = 0, dy = 0] of c.marks || []) {

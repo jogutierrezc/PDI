@@ -1,0 +1,43 @@
+Regresar
+Planeación y Seguimiento
+Crear actividad
+Crear actividad
+
+Oficina: Tecnología e Infraestructura TI. Cinco pasos; el borrador se guarda solo en este equipo.
+
+Qué se va a hacer
+(hecho)
+Plan de Desarrollo Institucional
+(hecho)
+3
+Cuándo y cuánto
+(paso actual)
+4
+Quién la hace
+(pendiente)
+5
+Revisar y crear
+(pendiente)
+Cuándo y cuánto
+
+Las fechas, si es un hito, la prioridad y el campus donde se hace.
+
+Es un hito (un momento, como una entrega o una firma; sin fecha de inicio)
+Fecha de inicio (obligatorio)
+Fecha de fin (obligatorio)
+Prioridad (obligatorio)
+Crítico
+Alto
+Medio
+Bajo
+Campus (obligatorio)
+
+Dónde se hace. «Todos los campus» si aplica a todos.
+
+Bucaramanga
+Valledupar
+Cúcuta
+Todos los campus
+Guardado hace un momento en este equipo
+Atrás
+Siguiente

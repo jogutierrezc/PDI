@@ -1,0 +1,185 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0
+
+Crear un plan
+
+Demostración.
+Las oficinas, personas y actividades son inventadas para probar la pantalla; las 75 líneas del plan son las reales.
+
+Oficina
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+
+Gestor en esta oficina · papel: gestor de la oficina
+
+Su nivel en el módulo y su papel en la oficina coinciden.
+
+Crear actividad
+Importar desde Excel
+Líneas del plan a su cargo
+10
+$ 28.461 M
+Actividades
+27
+3 propias de la oficina
+Vencidas
+3
+pasó su fecha y no están hechas
+Sin responsable
+5
+asignarlas
+En riesgo
+1
+3 esperan revisión
+Avance validado
+34 %
+promedio de las actividades
+Conexión con el Plan de Desarrollo Institucional
+17 
+PDI · 0 elementos
+4 Sin conexión con el PDI
+6 PDI sin definir
+
+Por pilar: P3 Entorno emprendedor (7) · P2 Ambiente tecnológico (5) · P4 Gobernanza para el buen gobierno (5) · P6 Apropiación social (4).
+
+ Las actividades «sin definir» son anteriores a este dato: edítelas para elegir su conexión. Verlas en la lista.
+
+Por validar en esta oficina 3
+
+Avances que reportó su equipo y esperan su revisión, el más antiguo primero.
+
+Elegir todos los que puedo validar
+Ninguno elegido
+Validar los elegidos…
+Elegir el avance de Iván Quiroga en «Reunión mensual de seguimiento de la oficina»
+Reunión mensual de seguimiento de la oficina
+Tecnología e Infraestructura TI · reportó Iván Quiroga · fecha límite 25 jun 2027
+
+Se completó lo planeado para el periodo y se adjunta el soporte; queda pendiente la socialización.
+
+85 %
+Espera 2 días
+1 evidencia
+Revisar
+el avance de «Reunión mensual de seguimiento de la oficina»
+Elegir el avance de Valentina Sarmiento en «Entregar el informe de cierre de infraestructura para la docencia»
+Entregar el informe de cierre de infraestructura para la docencia
+Tecnología e Infraestructura TI · reportó Valentina Sarmiento · fecha límite 25 jun 2027
+
+Se completó lo planeado para el periodo y se adjunta el soporte; queda pendiente la socialización.
+
+80 %
+Espera 20 horas
+2 evidencias
+Revisar
+el avance de «Entregar el informe de cierre de infraestructura para la docencia»
+Elegir el avance de Mariana Solano en «Preparar los estudios previos de servicios tecnológicos»
+Preparar los estudios previos de servicios tecnológicos
+Tecnología e Infraestructura TI · reportó Mariana Solano · fecha límite 10 ago 2027
+
+Se completó lo planeado para el periodo y se adjunta el soporte; queda pendiente la socialización.
+
+ Lo valida otra persona: no puede validar el propio avance, y el de un gestor lo valida un administrador.
+
+88 %
+Espera 4 horas
+2 evidencias
+Revisar
+el avance de «Preparar los estudios previos de servicios tecnológicos»
+Actividades por estado
+Por iniciar
+12
+En curso
+4
+En riesgo
+1
+En revisión
+3
+Hecho
+7
+
+Abrir el tablero para moverlas.
+
+Carga por persona
+Mariana Solano (usted)
+3
+activas
+Diana Cárdenas
+4
+activas
+Camilo Rojas
+5
+activas
+ · 1 vencida
+Iván Quiroga
+3
+activas
+ · 1 vencida
+Valentina Sarmiento
+5
+activas
+ · 1 vencida
+Líneas del plan a cargo de Tecnología e Infraestructura TI
+
+10 líneas. Cada una despliega sus actividades.
+
+#1 Infraestructura para la docencia
+IFT · Todos los campus
+Alto
+$ 6.971 M
+2 actividades
+1 vencida
+#2 Infraestructura de usuario final
+IFT · Todos los campus
+Alto
+$ 6.381 M
+3 actividades
+#3 Servicios tecnológicos
+IFT · Todos los campus
+Alto
+$ 5.421 M
+4 actividades
+#4 IA, analítica, datos y tecnologías emergentes
+IFT · Todos los campus
+Alto
+$ 2.211 M
+3 actividades
+#5 Procesamiento y almacenamiento
+IFT · Todos los campus
+Crítico
+$ 1.111 M
+2 actividades
+#6 Redes y conectividad
+IFT · Todos los campus
+Crítico
+$ 343 M
+3 actividades
+1 vencida
+#7 Seguridad de la infraestructura tecnológica
+IFT · Todos los campus
+Crítico
+$ 565 M
+4 actividades
+#8 Plataformas institucionales
+IFT · Todos los campus
+Alto
+$ 1.459 M
+3 actividades
+#9 Computación de alto rendimiento
+IFT · Bucaramanga
+Largo plazo
+$ 1.845 M
+Sin actividades
+#10 Observatorio de tendencias y vigilancia tecnológica
+IFT · Bucaramanga
+Largo plazo
+$ 2.150 M
+Sin actividades
+Actividades propias de la oficina
+No contribuyen a una línea del plan
+3 actividades

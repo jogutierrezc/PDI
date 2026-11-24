@@ -37,7 +37,7 @@ export default {
     ], "fix", ["22%", "58%", "20%"]),
     pilo("excelente", "Cuando un avance se valida al 100 %, la actividad queda «Hecha» y avisamos al gestor y a las personas asignadas."),
     h2("En el teléfono", "movil"),
-    p("Las pantallas se adaptan al celular: las listas se vuelven tarjetas, el pie con los botones queda fijo y «Mover a…» reemplaza al arrastre. El reporte de avance funciona igual que en el computador."),
-    shot({ f: "movil-tareas", url: "/admin/planeacion-seguimiento/mis-tareas", alt: "Mis tareas en un teléfono de 390 píxeles de ancho", w: 250, maxh: 640 }),
+    { ...p("Las pantallas se adaptan al celular: los pasos del formulario se apilan, los campos ocupan todo el ancho y el botón «Siguiente» queda fijo al pie. En las listas cada fila es una tarjeta, y «Mover a…» reemplaza al arrastre. La imagen muestra el primer paso del reporte de avance en una pantalla de 390 píxeles, completo."), keep: true },
+    shot({ f: "movil-reporte", url: "/reportar/…", alt: "Primer paso del reporte de avance en un teléfono de 390 píxeles de ancho", w: 230 }),
   ],
 };

@@ -1,0 +1,693 @@
+/* =============================================================================
+   Mr. Pilo · la app · la llamada.
+
+   Dos piezas: el aviso previo (.ll-preview, una hoja de las de siempre) y la
+   pantalla de la llamada (.ll). Ningún color a mano: todo sale de las
+   variables de los cinco temas (pilo-app-themes.css). La llamada usa las de la
+   escena de la bienvenida (--s-*, --acc), que son oscuras en los cinco, para
+   que se sienta un lugar aparte y no una pantalla más del chat.
+   ========================================================================== */
+
+/* --- El aviso previo ------------------------------------------------------------------------ */
+
+.ll-preview {
+  gap: 16px;
+}
+
+.ll-lead {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--c-ink2);
+  text-wrap: pretty;
+}
+
+.ll-lang {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ll-lang button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-ink);
+  font-weight: 700;
+  text-align: left;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+.ll-lang button:active {
+  transform: scale(0.97);
+}
+
+.ll-lang b {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--c-line);
+  border-radius: 50%;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--c-ink2);
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+/* Elegido: el contorno se hace trazo grueso y el círculo se llena (no solo cambia de color). */
+.ll-lang button[aria-checked="true"] {
+  border: 2px solid var(--c-link);
+  padding: 7px 11px;
+  background: var(--c-chip);
+}
+
+.ll-lang button[aria-checked="true"] b {
+  border-color: var(--c-link);
+  background: var(--c-link);
+  color: var(--c-bg);
+}
+
+.ll-feat,
+.ll-know {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pa-sheet .ll-feat li {
+  display: grid;
+  gap: 2px;
+  padding: 12px 0;
+  border-top: 1px solid var(--c-line);
+}
+
+.ll-feat strong {
+  font-weight: 800;
+}
+
+.ll-feat span {
+  max-width: 56ch;
+  color: var(--c-ink2);
+  font-size: 0.875rem;
+  text-wrap: pretty;
+}
+
+.ll-know {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pa-sheet .ll-know li {
+  position: relative;
+  padding: 0 0 0 16px;
+  border-top: 0;
+  max-width: 60ch;
+  color: var(--c-ink2);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.ll-know li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--c-ink2);
+}
+
+.ll-problem {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--c-warn-bg);
+  color: var(--c-warn);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.ll-actions {
+  position: sticky;
+  bottom: calc(-22px - env(safe-area-inset-bottom, 0px));
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  margin: 4px -4px -4px;
+  padding: 12px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, transparent, var(--c-sheet) 14px);
+}
+
+.ll-actions .pa-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- La llamada ----------------------------------------------------------------------------- */
+
+.ll {
+  --pc-bar: 112px;
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  background: radial-gradient(120% 78% at 50% 30%, var(--s1), var(--s2) 58%, var(--s3));
+  color: var(--s-ink);
+  outline: none;
+}
+
+.ll-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) var(--pa-side-r) 0 var(--pa-side);
+}
+
+.ll-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--s-muted);
+}
+
+.ll-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--s-muted);
+  transition: background-color var(--dur-base) ease;
+}
+
+.ll[data-phase="escucha"] .ll-live i,
+.ll[data-phase="habla"] .ll-live i {
+  background: var(--acc);
+}
+
+.ll-live time {
+  font-variant-numeric: tabular-nums;
+  color: var(--s-ink);
+}
+
+.ll-langs {
+  display: inline-flex;
+  border: 1px solid var(--s-line);
+  border-radius: var(--radius-pill);
+  background: var(--s-chip);
+}
+
+.ll-langs button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: var(--s-ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.ll-langs button:active {
+  transform: scale(0.97);
+}
+
+.ll-langs button[aria-checked="true"] {
+  background: var(--acc);
+  color: var(--acc-ink);
+}
+
+.ll-stage {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 8px 20px;
+  text-align: center;
+}
+
+.ll-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(70vw, 320px, 42dvh);
+  aspect-ratio: 1;
+  margin-bottom: clamp(28px, 7dvh, 48px);
+  border-radius: 50%;
+  cursor: default;
+}
+
+.ll-orb:not(:disabled) {
+  cursor: pointer;
+}
+
+.ll-orb:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 10px;
+}
+
+.ll-rings {
+  position: absolute;
+  inset: -20%;
+  width: 140%;
+  height: 140%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--acc);
+  stroke-width: 1.4;
+  max-width: none;
+  pointer-events: none;
+}
+
+.ll-ring {
+  opacity: 0.4;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.ll-ring--think {
+  stroke-dasharray: 2 9;
+  stroke-linecap: round;
+  stroke-width: 2.4;
+  opacity: 0;
+}
+
+.ll-face {
+  position: relative;
+  display: block;
+  width: 84%;
+  aspect-ratio: 1;
+  /* La mascota no es redonda: se apoya sobre la escena con una luz detrás, no dentro de un círculo. */
+  filter: drop-shadow(0 14px 22px var(--c-shadow));
+}
+
+.ll-face::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--s-glow), transparent);
+}
+
+.ll-state {
+  margin: 0;
+  font: 700 clamp(1.5rem, 1.1rem + 2vw, 2.125rem) / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.ll-hint {
+  margin: -4px 0 0;
+  min-height: 1.2em;
+  font-size: 0.8125rem;
+  color: var(--s-muted);
+  opacity: 0;
+  transition: opacity var(--dur-base) ease;
+}
+
+.ll-hint[data-on] {
+  opacity: 1;
+}
+
+.ll-caption {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  width: min(100%, 52ch);
+  height: 8.5em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, rgb(0 0 0) 32%);
+  mask-image: linear-gradient(to bottom, transparent, rgb(0 0 0) 32%);
+}
+
+.ll-caption p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.ll-heard {
+  color: var(--s-muted);
+  font-size: 0.9375rem;
+}
+
+.ll-said {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.ll-heard[data-empty],
+.ll-said[data-empty] {
+  display: none;
+}
+
+.ll-fail {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  width: min(100%, 44ch);
+}
+
+.ll-fail p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.ll-fail div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ll-btn {
+  background: var(--acc);
+  color: var(--acc-ink);
+}
+
+.ll-btn--line {
+  background: transparent;
+  color: var(--s-ink);
+  border: 1px solid var(--s-line);
+}
+
+.ll-log {
+  position: absolute;
+  inset: 16% 0 var(--pc-bar) 0;
+  z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px max(20px, var(--pa-side-r)) 12px max(20px, var(--pa-side));
+  border-radius: var(--pa-r-sheet);
+  background: var(--s3);
+  border: 1px solid var(--s-line);
+  border-bottom: 0;
+  animation: ll-up 260ms var(--ease-out);
+}
+
+.ll-log[hidden] {
+  display: none;
+}
+
+.ll-log ol {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 60ch);
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.ll-log li {
+  display: grid;
+  gap: 2px;
+}
+
+.ll-log b {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--s-muted);
+}
+
+.ll-log li[data-who="pilo"] span {
+  font-weight: 600;
+}
+
+.ll-log__empty {
+  margin: 0;
+  text-align: center;
+  color: var(--s-muted);
+}
+
+@keyframes ll-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+.ll-bar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 14px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+.ll-ctl {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--s-line);
+  border-radius: 50%;
+  background: var(--s-chip);
+  color: var(--s-ink);
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.ll-ctl .pa-i {
+  width: 24px;
+  height: 24px;
+}
+
+.ll-ctl:active {
+  transform: scale(0.97);
+}
+
+.ll-ctl:disabled {
+  opacity: 0.4;
+}
+
+/* Apagado (micrófono en pausa, conversación a la vista): se llena, no solo cambia de color. */
+.ll-ctl[aria-pressed="true"] {
+  background: var(--s-ink);
+  color: var(--s2);
+}
+
+.ll-ctl--end {
+  width: 76px;
+  height: 76px;
+  border-color: transparent;
+  background: var(--c-bad);
+  color: var(--s-ink);
+}
+
+.ll-ctl--end .pa-i {
+  width: 30px;
+  height: 30px;
+}
+
+.ll-ctl:focus-visible,
+.ll-langs button:focus-visible,
+.ll-btn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ll-langs button:not([aria-checked="true"]):hover,
+  .ll-ctl:not(:disabled):not([aria-pressed="true"]):hover {
+    background: var(--s-line);
+  }
+
+  .ll-lang button[aria-checked="false"]:hover {
+    border-color: var(--c-ink2);
+  }
+}
+
+/* Teléfono apaisado o ventana baja: la cara se achica y el aviso de tocar se va. */
+@media (max-height: 560px) {
+  .ll-orb {
+    width: min(40dvh, 200px);
+    margin-bottom: 8px;
+  }
+
+  .ll-hint {
+    display: none;
+  }
+
+  .ll-caption {
+    height: 5.5em;
+  }
+
+  .ll-ctl {
+    width: 52px;
+    height: 52px;
+  }
+
+  .ll-ctl--end {
+    width: 64px;
+    height: 64px;
+  }
+
+  .ll {
+    --pc-bar: 92px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ll-log {
+    animation: none;
+  }
+
+  .ll-ctl,
+  .ll-langs button,
+  .ll-lang button {
+    transition-property: background-color, color, border-color;
+  }
+
+  .ll-ctl:active,
+  .ll-langs button:active,
+  .ll-lang button:active {
+    transform: none;
+  }
+}
+
+/* --- El anuncio de lanzamiento --------------------------------------------------------------- */
+
+.pn-in {
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pn-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 136px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: radial-gradient(120% 120% at 50% 40%, var(--s1), var(--s2) 60%, var(--s3));
+}
+
+.pn-rings {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  max-width: none;
+  fill: none;
+  stroke: var(--acc);
+  stroke-width: 1.4;
+}
+
+.pn-ring {
+  opacity: 0.4;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.pn-face {
+  position: relative;
+  display: block;
+  width: 104px;
+  height: 104px;
+  filter: drop-shadow(0 10px 16px var(--c-shadow));
+}
+
+.pn-in h2 {
+  font-size: 1.45rem;
+  text-wrap: balance;
+}
+
+.pn-how {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: pn;
+}
+
+.pa-sheet .pn-how li {
+  counter-increment: pn;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 1px 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--c-line);
+}
+
+/* Es una secuencia de verdad: el número dice el orden en que se hace. */
+.pn-how li::before {
+  content: counter(pn);
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--c-link);
+  border-radius: 50%;
+  color: var(--c-link);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pn-how strong {
+  font-size: 0.92rem;
+}
+
+.pa-sheet .pn-how span {
+  color: var(--c-ink2);
+  font-size: 0.8125rem;
+  text-wrap: pretty;
+}
+
+.pa-sheet .pn-langs {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--c-ink2);
+}
+
+/* Tras cerrar el anuncio, el botón del teléfono late dos veces para mostrar dónde está. */
+.pa-bar .pa-icon[data-hint] {
+  position: relative;
+}
+
+.pa-bar .pa-icon[data-hint]::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid var(--acc);
+  border-radius: 50%;
+  opacity: 0;
+  animation: pn-ping 1.8s var(--ease-out) 2;
+  pointer-events: none;
+}
+
+@keyframes pn-ping {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pa-bar .pa-icon[data-hint]::after {
+    animation: none;
+  }
+}

@@ -41,7 +41,7 @@ const col = (id: CampoId, base: string, pista: string, ancho: number, tipo: Tipo
 
 export const COLUMNAS: Columna[] = [
   col("no", "N.º", "clave de la línea; no se repite", 10, "obligatoria"),
-  col("clasif", "Clasificación", "PLF, IFT o IFT-LOG", 16, "obligatoria"),
+  col("clasif", "Clasificación", "PLF, IFT, IFT-LOG o IFT-LAB", 16, "obligatoria"),
   col("nombre", "Nombre", "hasta 300 caracteres", 44, "obligatoria"),
   col("descripcion", "Descripción", "hasta 1.000 caracteres", 60, "diligenciar"),
   col("campus", "Campus", "elija de la lista", 16, "obligatoria"),

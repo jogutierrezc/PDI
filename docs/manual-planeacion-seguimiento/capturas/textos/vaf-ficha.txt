@@ -1,0 +1,48 @@
+Regresar
+Planeación y Seguimiento
+Financiación y presupuesto
+Evaluar el plan
+Evaluación financiera
+
+«PDIFyT 2027-2035» · Planeación Institucional · versión v1.0 · 
+En revisión de la VAF
+
+1
+Su decisión
+(paso actual)
+2
+Revisar y confirmar
+(pendiente)
+Su decisión
+
+Lo solicitado es $ 133.374.668.643. La evaluación no bloquea a la oficina; una vez registrada no se edita.
+
+Solicitado $ 133 MM
+$ 133.374.668.643
+Espera hace 12 días
+En revisión de la VAF
+Resultado (obligatorio)
+Aprobada
+La financiación es viable tal como se pidió o con el monto que indique.
+Aprobada con ajustes
+Se aprueba un monto distinto o con condiciones: explíquelas (al menos 20 caracteres).
+No viable
+No hay forma de financiarla como está: explíquelo (al menos 20 caracteres). La oficina verá su razón.
+Fuente de financiación
+
+Opcional. De dónde saldrán los recursos.
+
+Observaciones
+
+Opcional (0/2000).
+
+Historial de evaluaciones
+Versión v0.9 · solicitado $ 187 MM
+$ 186.724.536.100
+No viable
+El monto solicitado supera la capacidad de financiación del periodo; se pide reducir el alcance de las obras civiles.
+
+Evaluó Natalia Quintero (VAF) el 9 may 2027
+
+Guardado hace un momento en este equipo
+Siguiente

@@ -28,6 +28,7 @@ import { Estructuras } from "./ui/Estructuras";
 import { Revision } from "./ui/Revision";
 import { Tablero } from "./ui/Tablero";
 import { VistaInforme } from "./vista/VistaInforme";
+import { GaleriaAdmin } from "./vista/Galeria";
 import { AyudaPilo } from "./guia/AyudaPilo";
 import { BannerGuia } from "./guia/BannerGuia";
 import { GuiaProvider, useGuia } from "./guia/contexto";
@@ -37,9 +38,9 @@ import "./informes.css";
 import "./responsivo.css";
 
 const BASE = "/admin/informes-gestion";
-type Seccion = "tablero" | "mi-informe" | "revision" | "consolidador" | "capacitacion" | "estructuras" | "vista";
+type Seccion = "tablero" | "mi-informe" | "revision" | "consolidador" | "capacitacion" | "estructuras" | "galeria" | "vista";
 const SOLO_GESTION: Seccion[] = ["tablero", "revision", "consolidador", "capacitacion", "estructuras"];
-const SECCIONES: Seccion[] = ["tablero", "mi-informe", "revision", "consolidador", "capacitacion", "estructuras", "vista"];
+const SECCIONES: Seccion[] = ["tablero", "mi-informe", "revision", "consolidador", "capacitacion", "estructuras", "galeria", "vista"];
 
 const TITULOS: Record<Seccion, [string, string]> = {
   tablero: ["Tablero del ciclo", "Estado por unidad, fecha límite, plantillas y qué cifras se justifican"],
@@ -48,6 +49,7 @@ const TITULOS: Record<Seccion, [string, string]> = {
   consolidador: ["Consolidador", "Cada nivel recibe lo aprobado del nivel de abajo y decide qué entra"],
   capacitacion: ["Capacitación de Pilo", "Los informes de 2025 le enseñan a Pilo cómo escribe cada unidad"],
   estructuras: ["Estructuras", "Las plantillas A–D y las estructuras propias, y qué oficinas puede usar cada una"],
+  galeria: ["Galería de imágenes", "Las imágenes aprobadas que las unidades pueden elegir como fondo de su portada"],
   vista: ["Vista del informe", "El informe como saldrá en papel, en Carta o A4, con su portada y su PDF"],
 };
 
@@ -63,7 +65,8 @@ export function InformesAdmin() {
 function Pantalla() {
   const guia = useGuia();
   const { seccion: param } = useParams();
-  const { puedeGestionarInformes } = useAuth();
+  const { puedeGestionarInformes, hasRole } = useAuth();
+  const esAdmin = hasRole("admin");
   const gestiona = puedeGestionarInformes;
   // Quien recibe informes de otras unidades (jefe de la unidad destino) ve la Revisión para devolverlos (0281).
   const destinos = useMisDestinos();
@@ -80,7 +83,7 @@ function Pantalla() {
   const requisitos = useRequisitos(ciclo?.id);
   const instancias = useInstancias(gestiona ? ciclo?.id : undefined);
 
-  const sinAcceso = SOLO_GESTION.includes(seccion) && !gestiona && !(seccion === "revision" && (recibe || destinos.isPending));
+  const sinAcceso = (seccion === "galeria" && !esAdmin) || (SOLO_GESTION.includes(seccion) && !gestiona && !(seccion === "revision" && (recibe || destinos.isPending)));
   if (!SECCIONES.includes(seccion) || sinAcceso) return <Navigate to={`${BASE}/mi-informe`} replace />;
 
   const porRevisar = instancias.data?.filter((i) => i.estado === "sent").length;
@@ -114,6 +117,11 @@ function Pantalla() {
           Estructuras
         </AdminRailTab>
       )}
+      {esAdmin && (
+        <AdminRailTab current={seccion === "galeria"} to={`${BASE}/galeria`}>
+          Galería de imágenes
+        </AdminRailTab>
+      )}
       <AdminRailTab current={seccion === "vista"} to={`${BASE}/vista`}>
         Vista del informe
       </AdminRailTab>
@@ -139,6 +147,8 @@ function Pantalla() {
     );
   } else if (seccion === "capacitacion") {
     cuerpo = <Capacitacion />;
+  } else if (seccion === "galeria") {
+    cuerpo = <GaleriaAdmin />;
   } else if (seccion === "estructuras") {
     cuerpo = <Estructuras />;
   } else if (fallo) {

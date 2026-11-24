@@ -1,0 +1,31 @@
+Regresar
+Planeación y Seguimiento
+Financiación y presupuesto
+Cargar desde Excel
+Cargar la financiación por línea
+
+Plan «PDIFyT 2027-2035». Todo o nada: con un solo problema no se carga ninguna fila. El archivo se lee en su navegador.
+
+1
+Plantilla y archivo
+(paso actual)
+2
+Lo que se leyó
+(pendiente)
+3
+Confirmar y cargar
+(pendiente)
+Plantilla y archivo
+
+Baje la plantilla, llénela y elíjala aquí. Cambie de tipo si va a cargar lo otro.
+
+Financiación por línea
+Ejecución presupuestal
+Descargar la plantilla
+Elegir el archivo
+Ningún archivo elegido
+
+Hasta 2000 filas y 5 MB. Montos en pesos, solo el número.
+
+El borrador se guarda solo en este equipo.
+Ver lo que se leyó

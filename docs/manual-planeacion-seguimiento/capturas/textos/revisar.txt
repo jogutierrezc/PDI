@@ -1,0 +1,49 @@
+Regresar
+Planeación y Seguimiento
+Por validar
+Avances por validar
+
+De todas las oficinas en las que usted es gestor.
+
+Esperando su revisión 3
+
+Avances que reportó su equipo y esperan su revisión, el más antiguo primero.
+
+Elegir todos los que puedo validar
+Ninguno elegido
+Validar los elegidos…
+Elegir el avance de Iván Quiroga en «Reunión mensual de seguimiento de la oficina»
+Reunión mensual de seguimiento de la oficina
+Tecnología e Infraestructura TI · reportó Iván Quiroga · fecha límite 25 jun 2027
+
+Se completó lo planeado para el periodo y se adjunta el soporte; queda pendiente la socialización.
+
+85 %
+Espera 2 días
+1 evidencia
+Revisar
+el avance de «Reunión mensual de seguimiento de la oficina»
+Elegir el avance de Valentina Sarmiento en «Entregar el informe de cierre de infraestructura para la docencia»
+Entregar el informe de cierre de infraestructura para la docencia
+Tecnología e Infraestructura TI · reportó Valentina Sarmiento · fecha límite 25 jun 2027
+
+Se completó lo planeado para el periodo y se adjunta el soporte; queda pendiente la socialización.
+
+80 %
+Espera 20 horas
+2 evidencias
+Revisar
+el avance de «Entregar el informe de cierre de infraestructura para la docencia»
+Elegir el avance de Mariana Solano en «Preparar los estudios previos de servicios tecnológicos»
+Preparar los estudios previos de servicios tecnológicos
+Tecnología e Infraestructura TI · reportó Mariana Solano · fecha límite 10 ago 2027
+
+Se completó lo planeado para el periodo y se adjunta el soporte; queda pendiente la socialización.
+
+ Lo valida otra persona: no puede validar el propio avance, y el de un gestor lo valida un administrador.
+
+88 %
+Espera 4 horas
+2 evidencias
+Revisar
+el avance de «Preparar los estudios previos de servicios tecnológicos»

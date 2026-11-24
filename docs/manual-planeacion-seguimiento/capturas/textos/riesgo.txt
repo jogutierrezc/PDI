@@ -1,0 +1,30 @@
+Regresar
+Planeación y Seguimiento
+Actividad
+Registrar un riesgo
+Registrar un riesgo
+
+«Entregar el informe de cierre de infraestructura para la docencia»
+
+El riesgo, en pocas palabras (obligatorio)
+
+Por ejemplo: «El proveedor puede entregar tarde».
+
+Nivel (obligatorio)
+
+Crítico o Alto: mantiene la actividad «En riesgo» al validar un avance parcial.
+
+Crítico
+Alto
+Medio
+Bajo
+Qué puede pasar y por qué
+
+Opcional.
+
+Qué se hará para evitarlo
+
+Opcional. Las acciones concretas, con responsable y fecha, se agregan después en «Riesgos y acciones».
+
+Nada se guarda hasta que confirme.
+Registrar el riesgo

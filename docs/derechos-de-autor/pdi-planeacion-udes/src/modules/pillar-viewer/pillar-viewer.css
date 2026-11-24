@@ -1,0 +1,859 @@
+/* =============================================================================
+   Visor de pilar
+   ========================================================================== */
+
+.pillar-viewer {
+  display: grid;
+  gap: 0;
+}
+
+/* --- Cabecera -------------------------------------------------------------- */
+
+.pillar-hero {
+  padding: var(--space-9) 0 var(--space-8);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 82%
+    ),
+    var(--page);
+  border-bottom: 1px solid var(--line);
+}
+
+.pillar-hero__inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.pillar-hero__icon {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: var(--radius-lg);
+}
+
+.pillar-hero__copy {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.pillar-hero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pillar-hero__numeral,
+.pillar-hero__owner {
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.pillar-hero__numeral {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.pillar-hero__owner {
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+}
+
+.pillar-hero h1 {
+  font-size: var(--text-3xl);
+}
+
+.pillar-hero__gauge {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.pillar-hero__gauge small {
+  max-width: 12rem;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* --- Barra de secciones ---------------------------------------------------- */
+
+.pillar-subnav {
+  position: sticky;
+  top: var(--header-h);
+  z-index: var(--z-sticky);
+  background: var(--surface-glass);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.pillar-subnav__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 56px;
+}
+
+.pillar-subnav ul {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pillar-subnav ul::-webkit-scrollbar {
+  display: none;
+}
+
+.pillar-subnav a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-secondary);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  transition: color var(--dur-base) ease, background-color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pillar-subnav a:hover {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+}
+
+.area-selector {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.area-selector select {
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  /* La flecha nativa se sustituye por el ícono del sistema. */
+  appearance: none;
+  padding-right: var(--space-4);
+  outline: none;
+}
+
+.area-selector svg {
+  position: absolute;
+  right: var(--space-3);
+  pointer-events: none;
+}
+
+.area-selector:focus-within {
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+/* --- Cuerpo ---------------------------------------------------------------- */
+
+.pillar-body {
+  display: grid;
+  gap: var(--space-10);
+  padding: var(--space-9) 0 var(--space-10);
+}
+
+.pillar-section {
+  display: grid;
+  gap: var(--space-5);
+  scroll-margin-top: calc(var(--header-h) + 56px + var(--space-5));
+}
+
+.pillar-section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* --- Ficha ----------------------------------------------------------------- */
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.fact {
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.fact--wide {
+  grid-column: 1 / -1;
+}
+
+.fact dt {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.fact dd {
+  margin: var(--space-2) 0 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: var(--leading-normal);
+}
+
+.classification-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-3);
+}
+
+.classification {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-2);
+  border: 1px solid var(--line-faint);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-md);
+}
+
+.classification--active {
+  border-left-color: var(--accent);
+}
+
+.classification__glyph {
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+.classification strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+}
+
+.classification span:last-child {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* --- Recursos -------------------------------------------------------------- */
+
+.pillar-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-4);
+}
+
+.stat-block {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-block header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.stat-block strong {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-block p {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* --- Proyectos y líneas ----------------------------------------------------- */
+
+.entry-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.entry-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .entry-row:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+.entry-row__icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-xs);
+}
+
+.entry-row__info strong {
+  display: block;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+}
+
+/* Marca de que la actividad también sale en el tablero público. */
+.entry-row__flag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.entry-row__info small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.entry-row__state {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+}
+
+.entry-row__meter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 9rem;
+}
+
+.entry-row__meter .progress-track {
+  flex: 1 1 auto;
+  height: 6px;
+}
+
+.entry-row__meter b {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.line-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.line-list li {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.line-list li > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.line-list b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lines-section {
+  scroll-margin-top: calc(var(--header-h) + 56px + var(--space-5));
+}
+
+/* Lectura destacada del pilar, ahora dentro de la ficha. */
+.insight {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.insight svg {
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+/* --- Planeación y soporte --------------------------------------------------- */
+
+.support {
+  padding: var(--space-7);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+}
+
+.support__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-3);
+}
+
+.support__links a {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-base) ease, background-color var(--dur-base) ease;
+}
+
+.support__links strong {
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+.support__links small {
+  grid-column: 1;
+  font-size: var(--text-xs);
+}
+
+.support__links svg {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .support__links a:hover {
+    background: var(--surface-3);
+    border-color: var(--accent);
+  }
+
+  .support__links a:hover svg {
+    transform: translateX(3px);
+  }
+}
+
+.support .section-heading a {
+  color: var(--brand-blue);
+  font-weight: 700;
+}
+
+/* --- Tablas ----------------------------------------------------------------- */
+
+.data-table {
+  width: 100%;
+  min-width: 42rem;
+  font-size: var(--text-sm);
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table thead th {
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  border-top: 1px solid var(--line-faint);
+}
+
+.data-table tbody tr:first-child {
+  border-top: 0;
+}
+
+.data-table td {
+  color: var(--ink-secondary);
+}
+
+.data-table td:first-child {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Pie de navegación ------------------------------------------------------ */
+
+.pillar-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-7);
+  border-top: 1px solid var(--line);
+}
+
+/* --- Adaptación -------------------------------------------------------------- */
+
+@media (max-width: 1080px) {}
+
+@media (max-width: 860px) {
+  .pillar-hero__inner {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pillar-hero__gauge {
+    grid-column: 1 / -1;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .pillar-subnav {
+    top: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .entry-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .entry-row__state {
+    grid-column: 1 / -1;
+    justify-items: start;
+    width: 100%;
+  }
+
+  .entry-row__meter {
+    width: 100%;
+  }
+}
+
+/* =============================================================================
+   Filtro por área estratégica
+   ========================================================================== */
+
+/* Aviso del área activa. Vive fuera de la barra pegajosa para que se pueda
+   descartar sin perder de vista qué se está filtrando. */
+.area-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink-secondary);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.area-note svg {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.area-note span {
+  flex: 1 1 16rem;
+}
+
+.area-note strong {
+  color: var(--ink);
+}
+
+.area-note__clear {
+  padding: var(--space-1) var(--space-3);
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  transition: background-color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .area-note__clear:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+}
+
+/* --- De dónde cuelga cada proyecto ------------------------------------------
+   Pilar › Área › Línea. La jerarquía del plan estaba solo en la base de datos;
+   aquí se lee de un vistazo en la propia fila del proyecto.
+   -------------------------------------------------------------------------- */
+
+.entry-row__lineage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+
+.entry-row__lineage i {
+  color: var(--ink-faint);
+  font-style: normal;
+}
+
+.entry-row__lineage strong {
+  padding: 1px var(--space-2);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+}
+
+.entry-row__lineage--empty {
+  color: var(--status-pending);
+}
+
+/* --- Líneas agrupadas por área ---------------------------------------------- */
+
+/* A ancho completo los grupos van en rejilla: en una sola columna, doce líneas
+   formaban una tira larguísima al final de la página. */
+.line-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  gap: var(--space-4);
+}
+
+.line-group {
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.line-group h3 {
+  margin-bottom: var(--space-3);
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+/* =============================================================================
+   Áreas estratégicas del pilar
+   Tarjeta y filtro a la vez: pulsar una selecciona esa área, igual que el
+   desplegable de la barra.
+   ========================================================================== */
+
+.area-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: var(--space-4);
+}
+
+.area-card-public {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow: hidden;
+  text-align: left;
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) ease,
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+/* Cinta del color del pilar, como en las tarjetas de la portada: identifica
+   sin teñir la tarjeta entera. */
+.area-card-public::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0.2);
+  transform-origin: left center;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .area-card-public:hover {
+    transform: translateY(-3px);
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .area-card-public:hover::before {
+    transform: scaleX(1);
+  }
+
+  .area-card-public:hover .area-card-public__cta [data-arrow] {
+    transform: translateX(3px);
+  }
+}
+
+.area-card-public:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+.area-card-public__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.area-card-public__code {
+  padding: 3px var(--space-3);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+/* Sin código, el anillo se queda a la derecha igualmente. */
+.area-card-public__top > .progress-ring {
+  margin-left: auto;
+}
+
+.area-card-public__body strong {
+  display: block;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+}
+
+.area-card-public__body small {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.area-card-public__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line-faint);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.area-card-public__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  color: var(--brand-blue);
+  font-weight: 700;
+}
+
+.area-card-public__cta [data-arrow] {
+  display: inline-block;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* La barra de años va bajo la fila de secciones y del selector de áreas, dentro
+   de la misma barra pegajosa: filtrar por área y elegir el corte son la misma
+   decisión —qué recorte se está mirando— y separarlas obligaría a subir la
+   página para cambiar una de las dos. */
+.pillar-subnav__years {
+  padding-bottom: var(--space-3);
+}
+
+.pillar-subnav__years .year-scrubber__label {
+  display: none;
+}
+
+.pillar-subnav__years .year-scrubber__hint {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 52rem) {
+  .pillar-subnav__years .year-scrubber__hint {
+    display: none;
+  }
+}

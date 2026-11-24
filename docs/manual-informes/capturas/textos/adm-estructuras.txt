@@ -1,0 +1,80 @@
+Informes Institucionales
+Informes Institucionales · 2026
+Estructuras
+Panel
+Tablero del ciclo
+Mi informe
+Revisión
+3
+Consolidador
+Capacitación de Pilo
+Estructuras
+Vista del informe
+Estructuras
+
+Las plantillas A–D vienen de Planeación y no se editan. Las propias las arma usted.
+
+PLANTILLAS A–D
+Plantilla A
+Decanatura
+Plantilla B
+Vicerrectoría u oficina
+Plantilla C
+Rectoría de campus
+Plantilla D
+Rectoría General
+ESTRUCTURAS PROPIAS
+Informe de oficina de apoyo
+X1 · Oficina de apoyo
+Informe de centro de investigación
+X2 · Centro o instituto · inactiva
+Partir de
+En blanco (estructura mínima)
+Plantilla A · Decanatura
+Plantilla B · Vicerrectoría u oficina
+Plantilla C · Rectoría de campus
+Plantilla D · Rectoría General
+Nueva estructura
+PLANTILLA DEL CÓDIGO · SOLO LECTURA
+Plantilla A · Decanatura
+
+Se envía a Rectoría de Campus. No se edita: si necesita otra distribución, cópiela como estructura nueva.
+
+1
+Resumen ejecutivo
+Texto
+2
+Alineación estratégica con el PDI
+Alineación estratégica
+3
+Objetivos y metas 2026
+Objetivos y metas
+4
+Resultados por dimensión estratégica
+Resultados y evidencias
+5
+Síntesis de resultados institucionales
+Síntesis
+6
+Puntos críticos y acciones de mejora
+Tabla de filas
+7
+Logros destacados
+Logros e innovaciones
+8
+Evidencias y fuentes de verificación
+Evidencias y fuentes de verificación
+9
+Conclusiones
+Texto
+10
+Anexos
+Anexos
+Copiar como estructura nueva
+¿Quién puede usarla?
+
+Sirve para una plantilla pensada para una oficina concreta (por ejemplo, Planeación Institucional) o para una general. Aplica a los informes que se abran desde ahora.
+
+Todas las oficinas
+Solo estas oficinas
+Guardar quién la usa

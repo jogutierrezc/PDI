@@ -1,0 +1,90 @@
+Regresar
+Planeación y Seguimiento
+Tablero
+Actividad
+Entregar el informe de cierre de infraestructura para la docencia
+
+Tecnología e Infraestructura TI · línea #1
+
+Mover a…
+Editar
+Transferir…
+En revisión
+Hito · Venció hace 5 días
+Alto
+28 %
+1 por validar
+PDI sin definir
+Resumen
+Avances (2)
+Evidencias
+Riesgos y acciones
+Comentarios
+Checklist
+Asignaciones
+Historial
+
+Actividad de demostración, generada para probar el tablero.
+
+Oficina
+Tecnología e Infraestructura TI
+Línea del plan
+#1
+Fecha del hito
+25 jun 2027
+Campus
+Todos los campus
+Creada
+4 may 2027 por Diana Cárdenas
+Su permiso aquí
+Gestor
+Avance validado
+28 %
+1 por validar
+Plan de Desarrollo Institucional
+Sin definir (es anterior a este dato). Edite la actividad para definirlo.
+Responsables
+VS
+Valentina Sarmiento
+Presupuesto y ejecución de la línea
+Financiación: Aprobada
+Solicitado
+$ 7 MM
+$ 6.971.769.559
+lo que pidió la oficina
+Aprobado
+$ 795 M
+$ 794.800.000
+presupuesto del año
+Modificado
+−$ 79,5 M
+−$ 79.500.000
+adiciones y reducciones
+Vigente
+$ 715 M
+$ 715.300.000
+aprobado + modificado
+Comprometido
+$ 517 M
+$ 516.600.000
+Ejecutado
+$ 358 M
+$ 357.700.000
+Pagado
+$ 322 M
+$ 321.900.000
+Disponible
+$ 199 M
+$ 198.700.000
+vigente − lo mayor entre comprometido y ejecutado
+% de ejecución
+50 %
+ejecutado ÷ vigente
+Ejecución
+50 %
+Avance físico
+64 %
+
+Desviación: −14 puntos (avanza más de lo que ejecuta)
+
+Ver el libro de movimientos

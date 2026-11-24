@@ -1,0 +1,349 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0
+
+Crear un plan
+Mi oficina
+Todas
+Solo las mías
+Plan de Desarrollo (PDI)
+Todas
+Con PDI
+Sin conexión con el PDI
+PDI sin definir
+Pilar
+Todos los pilares
+P2 Ambiente tecnológico
+P3 Entorno emprendedor
+P4 Gobernanza para el buen gobierno
+P6 Apropiación social
+Oficina
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+
+27 actividades. Ordenadas por fecha límite (de menor a mayor).
+
+Actividad
+Línea
+Responsables
+Estado
+Avance
+Fecha límite
+Prioridad
+Acciones
+Definir el alcance y los criterios de «ia, analítica, datos y tecnologías emergentes»
+3/3 
+Sin PDI
+4 · IA, analítica, datos y tecnologías emergentes
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+Hecho
+100 %
+Cumplida
+Medio
+Mover a…
+Definir el alcance y los criterios de «servicios tecnológicos»
+3/3 
+PDI · 2 elementos
+3 · Servicios tecnológicos
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+Hecho
+100 %
+Cumplida
+Medio
+Mover a…
+Definir el alcance y los criterios de «infraestructura para la docencia»
+3/3 
+PDI · 1 elemento
+1 · Infraestructura para la docencia
+VS
+CR
+Asignada a Valentina Sarmiento, Camilo Rojas
+2 personas
+Hecho
+100 %
+Cumplida
+Alto
+Mover a…
+Definir el alcance y los criterios de «seguridad de la infraestructura tecnológica»
+3/3 
+PDI · 1 elemento
+7 · Seguridad de la infraestructura tecnológica
+MS
+Asignada a Mariana Solano
+Mariana Solano
+Hecho
+100 %
+Cumplida
+Crítico
+Mover a…
+Definir el alcance y los criterios de «procesamiento y almacenamiento»
+3/3 
+Sin PDI
+5 · Procesamiento y almacenamiento
+Sin responsable
+Hecho
+100 %
+Cumplida
+Crítico
+Mover a…
+Definir el alcance y los criterios de «redes y conectividad»
+0/3 
+PDI sin definir
+6 · Redes y conectividad
+CR
+Asignada a Camilo Rojas
+Camilo Rojas
+En curso
+34 %
+Venció hace 25 días
+Crítico
+Mover a…
+Entregar el informe de cierre de infraestructura para la docencia
+PDI sin definir
+1 · Infraestructura para la docencia
+VS
+Asignada a Valentina Sarmiento
+Valentina Sarmiento
+En revisión
+28 %
+1 por validar
+Hito · Venció hace 5 días
+Alto
+Mover a…
+Reunión mensual de seguimiento de la oficina
+2/2 
+PDI sin definir
+Propia de la oficina
+IQ
+Asignada a Iván Quiroga
+Iván Quiroga
+En revisión
+0 %
+1 por validar
+Venció hace 5 días
+Alto
+Mover a…
+Levantar el diagnóstico de servicios tecnológicos
+3/3 
+PDI · 1 elemento
+3 · Servicios tecnológicos
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+Hecho
+100 %
+Cumplida
+Medio
+Mover a…
+Definir el alcance y los criterios de «plataformas institucionales»
+3/3 
+PDI sin definir
+8 · Plataformas institucionales
+CR
+Asignada a Camilo Rojas
+Camilo Rojas
+Hecho
+100 %
+Cumplida
+Alto
+Mover a…
+Entregar el informe de cierre de procesamiento y almacenamiento
+PDI · 1 elemento
+5 · Procesamiento y almacenamiento
+DC
+CR
+Asignada a Diana Cárdenas, Camilo Rojas
+2 personas
+Por iniciar
+0 %
+Hito · Vence hoy
+Alto
+Mover a…
+Levantar el diagnóstico de seguridad de la infraestructura tecnológica
+0/3 
+Sin PDI
+7 · Seguridad de la infraestructura tecnológica
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+Por iniciar
+0 %
+En plazo
+Alto
+Mover a…
+Definir el alcance y los criterios de «infraestructura de usuario final»
+2/3 
+PDI · 1 elemento
+2 · Infraestructura de usuario final
+IQ
+Asignada a Iván Quiroga
+Iván Quiroga
+En curso
+0 %
+En plazo
+Alto
+Mover a…
+Actualizar el inventario de la oficina
+PDI · 1 elemento
+Propia de la oficina
+Sin responsable
+Por iniciar
+0 %
+En plazo
+Alto
+Mover a…
+Levantar el diagnóstico de redes y conectividad
+3/3 
+PDI · 1 elemento
+6 · Redes y conectividad
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+En curso
+0 %
+En plazo
+Alto
+Mover a…
+Levantar el diagnóstico de ia, analítica, datos y tecnologías emergentes
+1/3 
+PDI · 1 elemento
+4 · IA, analítica, datos y tecnologías emergentes
+CR
+Asignada a Camilo Rojas
+Camilo Rojas
+En riesgo
+42 %
+En plazo
+Alto
+Mover a…
+Levantar el diagnóstico de plataformas institucionales
+1/3 
+PDI · 2 elementos
+8 · Plataformas institucionales
+Sin responsable
+En curso
+59 %
+En plazo
+Alto
+Mover a…
+Preparar los estudios previos de servicios tecnológicos
+0/2 
+PDI · 1 elemento
+3 · Servicios tecnológicos
+MS
+Asignada a Mariana Solano
+Mariana Solano
+En revisión
+43 %
+1 por validar
+En plazo
+Alto
+Mover a…
+Preparar el informe de gestión del semestre
+0/2 
+PDI · 1 elemento
+Propia de la oficina
+IQ
+MS
+Asignada a Iván Quiroga, Mariana Solano
+2 personas
+Por iniciar
+0 %
+En plazo
+Alto
+Mover a…
+Entregar el informe de cierre de redes y conectividad
+PDI · 2 elementos
+6 · Redes y conectividad
+Sin responsable
+Por iniciar
+0 %
+Hito · En plazo
+Alto
+Mover a…
+Preparar los estudios previos de seguridad de la infraestructura tecnológica
+0/2 
+PDI sin definir
+7 · Seguridad de la infraestructura tecnológica
+CR
+VS
+Asignada a Camilo Rojas, Valentina Sarmiento
+2 personas
+Por iniciar
+0 %
+En plazo
+Crítico
+Mover a…
+Entregar el informe de cierre de plataformas institucionales
+PDI · 1 elemento
+8 · Plataformas institucionales
+VS
+Asignada a Valentina Sarmiento
+Valentina Sarmiento
+Por iniciar
+0 %
+Hito · En plazo
+Medio
+Mover a…
+Entregar el informe de cierre de ia, analítica, datos y tecnologías emergentes
+PDI · 1 elemento
+4 · IA, analítica, datos y tecnologías emergentes
+CR
+VS
+Asignada a Camilo Rojas, Valentina Sarmiento
+2 personas
+Por iniciar
+0 %
+Hito · En plazo
+Medio
+Mover a…
+Entregar el informe de cierre de seguridad de la infraestructura tecnológica
+PDI · 2 elementos
+7 · Seguridad de la infraestructura tecnológica
+VS
+MS
+Asignada a Valentina Sarmiento, Mariana Solano
+2 personas
+Por iniciar
+0 %
+Hito · En plazo
+Crítico
+Mover a…
+Entregar el informe de cierre de servicios tecnológicos
+PDI · 1 elemento
+3 · Servicios tecnológicos
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+Por iniciar
+0 %
+Hito · En plazo
+Alto
+Mover a…
+Levantar el diagnóstico de infraestructura de usuario final
+0/3 
+Sin PDI
+2 · Infraestructura de usuario final
+Sin responsable
+Por iniciar
+0 %
+En plazo
+Alto
+Mover a…
+Entregar el informe de cierre de infraestructura de usuario final
+PDI sin definir
+2 · Infraestructura de usuario final
+Sin responsable
+Por iniciar
+0 %
+Hito · En plazo
+Medio
+Mover a…

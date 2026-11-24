@@ -1,0 +1,36 @@
+Regresar
+Planeación y Seguimiento
+Importar la planificación
+Importar la planificación de la oficina
+
+Cuatro pasos para crear de una vez las actividades de Tecnología e Infraestructura TI. El archivo se lee en su navegador y nada sale de él hasta el último paso.
+
+Descargar la plantilla y elegir el archivo
+(hecho)
+Revisar lo leído
+(hecho)
+3
+Corregir
+(paso actual)
+4
+Crear las actividades
+(pendiente)
+Corregir
+
+Los problemas, por hoja, fila y columna, con cómo arreglarlos. Las filas con error no se importan; no se inventa ni se rellena ningún dato.
+
+2 filas con error y 0 avisos. Para corregir, abra su archivo, arregle esas celdas, guárdelo y elíjalo de nuevo.
+
+Elegir otro archivo
+Archivo: act-err.xlsx
+No se importa
+Fila 10 · Preparar los estudios previos de licenciamiento
+Columna «Fecha de fin». La fecha de fin no puede ser anterior a la de inicio.
+No se importa
+Fila 11 · Piloto de analítica de matrícula
+Columna «Prioridad». «Urgente» no es una prioridad válida. Elija de la lista: Crítico, Alto, Medio, Bajo.
+Columna «Responsable 1». «otra.persona@demo.udes.test» no es el correo de un miembro de Tecnología e Infraestructura TI. Un gestor solo asigna a la gente de su oficina: elija de la lista, o pídale al administrador que agregue a la persona en Usuarios.
+Entiendo que 2 filas con error no se importan y sigo con 3 actividades listas.
+El borrador se guarda solo en este equipo.
+Atrás
+Siguiente

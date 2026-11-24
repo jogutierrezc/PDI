@@ -1,0 +1,702 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0 
+Financiero: En revisión de la VAF
+
+Todos los planes
+Financiación y presupuesto
+
+La VAF evalúa lo financiero de cada plan y vigila el presupuesto y su ejecución. La evaluación no bloquea a las oficinas: pueden crear actividades y reportar avances mientras tanto. Usted evalúa y registra.
+
+Por evaluar
+Solicitado vs aprobado
+Presupuesto
+Alertas
+Configuración
+Presupuesto de «PDIFyT 2027-2035»
+
+Financiero: En revisión de la VAF
+
+Cargar la financiación (Excel)
+Cargar la ejecución (Excel)
+Solicitado
+$ 133 MM
+$ 133.374.668.643
+lo que pidió la oficina
+Aprobado
+$ 57,7 MM
+$ 57.710.700.000
+presupuesto del año
+Modificado
+−$ 1,4 MM
+−$ 1.363.700.000
+adiciones y reducciones
+Vigente
+$ 56,3 MM
+$ 56.347.000.000
+aprobado + modificado
+Comprometido
+$ 39,9 MM
+$ 39.888.300.000
+Ejecutado
+$ 33,1 MM
+$ 33.089.800.000
+Pagado
+$ 29,8 MM
+$ 29.780.400.000
+Disponible
+$ 16,5 MM
+$ 16.458.700.000
+vigente − lo mayor entre comprometido y ejecutado
+% de ejecución
+58,7 %
+ejecutado ÷ vigente
+Por año
+Presupuesto por año
+Año	Vigente	Comprometido	Ejecutado	Pagado
+2027	$ 56,3 MM
+$ 56.347.000.000
+	$ 39,9 MM
+$ 39.888.300.000
+	$ 33,1 MM
+$ 33.089.800.000
+	$ 29,8 MM
+$ 29.780.400.000
+Por oficina y pilar
+Por oficina
+Bienestar Universitario
+66 %
+ejecutado de $ 30,5 MM
+$ 30.546.500.000
+ vigente
+Compras y Contratación
+62 %
+ejecutado de $ 8,4 MM
+$ 8.405.800.000
+ vigente
+Infraestructura y Planta Física
+30 %
+ejecutado de $ 10,3 MM
+$ 10.318.700.000
+ vigente
+Planeación Institucional
+58 %
+ejecutado de $ 602 M
+$ 602.200.000
+ vigente
+Tecnología e Infraestructura TI
+68 %
+ejecutado de $ 6,5 MM
+$ 6.473.800.000
+ vigente
+Por pilar
+P2. Ambiente tecnológico
+68 %
+ejecutado de $ 6,7 MM
+$ 6.668.800.000
+ vigente
+P3. Entorno emprendedor
+80 %
+ejecutado de $ 713 M
+$ 712.500.000
+ vigente
+P4. Gobernanza para el buen gobierno
+56 %
+ejecutado de $ 46,4 MM
+$ 46.403.800.000
+ vigente
+P6. Apropiación social
+80 %
+ejecutado de $ 2,6 MM
+$ 2.561.900.000
+ vigente
+
+% de ejecución sobre lo vigente.
+
+Por línea (75)
+Oficina
+Todas
+Vicerrectoría Administrativa y Financiera
+Planeación Institucional
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+Compras y Contratación
+Bienestar Universitario
+Presupuesto por línea con el avance físico validado
+Línea	Vigente	Ejecutado	% ejec.	Avance físico	Desviación
+#1
+Infraestructura para la docencia
+	$ 715 M
+$ 715.300.000
+	$ 358 M
+$ 357.700.000
+	50 %	64 %	
+−14 puntos
+#2
+Infraestructura de usuario final
+	$ 909 M
+$ 909.400.000
+	$ 1,1 MM
+$ 1.109.500.000
+	122 %	0 %	
++122 puntos
+#3
+Servicios tecnológicos
+	$ 464 M
+$ 463.600.000
+	$ 371 M
+$ 370.900.000
+	80 %	60,8 %	
++19,2 puntos
+#4
+IA, analítica, datos y tecnologías emergentes
+	$ 170 M
+$ 170.300.000
+	$ 76,6 M
+$ 76.600.000
+	45 %	47,3 %	
+−2,3 puntos
+#5
+Procesamiento y almacenamiento
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	50 %	—
+#6
+Redes y conectividad
+	$ 212 M
+$ 212.000.000
+	$ 0
+$ 0
+	0 %	11,3 %	
+−11,3 puntos
+#7
+Seguridad de la infraestructura tecnológica
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	25 %	—
+#8
+Plataformas institucionales
+	$ 208 M
+$ 207.900.000
+	$ 93,6 M
+$ 93.600.000
+	45 %	53 %	
+−8 puntos
+#9
+Computación de alto rendimiento
+	$ 1,8 MM
+$ 1.752.800.000
+	$ 789 M
+$ 788.800.000
+	45 %	—	—
+#10
+Observatorio de tendencias y vigilancia tecnológica
+	$ 2 MM
+$ 2.042.500.000
+	$ 1,6 MM
+$ 1.634.000.000
+	80 %	—	—
+#11
+Remodelación Clínica
+	$ 27,2 M
+$ 27.200.000
+	$ 12,2 M
+$ 12.200.000
+	44,9 %	0 %	
++44,9 puntos
+#12
+Adecuación sala de juegos + materiales didácticos
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	100 %	—
+#13
+Actualización y reubicación cabina de radio + equipos audiovisuales
+	$ 3,2 M
+$ 3.200.000
+	$ 0
+$ 0
+	0 %	33,3 %	
+−33,3 puntos
+#14
+Gestión de disponibilidad de oficinas
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	25 %	—
+#15
+Adecuación consultorio empresarial + recursos bibliográficos
+	$ 1,4 M
+$ 1.400.000
+	$ 700.000
+$ 700.000
+	50 %	0 %	
++50 puntos
+#16
+Modernización agencia Élite Inhouse + equipos MAC + software
+	$ 3,2 M
+$ 3.200.000
+	$ 3,9 M
+$ 3.900.000
+	121,9 %	100 %	
++21,9 puntos
+#17
+Gestionar espacio físico para laboratorios AVD y Estimulación Sensoria
+	$ 15,8 M
+$ 15.800.000
+	$ 12,6 M
+$ 12.600.000
+	79,7 %	38,5 %	
++41,2 puntos
+#18
+Adecuación de múltiples laboratorios
+	$ 29,7 M
+$ 29.700.000
+	$ 13,4 M
+$ 13.400.000
+	45,1 %	33,3 %	
++11,8 puntos
+#19
+Adecuaciones locativas de salones
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#20
+Adecuación de instalaciones + equipos
+	$ 6,3 M
+$ 6.300.000
+	$ 0
+$ 0
+	0 %	12 %	
+−12 puntos
+#21
+Renovación de laboratorios de habla, voz, audición y lenguaje
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	11,8 %	—
+#22
+Actualización de laboratorios de Análisis del Movimiento
+	$ 1,3 M
+$ 1.300.000
+	$ 600.000
+$ 600.000
+	46,2 %	8,3 %	
++37,9 puntos
+#23
+Mantenimiento laboratorio simulación + adecuación espacios profesores
+	$ 6,2 M
+$ 6.200.000
+	$ 2,8 M
+$ 2.800.000
+	45,2 %	0 %	
++45,2 puntos
+#24
+Infraestructura académica con aulas activas y laboratorios flexibles,
+	$ 2,5 MM
+$ 2.530.800.000
+	$ 2 MM
+$ 2.024.600.000
+	80 %	20 %	
++60 puntos
+#25
+Conexión vial estratégica entre parqueaderos, zonas deportivas y equip
+	$ 1,8 MM
+$ 1.750.000.000
+	$ 788 M
+$ 787.500.000
+	45 %	15 %	
++30 puntos
+#26
+Conexión directa entre el campus académico y las zonas deportivas y cu
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#27
+Reingeniería del ingreso institucional con mayor seguridad y eficienci
+	$ 3,3 MM
+$ 3.325.000.000
+	$ 0
+$ 0
+	0 %	—	—
+#28
+Escenario multipropósito para eventos académicos y culturales de gran
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	—	—
+#29
+Equipamiento deportivo y cultural de aforo masivo y uso multifuncional
+	$ 8,6 MM
+$ 8.550.000.000
+	$ 4,3 MM
+$ 4.275.000.000
+	50 %	—	—
+#30
+Alojamiento con ambientes de estudio, conectividad y servicios complem
+	$ 11,4 MM
+$ 11.400.000.000
+	$ 13,9 MM
+$ 13.908.000.000
+	122 %	—	—
+#31
+Centro de Desarrollo Tecnológico consolidado en 2025 (Acuerdo 009), or
+	$ 713 M
+$ 712.500.000
+	$ 570 M
+$ 570.000.000
+	80 %	72 %	
++8 puntos
+#32
+Reposición de redes de media tensión y sistema de medida
+	$ 245 M
+$ 245.000.000
+	$ 110 M
+$ 110.300.000
+	45 %	18 %	
++27 puntos
+#33
+Reposición de redes hidraulicas
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#34
+Implementación de redes contraincendio generales
+	$ 523 M
+$ 522.500.000
+	$ 0
+$ 0
+	0 %	61,3 %	
+−61,3 puntos
+#35
+Reposición de equipos de transporte vertical
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	—	—
+#36
+Instalación de aire acondicionado aulas chibcha
+	$ 1 MM
+$ 1.045.000.000
+	$ 470 M
+$ 470.300.000
+	45 %	0 %	
++45 puntos
+#37
+Actualización arquitectónica de fachadas de salones chibcha
+	$ 570 M
+$ 570.000.000
+	$ 257 M
+$ 256.500.000
+	45 %	0 %	
++45 puntos
+#38
+Reposición de pisos y cielo raso aulas
+	$ 570 M
+$ 570.000.000
+	$ 456 M
+$ 456.000.000
+	80 %	20,3 %	
++59,7 puntos
+#39
+Reposición de equipos de climatización
+	$ 315 M
+$ 315.000.000
+	$ 142 M
+$ 141.800.000
+	45 %	16 %	
++29 puntos
+#40
+Actualización arquitectonica de la biblioteca
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#41
+Actualizaciones estructurales ( Vulnerabilidad sísmica y diseños de re
+	$ 152 M
+$ 152.000.000
+	$ 0
+$ 0
+	0 %	0 %	
+0 puntos
+#42
+Expansión de los sistemas solares Fotovoltaicos
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	50 %	—
+#43
+Adecuación del laboratorio
+	$ 12,9 M
+$ 12.900.000
+	$ 6,4 M
+$ 6.400.000
+	49,6 %	9,8 %	
++39,8 puntos
+#44
+Garantizar recursos físicos y tecnológicos
+	$ 497 M
+$ 496.800.000
+	$ 606 M
+$ 606.100.000
+	122 %	—	—
+#45
+Plan prospectivo de internacionalización
+	$ 370 M
+$ 369.600.000
+	$ 296 M
+$ 295.700.000
+	80 %	—	—
+#46
+Mantenimiento, dotación y modernización de laboratorios
+	$ 2,3 M
+$ 2.300.000
+	$ 1 M
+$ 1.000.000
+	43,5 %	29,8 %	
++13,7 puntos
+#47
+Adecuar puestos de trabajo
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#48
+Renovación del borde institucional para reforzar identidad, iluminació
+	$ 570 M
+$ 570.000.000
+	$ 0
+$ 0
+	0 %	0 %	
+0 puntos
+#49
+Optimización de flujos, señalización e infraestructura vial interna
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	66,7 %	—
+#50
+Construcción de subestación y planta de emergencia sede Bari
+	$ 105 M
+$ 104.500.000
+	$ 47 M
+$ 47.000.000
+	45 %	0 %	
++45 puntos
+#51
+Adecuaciones de oficinas de la sede Bari y consolidación del área admi
+	$ 1,5 MM
+$ 1.518.500.000
+	$ 683 M
+$ 683.300.000
+	45 %	50 %	
+−5 puntos
+#52
+Reposición de sistema de climatización bloque Arhuaco
+	$ 285 M
+$ 285.000.000
+	$ 228 M
+$ 228.000.000
+	80 %	33,3 %	
++46,7 puntos
+#53
+Instalación de respaldo energético de la sede principal
+	$ 140 M
+$ 140.000.000
+	$ 63 M
+$ 63.000.000
+	45 %	0 %	
++45 puntos
+#54
+Construcción de estructura e Instalación de equipo ascensor para el bl
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#55
+Ampliación sistema contraincendios
+	$ 114 M
+$ 114.000.000
+	$ 0
+$ 0
+	0 %	15,3 %	
+−15,3 puntos
+#56
+Expansión de sistemas solares fotovoltaicos
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#57
+Elaborar plan estratégico para laboratorio de simulación
+	$ 800.000
+$ 800.000
+	$ 400.000
+$ 400.000
+	50 %	50 %	
+0 puntos
+#58
+Garantizar disponibilidad de espacios físicos y dotación
+	$ 1,7 M
+$ 1.700.000
+	$ 2,1 M
+$ 2.100.000
+	123,5 %	25 %	
++98,5 puntos
+#59
+Adecuación espacios grandes animales
+	$ 1 M
+$ 1.000.000
+	$ 800.000
+$ 800.000
+	80 %	35,3 %	
++44,7 puntos
+#60
+Socializar infraestructura disponible y ajustes razonables
+	$ 6,4 M
+$ 6.400.000
+	$ 2,9 M
+$ 2.900.000
+	45,3 %	—	—
+#61
+Socializar infraestructura existente
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	—	—
+#62
+Construcción de nuevo bloque académico-administrativo
+	$ 4,3 MM
+$ 4.275.000.000
+	$ 0
+$ 0
+	0 %	—	—
+#63
+Compra de predio para expansión futura del campus
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	10,8 %	—
+#64
+Compra predio de centro de conciliación
+	$ 1,4 MM
+$ 1.425.000.000
+	$ 641 M
+$ 641.300.000
+	45 %	0 %	
++45 puntos
+#65
+Compra predio de la clínica veterinaria
+	$ 1,4 MM
+$ 1.425.000.000
+	$ 641 M
+$ 641.300.000
+	45 %	7,7 %	
++37,3 puntos
+#66
+Sistema de respaldo eléctrico para sede Kankuamo
+	$ 333 M
+$ 332.500.000
+	$ 266 M
+$ 266.000.000
+	80 %	0 %	
++80 puntos
+#67
+Sistema de transporte vertical para bloque Kankuamo
+	$ 160 M
+$ 159.600.000
+	$ 71,8 M
+$ 71.800.000
+	45 %	0 %	
++45 puntos
+#68
+Restauración fachada Kankuamo
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#69
+Construcción en lote contiguo a la casona
+	$ 3,3 MM
+$ 3.325.000.000
+	$ 0
+$ 0
+	0 %	0 %	
+0 puntos
+#70
+Construcción Facultad ciencias de la salud en San Vicente
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	0 %	—
+#71
+Espacio de prácticas Finca de Veterinaria
+	$ 3 MM
+$ 2.992.500.000
+	$ 1,5 MM
+$ 1.496.300.000
+	50 %	0 %	
++50 puntos
+#72
+Expansión de sistemas solares fotovoltaicos
+	$ 380 M
+$ 380.000.000
+	$ 464 M
+$ 463.600.000
+	122 %	12,8 %	
++109,2 puntos
+#73
+Seguridad física y campus
+	$ 76 M
+$ 76.000.000
+	$ 60,8 M
+$ 60.800.000
+	80 %	0 %	
++80 puntos
+#74
+Seguridad física y campus
+	$ 77 M
+$ 77.000.000
+	$ 34,7 M
+$ 34.700.000
+	45,1 %	0 %	
++45,1 puntos
+#75
+Seguridad física y campus
+	$ 0
+$ 0
+	$ 0
+$ 0
+	—	87,7 %	—
+
+Ver todos los planes

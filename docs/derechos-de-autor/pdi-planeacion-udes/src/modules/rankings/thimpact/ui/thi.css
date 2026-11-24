@@ -1,0 +1,77 @@
+/* =============================================================================
+   THE Impact · lo que se suma a los estilos de UI GreenMetric (ugm.css, que se
+   reutiliza tal cual para que las dos secciones se vean como una sola). Prefijo thi-.
+   Solo tokens de src/styles/tokens.css. Sin bordes laterales de color: el color vive
+   en puntos, etiquetas y barras. Movimiento de color y opacidad cortos; con
+   prefers-reduced-motion no hay transiciones.
+   ========================================================================== */
+
+/* ---------- Cabecera ---------- */
+.thi-cab { padding-bottom: var(--space-2); }
+
+/* ---------- Pasos del ciclo ---------- */
+.thi-pasos { display: grid; margin: 0; padding: 0; list-style: none; counter-reset: paso; }
+.thi-paso {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-faint);
+}
+.thi-paso:last-child { border-bottom: 0; }
+.thi-paso__marca {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+}
+.thi-paso__texto { display: grid; gap: 2px; min-width: 0; }
+.thi-paso__texto b { color: var(--ink); font-size: var(--text-sm); }
+.thi-paso__texto small { color: var(--ink-secondary); font-size: var(--text-xs); line-height: var(--leading-snug); }
+.thi-paso--hecho .thi-paso__marca { background: var(--status-done-soft); border-color: var(--status-done); color: var(--status-done); }
+.thi-paso--ahora .thi-paso__marca { border-color: var(--brand-blue); color: var(--brand-blue); }
+.thi-paso--ahora .thi-paso__texto b { color: var(--brand-blue-strong); }
+@media (max-width: 560px) {
+  .thi-paso { grid-template-columns: 28px minmax(0, 1fr); }
+  .thi-paso > .ugm-btn { grid-column: 2; justify-self: start; }
+}
+
+/* ---------- Marca del ODS (la rk-odsmark de Rankings, un poco más compacta en las listas) ---------- */
+.thi-ods { vertical-align: baseline; }
+
+/* ---------- Evidencias ---------- */
+.thi-evid { gap: var(--space-3); }
+.thi-exige { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-xs); background: var(--surface-3); color: var(--ink-secondary); font-size: var(--text-sm); }
+.thi-exige b { color: var(--ink); }
+.thi-exige--obligatoria { background: var(--status-pending-soft); }
+.thi-exige--respaldo { background: var(--brand-blue-soft); }
+.thi-reglas { font-size: var(--text-sm); color: var(--ink-secondary); }
+.thi-reglas > summary { cursor: pointer; color: var(--brand-blue); font-weight: 700; padding: 6px 0; }
+.thi-reglas > summary:active { opacity: 0.8; }
+.thi-reglas ul { display: grid; gap: var(--space-1); margin: var(--space-2) 0 0; padding-left: var(--space-5); line-height: var(--leading-snug); }
+.thi-importar { display: grid; gap: var(--space-4); margin-top: var(--space-3); }
+.thi-detalle { display: grid; gap: var(--space-3); padding: var(--space-3) 0 var(--space-4) var(--space-3); }
+
+/* ---------- Mesa de coordinación y biblioteca (estilos del reporte por oficinas, dentro del marco) ---------- */
+.thi-mesa { min-width: 0; }
+
+/* ---------- Vista previa de correo ---------- */
+.thi-previa {
+  width: 100%;
+  min-height: 560px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thi-paso__marca { transition: none; }
+}

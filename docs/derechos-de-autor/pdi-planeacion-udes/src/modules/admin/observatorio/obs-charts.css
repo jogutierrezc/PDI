@@ -1,0 +1,192 @@
+/* =============================================================================
+   Observatorio · gráficas compartidas.
+
+   Lo que dibuja un visor, igual en el taller de la intranet, en el portal
+   público y en el boletín: la tabla de datos brutos (con la reserva «< 5» a
+   la vista), las gráficas propias del Observatorio (mapa de calor, mosaico,
+   embudo, puntos, bosque, ranking, mapa por municipio) y las minivistas.
+   Colores de tokens.css.
+   ========================================================================== */
+
+:root {
+  --obs-thumb-1: var(--od-inst-5, #3f6fae);
+  --obs-thumb-2: var(--od-inst-2, #f0a868);
+  --obs-thumb-3: var(--od-inst-3, #c08457);
+  --obs-thumb-4: var(--od-inst-4, #d9b44a);
+  --obs-thumb-line: var(--line-strong);
+}
+
+/* --- Tabla de datos brutos -------------------------------------------------------------- */
+
+.obs-raw {
+  max-height: 34rem;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  scrollbar-width: thin;
+}
+
+.obs-raw[data-compact] { max-height: 26rem; }
+.obs-raw:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.obs-raw table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.obs-raw thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-strong);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.obs-raw thead button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.obs-raw thead th[data-numeric] button { justify-content: flex-end; }
+.obs-raw thead button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+
+.obs-raw__kind {
+  padding: 1px 4px;
+  color: var(--ink-muted);
+  background: var(--surface-3);
+  border-radius: 3px;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.obs-raw__kind[data-kind="cifra"] { color: var(--status-done); background: var(--status-done-soft); }
+.obs-raw__kind[data-kind="territorio"] { color: var(--brand-blue); background: var(--brand-blue-soft); }
+
+.obs-raw__sort { color: var(--ink-faint); opacity: 0.6; transition: transform var(--dur-fast) ease; }
+.obs-raw__sort[data-dir] { color: var(--brand-blue); opacity: 1; }
+.obs-raw__sort[data-dir="asc"] { transform: rotate(180deg); }
+
+.obs-raw tbody td {
+  padding: 6px var(--space-3);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line-faint);
+  white-space: nowrap;
+}
+
+.obs-raw tbody tr:hover td { background: var(--surface-2); }
+.obs-raw td[data-numeric] { text-align: right; }
+.obs-raw .obs-raw__n { width: 1%; color: var(--ink-faint); text-align: right; }
+.obs-raw thead .obs-raw__n { padding: var(--space-2) var(--space-3); color: var(--ink-faint); }
+
+/* Casilla vacía rayada, como en la rejilla de captura; la reserva, marcada. */
+.obs-raw td[data-empty] {
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, var(--line-faint) 5px 6px);
+}
+
+.obs-raw td[data-reserved] { color: var(--status-pending); font-weight: 700; }
+.obs-raw__more { margin: 0; padding: var(--space-2) var(--space-3); color: var(--ink-muted); background: var(--surface-2); font-size: var(--text-xs); }
+
+/* --- Minivistas --------------------------------------------------------------------------- */
+
+.obs-thumb { display: block; width: 70px; height: 48px; flex: none; }
+
+/* --- Gráficas propias ------------------------------------------------------------------- */
+
+.obs-chart { display: grid; gap: var(--space-2); min-width: 0; }
+.obs-canvas { width: 100%; min-width: 0; }
+.obs-scroll { overflow-x: auto; }
+.obs-svg { display: block; overflow: visible; }
+.obs-tick { fill: var(--ink-muted); font-size: 11px; }
+.obs-label { fill: var(--ink-secondary); font-size: 12px; font-weight: 600; }
+.obs-value { fill: var(--ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.obs-tile-label { font-size: 12px; font-weight: 700; }
+.obs-tile-value { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.obs-chart__reserve { margin: 0; color: var(--ink-muted); font-size: var(--text-xs); }
+
+.obs-chart-empty {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.obs-chart-empty strong { color: var(--ink); }
+.obs-chart-empty ul { margin: 0; padding-left: 1.1rem; }
+
+.obs-ranking { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+
+.obs-ranking li {
+  display: grid;
+  grid-template-columns: 1.8rem minmax(6rem, 14rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.obs-ranking__pos {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.obs-ranking li:nth-child(-n + 3) .obs-ranking__pos { color: #fff; background: var(--tone); }
+.obs-ranking__label { overflow: hidden; color: var(--ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.obs-ranking__bar { height: 10px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.obs-ranking__bar i { display: block; width: var(--w); height: 100%; background: var(--tone); border-radius: 3px; }
+.obs-ranking b { font-variant-numeric: tabular-nums; }
+.obs-ranking__more { display: block !important; color: var(--ink-muted); font-size: var(--text-xs); }
+
+.obs-munimap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 13rem;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.obs-munimap__map { width: 100%; max-height: 30rem; }
+.obs-munimap__side { display: grid; gap: var(--space-2); font-size: var(--text-sm); }
+.obs-munimap__side ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; counter-reset: rank; }
+.obs-munimap__side li { display: flex; justify-content: space-between; gap: var(--space-2); padding-bottom: 4px; border-bottom: 1px solid var(--line-faint); }
+.obs-munimap__side li b { font-variant-numeric: tabular-nums; }
+.obs-munimap__side p { margin: 0; color: var(--ink-muted); font-size: var(--text-xs); }
+
+@media (max-width: 900px) {
+  .obs-munimap { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .obs-ranking li { grid-template-columns: 1.8rem minmax(0, 1fr) auto; }
+  .obs-ranking__bar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obs-raw__sort { transition: none; }
+}

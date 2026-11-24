@@ -1,0 +1,301 @@
+// TEMPORAL: genera los .xlsx de ejemplo del manual de Informes y comprueba que el importador los acepta.
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { PLANTILLAS } from "../src/modules/informes/plantillas";
+import { armarLibro, armarLibrosPorEquipo, aplicar, clasificar, destinosDe, huellaDe, leerLibro, nombreArchivoLibro, validarControl } from "../src/modules/informes/libro-informe";
+import type { EntradaAplicar, EntradaLibro, ModoAplicacion } from "../src/modules/informes/libro-informe";
+import { construirLibro, leerLibroCompleto } from "../src/modules/informes/ui/excel";
+import type { HojaExcel } from "../src/modules/informes/ui/excel";
+import { COLUMNAS_ACCIONES, COLUMNAS_CIFRAS, CRITERIOS_BASE, HOJA_ACCIONES, HOJA_CIFRAS, MAS_ES_MEJOR, MENOS_ES_MEJOR, criteriosDe, filasAcciones, filasCifras, indicadorNuevo, opcionesPilar } from "../src/modules/informes/indicadores-manual";
+import type { IndicadorManual } from "../src/modules/informes/indicadores-manual";
+import { AYUDA_LOGROS, AYUDA_METAS, COLUMNAS_LOGROS, COLUMNAS_METAS, EJEMPLO_LOGROS, EJEMPLO_METAS } from "../src/modules/informes/excel-secciones";
+import { COLUMNAS_REQ, FUENTES_REQ, filasDeRequeridos, leerFilasRequeridos } from "../src/modules/informes/requeridos-logica";
+import type { DatoRequerido } from "../src/modules/informes/requeridos-logica";
+import { filasCriterios } from "../src/modules/informes/indicadores-manual";
+import { leerFilasSeccion } from "../src/modules/informes/filas-excel";
+import type { AnexoRow, PilarRef } from "../src/modules/informes/types";
+
+const RAIZ = "/Users/coordinadorinteligenciadenegocios/Documents/PDI";
+const OUT = `${RAIZ}/docs/manual-informes/excel`;
+const SCRATCH = "/private/tmp/claude-501/-Users-coordinadorinteligenciadenegocios-Documents-PDI/519be8fa-3f90-41c1-9488-e21afcaa3e74/scratchpad";
+const D = {
+  vacio: "01-libro-completo-vacio",
+  lleno: "02-libro-diligenciado",
+  equipos: "03-libros-por-equipo",
+  errores: "04-libro-con-errores",
+  otro: "05-libro-de-otro-informe",
+  filas: "06-plantillas-de-filas",
+  resultados: "07-plantilla-resultados",
+  admin: "08-datos-requeridos-admin",
+};
+for (const d of Object.values(D)) mkdirSync(join(OUT, d), { recursive: true });
+
+const logo = readFileSync(`${RAIZ}/public/logo-udes-blanco.png`).toString("base64");
+const PILARES: PilarRef[] = [
+  { id: "p1", numeral: "1", name: "Formación integral con calidad", progress: 62 },
+  { id: "p2", numeral: "2", name: "Investigación e innovación", progress: 48 },
+  { id: "p3", numeral: "3", name: "Proyección social y extensión", progress: 55 },
+  { id: "p4", numeral: "4", name: "Internacionalización", progress: 35 },
+  { id: "p5", numeral: "5", name: "Bienestar y permanencia", progress: null },
+  { id: "p6", numeral: "6", name: "Sostenibilidad institucional", progress: 70 },
+];
+const ANEXOS: AnexoRow[] = [
+  { id: "a1", instancia_id: "inst-ing-2026", n: 1, nombre: "Acta del Consejo de Facultad", tipo: "archivo", ruta: "informes/acta-consejo.pdf", descripcion: "Aprobación del plan de mejoramiento" },
+  { id: "a2", instancia_id: "inst-ing-2026", n: 2, nombre: "Convenio con universidad aliada", tipo: "url", ruta: "https://udrive.udes.example/convenio-aliada", descripcion: "Convenio marco firmado en 2026" },
+  { id: "a3", instancia_id: "inst-ing-2026", n: 3, nombre: "Reporte de semilleros", tipo: "archivo", ruta: "informes/semilleros.xlsx", descripcion: "Listado de semilleros activos" },
+];
+const APROBADOS = [{ id: "c_1", nombre: "Bienestar y permanencia estudiantil" }];
+const A = PLANTILLAS.A.secciones;
+const base = (extra: Partial<EntradaLibro> = {}): EntradaLibro => ({ ciclo: { id: "ciclo-2026", anio: 2026 }, instancia: "inst-ing-2026", unidad: "Facultad de Ingeniería", plantilla: "A", secciones: A, contenidos: {}, aprobados: APROBADOS, pilares: PILARES, anexos: [], fecha: "2026-11-23", ...extra });
+const claveDe = (t: string, n = 0) => A.filter((s) => s.tipo === t)[n].clave;
+
+const ind = (criterio: string, cn: string, nombre: string, unidad: string, mayor: boolean, ant: number | null, act: number | null, meta: number | null, fuente: string, nota: string, extra: Partial<IndicadorManual> = {}): IndicadorManual => ({ ...indicadorNuevo(criterio, cn), id: `i${nombre.length}${criterio}${Math.abs(nombre.charCodeAt(0))}`, nombre, unidad, mayorMejor: mayor, anterior: ant, actual: act, meta, fuente, nota, ...extra });
+const accion = (criterio: string, cn: string, nombre: string, d: string, h: string, fin: string, pt: string, pn: number | null, extra: Partial<IndicadorManual> = {}): IndicadorManual => ({ ...indicadorNuevo(criterio, cn, "accion"), id: `a${nombre.length}${criterio}`, nombre, descripcion: d, avance_texto: h, finalizacion: fin, proyeccion_texto: pt, proyeccion_num: pn, ...extra });
+
+const INDICADORES: IndicadorManual[] = [
+  ind("ens", "Enseñanza", "Tasa de deserción anual", " %", false, 8.4, 6.9, 6, "SPADIES", "Bajó por las tutorías de primer semestre.", { pilar: "p5", evidencias: [3] }),
+  ind("ens", "Enseñanza", "Profesores con doctorado", " %", true, 18, 21, 25, "Registro de talento humano", "Dos nuevos doctores vinculados.", { pilar: "p1" }),
+  ind("inv", "Investigación", "Semilleros de investigación activos", "", true, 9, 12, 15, "Registro de la unidad", "Se abrieron tres semilleros en 2026.", { pilar: "p2", evidencias: [3] }),
+  ind("inv", "Investigación", "Productos de nuevo conocimiento", "", true, 22, 27, 30, "Minciencias", "", { pilar: "p2" }),
+  ind("ext", "Extensión", "Proyectos de extensión en ejecución", "", true, 6, 8, 8, "Oficina de extensión", "Se cumplió la meta.", { pilar: "p3" }),
+  ind("int", "Internacionalización", "Convenios internacionales activos", "", true, 4, 5, 6, "Oficina de relaciones internacionales", "Convenio nuevo con una universidad aliada.", { pilar: "p4", evidencias: [2] }),
+  ind("fin", "Gestión administrativa y financiera", "Ejecución presupuestal", " %", true, 91, 94, 95, "Vicerrectoría Administrativa y Financiera", ""),
+  ind("c_1", "Bienestar y permanencia estudiantil", "Estudiantes con apoyo socioeconómico", "", true, 140, 165, 160, "Bienestar universitario", "", { pilar: "p5" }),
+  accion("ae", "Acciones estratégicas", "Convocatoria interna de investigación con pares", "Convocatoria abierta a todos los grupos con evaluación de pares externos.", "Se recibieron 14 propuestas y se financiaron 6.", "Diciembre de 2026", "Repetirla en 2027 con más pares internacionales", 8, { pilar: "p2", evidencias: [1] }),
+  accion("ens", "Enseñanza", "Tutorías de refuerzo en primer semestre", "Acompañamiento a estudiantes con bajo rendimiento.", "Se abrieron 12 grupos en el primer periodo.", "Segundo periodo de 2026", "Ampliar a todos los programas", 20, { pilar: "p5" }),
+];
+
+const CONT_LLENO: EntradaLibro["contenidos"] = {
+  [claveDe("narr", 0)]: { texto: "En 2026 la Facultad de Ingeniería consolidó sus programas de pregrado y posgrado, redujo la deserción de 8,4 % a 6,9 % y abrió tres semilleros de investigación.\n\nSe firmó un convenio con una universidad aliada y se ejecutó el 94 % del presupuesto." },
+  [claveDe("pdi")]: { alineacion: [{ pilar: "p1", aporte: "Actualizamos los planes de estudio con enfoque en competencias y vinculamos dos doctores.", acciones: [] }, { pilar: "p2", aporte: "Tres semilleros nuevos y una convocatoria interna con evaluación de pares.", acciones: [] }, { pilar: "p5", aporte: "Tutorías de primer semestre para reducir la deserción.", acciones: [] }], pilares: ["p1", "p2", "p5"] },
+  [claveDe("metas")]: { metas: [{ meta: "Graduar 120 estudiantes en el año", programado: 120, alcanzado: 104 }, { meta: "Abrir 4 convenios nuevos", programado: 4, alcanzado: 5 }, { meta: "Reducir la deserción a 6 %", programado: 6, alcanzado: null }] },
+  [claveDe("dim")]: { indicadores: INDICADORES, criterios_reporta: ["ens", "inv", "ext", "int", "fin", "c_1", "ae"] },
+  [claveDe("filas")]: { filas: [["Investigación", "Pocos docentes con dedicación a investigación", "Asignar horas de investigación a cinco docentes", "Primer semestre de 2027", "$ 25.000.000"], ["Enseñanza", "Deserción alta en primer semestre", "Ampliar las tutorías a todos los programas", "Segundo semestre de 2026", "$ 12.000.000"]] },
+  [claveDe("logros")]: { logros: [{ titulo: "Primera convocatoria interna con pares internacionales", resultado: "Se evaluaron 14 propuestas con pares de tres países y se financiaron 6 proyectos.", anexo: 1 }, { titulo: "Convenio marco con universidad aliada", resultado: "Habilita movilidad de estudiantes y profesores desde 2027.", anexo: 2 }] },
+  [claveDe("narr", 1)]: { texto: "La facultad avanzó en permanencia e investigación. Para 2027 prioriza ampliar las tutorías y asignar horas de investigación a más docentes." },
+};
+
+async function guardar(dir: string, archivo: string, hojas: HojaExcel[]) {
+  const buf = await construirLibro(hojas, { logo });
+  writeFileSync(join(OUT, dir, archivo), Buffer.from(buf));
+}
+
+describe("generar los libros del manual", () => {
+  it("libro vacío, diligenciado y por equipo", async () => {
+    const vacio = base();
+    await guardar(D.vacio, nombreArchivoLibro(vacio), armarLibro(vacio));
+    const lleno = base({ contenidos: CONT_LLENO, anexos: ANEXOS });
+    await guardar(D.lleno, nombreArchivoLibro(lleno), armarLibro(lleno));
+    const EQ: Record<string, string> = { narr: "Quien lidera el informe", pdi: "Dirección de programa", metas: "Dirección de programa", dim: "Secretaría académica", matriz: "Quien lidera el informe", filas: "Dirección de programa", logros: "Coordinación de extensión", evid: "Secretaría académica", anexos: "Quien lidera el informe" };
+    const asign = Object.fromEntries(A.map((s) => [s.clave, EQ[s.tipo]]));
+    const libros = armarLibrosPorEquipo(base({ anexos: ANEXOS }), asign);
+    for (const l of libros) await guardar(D.equipos, l.archivo, l.hojas);
+    expect(libros.length).toBe(4);
+  });
+
+  it("libro con errores a propósito y libro de otro informe", async () => {
+    const e = base({ contenidos: CONT_LLENO, anexos: ANEXOS });
+    const hojas = armarLibro(e);
+    const h = (parte: string) => hojas.find((x) => x.nombre.includes(parte) && !x.nombre.includes("Criterios"))!;
+    // Resumen: se deja una hoja de texto sin nada (Conclusiones).
+    const concl = hojas.find((x) => x.nombre.includes("Conclusiones"))!;
+    concl.filas = [["", 0]];
+    // Objetivos y metas: un número escrito en letras y un Programado vacío.
+    const metas = h("Objetivos");
+    metas.filas = [...metas.filas, ["Aumentar los semilleros de investigación", "cuatro", "5", ""], ["Reducir la deserción a 5 %", "", "4,8", ""]];
+    // Alineación: un pilar que no existe.
+    const pdi = h("Alineación");
+    pdi.filas[5] = ["9. Pilar que no existe en el plan", "", "Sí", "Aporte escrito sobre un pilar que no es del PDI."];
+    // Criterios de resultados: una respuesta que no es Sí ni No y un criterio nuevo.
+    const crit = hojas.find((x) => x.nombre.endsWith("Criterios"))!;
+    crit.filas[1][1] = "Tal vez";
+    crit.filas = [...crit.filas, ["Gestión del conocimiento", "Sí", ""]];
+    // Resultados: criterio inventado, sin nombre, número en letras, pilar ajeno, sin tipo, cifra sin meta.
+    const res = hojas.find((x) => x.nombre.includes("Resultados") && !x.nombre.endsWith("Criterios"))!;
+    const fila = (c: string, n: string, u: string, s: string, a: string | number | null, ac: string | number | null, m: string | number | null, f: string, nota: string, tipo: string, pilar = "", anexos = ""): (string | number | null)[] => [c, n, u, s, a, ac, m, f, nota, tipo, "", "", "", "", null, pilar, anexos, ""];
+    res.filas = [
+      ...res.filas,
+      fila("Criterio que no existe", "Estudiantes en intercambio", "", MAS_ES_MEJOR, 10, 14, 18, "Oficina de relaciones internacionales", "", "Cifra"),
+      fila("Extensión", "", "", MAS_ES_MEJOR, 3, 4, 5, "Oficina de extensión", "", "Cifra"),
+      fila("Investigación", "Artículos en revistas indexadas", "", MAS_ES_MEJOR, 20, "doce", 30, "Minciencias", "", "Cifra"),
+      fila("Enseñanza", "Estudiantes en prácticas", "", MAS_ES_MEJOR, 80, 95, 100, "Secretaría académica", "", "Cifra", "Pilar de prueba"),
+      fila("Extensión", "Eventos académicos realizados", "", MAS_ES_MEJOR, 5, 7, 8, "Oficina de extensión", "", ""),
+      fila("Gestión administrativa y financiera", "Ahorro en contratación", " %", MAS_ES_MEJOR, 2, 3, null, "Contratación", "", "Cifra"),
+      fila("Extensión", "Feria de servicios a la comunidad", "", "", null, null, null, "", "", "Acción"),
+    ];
+    // Puntos críticos: dimensión desconocida y acción vacía.
+    const pc = h("Puntos críticos");
+    pc.filas = [...pc.filas, ["Bienestar institucional", "Poca participación en actividades", "Programar jornadas por programa", "2027-1", ""], ["Extensión", "Pocos convenios con empresas", "", "Primer semestre de 2027", ""]];
+    // Logros: anexo que no es número y logro sin contexto.
+    const lg = h("Logros");
+    lg.filas = [...lg.filas, ["Premio regional a un proyecto de aula", "Un proyecto de estudiantes ganó el premio regional.", "abc"], ["Acreditación de un laboratorio", "", "3"]];
+    // Evidencias: una sin enlace y otra con http://.
+    const ev = hojas.find((x) => x.nombre.includes("Evidencias"))!;
+    ev.filas = [...ev.filas, ["", "Informe de autoevaluación", "Respalda la meta de calidad", ""], ["", "Encuesta de satisfacción", "Resultados 2026", "http://udrive.udes.example/encuesta"]];
+    // Una hoja renombrada por quien la diligenció: se reconoce por sus encabezados.
+    ev.nombre = "Mis soportes";
+    await guardar(D.errores, nombreArchivoLibro(e), hojas);
+
+    const otro = base({ instancia: "inst-otra-unidad-2026", unidad: "Facultad de Salud", contenidos: {}, anexos: [] });
+    await guardar(D.otro, nombreArchivoLibro(otro), armarLibro(otro));
+  });
+
+  it("plantillas de filas, de resultados y de datos requeridos (como las arma la pantalla)", async () => {
+    const dims = CRITERIOS_BASE.map((d) => d.nombre);
+    const ayudaBase = (extra: string[], columnas: string[], dimensiones?: string[]) =>
+      [...(extra.length ? extra : ["Una fila por punto."]), "Borre las filas de ejemplo antes de subir el archivo.", `Columnas: ${columnas.join(", ")}. No cambie los encabezados de la primera fila.`, ...(dimensiones ? ["Dimensión: elija de la lista; si escribe otra, se importa igual como texto libre."] : []), "Una fila con alguna celda vacía se importa, pero la sección no queda lista hasta completarla.", "Las fechas se pasan a dd/mm/aaaa. Máximo 500 filas."].join("\n");
+    const filasPlantilla = async (archivo: string, columnas: string[], dimensiones?: string[], ejemploPropio?: string[][], ayuda: string[] = []) => {
+      const cols = columnas.map((t, n) => ({ titulo: t, ancho: n === 0 && dimensiones ? 34 : 30 }));
+      const ejemplo = ejemploPropio ?? [0, 1].map((n) => columnas.map((c, i) => (i === 0 && dimensiones ? (dimensiones[n] ?? "") : `Ejemplo: ${c.toLowerCase()} (borre esta fila)`)));
+      const listas = dimensiones ? { 0: dimensiones.map((d) => d.replace(/,/g, " ")) } : undefined;
+      const buf = await construirLibro([{ nombre: "Filas", columnas: cols, filas: ejemplo, listas, ayuda: ayudaBase(ayuda, columnas, dimensiones) }]);
+      writeFileSync(join(OUT, D.filas, `plantilla-${archivo}.xlsx`), Buffer.from(buf));
+    };
+    await filasPlantilla("puntos-criticos", A.find((s) => s.tipo === "filas")!.columnas!, dims);
+    await filasPlantilla("retos-oportunidades", PLANTILLAS.B.secciones.find((s) => s.tipo === "filas")!.columnas!);
+    await filasPlantilla("logros", [...COLUMNAS_LOGROS], undefined, EJEMPLO_LOGROS, AYUDA_LOGROS);
+    await filasPlantilla("objetivos-y-metas-anuales", [...COLUMNAS_METAS], undefined, EJEMPLO_METAS, AYUDA_METAS);
+
+    const criterios = criteriosDe([], APROBADOS, []);
+    const pilares = opcionesPilar(PILARES);
+    const rangoCriterios = `Criterios!$A$2:$A$${Math.max(2, criterios.length + 1)}`;
+    const rangoPilares = `Pilares!$A$2:$A$${Math.max(2, pilares.length + 1)}`;
+    const anchoCifras = (n: number) => (n === 0 || n === 9 ? 34 : n === 1 || n === 7 || n === 8 ? 40 : 16);
+    const anchoAcciones = (n: number) => (n === 0 || n === 10 ? 34 : n === 1 || n === 2 || n === 3 ? 40 : n === 4 || n === 5 ? 28 : 16);
+    const [k1, k2] = [criterios[0], criterios[1] ?? criterios[0]];
+    const ejC: IndicadorManual[] = [k1, k2].map((k, n) => ({ ...indicadorNuevo(k.id, k.nombre), nombre: n ? "Ejemplo: profesores con doctorado" : "Ejemplo: tasa de graduación", unidad: "%", anterior: n ? 18 : 62, actual: n ? 21 : 66, meta: n ? 25 : 70, fuente: "Oficina de la unidad" }));
+    const ejA: IndicadorManual[] = [{ ...indicadorNuevo(k1.id, k1.nombre, "accion"), nombre: "Ejemplo: tutorías de refuerzo", descripcion: "Acompañamiento a estudiantes de primer semestre", avance_texto: "Se abrieron 12 grupos en el primer periodo", finalizacion: "Segundo periodo de 2026", proyeccion_texto: "Ampliar a todos los programas", proyeccion_num: 20, unidad: "" }];
+    const buf = await construirLibro([
+      { nombre: HOJA_CIFRAS, columnas: COLUMNAS_CIFRAS.map((t, n) => ({ titulo: t, ancho: anchoCifras(n) })), filas: filasCifras(ejC, criterios, pilares), listas: { 0: { rango: rangoCriterios }, 3: [MAS_ES_MEJOR, MENOS_ES_MEJOR], 9: { rango: rangoPilares } }, ayuda: "Una fila por cifra. Borre las filas de ejemplo.\nCriterio: elija de la lista (hoja «Criterios») o escriba uno nuevo; si no existe se crea como criterio propio de su unidad.\nQué es mejor: «Más es mejor» o «Menos es mejor».\nAño anterior, Cifra actual y Meta: solo números. El estado no se escribe: lo calcula el informe.\nUnidad: déjela vacía para conteos, o escriba % o pp.\nPilar del PDI: opcional." },
+      { nombre: HOJA_ACCIONES, columnas: COLUMNAS_ACCIONES.map((t, n) => ({ titulo: t, ancho: anchoAcciones(n) })), filas: filasAcciones(ejA, criterios, pilares), listas: { 0: { rango: rangoCriterios }, 10: { rango: rangoPilares } }, ayuda: "Una fila por acción. Borre la fila de ejemplo.\nAcción: el nombre corto. Descripción y Qué se ha hecho son obligatorios para dar la acción por completa.\nFinalización: cuándo se plantea terminarla (texto)." },
+      { nombre: "Criterios", columnas: [{ titulo: "Criterios disponibles", ancho: 50 }, { titulo: "Origen", ancho: 28 }], filas: filasCriterios(criterios) },
+      { nombre: "Pilares", columnas: [{ titulo: "Pilares del Plan de Desarrollo", ancho: 60 }], filas: pilares.map((p) => [p.etiqueta]) },
+    ]);
+    writeFileSync(join(OUT, D.resultados, "plantilla-resultados-y-evidencias.xlsx"), Buffer.from(buf));
+
+    const mk = (plantilla: "A" | "B" | "C" | "D", orden: number, dato: string, ft: DatoRequerido["fuente_tipo"], fn: string, criterio: string, unidad: string, mm: boolean, cond: DatoRequerido["condicion"]): DatoRequerido => ({ id: `r${orden}${plantilla}`, ciclo_id: "ciclo-2026", plantilla, clave: `req_${orden}${plantilla}`, dato, fuente_tipo: ft, fuente_nombre: fn, criterio, unidad, mayor_mejor: mm, condicion: cond, orden });
+    const reqs = [
+      mk("A", 0, "Deserción anual", "auto", "UDES en Cifras · SPADIES", "ens", " %", false, "justificar"),
+      mk("A", 1, "Semilleros de investigación activos", "auto", "UDES en Cifras · Semilleros", "inv", "", true, "justificar"),
+      mk("A", 2, "Proyectos de extensión en ejecución", "manual", "Oficina de extensión", "ext", "", true, "sugerido"),
+      mk("B", 0, "Convenios internacionales activos", "excel", "Relaciones internacionales", "int", "", true, "justificar"),
+      mk("C", 0, "Ejecución presupuestal del campus", "pdi", "Plan de Desarrollo", "fin", " %", true, "no"),
+    ];
+    const nombreCrit = (id: string) => CRITERIOS_BASE.find((c) => c.id === id)?.nombre ?? id;
+    const bufReq = await construirLibro([{ nombre: "Datos requeridos", columnas: COLUMNAS_REQ.map((t, n) => ({ titulo: t, ancho: n === 1 || n === 3 ? 40 : 18 })), filas: filasDeRequeridos(reqs, nombreCrit), listas: { 0: ["A", "B", "C", "D"], 2: FUENTES_REQ.map((f) => f.texto), 4: [...CRITERIOS_BASE, ...APROBADOS].map((o) => o.nombre.replace(/,/g, " ")), 6: ["Más es mejor", "Menos es mejor"], 7: ["Justificar", "Sugerido", "No pedir"] }, ayuda: "Una fila por dato. Plantilla: A, B, C o D. Al subirlo, las filas se añaden a la configuración de cada plantilla." }]);
+    writeFileSync(join(OUT, D.admin, "datos-requeridos.xlsx"), Buffer.from(bufReq));
+  });
+});
+
+/* ---------- Verificación: releer y pasar por el importador ---------------------------- */
+
+const listar = (d: string) => readdirSync(join(OUT, d)).filter((f) => f.endsWith(".xlsx"));
+const ctx = (e: EntradaLibro): EntradaAplicar["contexto"] => ({ secciones: e.secciones, contenidos: e.contenidos, aprobados: APROBADOS, pilares: opcionesPilar(PILARES), anexos: e.anexos });
+const bitacora: Record<string, unknown> = {};
+
+async function importar(dir: string, archivo: string, e: EntradaLibro, modo: ModoAplicacion) {
+  const hojas = await leerLibroCompleto(readFileSync(join(OUT, dir, archivo)));
+  const libro = leerLibro(hojas);
+  const control = validarControl(libro.control, { ciclo: e.ciclo.id, instancia: e.instancia, plantilla: e.plantilla, huella: huellaDe(e.plantilla, e.secciones) });
+  const propuestas = clasificar(libro.bloques, destinosDe(e.secciones), libro.control);
+  const r = aplicar({ bloques: libro.bloques, propuestas, contexto: ctx(e), modo, estado: "draft", rol: "jefe", aporta: libro.control?.valores.equipo });
+  return { hojas, libro, control, propuestas, r };
+}
+
+describe("verificar los libros generados", () => {
+  it("todos los .xlsx se abren con exceljs y traen hojas ocultas de control", async () => {
+    const { default: ExcelJS } = await import("exceljs");
+    const todos = Object.values(D).flatMap((d) => listar(d).map((f) => join(OUT, d, f)));
+    expect(todos.length).toBeGreaterThanOrEqual(14);
+    for (const ruta of todos) {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.readFile(ruta);
+      expect(wb.worksheets.length).toBeGreaterThan(0);
+      if (/04-|01-|02-|03-|05-/.test(ruta)) {
+        const ocultas = wb.worksheets.filter((w) => w.state !== "visible").map((w) => w.name);
+        expect(ocultas).toEqual(["Listas", "_Control"]);
+      }
+    }
+  });
+
+  it("el libro vacío, el diligenciado y los de equipo entran sin errores", async () => {
+    const vacio = base();
+    const lleno = base({ contenidos: CONT_LLENO, anexos: ANEXOS });
+    const rv = await importar(D.vacio, nombreArchivoLibro(vacio), vacio, "agregar");
+    expect(rv.control.error).toBeUndefined();
+    expect(rv.control.avisos).toEqual([]);
+    expect(rv.propuestas.every((p) => p.origen === "control" && p.nivel === "reconocida")).toBe(true);
+    // Sin diligenciar solo avisa de lo que falta o de las filas de ejemplo; nunca de errores de formato.
+    expect(rv.r.avisos.every((a) => /no hay texto para importar|de ejemplo se omiti|falta «/.test(a))).toBe(true);
+    bitacora.vacio = { avisos: rv.r.avisos, totales: rv.r.totales, resumen: rv.r.resumen, hojas: rv.libro.bloques.length, secciones: Object.keys(rv.r.contenidos), contenidos: rv.r.contenidos };
+
+    for (const modo of ["agregar", "vacios", "reemplazar"] as ModoAplicacion[]) {
+      const rl = await importar(D.lleno, nombreArchivoLibro(lleno), base({ contenidos: {}, anexos: ANEXOS }), modo);
+      expect(rl.control.error).toBeUndefined();
+      expect(rl.r.avisos.filter((a) => !/^Las evidencias no se reemplazan/.test(a))).toEqual([]);
+      expect(rl.r.totales.conAviso).toBe(0);
+      expect(Object.keys(rl.r.contenidos).length).toBeGreaterThan(4);
+      bitacora[`lleno_${modo}`] = { resumen: rl.r.resumen, totales: rl.r.totales, secciones: rl.r.secciones.map((s) => ({ t: s.titulo, ag: s.agregadas, comp: s.completadas, om: s.omitidas, li: s.listas })) };
+    }
+    // Mismo libro sobre un informe que ya trae lo mismo: no agrega nada nuevo (omitidas).
+    const ya = await importar(D.lleno, nombreArchivoLibro(lleno), lleno, "agregar");
+    bitacora.lleno_sobre_lleno = { resumen: ya.r.resumen, secciones: ya.r.secciones.map((s) => ({ t: s.titulo, ag: s.agregadas, om: s.omitidas })) };
+
+    for (const f of listar(D.equipos)) {
+      const re = await importar(D.equipos, f, base({ anexos: ANEXOS }), "agregar");
+      expect(re.control.error).toBeUndefined();
+      expect(re.r.avisos.every((a) => /no hay texto para importar|de ejemplo se omiti|falta «/.test(a))).toBe(true);
+      expect(re.propuestas.every((p) => p.origen === "control")).toBe(true);
+      bitacora[`equipo_${f}`] = { hojas: re.libro.bloques.map((b) => b.hoja), equipo: re.libro.control?.valores.equipo, avisos: re.r.avisos };
+    }
+  });
+
+  it("el libro con errores muestra avisos y el de otro informe se rechaza", async () => {
+    const e = base({ contenidos: CONT_LLENO, anexos: ANEXOS });
+    const rr = await importar(D.errores, nombreArchivoLibro(e), base({ anexos: ANEXOS }), "agregar");
+    expect(rr.control.error).toBeUndefined();
+    expect(rr.r.avisos.length).toBeGreaterThan(10);
+    expect(rr.r.totales.conAviso + rr.r.totales.sinImportar).toBeGreaterThan(5);
+    const soportes = rr.propuestas[rr.libro.bloques.findIndex((b) => b.hoja === "Mis soportes")];
+    bitacora.errores = { avisos: rr.r.avisos, totales: rr.r.totales, resumen: rr.r.resumen, soportes: { origen: soportes.origen, nivel: soportes.nivel, puntaje: soportes.puntaje }, propuestas: rr.propuestas.map((p, i) => ({ hoja: rr.libro.bloques[i].hoja, destino: p.destino, origen: p.origen, nivel: p.nivel })) };
+
+    const o = base({ instancia: "inst-otra-unidad-2026", unidad: "Facultad de Salud" });
+    const ro = await importar(D.otro, nombreArchivoLibro(o), base(), "agregar");
+    expect(ro.control.error).toMatch(/no corresponde a este informe/);
+    bitacora.otro = { error: ro.control.error };
+    const cambiada = validarControl(ro.libro.control, { ciclo: "ciclo-2026", instancia: "inst-otra-unidad-2026", plantilla: "A", huella: "00000000" });
+    bitacora.huella = cambiada.avisos;
+    bitacora.noEsLibro = validarControl({ valores: { formato: "otro" }, hojas: {} }, { ciclo: "x", instancia: "x", plantilla: "A", huella: "x" });
+    bitacora.otroCiclo = validarControl({ valores: { formato: "libro-informe", ciclo: "c-2025", anio: "2025", instancia: "inst-ing-2026" }, hojas: {} }, { ciclo: "ciclo-2026", instancia: "inst-ing-2026", plantilla: "A", huella: "x" });
+    bitacora.otraPlantilla = validarControl({ valores: { formato: "libro-informe", plantilla: "B", instancia: "inst-ing-2026" }, hojas: {} }, { ciclo: "ciclo-2026", instancia: "inst-ing-2026", plantilla: "A", huella: "x" });
+    // Informe enviado: no se escribe.
+    const hojas = await leerLibroCompleto(readFileSync(join(OUT, D.lleno, nombreArchivoLibro(e))));
+    const libro = leerLibro(hojas);
+    const env = aplicar({ bloques: libro.bloques, propuestas: clasificar(libro.bloques, destinosDe(A), libro.control), contexto: ctx(base()), modo: "agregar", estado: "sent", rol: "jefe" });
+    bitacora.enviado = env.bloqueado;
+  });
+
+  it("las plantillas de filas, resultados y datos requeridos se leen con su lector", async () => {
+    const { default: ExcelJS } = await import("exceljs");
+    const leerHojaPlana = async (ruta: string, nombre: string) => {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.readFile(ruta);
+      const ws = wb.getWorksheet(nombre)!;
+      const filas: string[][] = [];
+      ws.eachRow({ includeEmpty: false }, (row) => { const c: string[] = []; row.eachCell({ includeEmpty: true }, (cel, n) => { c[n - 1] = String(cel.value ?? ""); }); filas.push(Array.from(c, (x) => x ?? "")); });
+      return filas;
+    };
+    const f1 = await leerHojaPlana(join(OUT, D.filas, "plantilla-puntos-criticos.xlsx"), "Filas");
+    const r1 = leerFilasSeccion(A.find((s) => s.tipo === "filas")!.columnas!, f1, CRITERIOS_BASE.map((d) => d.nombre));
+    bitacora.filas_puntos = r1;
+    expect(r1.filas.length).toBe(2);
+    const f2 = await leerHojaPlana(join(OUT, D.filas, "plantilla-logros.xlsx"), "Filas");
+    bitacora.filas_logros = leerFilasSeccion([...COLUMNAS_LOGROS], f2);
+    const f3 = await leerHojaPlana(join(OUT, D.admin, "datos-requeridos.xlsx"), "Datos requeridos");
+    const r3 = leerFilasRequeridos(f3, "ciclo-2026", [...CRITERIOS_BASE, ...APROBADOS], { A: 0, B: 0, C: 0, D: 0 });
+    expect(r3.datos.length).toBe(5);
+    expect(r3.avisos).toEqual([]);
+    writeFileSync(join(SCRATCH, "bitacora-excel.json"), JSON.stringify(bitacora, null, 1));
+  });
+});

@@ -1,0 +1,53 @@
+Regresar
+Planeación y Seguimiento
+Crear plan
+Crear plan
+
+Cada plan tiene su oficina dueña, su plantilla y sus pilares. Después se agregan los proyectos uno a uno o se cargan desde Excel.
+
+Datos del plan
+(hecho)
+Oficina dueña y alcance
+(hecho)
+Plantilla de carga
+(hecho)
+4
+Pilares del plan
+(paso actual)
+5
+Revisar y crear
+(pendiente)
+Pilares del plan
+
+Los pilares entre los que se reparte el plan: del PDI institucional y/o propios. Las líneas del Excel se validan contra esta lista.
+
+Del PDI institucional
+Buscar un pilar o una línea de acción
+P2 Ambiente tecnológico
+2 áreas · 5 líneas de acción. Las actividades del plan pueden conectarse con ellas.
+P3 Entorno emprendedor
+2 áreas · 4 líneas de acción. Las actividades del plan pueden conectarse con ellas.
+P4 Gobernanza para el buen gobierno
+2 áreas · 4 líneas de acción. Las actividades del plan pueden conectarse con ellas.
+P6 Apropiación social
+1 área · 3 líneas de acción. Las actividades del plan pueden conectarse con ellas.
+Un pilar propio del plan
+Código (opcional)
+Nombre
+Agregar el pilar
+Pilares de este plan (4)
+P2. Ambiente tecnológico
+Propio del plan
+Quitar
+P3. Entorno emprendedor
+Propio del plan
+Quitar
+P4. Gobernanza para el buen gobierno
+Propio del plan
+Quitar
+P6. Apropiación social
+Propio del plan
+Quitar
+Guardado hace un momento en este equipo
+Atrás
+Siguiente

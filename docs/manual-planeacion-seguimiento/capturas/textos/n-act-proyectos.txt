@@ -1,0 +1,121 @@
+Regresar
+Planeación y Seguimiento
+Crear actividad
+Crear actividad
+
+Oficina: Tecnología e Infraestructura TI. Cinco pasos; el borrador se guarda solo en este equipo.
+
+1
+Qué se va a hacer
+(paso actual)
+2
+Plan de Desarrollo Institucional
+(pendiente)
+3
+Cuándo y cuánto
+(pendiente)
+4
+Quién la hace
+(pendiente)
+5
+Revisar y crear
+(pendiente)
+Qué se va a hacer
+
+A qué línea del plan contribuye (o si es propia de la oficina), cómo se llama y qué incluye.
+
+Buscar un proyecto por nombre, número u oficina
+Línea del plan a la que contribuye (obligatorio)
+
+Primero los proyectos que Tecnología e Infraestructura TI tiene a su cargo; debajo, los de otras oficinas del plan.
+
+Elija una opción…
+Actividad propia de la oficina (no contribuye a una línea)
+#1 · Infraestructura para la docencia
+#2 · Infraestructura de usuario final
+#3 · Servicios tecnológicos
+#4 · IA, analítica, datos y tecnologías emergentes
+#5 · Procesamiento y almacenamiento
+#6 · Redes y conectividad
+#7 · Seguridad de la infraestructura tecnológica
+#8 · Plataformas institucionales
+#9 · Computación de alto rendimiento
+#10 · Observatorio de tendencias y vigilancia tecnológica
+#18 · Adecuación de múltiples laboratorios
+#21 · Renovación de laboratorios de habla, voz, audición y lenguaje
+#25 · Conexión vial estratégica entre parqueaderos, zonas deportivas y equipamientos i
+#26 · Conexión directa entre el campus académico y las zonas deportivas y culturales
+#27 · Reingeniería del ingreso institucional con mayor seguridad y eficiencia operativ
+#28 · Escenario multipropósito para eventos académicos y culturales de gran formato
+#29 · Equipamiento deportivo y cultural de aforo masivo y uso multifuncional
+#30 · Alojamiento con ambientes de estudio, conectividad y servicios complementarios
+#33 · Reposición de redes hidraulicas
+#39 · Reposición de equipos de climatización
+#42 · Expansión de los sistemas solares Fotovoltaicos
+#51 · Adecuaciones de oficinas de la sede Bari y consolidación del área adminsitrativa
+#54 · Construcción de estructura e Instalación de equipo ascensor para el bloque motil
+#57 · Elaborar plan estratégico para laboratorio de simulación
+#66 · Sistema de respaldo eléctrico para sede Kankuamo
+#69 · Construcción en lote contiguo a la casona
+#12 · Adecuación sala de juegos + materiales didácticos
+#16 · Modernización agencia Élite Inhouse + equipos MAC + software
+#24 · Infraestructura académica con aulas activas y laboratorios flexibles, preparada
+#32 · Reposición de redes de media tensión y sistema de medida
+#36 · Instalación de aire acondicionado aulas chibcha
+#44 · Garantizar recursos físicos y tecnológicos
+#48 · Renovación del borde institucional para reforzar identidad, iluminación y acceso
+#52 · Reposición de sistema de climatización bloque Arhuaco
+#56 · Expansión de sistemas solares fotovoltaicos
+#63 · Compra de predio para expansión futura del campus
+#64 · Compra predio de centro de conciliación
+#65 · Compra predio de la clínica veterinaria
+#68 · Restauración fachada Kankuamo
+#72 · Expansión de sistemas solares fotovoltaicos
+#11 · Remodelación Clínica
+#13 · Actualización y reubicación cabina de radio + equipos audiovisuales
+#14 · Gestión de disponibilidad de oficinas
+#17 · Gestionar espacio físico para laboratorios AVD y Estimulación Sensorial
+#19 · Adecuaciones locativas de salones
+#22 · Actualización de laboratorios de Análisis del Movimiento
+#23 · Mantenimiento laboratorio simulación + adecuación espacios profesores
+#31 · Centro de Desarrollo Tecnológico consolidado en 2025 (Acuerdo 009), orientado
+#34 · Implementación de redes contraincendio generales
+#37 · Actualización arquitectónica de fachadas de salones chibcha
+#38 · Reposición de pisos y cielo raso aulas
+#41 · Actualizaciones estructurales ( Vulnerabilidad sísmica y diseños de reforzamient
+#43 · Adecuación del laboratorio
+#46 · Mantenimiento, dotación y modernización de laboratorios
+#47 · Adecuar puestos de trabajo
+#49 · Optimización de flujos, señalización e infraestructura vial interna
+#53 · Instalación de respaldo energético de la sede principal
+#58 · Garantizar disponibilidad de espacios físicos y dotación
+#59 · Adecuación espacios grandes animales
+#61 · Socializar infraestructura existente
+#62 · Construcción de nuevo bloque académico-administrativo
+#67 · Sistema de transporte vertical para bloque Kankuamo
+#71 · Espacio de prácticas Finca de Veterinaria
+#73 · Seguridad física y campus
+#74 · Seguridad física y campus
+#75 · Seguridad física y campus
+#15 · Adecuación consultorio empresarial + recursos bibliográficos
+#20 · Adecuación de instalaciones + equipos
+#35 · Reposición de equipos de transporte vertical
+#40 · Actualización arquitectonica de la biblioteca
+#45 · Plan prospectivo de internacionalización
+#50 · Construcción de subestación y planta de emergencia sede Bari
+#55 · Ampliación sistema contraincendios
+#60 · Socializar infraestructura disponible y ajustes razonables
+#70 · Construcción Facultad ciencias de la salud en San Vicente
+
+Este proyecto es de Bienestar Universitario. Su actividad aportará a otra oficina y se le notificará a su gestor.
+
+Título de la actividad (obligatorio)
+
+Empiece con un verbo: «Levantar el inventario de aulas».
+
+Descripción
+
+Opcional. Qué incluye y qué se entrega. 0/1000
+
+Guardado hace un momento en este equipo
+Siguiente

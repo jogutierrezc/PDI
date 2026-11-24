@@ -1,0 +1,944 @@
+/* =============================================================================
+   Manual de uso · Planeación y Seguimiento · formato Carta (816 × 1056 px a 96 ppp).
+
+   Hereda el sistema de docs/manual y docs/manual-iso: azul marino UDES, paletas
+   partidas (la ruta, el folio, el número de capítulo), boleto perforado para lo
+   que conviene saber, estados con glifo y palabra, ámbar solo para lo nuevo.
+   Tipografías locales en fuentes/ (Fraunces, Open Sans, Barlow Condensed).
+   Tinta: nada más claro que #5b6c83 sobre papel; trazos de 1 px o más.
+   ========================================================================== */
+@import url("fuentes/local.css");
+
+:root {
+  --navy: #0a2d63;
+  --navy-deep: #061e46;
+  --blue: #2166d6;
+  --blue-strong: #1b52ad;
+  --blue-soft: #eaf1fd;
+  --blue-mid: #cfdef7;
+  --page: #f4f7fb;
+  --paper: #ffffff;
+  --surface-3: #eef3fa;
+  --ink: #0d1c31;
+  --ink-2: #45566d;
+  --ink-3: #5b6c83;
+  --on-navy: #c3d5f2;
+  --line: rgba(13, 40, 84, 0.2);
+  --line-faint: rgba(13, 40, 84, 0.11);
+  --signal: #f6b93f;
+  --signal-ink: #1d1402;
+  --flap: #f6f8fc;
+  --ticket: #eef2f8;
+  --done: #0d6a2e;
+  --done-soft: #e6f4ea;
+  --pending: #8a5f00;
+  --pending-soft: #fbf2e0;
+  --risk: #b52e2e;
+  --risk-soft: #fceaea;
+  --f-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --f-sans: "Open Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --f-sign: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+}
+
+@page {
+  size: 816px 1056px;
+  margin: 0;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: #cfd8e6;
+}
+::selection {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+
+/* --- La página ------------------------------------------------------------- */
+.pg {
+  position: relative;
+  width: 816px;
+  height: 1056px;
+  margin: 0 auto 24px;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  break-after: page;
+  page-break-after: always;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.pg:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+@media print {
+  html,
+  body {
+    background: none;
+  }
+  .pg {
+    margin: 0;
+  }
+}
+.pg p {
+  margin: 0;
+  text-wrap: pretty;
+}
+.pg b,
+.pg strong {
+  font-weight: 700;
+}
+
+/* --- Paletas partidas ---------------------------------------------------------- */
+.fls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.07em;
+  font-family: var(--f-sign);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
+}
+.fl {
+  position: relative;
+  display: inline-block;
+  width: 0.7em;
+  height: 1.24em;
+  line-height: 1.24em;
+  text-align: center;
+  background: var(--flap);
+  color: var(--navy);
+  border-radius: 0.1em;
+  text-transform: uppercase;
+}
+.fl::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(10, 45, 99, 0.3);
+}
+.fl.s {
+  width: 0.36em;
+}
+.fl.d {
+  background: var(--navy);
+  color: #fff;
+}
+.fl.d::after {
+  background: rgba(255, 255, 255, 0.34);
+}
+.fl.sg {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+.fl.sg::after {
+  background: rgba(29, 20, 2, 0.3);
+}
+
+/* --- Encabezado y pie corrientes ---------------------------------------------------- */
+.run {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  top: 26px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 3px solid var(--navy);
+  padding-bottom: 8px;
+}
+.run-l {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.run-l img {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+.run-l i {
+  width: 1px;
+  height: 26px;
+  background: var(--line);
+}
+.run-l span {
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.run-l span b {
+  display: block;
+  color: var(--navy);
+  font-weight: 800;
+  font-size: 13px;
+}
+.run-r {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.run-r b {
+  color: var(--navy);
+  font-weight: 800;
+}
+.foot {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  bottom: 24px;
+  height: 36px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.foot b {
+  color: var(--navy);
+  font-weight: 800;
+}
+.foot.l {
+  flex-direction: row-reverse;
+}
+.fn {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  bottom: 70px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.fn::before {
+  content: "";
+  display: block;
+  width: 64px;
+  border-top: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.tab {
+  position: absolute;
+  right: 0;
+  width: 30px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  background: var(--navy);
+  color: #fff;
+  font: 700 24px/1 var(--f-sign);
+  border-radius: 8px 0 0 8px;
+}
+.tab.l {
+  right: auto;
+  left: 0;
+  border-radius: 0 8px 8px 0;
+}
+.tab.sg {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+
+/* --- El cuerpo de la página -------------------------------------------------------------- */
+.body {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  top: 98px;
+  bottom: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+.body.fnb {
+  bottom: 120px;
+}
+.blk {
+  flex: none;
+}
+
+/* --- Títulos y texto ------------------------------------------------------------------------ */
+.h1 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  color: var(--navy);
+  text-wrap: balance;
+}
+.h2 {
+  margin: 8px 0 0;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.2;
+  letter-spacing: -0.018em;
+  color: var(--navy);
+  text-wrap: balance;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.h2.first {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+.h3 {
+  margin: 0;
+  font-weight: 800;
+  font-size: 14.5px;
+  line-height: 1.3;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.lead {
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.txt {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.txt + .txt {
+  margin-top: 8px;
+}
+.cap {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.sign {
+  font-family: var(--f-sign);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.rt,
+.q {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--navy);
+  font-weight: 700;
+  font-size: 0.93em;
+  line-height: 1.5;
+}
+.q {
+  background: var(--blue-soft);
+}
+.pg ul.lst {
+  margin: 0;
+  padding: 0 0 0 20px;
+  font-size: 14px;
+}
+.pg ul.lst li {
+  margin: 0 0 5px;
+  padding-left: 2px;
+}
+.pg ul.lst li::marker {
+  color: var(--blue);
+}
+
+/* --- Apertura de capítulo -------------------------------------------------------------------- */
+.open {
+  position: relative;
+  background: var(--navy);
+  color: #fff;
+  border-radius: 6px;
+  padding: 22px 26px 22px 26px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: center;
+}
+.open .sign {
+  color: var(--on-navy);
+}
+.open h1 {
+  margin: 4px 0 8px;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 33px;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.open p {
+  color: var(--on-navy);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 470px;
+}
+.open .rutaf {
+  margin-top: 12px;
+}
+
+/* --- Pasos y marcas ------------------------------------------------------------------------------- */
+.dot {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  font: 800 13px/24px var(--f-sans);
+  text-align: center;
+}
+.step {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.steps.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 26px;
+}
+.step .h3 {
+  margin-top: 1px;
+}
+.step p {
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.step.c .dot {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+
+/* --- La captura ----------------------------------------------------------------------------------------- */
+.shot {
+  margin: 0 auto;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--paper);
+}
+.shot-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--line);
+}
+.shot-bar::before {
+  content: "";
+  width: 34px;
+  height: 8px;
+  background: radial-gradient(circle, #9db0cc 3px, transparent 3.5px) 0 50% / 12px 8px repeat-x;
+}
+.shot-url {
+  flex: 1;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.shot-img {
+  position: relative;
+  line-height: 0;
+}
+.shot-img img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.shot-img .dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--navy);
+  background: var(--signal);
+  color: var(--signal-ink);
+  width: 22px;
+  height: 22px;
+  font-size: 12.5px;
+  line-height: 22px;
+  font-family: var(--f-sans);
+}
+.shot-img .box {
+  position: absolute;
+  border: 2px solid var(--signal);
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--navy);
+}
+.shot-miss {
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+  background: repeating-linear-gradient(135deg, var(--surface-3) 0 10px, #f8fafd 10px 20px);
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 16px;
+}
+.shotpair {
+  display: grid;
+  gap: 12px;
+}
+
+/* --- El boleto (papel perforado) ----------------------------------------------------------------------------- */
+.ticket {
+  position: relative;
+  background: var(--ticket);
+  border-radius: 3px;
+  padding: 10px 16px 10px 32px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.ticket::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  background-image: radial-gradient(circle, var(--paper) 2.6px, transparent 3px);
+  background-size: 8px 14px;
+  background-repeat: repeat-y;
+}
+.ticket b.t {
+  font-family: var(--f-sign);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy);
+  font-size: 14px;
+  margin-right: 6px;
+}
+
+/* --- Pilo explica ------------------------------------------------------------------------------------------------ */
+.pilo {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 12px;
+  align-items: end;
+}
+.pilo .cara {
+  display: block;
+  width: 78px;
+  height: 84px;
+  object-fit: contain;
+  object-position: bottom;
+}
+.pilo .globo {
+  position: relative;
+  background: var(--blue-soft);
+  border: 1px solid var(--blue-mid);
+  border-radius: 14px 14px 14px 4px;
+  padding: 10px 16px 11px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  align-self: center;
+}
+.pilo .globo::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  bottom: 14px;
+  width: 0;
+  height: 0;
+  border: 9px solid transparent;
+  border-right-color: var(--blue-mid);
+  border-left: 0;
+}
+.pilo .globo::after {
+  content: "";
+  position: absolute;
+  left: -7px;
+  bottom: 15px;
+  width: 0;
+  height: 0;
+  border: 8px solid transparent;
+  border-right-color: var(--blue-soft);
+  border-left: 0;
+}
+.pilo .globo b.n {
+  display: block;
+  font-family: var(--f-sign);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy);
+  margin-bottom: 1px;
+}
+
+/* --- Tablas ---------------------------------------------------------------------------------------------------------------- */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.tbl th {
+  font-family: var(--f-sign);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-size: 13.5px;
+  color: var(--navy);
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--surface-3);
+  border-bottom: 2px solid var(--navy);
+  vertical-align: bottom;
+}
+.tbl td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.tbl td:first-child {
+  font-weight: 700;
+  color: var(--navy);
+}
+.tbl.mx th,
+.tbl.mx td {
+  text-align: center;
+  padding: 5px 4px;
+  font-size: 12px;
+}
+.tbl.mx th:first-child,
+.tbl.mx td:first-child {
+  text-align: left;
+  width: 31%;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tbl.mx th {
+  font-size: 12.5px;
+  letter-spacing: 0.03em;
+}
+.tbl.mx td.s {
+  color: var(--done);
+  font-weight: 800;
+}
+.tbl.mx td.n {
+  color: var(--ink-3);
+}
+.tbl.mx td.l {
+  color: var(--pending);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.25;
+}
+.tbl.fix {
+  table-layout: fixed;
+}
+
+/* --- Estados ------------------------------------------------------------------------------------------------------------------------ */
+.st {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 9px 1px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.st svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.st.ok {
+  background: var(--done-soft);
+  color: var(--done);
+}
+.st.pe {
+  background: var(--pending-soft);
+  color: var(--pending);
+}
+.st.ri {
+  background: var(--risk-soft);
+  color: var(--risk);
+}
+.st.ne {
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+.st.az {
+  background: var(--blue-soft);
+  color: var(--blue-strong);
+}
+
+/* --- Dos columnas y fichas ------------------------------------------------------------------------------------------------------------ */
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 28px;
+}
+.cols.w {
+  grid-template-columns: 1.25fr 1fr;
+}
+.card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px 12px;
+  background: var(--paper);
+}
+.card .h3 {
+  color: var(--navy);
+  margin-bottom: 3px;
+}
+.card p,
+.card li {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.card ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.rolcard {
+  border-top: 3px solid var(--navy);
+  background: var(--page);
+  padding: 10px 14px 12px;
+  border-radius: 0 0 6px 6px;
+}
+.rolcard .h3 {
+  font-family: var(--f-display);
+  font-size: 17px;
+  color: var(--navy);
+}
+.rolcard p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin-top: 3px;
+}
+.rolcard .cap {
+  margin-top: 5px;
+}
+
+/* --- Diagrama de flujo (cadena de partes) -------------------------------------------------------------------------------------------- */
+.cadena {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px 22px;
+  counter-reset: c;
+}
+.cadena .nodo {
+  position: relative;
+  background: var(--page);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 11px 10px;
+  min-height: 84px;
+}
+.cadena .nodo.vaf {
+  background: var(--blue-soft);
+  border-color: var(--blue-mid);
+}
+.cadena .nodo::after {
+  content: "";
+  position: absolute;
+  right: -17px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-top: 2px solid var(--blue);
+  border-right: 2px solid var(--blue);
+  transform: translateY(-50%) rotate(45deg);
+}
+.cadena .nodo:nth-child(4n)::after {
+  display: none;
+}
+.cadena .nodo:last-child::after {
+  display: none;
+}
+.cadena .nodo b {
+  display: block;
+  font-family: var(--f-display);
+  font-size: 15px;
+  color: var(--navy);
+  line-height: 1.15;
+}
+.cadena .nodo .n {
+  font-family: var(--f-sign);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+.cadena .nodo span.d {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.38;
+  color: var(--ink-2);
+}
+
+/* --- Flujo de un ejemplo (línea de tiempo) --------------------------------------------------------------------------------------------------- */
+.flujo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-left: 0;
+}
+.flujo .f {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px 118px 1fr;
+  gap: 10px;
+  padding: 7px 0 9px;
+  border-top: 1px solid var(--line-faint);
+}
+.flujo .f:first-child {
+  border-top: 0;
+}
+.flujo .f::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 34px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--blue-mid);
+}
+.flujo .f:last-child::before {
+  display: none;
+}
+.flujo .who {
+  font-family: var(--f-sign);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 14px;
+  color: var(--navy);
+  padding-top: 2px;
+}
+.flujo .what {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.flujo .what b {
+  color: var(--navy);
+}
+
+/* --- Preguntas frecuentes --------------------------------------------------------------------------------------------------------------------- */
+.faq {
+  padding: 9px 0 10px;
+  border-top: 1px solid var(--line);
+}
+.faq .h3 {
+  color: var(--navy);
+  font-size: 14px;
+}
+.faq p {
+  margin-top: 3px;
+  font-size: 13.2px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* --- Contenido -------------------------------------------------------------------------------------------------------------------------------------- */
+.toc-ch {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0 2px;
+  border-top: 2px solid var(--navy);
+  margin-top: 6px;
+}
+.toc-ch .t {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--navy);
+  letter-spacing: -0.01em;
+}
+.toc-ch .p {
+  font-weight: 800;
+  color: var(--navy);
+  font-size: 14px;
+}
+.toc-s {
+  display: grid;
+  grid-template-columns: 56px 1fr 34px;
+  gap: 8px;
+  font-size: 12.8px;
+  line-height: 1.3;
+  padding: 0;
+  color: var(--ink-2);
+}
+.toc-s .p {
+  text-align: right;
+  font-weight: 700;
+  color: var(--ink);
+}
+.toc-s .dl {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.toc-s .dl i {
+  flex: 1;
+  border-bottom: 1px dotted var(--ink-3);
+  transform: translateY(-3px);
+}
+
+/* Recorte de una captura: el borde inferior se difumina para que se lea como recorte intencional. */
+.shot-img.cut::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 26px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #fff 92%);
+}

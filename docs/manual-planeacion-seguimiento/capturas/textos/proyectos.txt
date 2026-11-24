@@ -1,0 +1,638 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0 
+Financiero: En revisión de la VAF
+
+Todos los planes
+Editar el plan
+Crear un plan
+Financiación y presupuesto
+Filtros
+
+Mostrando 75 de 75 líneas · $ 133.374 M
+
+75 proyectos no tienen oficina responsable, así que nadie les planifica actividades. Asignar oficinas
+
+Solo sin evaluar
+12
+Proyectos del plan
+Buscar por nombre, descripción o número
+Ordenar por
+Mayor inversión
+Nombre
+N.º de la línea
+Prioridad
+Campus
+
+75 líneas
+
+Línea
+Campus
+Prioridad
+Monto
+Evaluación
+Acción
+Escenario multipropósito para eventos académicos y culturales de gran formato
+#28 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 20.000 M
+Sin evaluar
+Evaluar
+el proyecto 28
+Alojamiento con ambientes de estudio, conectividad y servicios complementarios
+#30 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 12.000 M
+Sin evaluar
+Evaluar
+el proyecto 30
+Equipamiento deportivo y cultural de aforo masivo y uso multifuncional
+#29 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 10.000 M
+Sin evaluar
+Evaluar
+el proyecto 29
+Construcción Facultad ciencias de la salud en San Vicente
+#70 · PLF · P4
+Valledupar
+Alto
+$ 9.500 M
+Aprobado
+Revisar
+el proyecto 70
+Infraestructura académica con aulas activas y laboratorios flexibles, preparada para ampliaciones futuras
+#24 · PLF · P6
+Bucaramanga
+Alto
+$ 8.000 M
+Aprobado
+Revisar
+el proyecto 24
+Infraestructura para la docencia
+#1 · IFT · P2
+Todos los campus
+Alto
+$ 6.971 M
+Aprobado
+Revisar
+el proyecto 1
+Infraestructura de usuario final
+#2 · IFT · P2
+Todos los campus
+Alto
+$ 6.381 M
+Aprobado
+Revisar
+el proyecto 2
+Servicios tecnológicos
+#3 · IFT · P2
+Todos los campus
+Alto
+$ 5.421 M
+Aprobado
+Revisar
+el proyecto 3
+Adecuaciones de oficinas de la sede Bari y consolidación del área adminsitrativa
+#51 · PLF · P4
+Cúcuta
+Alto
+$ 4.800 M
+Aprobado
+Revisar
+el proyecto 51
+Construcción de nuevo bloque académico-administrativo
+#62 · PLF · P4
+Valledupar
+Largo plazo
+$ 4.500 M
+Sin evaluar
+Evaluar
+el proyecto 62
+Reingeniería del ingreso institucional con mayor seguridad y eficiencia operativa
+#27 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 3.500 M
+Sin evaluar
+Evaluar
+el proyecto 27
+Construcción en lote contiguo a la casona
+#69 · PLF · P4
+Valledupar
+Alto
+$ 3.500 M
+Aprobado
+Revisar
+el proyecto 69
+Espacio de prácticas Finca de Veterinaria
+#71 · PLF · P4
+Valledupar
+Medio
+$ 3.500 M
+Aprobado
+Revisar
+el proyecto 71
+Centro de Desarrollo Tecnológico consolidado en 2025 (Acuerdo 009), orientado
+#31 · PLF · P3
+Bucaramanga
+Alto
+$ 3.000 M
+Aprobado
+Revisar
+el proyecto 31
+Conexión vial estratégica entre parqueaderos, zonas deportivas y equipamientos institucionales
+#25 · PLF · P4
+Bucaramanga
+Alto
+$ 2.500 M
+Aprobado
+Revisar
+el proyecto 25
+IA, analítica, datos y tecnologías emergentes
+#4 · IFT · P2
+Todos los campus
+Alto
+$ 2.211 M
+Aprobado
+Revisar
+el proyecto 4
+Observatorio de tendencias y vigilancia tecnológica
+#10 · IFT · P2
+Bucaramanga
+Largo plazo
+$ 2.150 M
+Sin evaluar
+Evaluar
+el proyecto 10
+Computación de alto rendimiento
+#9 · IFT · P2
+Bucaramanga
+Largo plazo
+$ 1.845 M
+Sin evaluar
+Evaluar
+el proyecto 9
+Conexión directa entre el campus académico y las zonas deportivas y culturales
+#26 · PLF · P4
+Bucaramanga
+Alto
+$ 1.500 M
+Aprobado
+Revisar
+el proyecto 26
+Compra de predio para expansión futura del campus
+#63 · PLF · P4
+Valledupar
+Crítico
+$ 1.500 M
+Aprobado
+Revisar
+el proyecto 63
+Compra predio de centro de conciliación
+#64 · PLF · P4
+Valledupar
+Alto
+$ 1.500 M
+Aprobado
+Revisar
+el proyecto 64
+Compra predio de la clínica veterinaria
+#65 · PLF · P4
+Valledupar
+Crítico
+$ 1.500 M
+Aprobado
+Revisar
+el proyecto 65
+Plataformas institucionales
+#8 · IFT · P2
+Todos los campus
+Alto
+$ 1.459 M
+Aprobado
+Revisar
+el proyecto 8
+Procesamiento y almacenamiento
+#5 · IFT · P2
+Todos los campus
+Crítico
+$ 1.111 M
+Aprobado
+Revisar
+el proyecto 5
+Instalación de aire acondicionado aulas chibcha
+#36 · PLF · P4
+Bucaramanga
+Medio
+$ 1.100 M
+Aprobado
+Revisar
+el proyecto 36
+Adecuaciones locativas de salones
+#19 · PLF · P4
+Bucaramanga
+Medio
+$ 700 M
+Aprobado
+Revisar
+el proyecto 19
+Actualización arquitectónica de fachadas de salones chibcha
+#37 · PLF · P4
+Bucaramanga
+Medio
+$ 600 M
+Aprobado
+Revisar
+el proyecto 37
+Reposición de pisos y cielo raso aulas
+#38 · PLF · P4
+Bucaramanga
+Medio
+$ 600 M
+Aprobado
+Revisar
+el proyecto 38
+Expansión de los sistemas solares Fotovoltaicos
+#42 · PLF · P4
+Bucaramanga
+Alto
+$ 600 M
+Aprobado
+Revisar
+el proyecto 42
+Renovación del borde institucional para reforzar identidad, iluminación y accesos
+#48 · PLF · P4
+Cúcuta
+Alto
+$ 600 M
+Aprobado
+Revisar
+el proyecto 48
+Reposición de sistema de climatización bloque Arhuaco
+#52 · PLF · P4
+Cúcuta
+Crítico
+$ 600 M
+Aprobado
+Revisar
+el proyecto 52
+Seguridad de la infraestructura tecnológica
+#7 · IFT · P2
+Todos los campus
+Crítico
+$ 565 M
+Aprobado
+Revisar
+el proyecto 7
+Implementación de redes contraincendio generales
+#34 · PLF · P4
+Bucaramanga
+Crítico
+$ 550 M
+Aprobado
+Revisar
+el proyecto 34
+Construcción de subestación y planta de emergencia sede Bari
+#50 · PLF · P4
+Cúcuta
+Alto
+$ 550 M
+Aprobado
+Revisar
+el proyecto 50
+Garantizar recursos físicos y tecnológicos
+#44 · PLF · P4
+Cúcuta
+Largo plazo
+$ 522 M
+Sin evaluar
+Evaluar
+el proyecto 44
+Reposición de equipos de climatización
+#39 · PLF · P4
+Bucaramanga
+Medio
+$ 450 M
+Aprobado
+Revisar
+el proyecto 39
+Construcción de estructura e Instalación de equipo ascensor para el bloque motilón
+#54 · PLF · P4
+Cúcuta
+Alto
+$ 450 M
+Aprobado
+Revisar
+el proyecto 54
+Reposición de equipos de transporte vertical
+#35 · PLF · P4
+Bucaramanga
+Largo plazo
+$ 400 M
+Sin evaluar
+Evaluar
+el proyecto 35
+Actualización arquitectonica de la biblioteca
+#40 · PLF · P4
+Bucaramanga
+Alto
+$ 400 M
+Aprobado
+Revisar
+el proyecto 40
+Actualizaciones estructurales ( Vulnerabilidad sísmica y diseños de reforzamiento) No incluye obras
+#41 · PLF · P4
+Bucaramanga
+Alto
+$ 400 M
+Aprobado
+Revisar
+el proyecto 41
+Instalación de respaldo energético de la sede principal
+#53 · PLF · P4
+Cúcuta
+Crítico
+$ 400 M
+Aprobado
+Revisar
+el proyecto 53
+Expansión de sistemas solares fotovoltaicos
+#56 · PLF · P4
+Cúcuta
+Crítico
+$ 400 M
+Aprobado
+Revisar
+el proyecto 56
+Expansión de sistemas solares fotovoltaicos
+#72 · PLF · P4
+Valledupar
+Alto
+$ 400 M
+Aprobado
+Revisar
+el proyecto 72
+Plan prospectivo de internacionalización
+#45 · PLF · P4
+Cúcuta
+Largo plazo
+$ 389 M
+Sin evaluar
+Evaluar
+el proyecto 45
+Adecuación de múltiples laboratorios
+#18 · PLF · P6
+Bucaramanga
+Medio
+$ 382 M
+Aprobado
+Revisar
+el proyecto 18
+Sistema de transporte vertical para bloque Kankuamo
+#67 · PLF · P4
+Valledupar
+Crítico
+$ 380 M
+Aprobado
+Revisar
+el proyecto 67
+Remodelación Clínica
+#11 · PLF · P4
+Bucaramanga
+Medio
+$ 350 M
+Aprobado
+Revisar
+el proyecto 11
+Reposición de redes de media tensión y sistema de medida
+#32 · PLF · P4
+Bucaramanga
+Crítico
+$ 350 M
+Aprobado
+Revisar
+el proyecto 32
+Optimización de flujos, señalización e infraestructura vial interna
+#49 · PLF · P4
+Cúcuta
+Crítico
+$ 350 M
+Aprobado
+Revisar
+el proyecto 49
+Sistema de respaldo eléctrico para sede Kankuamo
+#66 · PLF · P4
+Valledupar
+Crítico
+$ 350 M
+Aprobado
+Revisar
+el proyecto 66
+Redes y conectividad
+#6 · IFT · P2
+Todos los campus
+Crítico
+$ 343 M
+Aprobado
+Revisar
+el proyecto 6
+Reposición de redes hidraulicas
+#33 · PLF · P4
+Bucaramanga
+Alto
+$ 300 M
+Aprobado
+Revisar
+el proyecto 33
+Ampliación sistema contraincendios
+#55 · PLF · P4
+Cúcuta
+Alto
+$ 300 M
+Aprobado
+Revisar
+el proyecto 55
+Gestionar espacio físico para laboratorios AVD y Estimulación Sensorial
+#17 · PLF · P2
+Bucaramanga
+Medio
+$ 150 M
+Aprobado
+Revisar
+el proyecto 17
+Renovación de laboratorios de habla, voz, audición y lenguaje
+#21 · PLF · P2
+Bucaramanga
+Medio
+$ 150 M
+Aprobado
+Revisar
+el proyecto 21
+Restauración fachada Kankuamo
+#68 · PLF · P4
+Valledupar
+Crítico
+$ 150 M
+Aprobado
+Revisar
+el proyecto 68
+Seguridad física y campus
+#75 · IFT-LOG · P2
+Bucaramanga
+Crítico
+$ 140 M
+Aprobado
+Revisar
+el proyecto 75
+Adecuación del laboratorio
+#43 · PLF · P4
+Cúcuta
+Medio
+$ 135 M
+Aprobado
+Revisar
+el proyecto 43
+Seguridad física y campus
+#74 · IFT-LOG · P2
+Bucaramanga
+Alto
+$ 110 M
+Aprobado
+Revisar
+el proyecto 74
+Seguridad física y campus
+#73 · IFT-LOG · P2
+Bucaramanga
+Alto
+$ 80 M
+Aprobado
+Revisar
+el proyecto 73
+Adecuación de instalaciones + equipos
+#20 · PLF · P2
+Bucaramanga
+Medio
+$ 60 M
+Aprobado
+Revisar
+el proyecto 20
+Mantenimiento laboratorio simulación + adecuación espacios profesores
+#23 · PLF · P4
+Bucaramanga
+Medio
+$ 58 M
+Aprobado
+Revisar
+el proyecto 23
+Actualización y reubicación cabina de radio + equipos audiovisuales
+#13 · PLF · P2
+Bucaramanga
+Medio
+$ 30 M
+Aprobado
+Revisar
+el proyecto 13
+Modernización agencia Élite Inhouse + equipos MAC + software
+#16 · PLF · P2
+Bucaramanga
+Medio
+$ 30 M
+Aprobado
+Revisar
+el proyecto 16
+Mantenimiento, dotación y modernización de laboratorios
+#46 · PLF · P2
+Cúcuta
+Medio
+$ 29 M
+Aprobado
+Revisar
+el proyecto 46
+Socializar infraestructura existente
+#61 · PLF · P2
+Valledupar
+Largo plazo
+$ 21 M
+Sin evaluar
+Evaluar
+el proyecto 61
+Garantizar disponibilidad de espacios físicos y dotación
+#58 · PLF · P2
+Valledupar
+Medio
+$ 15 M
+Aprobado
+Revisar
+el proyecto 58
+Adecuación consultorio empresarial + recursos bibliográficos
+#15 · PLF · P6
+Bucaramanga
+Medio
+$ 15 M
+Aprobado
+Revisar
+el proyecto 15
+Actualización de laboratorios de Análisis del Movimiento
+#22 · PLF · P2
+Bucaramanga
+Medio
+$ 12 M
+Aprobado
+Revisar
+el proyecto 22
+Gestión de disponibilidad de oficinas
+#14 · PLF · P4
+Bucaramanga
+Medio
+$ 10 M
+Aprobado
+Revisar
+el proyecto 14
+Adecuación espacios grandes animales
+#59 · PLF · P2
+Valledupar
+Medio
+$ 9,8 M
+Aprobado
+Revisar
+el proyecto 59
+Socializar infraestructura disponible y ajustes razonables
+#60 · PLF · P2
+Valledupar
+Largo plazo
+$ 9,1 M
+Sin evaluar
+Evaluar
+el proyecto 60
+Elaborar plan estratégico para laboratorio de simulación
+#57 · PLF · P2
+Valledupar
+Medio
+$ 8,1 M
+Aprobado
+Revisar
+el proyecto 57
+Adecuación sala de juegos + materiales didácticos
+#12 · PLF · P2
+Bucaramanga
+Crítico
+$ 7 M
+Aprobado
+Revisar
+el proyecto 12
+Adecuar puestos de trabajo
+#47 · PLF · P2
+Cúcuta
+Medio
+$ 6,6 M
+Aprobado
+Revisar
+el proyecto 47

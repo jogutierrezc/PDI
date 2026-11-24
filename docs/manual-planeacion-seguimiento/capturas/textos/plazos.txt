@@ -1,0 +1,27 @@
+Regresar
+Planeación y Seguimiento
+Cómo te avisamos
+Plazos de la oficina
+Plazos de aviso de la oficina
+
+Tecnología e Infraestructura TI. Hoy usa los plazos generales. Los generales son 7 días antes, 3 días antes, el mismo día.
+
+Enviar avisos por vencimiento en esta oficina (activo)
+Días antes de la fecha límite en que se avisa
+
+Hasta 6 días, de 0 a 60, separados por comas. El 0 es el mismo día. Ejemplo: 7, 3, 0.
+
+Avisos de actividad vencida
+
+Cuántos avisos diarios, de 0 a 10.
+
+Horas para avisar al gestor
+
+Pasadas estas horas de vencida, el gestor recibe copia (0 a 720).
+
+Horas para validar un avance
+
+Pasado este plazo, el avance se marca «plazo vencido» y se avisa al gestor (1 a 720).
+
+Nada cambia hasta que guarde.
+Guardar los plazos de la oficina

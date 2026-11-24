@@ -1,0 +1,46 @@
+Regresar
+Planeación y Seguimiento
+Actividad
+Reportar avance
+Reportar avance
+
+«Levantar el diagnóstico de actualización y reubicación cabina de radio + equipos a…» · 
+En curso · avance validado hasta ahora: 0 %
+
+Qué avanzó
+(hecho)
+Evidencias
+(hecho)
+Riesgos
+(hecho)
+4
+Revisar y enviar
+(paso actual)
+Revisar y enviar
+
+Confirme lo que va a ver el gestor. Aún no se ha enviado nada.
+
+Actividad
+Levantar el diagnóstico de actualización y reubicación cabina de radio + equipos a…
+Avance físico
+0 % (igual al último validado)
+Avance financiero
+No aplica
+Fecha del avance
+30 jun 2027
+Qué se hizo
+Se terminó el diagnóstico de las cabinas y se adjunta el informe firmado.
+Evidencias
+Ninguna
+Riesgo
+No hay un riesgo nuevo
+Al enviar, el avance queda por validar y la actividad pasa a «En revisión». Ningún avance se valida a sí mismo: lo revisa el gestor de la oficina.
+
+Se avisará a 1 persona por correo. Lo envía el servidor, no esta pantalla.
+
+HM
+Héctor Mantilla hector.mantilla@demo.udes.test
+Revisa el avance
+Guardado hace un momento en este equipo
+Atrás
+Enviar el avance al gestor

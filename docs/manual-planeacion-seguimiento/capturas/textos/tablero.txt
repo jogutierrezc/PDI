@@ -1,0 +1,347 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0
+
+Crear un plan
+Mi oficina
+Todas
+Solo las mías
+Plan de Desarrollo (PDI)
+Todas
+Con PDI
+Sin conexión con el PDI
+PDI sin definir
+Pilar
+Todos los pilares
+P2 Ambiente tecnológico
+P3 Entorno emprendedor
+P4 Gobernanza para el buen gobierno
+P6 Apropiación social
+Agrupar por
+Estado
+Persona
+Línea del plan
+Prioridad
+Campus
+Oficina
+Infraestructura y Planta Física
+Tecnología e Infraestructura TI
+
+Usted es gestor en Tecnología e Infraestructura TI: mueve cualquier actividad de la oficina; pasar a «Hecho» abre la revisión del avance o el cierre administrativo. Arrastre una tarjeta o use «Mover a…» (también con teclado).
+
+27 actividades.
+
+Por iniciar
+12
+
+Aún no se empieza.
+
+5 · Procesamiento y almacenamiento
+Entregar el informe de cierre de procesamiento y almacenamiento
+Alto
+Hito · Vence hoy
+DC
+CR
+Asignada a Diana Cárdenas, Camilo Rojas
+2 personas
+0 %
+PDI · 1 elemento
+Mover a…
+7 · Seguridad de la infraestructura tecnológica
+Levantar el diagnóstico de seguridad de la infraestructura tecnológica
+Alto
+En plazo
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+0/3
+0 %
+Sin PDI
+Mover a…
+Actividad propia de la oficina
+Actualizar el inventario de la oficina
+Alto
+En plazo
+Sin responsable
+0 %
+PDI · 1 elemento
+Mover a…
+Actividad propia de la oficina
+Preparar el informe de gestión del semestre
+Alto
+En plazo
+IQ
+MS
+Asignada a Iván Quiroga, Mariana Solano
+2 personas
+0/2
+0 %
+PDI · 1 elemento
+Mover a…
+6 · Redes y conectividad
+Entregar el informe de cierre de redes y conectividad
+Alto
+Hito · En plazo
+Sin responsable
+0 %
+PDI · 2 elementos
+Mover a…
+7 · Seguridad de la infraestructura tecnológica
+Preparar los estudios previos de seguridad de la infraestructura tecnológica
+Crítico
+En plazo
+CR
+VS
+Asignada a Camilo Rojas, Valentina Sarmiento
+2 personas
+0/2
+0 %
+PDI sin definir
+Mover a…
+8 · Plataformas institucionales
+Entregar el informe de cierre de plataformas institucionales
+Medio
+Hito · En plazo
+VS
+Asignada a Valentina Sarmiento
+Valentina Sarmiento
+0 %
+PDI · 1 elemento
+Mover a…
+4 · IA, analítica, datos y tecnologías emergentes
+Entregar el informe de cierre de ia, analítica, datos y tecnologías emergentes
+Medio
+Hito · En plazo
+CR
+VS
+Asignada a Camilo Rojas, Valentina Sarmiento
+2 personas
+0 %
+PDI · 1 elemento
+Mover a…
+7 · Seguridad de la infraestructura tecnológica
+Entregar el informe de cierre de seguridad de la infraestructura tecnológica
+Crítico
+Hito · En plazo
+VS
+MS
+Asignada a Valentina Sarmiento, Mariana Solano
+2 personas
+0 %
+PDI · 2 elementos
+Mover a…
+3 · Servicios tecnológicos
+Entregar el informe de cierre de servicios tecnológicos
+Alto
+Hito · En plazo
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+0 %
+PDI · 1 elemento
+Mover a…
+2 · Infraestructura de usuario final
+Levantar el diagnóstico de infraestructura de usuario final
+Alto
+En plazo
+Sin responsable
+0/3
+0 %
+Sin PDI
+Mover a…
+2 · Infraestructura de usuario final
+Entregar el informe de cierre de infraestructura de usuario final
+Medio
+Hito · En plazo
+Sin responsable
+0 %
+PDI sin definir
+Mover a…
+En curso
+4
+
+Se está trabajando en ella.
+
+6 · Redes y conectividad
+Definir el alcance y los criterios de «redes y conectividad»
+Crítico
+Venció hace 25 días
+CR
+Asignada a Camilo Rojas
+Camilo Rojas
+0/3
+34 %
+PDI sin definir
+Mover a…
+2 · Infraestructura de usuario final
+Definir el alcance y los criterios de «infraestructura de usuario final»
+Alto
+En plazo
+IQ
+Asignada a Iván Quiroga
+Iván Quiroga
+2/3
+0 %
+PDI · 1 elemento
+Mover a…
+6 · Redes y conectividad
+Levantar el diagnóstico de redes y conectividad
+Alto
+En plazo
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+3/3
+0 %
+PDI · 1 elemento
+Mover a…
+8 · Plataformas institucionales
+Levantar el diagnóstico de plataformas institucionales
+Alto
+En plazo
+Sin responsable
+1/3
+59 %
+PDI · 2 elementos
+Mover a…
+En riesgo
+1
+
+Puede no cumplirse a tiempo.
+
+4 · IA, analítica, datos y tecnologías emergentes
+Levantar el diagnóstico de ia, analítica, datos y tecnologías emergentes
+Alto
+En plazo
+CR
+Asignada a Camilo Rojas
+Camilo Rojas
+1/3
+42 %
+PDI · 1 elemento
+Mover a…
+En revisión
+3
+
+El colaborador terminó y espera al gestor.
+
+1 · Infraestructura para la docencia
+Entregar el informe de cierre de infraestructura para la docencia
+Alto
+Hito · Venció hace 5 días
+VS
+Asignada a Valentina Sarmiento
+Valentina Sarmiento
+28 %
+1 por validar
+PDI sin definir
+Mover a…
+Actividad propia de la oficina
+Reunión mensual de seguimiento de la oficina
+Alto
+Venció hace 5 días
+IQ
+Asignada a Iván Quiroga
+Iván Quiroga
+2/2
+0 %
+1 por validar
+PDI sin definir
+Mover a…
+3 · Servicios tecnológicos
+Preparar los estudios previos de servicios tecnológicos
+Alto
+En plazo
+MS
+Asignada a Mariana Solano
+Mariana Solano
+0/2
+43 %
+1 por validar
+PDI · 1 elemento
+Mover a…
+Hecho
+7
+
+El gestor la dio por cumplida.
+
+4 · IA, analítica, datos y tecnologías emergentes
+Definir el alcance y los criterios de «ia, analítica, datos y tecnologías emergentes»
+Medio
+Cumplida
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+3/3
+100 %
+Sin PDI
+Mover a…
+3 · Servicios tecnológicos
+Definir el alcance y los criterios de «servicios tecnológicos»
+Medio
+Cumplida
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+3/3
+100 %
+PDI · 2 elementos
+Mover a…
+1 · Infraestructura para la docencia
+Definir el alcance y los criterios de «infraestructura para la docencia»
+Alto
+Cumplida
+VS
+CR
+Asignada a Valentina Sarmiento, Camilo Rojas
+2 personas
+3/3
+100 %
+PDI · 1 elemento
+Mover a…
+7 · Seguridad de la infraestructura tecnológica
+Definir el alcance y los criterios de «seguridad de la infraestructura tecnológica»
+Crítico
+Cumplida
+MS
+Asignada a Mariana Solano
+Mariana Solano
+3/3
+100 %
+PDI · 1 elemento
+Mover a…
+5 · Procesamiento y almacenamiento
+Definir el alcance y los criterios de «procesamiento y almacenamiento»
+Crítico
+Cumplida
+Sin responsable
+3/3
+100 %
+Sin PDI
+Mover a…
+3 · Servicios tecnológicos
+Levantar el diagnóstico de servicios tecnológicos
+Medio
+Cumplida
+DC
+Asignada a Diana Cárdenas
+Diana Cárdenas
+3/3
+100 %
+PDI · 1 elemento
+Mover a…
+8 · Plataformas institucionales
+Definir el alcance y los criterios de «plataformas institucionales»
+Alto
+Cumplida
+CR
+Asignada a Camilo Rojas
+Camilo Rojas
+3/3
+100 %
+PDI sin definir
+Mover a…

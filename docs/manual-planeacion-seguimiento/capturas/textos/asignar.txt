@@ -1,0 +1,89 @@
+Plan
+PDIFyT 2027-2035 · Planeación Institucional
+Plan de Tecnología 2027-2029 · Tecnología e Infraestructura TI
+Plan de Bienestar 2024-2026 · Bienestar Universitario (archivado)
+Plan de Infraestructura 2027-2028 · Infraestructura y Planta Física
+
+Activo Oficina dueña: Planeación Institucional · versión v1.0
+
+Crear un plan
+
+Oficina
+Tecnología e Infraestructura TI
+
+Equipo de Tecnología e Infraestructura TI
+
+Su carga hoy: actividades sin cerrar. Solo los miembros de la oficina reciben actividades.
+
+Persona
+Papel
+Activas
+Vencidas
+En riesgo
+Acciones
+Mariana Solano (usted)
+mariana.solano@demo.udes.test
+Gestor de la oficina
+3
+0
+0
+Ver sus actividades
+Diana Cárdenas
+diana.cardenas@demo.udes.test
+Gestor de la oficina
+4
+0
+0
+Ver sus actividades
+Camilo Rojas
+camilo.rojas@demo.udes.test
+Colaborador de la oficina
+5
+1
+1
+Ver sus actividades
+Iván Quiroga
+ivan.quiroga@demo.udes.test
+Colaborador de la oficina
+3
+1
+0
+Ver sus actividades
+Valentina Sarmiento
+valentina.sarmiento@demo.udes.test
+Colaborador de la oficina
+5
+1
+0
+Ver sus actividades
+Natalia Prada
+natalia.prada@demo.udes.test
+Lector de la oficina
+No recibe
+—
+—
+Actividades sin responsable 5
+Marcar las 5
+Actualizar el inventario de la oficina
+Propia de la oficina
+En plazo
+Levantar el diagnóstico de plataformas institucionales
+Línea #8
+En plazo
+Entregar el informe de cierre de redes y conectividad
+Línea #6
+Hito · En plazo
+Levantar el diagnóstico de infraestructura de usuario final
+Línea #2
+En plazo
+Entregar el informe de cierre de infraestructura de usuario final
+Línea #2
+Hito · En plazo
+Asignar las marcadas a
+Elija a una persona…
+Mariana Solano (usted) · 3 activas
+Diana Cárdenas · 4 activas
+Camilo Rojas · 5 activas
+Iván Quiroga · 3 activas
+Valentina Sarmiento · 5 activas
+Asignar

@@ -1,0 +1,41 @@
+Regresar
+Planeación y Seguimiento
+Cargar la planificación
+Cargar la planificación
+
+Plan «PDIFyT 2027-2035». Cuatro pasos: el archivo se lee en su navegador y nada sale de él hasta el último.
+
+Descargar la plantilla y elegir el archivo
+(hecho)
+Revisar lo leído
+(hecho)
+3
+Corregir
+(paso actual)
+4
+Crear la versión borrador
+(pendiente)
+Corregir
+
+Los problemas, por hoja, fila y columna, con cómo arreglarlos. Las filas con error no se importan; no se inventa ni se rellena ningún dato.
+
+3 filas con error y 0 avisos. Para corregir, abra su archivo, arregle esas celdas, guárdelo y elíjalo de nuevo.
+
+Elegir otro archivo
+Archivo: errores.xlsx
+▲
+No se importa
+Fila 8 · Renovación de equipos de cómputo de laboratorios
+Columna «Campus». «Medellín» no es un campus válido. Elija uno de la lista desplegable: Bucaramanga, Valledupar, Cúcuta, Todos.
+▲
+No se importa
+Fila 10 · Cubierta del escenario deportivo
+Columna «Prioridad». «Urgente» no es una prioridad válido. Elija uno de la lista desplegable: Crítico, Alto, Medio, Largo plazo.
+▲
+No se importa
+Fila 11 · Red inalámbrica de los tres campus
+Columna «N.º». El N.º «3» ya está en la fila 9. Cada línea lleva su propio N.º: cámbielo o borre la fila repetida.
+Entiendo que 3 filas con error no se importan y sigo con las 2 líneas listas.
+El borrador se guarda solo en este equipo.
+Atrás
+Siguiente

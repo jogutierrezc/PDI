@@ -1,0 +1,257 @@
+/* =============================================================================
+   UDES Sostenible · tableros personalizados (TableroSos.tsx).
+
+   Acotado a .sos-tab* y .sos-ti*, con los tokens del portal. La cuadrícula es de
+   12 columnas y se adapta al ANCHO DEL CONTENEDOR (container query), así que
+   sirve igual en la página, en una celda de columnas del CMS y en el modo
+   Tableta o Teléfono del editor. Transiciones cortas de color; el hover solo en
+   punteros finos; sin desplazamiento con movimiento reducido.
+   ========================================================================== */
+
+.sos-tab {
+  container-type: inline-size;
+  container-name: sos-tab;
+  min-width: 0;
+}
+
+.sos-tab__rejilla {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-4, 16px);
+  align-items: start;
+}
+
+.sos-tab__el {
+  grid-column: span var(--span, 12);
+  min-width: 0;
+  border-radius: var(--radius-lg);
+}
+
+.sos-tab__el[data-editable] {
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color var(--dur-fast, 120ms) ease;
+}
+
+.sos-tab__el[data-editable]:focus-visible {
+  outline-color: var(--brand-blue-strong);
+}
+
+.sos-tab__el[data-sel] {
+  outline-color: var(--brand-blue-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sos-tab__el[data-editable]:not([data-sel]):hover {
+    outline-color: var(--line-strong);
+  }
+}
+
+/* Tableta: las columnas angostas pasan a media fila; el resto, a fila entera. */
+@container sos-tab (max-width: 760px) {
+  .sos-tab__el[data-ancho="3"],
+  .sos-tab__el[data-ancho="4"] {
+    grid-column: span 6;
+  }
+
+  .sos-tab__el[data-ancho="6"],
+  .sos-tab__el[data-ancho="8"],
+  .sos-tab__el[data-ancho="12"] {
+    grid-column: span 12;
+  }
+}
+
+@container sos-tab (max-width: 480px) {
+  .sos-tab__el {
+    grid-column: span 12;
+  }
+}
+
+/* --- Piezas de texto ------------------------------------------------------------------------ */
+
+.sos-tab__h {
+  margin: var(--space-2, 8px) 0 0;
+  font-size: var(--text-lg, 1.25rem);
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.sos-tab__texto h4 {
+  margin: 0 0 4px;
+  font-size: var(--text-base, 1rem);
+  color: var(--ink);
+}
+
+.sos-tab__texto p {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-secondary);
+  white-space: pre-line;
+}
+
+.sos-tab__sep {
+  margin: var(--space-2, 8px) 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.sos-tab__vacio {
+  margin: 0;
+  padding: var(--space-4, 16px);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.sos-tab__fantasma {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-4, 16px);
+  border: 1px dashed var(--status-pending);
+  border-radius: var(--radius-lg);
+  background: var(--status-pending-soft);
+  font-size: var(--text-xs);
+  color: var(--ink-secondary);
+}
+
+.sos-tab__fantasma b {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+/* --- Indicadores ---------------------------------------------------------------------------- */
+
+.sos-ti {
+  display: grid;
+  gap: 6px;
+}
+
+.sos-ti__meta {
+  margin: 0;
+  padding: 0 4px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+/* Opciones del bloque: apagan lo que no se quiere ver sin tocar la tarjeta del portal. */
+.sos-ti[data-sin-tendencia] .sos-delta,
+.sos-ti[data-sin-tendencia] .sos-spark,
+.sos-ti[data-sin-fuente] .sos-tile__src:not(.sos-tile__ilus) {
+  display: none;
+}
+
+/* Compacta: solo nombre, cifra y cambio. */
+.sos-ti[data-estilo="compacta"] .sos-tile {
+  padding: 14px;
+}
+
+.sos-ti[data-estilo="compacta"] .sos-tile__value {
+  font-size: 1.5rem;
+}
+
+.sos-ti[data-estilo="compacta"] .sos-spark,
+.sos-ti[data-estilo="compacta"] .sos-bar {
+  display: none;
+}
+
+/* Grande: la cifra manda. */
+.sos-ti[data-estilo="grande"] .sos-tile {
+  padding: 28px;
+}
+
+.sos-ti[data-estilo="grande"] .sos-tile__name {
+  font-size: var(--text-base, 1rem);
+}
+
+.sos-ti[data-estilo="grande"] .sos-tile__value {
+  font-size: 3.2rem;
+}
+
+/* Lista: una fila por indicador. */
+.sos-ti-fila {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.sos-ti-fila__n {
+  flex: 1 1 14rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink-secondary);
+}
+
+.sos-ti-fila__v {
+  color: var(--brand-blue-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.sos-ti-fila__v b {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.sos-ti-fila__v small,
+.sos-ti-fila__f {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.sos-ti-fila .sos-ti__meta {
+  padding: 0;
+}
+
+/* --- La página /sostenible/tablero/:slug ------------------------------------------------------ */
+
+.sos-tabpag {
+  padding: clamp(32px, 6vw, 72px) 0;
+}
+
+.sos-tabpag__cab {
+  margin-bottom: var(--space-6, 24px);
+}
+
+.sos-tabpag__cab h1 {
+  margin: 0 0 6px;
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.sos-tabpag__cab p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--ink-secondary);
+}
+
+.sos-tabpag__vacio {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: var(--space-6, 24px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.sos-tabpag__vacio h1 {
+  margin: 0;
+  font-size: var(--text-xl, 1.5rem);
+}
+
+.sos-tabpag__vacio p {
+  margin: 0;
+  color: var(--ink-secondary);
+}

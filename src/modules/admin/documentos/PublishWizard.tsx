@@ -24,7 +24,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { ThumbCover, DocThumb } from "../../documentos/DocThumb";
 import { TipoDoc } from "../../documentos/TipoDoc";
 import { documentFileUrl } from "../../documentos/data";
-import { FORMAT_LABEL, REPO_HOST, THUMB_NOTE, formatOf, hostOf, isPreviewableFormat, shortDescription } from "../../documentos/tipos";
+import { FORMAT_LABEL, REPO_HOST, THUMB_NOTE, formatOf, hostOf, isPreviewableFormat, shortDescription, videoEmbedUrl } from "../../documentos/tipos";
 import type { DocFormat } from "../../documentos/tipos";
 import type { DocCollection, DocFlavor, DocItem, DocStatus } from "../../documentos/data";
 import { markdownToHtml } from "../../documentos/visor/resaltar";
@@ -34,6 +34,8 @@ import { enterList, reducedMotion, sleep } from "./motion";
 import { autoThumbnail, thumbFromImage } from "./miniatura";
 import {
   MAX_DOC_BYTES,
+  MAX_VIDEO_BYTES,
+  maxBytesFor,
   MAX_PORTAL_ZIP_BYTES,
   extensionOf,
   formatBytes,
@@ -64,7 +66,7 @@ interface Thumb {
 
 const NO_THUMB: Thumb = { blob: null, url: null };
 
-const ACCEPT = ".pdf,.docx,.doc,.html,.htm,.md,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.zip,.jpg,.jpeg,.png,.webp";
+const ACCEPT = ".pdf,.docx,.doc,.html,.htm,.md,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.zip,.jpg,.jpeg,.png,.webp,.mp4,.webm";
 const SUMMARY_SOFT = 180;
 /** El tope que impone la base (check de doc_items.summary). */
 const SUMMARY_HARD = 400;
@@ -321,7 +323,7 @@ export function PublishWizard({
   async function pickFile(picked: File | undefined) {
     if (!picked) return;
     setError("");
-    setBusy("Subiendo el archivo…");
+    setBusy(maxBytesFor(picked.name) === MAX_VIDEO_BYTES ? "Subiendo el video… puede tardar varios minutos, no cierres esta ventana." : "Subiendo el archivo…");
     try {
       const up = await uploadDocFile(form.collectionId, picked);
       await dropSession(form.path);
@@ -475,7 +477,9 @@ export function PublishWizard({
             : isLink
               ? kind === "repo"
                 ? "Es un enlace al Repositorio Digital de la universidad."
-                : "Es un enlace a otro sitio; el portal solo lo abre en una pestaña nueva."
+                : kind === "video"
+                  ? "Es un enlace de video (YouTube, Vimeo o Google Drive): el portal lo reproduce dentro de su visor."
+                  : "Es un enlace a otro sitio; el portal solo lo abre en una pestaña nueva."
               : isPreviewableFormat(kind)
                 ? "El portal lo muestra dentro de su propio visor."
                 : "Se ofrecerá para abrir o descargar.",
@@ -524,9 +528,9 @@ export function PublishWizard({
       jobs.push({
         pending: "Midiendo el archivo",
         run: async () => ({
-          state: file.size > MAX_DOC_BYTES ? "warn" : "ok",
-          title: `${formatBytes(file.size)} de ${formatBytes(MAX_DOC_BYTES)} permitidos`,
-          detail: file.size > MAX_DOC_BYTES ? "Pasa del límite: súbelo a otro sitio y añádelo como enlace." : "Dentro del límite.",
+          state: file.size > maxBytesFor(file.name) ? "warn" : "ok",
+          title: `${formatBytes(file.size)} de ${formatBytes(maxBytesFor(file.name))} permitidos`,
+          detail: file.size > maxBytesFor(file.name) ? "Pasa del límite: súbelo a otro sitio y añádelo como enlace." : "Dentro del límite.",
         }),
       });
 
@@ -862,7 +866,7 @@ export function PublishWizard({
                         <Icon name="upload" size={22} />
                         <strong>Suelta aquí tu documento</strong>
                         <p>
-                          PDF, Word, HTML, Markdown, o un informe de <b>Quarto</b> o <b>R Markdown</b> ya renderizado a HTML. Hasta {formatBytes(MAX_DOC_BYTES)}.
+                          PDF, Word, HTML, Markdown, o un informe de <b>Quarto</b> o <b>R Markdown</b> ya renderizado a HTML. Hasta {formatBytes(MAX_DOC_BYTES)}. Videos <b>MP4</b> o WebM: hasta {formatBytes(MAX_VIDEO_BYTES)}.
                         </p>
                         <input ref={filePicker} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-label="Elegir el archivo del documento" onChange={(event) => void pickFile(event.target.files?.[0])} />
                         <button type="button" className="button-secondary" data-autofocus disabled={Boolean(busy)} onClick={() => filePicker.current?.click()}>
@@ -967,6 +971,8 @@ export function PublishWizard({
                         <small className="doc-hint">
                           {hostOf(form.url) === REPO_HOST ? (
                             <b>Reconocido como un documento del Repositorio Digital.</b>
+                          ) : videoEmbedUrl(form.url) ? (
+                            <b>Reconocido como un video: se reproduce dentro del portal (YouTube, Vimeo o Google Drive). En Drive, el archivo debe estar compartido con «Cualquier persona con el enlace».</b>
                           ) : (
                             "Se abre en una pestaña nueva. Sin vista previa: el sitio de destino decide cómo se ve, y si lo mueve el enlace se rompe sin avisar."
                           )}
@@ -1118,7 +1124,7 @@ export function PublishWizard({
                               <button type="button" className="oda-link-button" disabled={Boolean(busy)} onClick={() => filePicker.current?.click()}>
                                 Reemplazar el archivo
                               </button>
-                              <small className="doc-hint">Hasta {formatBytes(MAX_DOC_BYTES)}. El anterior se borra al guardar.</small>
+                              <small className="doc-hint">Hasta {formatBytes(MAX_DOC_BYTES)} ({formatBytes(MAX_VIDEO_BYTES)} si es un video). El anterior se borra al guardar.</small>
                             </span>
                           )}
                         </div>

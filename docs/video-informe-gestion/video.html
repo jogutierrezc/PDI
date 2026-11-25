@@ -349,13 +349,23 @@ h2{font-size:68px;line-height:1.04}
 </section>
 
 </div></div>
-<audio id="aud" src="audio/voz-demo.wav" preload="auto"></audio>
+<audio id="aud" src="audio/voz-final.wav" preload="auto"></audio>
 <script src="gsap.min.js"></script>
 <script>
-const D = 210;                 // duración total (s): voz 208,5 + cola
+const D = 216;                 // duración total (s): voz 214,4 + cola
+const D_OLD = 210;             // los tiempos del código están en la escala de la primera voz
 const E = "power4.out";
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const tl = gsap.timeline({ paused:true, defaults:{ ease:E } });
+// Los tiempos escritos abajo siguen la primera grabación; ANCH los lleva a la voz final
+// (pares [tiempo antiguo, tiempo nuevo] de las mismas frases). Solo cambia dónde empieza cada animación.
+const ANCH = [[0, 0], [3.68, 4.02], [12.98, 13.4], [14.72, 14.56], [17.08, 17.02], [20.08, 20.18], [22.34, 22.7], [24.1, 24.28], [26.16, 26.4], [26.78, 26.72], [28.7, 29.26], [32.58, 33.24], [34.48, 35.18], [35.72, 36.48], [37.62, 38.42], [41.66, 42.4], [45.24, 46.1], [46.7, 47.68], [50.14, 51.74], [54.04, 55.46], [56.59, 57.98], [57.84, 59.5], [61.16, 62.8], [66.36, 67.78], [71.74, 74.04], [73.9, 76.2], [75.8, 77.72], [81.92, 83.94], [86.2, 88.66], [90.36, 93.08], [92.3, 94.96], [98.3, 101.72], [99.58, 102.88], [102.5, 105.7], [105.12, 108.5], [108.0, 111.1], [111.74, 115.76], [116.26, 120.24], [118.34, 122.0], [123.22, 127.08], [125.3, 129.2], [128.08, 132.38], [131.72, 135.98], [134.28, 138.32], [138.62, 143.12], [142.6, 147.16], [146.72, 151.26], [149.52, 154.6], [151.52, 156.36], [153.62, 158.28], [156.82, 162.08], [158.16, 163.1], [162.9, 168.8], [166.14, 171.04], [168.7, 173.92], [171.26, 176.46], [174.84, 180.4], [176.92, 182.66], [179.24, 184.84], [183.12, 188.3], [187.76, 193.32], [189.78, 195.36], [192.0, 197.76], [194.52, 199.88], [197.3, 202.42], [199.08, 203.72], [201.68, 206.38], [205.36, 210.94], [208.5, 214.4], [210, 215.9]];
+const W = t => {
+  if(t<=0) return 0;
+  for(let i=1;i<ANCH.length;i++){ if(t<=ANCH[i][0]){ const [a0,b0]=ANCH[i-1],[a1,b1]=ANCH[i]; return b0+(t-a0)*(b1-b0)/(a1-a0); } }
+  const [a,b]=ANCH[ANCH.length-1]; return b+(t-a);
+};
+["fromTo","to","set"].forEach(m=>{ const f=tl[m].bind(tl); tl[m]=(...a)=>{ const i=a.length-1; if(typeof a[i]==="number") a[i]=W(a[i]); return f(...a); }; });
 
 /* ---------- utilidades ---------- */
 // entrada: de invisible+desplazado a su sitio (fromTo para que el salto atrás sea exacto)
@@ -613,7 +623,7 @@ tl.fromTo("#pilo1", { y:0 }, { y:-26, duration:.35, ease:"power2.out", yoyo:true
   tl.fromTo("#endcard img", { autoAlpha:0, y:20 }, { autoAlpha:1, y:0, duration:.7, ease:E }, 205.2);
   tl.fromTo("#endcard .kicker", { autoAlpha:0 }, { autoAlpha:1, duration:.5 }, 205.3);
 }
-tl.to({}, { duration:.01 }, D);   // fija la duración total
+tl.to({}, { duration:.01 }, D_OLD);   // fija la duración total
 
 /* ---------- control: render (seek) y vista previa (audio) ---------- */
 window.__dur = D;

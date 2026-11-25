@@ -3,7 +3,7 @@
 //
 //   node render.mjs --stills 3,20,40            → cuadros sueltos en salida/stills
 //   node render.mjs --out salida/video.mp4      → video completo (1920x1080, 30 fps)
-//   opciones: --fps 30  --workers 4  --audio audio/voz-demo.wav  --scale 1  --from 0 --to 210
+//   opciones: --fps 30  --workers 4  --audio audio/voz-final.wav  --scale 1  --from 0 --to 210
 import { chromium } from "playwright-core";
 import { mkdirSync, rmSync, existsSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -42,7 +42,7 @@ try {
   } else {
     const fps = +arg("fps", 30), workers = +arg("workers", 4), scale = +arg("scale", 1);
     const out = resolve(here, arg("out", "salida/video.mp4"));
-    const audio = resolve(here, arg("audio", "audio/voz-demo.wav"));
+    const audio = resolve(here, arg("audio", "audio/voz-final.wav"));
     const probe = await openPage(browser, scale);
     const dur = await probe.evaluate(() => window.__dur);
     const t0 = +arg("from", 0), t1 = +arg("to", dur);

@@ -8,13 +8,14 @@ import { FORMAT_LABEL } from "./tipos";
 import type { DocFormat } from "./tipos";
 import "./doc-visor.css";
 
-const ICON: Record<DocFormat, "document" | "code" | "external"> = {
+const ICON: Record<DocFormat, "document" | "code" | "external" | "play"> = {
   pdf: "document",
   doc: "document",
   html: "code",
   qmd: "code",
   r: "code",
   md: "document",
+  video: "play",
   portal: "code",
   repo: "external",
   link: "external",

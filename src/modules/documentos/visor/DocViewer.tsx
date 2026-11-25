@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { documentFileUrl, documentHref } from "../data";
 import type { DocItem } from "../data";
-import { formatOf, FORMAT_LABEL } from "../tipos";
+import { formatOf, FORMAT_LABEL, videoEmbedUrl } from "../tipos";
 import { highlightLines, markdownToHtml } from "./resaltar";
 import type { PdfHandle } from "./pdf";
 import "../doc-visor.css";
@@ -271,6 +271,44 @@ function MarkdownView({ url }: { url: string }) {
   return <article className="dv-md" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+/* --- Video ----------------------------------------------------------------------------- */
+
+/**
+ * Un video subido (.mp4, .webm) se reproduce con el reproductor del navegador:
+ * adelantar, pantalla completa y velocidad sin cargar nada más. Un enlace de
+ * YouTube, Vimeo o Google Drive se incrusta con el reproductor de ese sitio.
+ */
+function VideoView({ item, url }: { item: DocItem; url: string }) {
+  const poster = documentFileUrl(item.thumbPath) ?? undefined;
+  const embed = item.kind === "enlace" ? videoEmbedUrl(item.url) : null;
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  return (
+    <div className="dv-video">
+      <div className="dv-video__box">
+        {embed ? (
+          <iframe
+            src={embed}
+            title={`Video: ${item.title}`}
+            loading="lazy"
+            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
+          />
+        ) : failed ? (
+          <Aviso>Tu navegador no pudo reproducir este video. Descárgalo para verlo.</Aviso>
+        ) : (
+          // eslint-disable-next-line jsx-a11y/media-has-caption -- el portal no recibe subtítulos aparte
+          <video src={url} poster={poster} controls playsInline preload="metadata" onError={() => setFailed(true)}>
+            Tu navegador no reproduce este video. Descárgalo para verlo.
+          </video>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* --- El visor -------------------------------------------------------------------------- */
 
 export function DocViewer({ item }: { item: DocItem }) {
@@ -327,6 +365,8 @@ export function DocViewer({ item }: { item: DocItem }) {
           ) : (
             <HtmlView url={url} mobile={mobile} />
           )
+        ) : format === "video" ? (
+          <VideoView item={item} url={url} />
         ) : format === "md" ? (
           <MarkdownView url={url} />
         ) : (

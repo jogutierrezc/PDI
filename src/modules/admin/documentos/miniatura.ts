@@ -162,11 +162,49 @@ export async function thumbFromImage(file: File): Promise<Blob | null> {
   }
 }
 
+/** Un fotograma del video (a los 2 s, o a la mitad si es más corto), como miniatura. */
+async function fromVideo(file: File): Promise<Blob | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.preload = "metadata";
+    video.playsInline = true;
+    video.src = url;
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error("timeout")), 15000);
+      video.onloadedmetadata = () => {
+        video.currentTime = Math.min(2, (video.duration || 2) / 2);
+      };
+      video.onseeked = () => {
+        window.clearTimeout(timer);
+        resolve();
+      };
+      video.onerror = () => {
+        window.clearTimeout(timer);
+        reject(new Error("video"));
+      };
+    });
+    if (!video.videoWidth || !video.videoHeight) return null;
+    const width = Math.min(640, video.videoWidth);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = Math.round((width * video.videoHeight) / video.videoWidth);
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 /** La miniatura automática de un archivo; null si no se pudo (el portal dibuja una portada). */
 export async function autoThumbnail(file: File, format: DocFormat): Promise<Blob | null> {
   try {
     if (format === "pdf") return await fromPdf(file);
     if (format === "doc") return await fromDocx(file);
+    if (format === "video") return await fromVideo(file);
     if (format === "html" || format === "qmd" || format === "r" || format === "portal") return await fromHtml(file);
     return null;
   } catch {

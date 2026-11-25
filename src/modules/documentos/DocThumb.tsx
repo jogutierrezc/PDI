@@ -51,6 +51,10 @@ export function ThumbCover({ format, size = "md" }: { format: DocFormat; size?: 
             <u style={{ height: "35%" }} />
           </span>
         </>
+      ) : format === "video" ? (
+        <span className="dv-tn__play">
+          <u />
+        </span>
       ) : format === "md" ? (
         <>
           <i className="dv-tn__h" />

@@ -169,6 +169,11 @@ export function useRemoveItem() {
 /* --- Archivos -------------------------------------------------------------------------- */
 
 export const MAX_DOC_BYTES = 50 * 1024 * 1024;
+/** Un video pesa más que un documento: tiene su propio tope (el del bucket lo fija la migración 0294). */
+export const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
+export const VIDEO_EXTENSIONS_DOT = [".mp4", ".webm"];
+/** El tope que corresponde a un archivo según su extensión. */
+export const maxBytesFor = (name: string) => (VIDEO_EXTENSIONS_DOT.includes(extensionOf(name)) ? MAX_VIDEO_BYTES : MAX_DOC_BYTES);
 export const MAX_COVER_BYTES = 8 * 1024 * 1024;
 
 const COVER_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
@@ -179,6 +184,8 @@ const DOC_EXTENSIONS = [
   ".csv", ".txt", ".zip", ".jpg", ".jpeg", ".png", ".webp",
   // Resultados de Quarto y R Markdown (ya renderizados), HTML y Markdown.
   ".html", ".htm", ".md",
+  // Videos que el navegador reproduce sin ayuda.
+  ".mp4", ".webm",
 ];
 
 /** Código fuente que acompaña a un .html de Quarto o R: se muestra como texto, no se ejecuta. */
@@ -227,9 +234,12 @@ export async function uploadDocFile(collectionId: string, file: File): Promise<U
       `No se admiten archivos ${extension}. Formatos aceptados: ${DOC_EXTENSIONS.join(", ")}.`,
     );
   }
-  if (file.size > MAX_DOC_BYTES) {
+  const max = maxBytesFor(file.name);
+  if (file.size > max) {
     throw new FriendlyError(
-      `«${file.name}» pesa ${formatBytes(file.size)} y el máximo son ${formatBytes(MAX_DOC_BYTES)}. Si es un documento grande, súbelo a otro sitio y añádelo como enlace.`,
+      max === MAX_VIDEO_BYTES
+        ? `«${file.name}» pesa ${formatBytes(file.size)} y el máximo para un video son ${formatBytes(max)}. Comprímelo, o súbelo a YouTube, Vimeo o Drive y añádelo como enlace.`
+        : `«${file.name}» pesa ${formatBytes(file.size)} y el máximo son ${formatBytes(max)}. Si es un documento grande, súbelo a otro sitio y añádelo como enlace.`,
     );
   }
 
@@ -293,9 +303,11 @@ export async function uploadDocCover(file: File): Promise<string> {
 
 function uploadError(message: string) {
   return new FriendlyError(
-    /bucket/i.test(message)
-      ? 'No existe el bucket "documentos" en Storage. Aplica la migración 0051 o créalo a mano: público en lectura, 50 MB por archivo.'
-      : `No se pudo subir el archivo: ${message}`,
+    /exceeded the maximum allowed size|payload too large|entity too large|\b413\b/i.test(message)
+      ? 'El servidor rechazó el archivo por su tamaño. Para videos hace falta la migración 0294 (bucket de 500 MB) y que el límite global de Storage (FILE_SIZE_LIMIT) y el del proxy sean de al menos 500 MB.'
+      : /bucket/i.test(message)
+        ? 'No existe el bucket "documentos" en Storage. Aplica la migración 0051 o créalo a mano: público en lectura, 50 MB por archivo (500 MB si va a llevar videos).'
+        : `No se pudo subir el archivo: ${message}`,
   );
 }
 

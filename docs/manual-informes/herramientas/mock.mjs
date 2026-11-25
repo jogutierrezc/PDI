@@ -80,7 +80,15 @@ export async function instalarRed(context, fx, registro) {
         }
         return dev(200, r, rango);
       }
-      // Escrituras: se aceptan y no cambian nada (los manuales no necesitan guardar).
+      // Escrituras: se aceptan y no cambian nada (los manuales no necesitan guardar), salvo las tablas con estado en fx.escribir.
+      const w = fx.escribir?.[tabla];
+      if (w) {
+        let cuerpo = null;
+        try { cuerpo = JSON.parse(req.postData() || "null"); } catch {}
+        const r = w(metodo, cuerpo, url.searchParams);
+        if (metodo === "DELETE") return dev(204);
+        return dev(201, (req.headers()["accept"] || "").includes("vnd.pgrst.object") ? (Array.isArray(r) ? r[0] : r) : r);
+      }
       return dev(201, []);
     }
     if (ruta.startsWith("/functions/v1/")) {
@@ -89,7 +97,10 @@ export async function instalarRed(context, fx, registro) {
       try { args = JSON.parse(req.postData() || "{}"); } catch {}
       const f = fx.funciones[nombre];
       if (f === undefined) { sinSimular.add(`FUNCION ${nombre}`); return dev(404, { error: "función no simulada" }); }
-      return dev(200, typeof f === "function" ? f(args) : f);
+      const res = typeof f === "function" ? f(args) : f;
+      // Una función de flujo (Pilo): { __sse } se entrega como text/event-stream.
+      if (res && res.__sse !== undefined) return route.fulfill({ status: 200, headers: { ...CORS, "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache" }, body: res.__sse });
+      return dev(200, res);
     }
     if (ruta.startsWith("/storage/v1/")) {
       if (ruta.includes("/object/sign/")) return dev(200, { signedURL: ruta.replace("/object/sign/", "/object/") });

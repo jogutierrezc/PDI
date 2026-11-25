@@ -1,0 +1,263 @@
+Informes Institucionales
+Informes Institucionales · 2026
+Mi informe
+
+Las cifras de UDES en Cifras y del Plan de Desarrollo ya cargadas; usted escribe lo que solo su unidad puede decir
+
+Panel
+Mi informe
+Vista del informe
+Guía con Pilo
+PLANTILLA A · DECANATURA
+Facultad de Ingeniería ?
+Informe 2026 · su papel: Gestor
+◐
+Borrador
+7 de 10 listas
+Las cifras siguen en vivo hasta que envíe.
+Vista del informe en papel
+Libro de Excel
+Compilar informe de colaboradores con Pilo
+?
+1
+Resumen ejecutivo
+Lista
+2
+Alineación estratégica con el PDI
+Lista
+3
+Objetivos y metas 2026
+Lista
+4
+Resultados por dimensión estratégica
+En curso
+5
+Puntos críticos y acciones de mejora
+Lista
+6
+Logros destacados
+Lista
+7
+Evidencias y fuentes de verificación
+Lista
+8
+Conclusiones
+Sin empezar
+9
+Reconocimientos externos
+Sin empezar
+10
+Anexos
+Lista
+?
+Enviar
+Se habilita cuando las 10 secciones estén listas (van 7).
+SECCIÓN 1 DE 10
+Resumen ejecutivo ?
+Lista
+
+Lo escribe la unidad · 1 a 3 párrafos.
+
+APORTE
+1 a 3 párrafos
+Insertar una cifra viva…
+Matrícula total (2.851)
+Deserción anual (8,6 %)
+Retención de primer semestre (80,2 %)
+Saber PRO · promedio global (155)
+Profesores con doctorado (27 %)
+Evaluación docente (4,3)
+Registros calificados vigentes (14)
+Grupos categorizados (8)
+Semilleros activos (21)
+Convenios activos (35)
+Ejecución presupuestal (92 %)
+Prácticas en laboratorios externos (64)
+Egresados empleados a los 6 meses (83 %)
+Estudiantes en prácticas profesionales (64)
+Egresados vinculados laboralmente (83 %)
+Estudiantes con tutoría de pares (420)
+Artículos en revistas indexadas (38)
+Ejecución del presupuesto de laboratorios (92 %)
+Metas con resultado (3)
+Metas cumplidas o superadas (0)
+Indicadores reportados (18)
+Indicadores que cumplen o superan la meta (1)
+Indicadores que cumplen o superan la meta (%) (6 %)
+Indicadores rezagados (0)
+Indicadores que mejoraron frente al periodo anterior (17)
+Insertar
+La cifra queda como vínculo: si la fuente cambia, el texto cambia.
+67 palabras · mínimo 25
+Pilo redacta un borrador
+ASÍ SE LEERÁ, CON LAS CIFRAS VIVAS
+Durante 2026 la Facultad de Ingeniería llegó a 2.851 estudiantes, con una retención de primer semestre de 80,2 % y 27 % de profesores con doctorado. Los 8 grupos de investigación categorizados y los 21 semilleros activos sostuvieron la producción académica, mientras que la ejecución presupuestal cerró en 92 %.
+
+El año deja como reto principal reducir la deserción en los primeros semestres y consolidar la oferta nocturna de Sistemas.
+Tablas y gráficas de UDrive · se actualizan mientras el informe está en borrador
++ Agregar una tabla o gráfica de UDrive
+Abrir UDrive para crear una
+Controles ?
+✓
+Bien:
+Extensión adecuada (67 palabras)
+✓
+Bien:
+Sin frases de ejemplo de la plantilla
+✓
+Bien:
+Las cifras del texto están enlazadas a su fuente
+✓
+Bien:
+Cifras en vivo hasta que envíe. Corte de referencia: 31 de dic de 2026
+Datos que puede consultar ?
+UDES en Cifras
+Cifras del periodo con su fuente y corte
+Abrir UDES en Cifras
+Plan de Desarrollo
+Pilares, proyectos y su avance
+Abrir el portal de implementación
+Pilo
+Pregunte de dónde sale una cifra o pida comparar con otra unidad.
+Preguntar a Pilo
+Compilar informe de colaboradores con Pilo
+Facultad de Ingeniería · Informe de gestión 2026 · Plantilla A
+Exportar Excel
+Importar al informe
+Cerrar
+1
+Recibir
+Libros de los equipos
+2
+Organizar
+Criterios y fuentes
+3
+Redactar
+Borrador con Pilo
+4
+Aprobar
+Importar al informe
+Libros recibidos de los equipos
+
+Suba los libros de Excel que devuelven las unidades de apoyo, uno por uno o todos juntos en un ZIP. Pilo comprueba que sean de este informe y reconoce su plantilla (A, B, C o D). Si no es la del informe, la adapta.
+
+4
+libros recibidos
+40
+filas leídas
+1
+plantillas adaptadas
+1
+avisos
+Arrastre libros .xlsx o un archivo .zip con todos los libros
+El ZIP puede traer carpetas. Pilo ignora lo que no es un libro (archivos temporales, Thumbs.db) y rechaza lo que es de otro informe.
+libros-de-los-equipos.zip
+· 9 archivos
+4 recibidos · 3 ignorados · 2 rechazados
+✓
+libros/Informe_Gestion_2026_A_secretaria-academica.xlsx
+Libro de Secretaría académica
+✓
+libros/Informe_Gestion_2026_A_direccion-de-programa.xlsx
+Libro de Dirección de programa
+✓
+libros/Informe_Gestion_2026_B_bienestar-universitario.xlsx
+Libro de Bienestar universitario
+✓
+libros/Informe_Gestion_2026_A_investigacion.xlsx
+Libro de Coordinación de investigación
+✕
+libros/Informe_Gestion_2026_otro.xlsx
+Rechazado: Este libro es del informe de «Facultad de Derecho», ciclo 2026, plantilla A y no corresponde a este informe. Descargue el libro desde este informe y vuelva a intentarlo.
+✕
+libros/Informe_Gestion_2024_antiguo.xls
+Solo se leen libros .xlsx. Ábralo en Excel y guárdelo como .xlsx.
+–
+libros/Thumbs.db
+Archivo del sistema operativo.
+–
+libros/~$Informe_temporal.xlsx
+Archivo temporal de Excel.
+–
+__MACOSX/libros/._x.xlsx
+Archivo del sistema operativo.
+Adaptar los libros de otra plantilla a la A
+A es Decanatura, B Vicerrectoría u oficina, C Rectoría de campus y D Rectoría General. Son parecidas: una oficina puede haber usado otra sin querer. Pilo mueve las hojas y columnas, no borra nada y le muestra qué cambió.
+SA
+Secretaría académica
+Informe_Gestion_2026_A_secretaria-academica.xlsx
+11 filas
+ZIP: libros-de-los-equipos.zip
+Recibido
+Quitar
+PLANTILLA A
+Decanatura.
+Es la del informe: no se cambia nada.
+Ver adaptación
+04 Criterios
+04 Resultados por dimensión est
+08 Evidencias y fuentes de veri
+DD
+Dirección de programa
+Informe_Gestion_2026_A_direccion-de-programa.xlsx
+10 filas
+ZIP: libros-de-los-equipos.zip
+Recibido
+Quitar
+PLANTILLA A
+Decanatura.
+Es la del informe: no se cambia nada.
+Ver adaptación
+04 Criterios
+04 Resultados por dimensión est
+08 Evidencias y fuentes de veri
+BU
+Bienestar universitario
+Informe_Gestion_2026_B_bienestar-universitario.xlsx
+10 filas
+ZIP: libros-de-los-equipos.zip
+Con aviso
+Quitar
+PLANTILLA B
+Vicerrectoría u oficina.
+Adaptada a la A
+Ver adaptación
+Qué hizo Pilo con este libro
+HOJA DEL LIBRO	QUEDA EN	CAMBIO
+04 Criterios	Resultados por dimensión estratégica · criterios	Hoja renombrada
+04 Resultados y evidencias	Resultados por dimensión estratégica	Hoja renombrada
+
+No se borra nada del libro original.
+
+04 Criterios
+04 Resultados y evidencias
+Venía en la plantilla B y el informe usa la A: se adaptó.
+CD
+Coordinación de investigación
+Informe_Gestion_2026_A_investigacion.xlsx
+9 filas
+ZIP: libros-de-los-equipos.zip
+Recibido
+Quitar
+PLANTILLA A
+Decanatura.
+Es la del informe: no se cambia nada.
+Ver adaptación
+04 Criterios
+04 Resultados por dimensión est
+08 Evidencias y fuentes de veri
+Pilo Astra 1.0
+RAZONA ANTES DE ESCRIBIR
+Recibí 4 libros. Reconocí la plantilla de cada uno y adapté los que venían en otra. Siga a organizar cuando estén todos; lo que no llegue lo marcaré como «sin dato».
+NIVEL DE RAZONAMIENTO
+Rápida
+Compleja
+Investigación
+Equilibrio entre calidad y tiempo. Recomendado.
+Cómo pensó Pilo
+
+Regla de Pilo: no inventa cifras. Todo número del texto es una cifra enlazada a su fuente; lo que ningún equipo entregó queda como «sin dato».
+
+Sin tope fijo de longitud: Pilo escribe cada sección por partes, tan largas como lo pidan los datos, y las une.
+
+Organizar los datos

@@ -1,0 +1,8 @@
+[2026-11-25 16:30:02.110] [ctranslate2] [thread 21821252] [warning] Tip: experimental MPS backend is available and often 2x+ faster than CPU on Apple Silicon (varies by workload and hardware). Try device="mps".
+/private/tmp/claude-501/-Users-coordinadorinteligenciadenegocios-Documents-PDI/fd4aae02-2dd2-4a00-a672-e37f73af5c77/scratchpad/asr/lib/python3.9/site-packages/faster_whisper/feature_extractor.py:224: RuntimeWarning: divide by zero encountered in matmul
+  mel_spec = self.mel_filters @ magnitudes
+/private/tmp/claude-501/-Users-coordinadorinteligenciadenegocios-Documents-PDI/fd4aae02-2dd2-4a00-a672-e37f73af5c77/scratchpad/asr/lib/python3.9/site-packages/faster_whisper/feature_extractor.py:224: RuntimeWarning: overflow encountered in matmul
+  mel_spec = self.mel_filters @ magnitudes
+/private/tmp/claude-501/-Users-coordinadorinteligenciadenegocios-Documents-PDI/fd4aae02-2dd2-4a00-a672-e37f73af5c77/scratchpad/asr/lib/python3.9/site-packages/faster_whisper/feature_extractor.py:224: RuntimeWarning: invalid value encountered in matmul
+  mel_spec = self.mel_filters @ magnitudes
+escenas: 16 duración: 700.3 s · palabras: 1778

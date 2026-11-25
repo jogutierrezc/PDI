@@ -31,7 +31,7 @@ export const CAPITULOS = ["Primer vistazo", "Escribir cada sección", "Controles
 
 export const PASOS: Paso[] = [
   { c: 0, z: "tabs", v: "mi-informe", t: "Dónde está todo", x: "Soy Pilo y le acompaño a armar su informe de gestión. Arriba están las opciones del módulo. Esta pestaña, Guía con Pilo, solo aparece dentro de Mi informe, y puede volver a ella cuando quiera. Un informe se recorre en cuatro pasos: abrir, diligenciar, enviar y esperar la revisión de Planeación." },
-  { c: 0, z: "estado", v: "mi-informe", t: "El estado de su informe", x: "Aquí ve en qué punto va. La etiqueta dice si está en borrador, enviado, aprobado o devuelto, y la barra cuenta las secciones listas. Mientras no envíe, las cifras siguen en vivo. El Gestor diligencia y envía, el Contribuyente diligencia, y quien tiene rol de Consulta solo mira." },
+  { c: 0, z: "estado", v: "mi-informe", t: "El estado de su informe", x: "Aquí ve en qué punto va. La etiqueta dice si está en borrador, enviado, aprobado o devuelto, y la barra cuenta las secciones listas. El Gestor diligencia y envía, el Contribuyente diligencia, y quien tiene rol de Consulta solo mira." },
   { c: 0, z: "secs", v: "mi-informe", t: "Las secciones", x: "Su plantilla trae entre ocho y diez secciones numeradas, según su unidad. El punto de cada una marca su avance: sin empezar, en curso o lista, y se calcula solo. Puede pasar de una a otra en el orden que prefiera. Lo que escribe se guarda solo." },
   { c: 1, z: "sec-body", v: "mi-informe", tipo: "narr", t: "Resumen ejecutivo", x: "Escriba de uno a tres párrafos. Las cifras no se digitan: se citan con una clave entre dobles corchetes, como matric, y yo las cambio por su valor vivo. Si escribe un número a mano, le aviso. Así el texto nunca queda desactualizado." },
   { c: 1, z: "sec-body", v: "mi-informe", tipo: "pdi", t: "Alineación estratégica con el PDI", x: "Marque los pilares del Plan de Desarrollo a los que aportó su unidad, se recomiendan al menos tres, y cuente brevemente cómo. Con eso el informe queda conectado al plan institucional." },
@@ -58,7 +58,7 @@ export const PASOS: Paso[] = [
 
 /** La explicación corta de cada «?». Una zona sin paso en la guía lleva al inicio. */
 export const AYUDAS: Record<string, { nombre: string; texto: string }> = {
-  estado: { nombre: "estado del informe", texto: "El estado del informe y cuántas secciones van listas. Las cifras siguen en vivo hasta que envíe." },
+  estado: { nombre: "estado del informe", texto: "El estado del informe y cuántas secciones van listas." },
   secs: { nombre: "lista de secciones", texto: "Las secciones de su plantilla. El punto marca el avance, que se calcula solo. Puede saltar entre ellas." },
   "sec-body": { nombre: "cuerpo de la sección", texto: "Aquí se escribe la sección. El contenido cambia según su tipo: texto, tabla, cifras o anexos." },
   controles: { nombre: "controles de la sección", texto: "Lo que falta en esta sección. Verde está bien y ámbar es un aviso." },

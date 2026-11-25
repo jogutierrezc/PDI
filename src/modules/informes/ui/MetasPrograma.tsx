@@ -79,7 +79,7 @@ export function TablaMetasPrograma({
               <td className="r inf-num">{f.meta !== null ? formatoCifra(f.meta, f.unidad) : f.metaTexto || <span className="inf-muted">Sin meta</span>}</td>
               <td className="r inf-num">
                 {formatoCifra(f.alcanzado, f.unidad)}
-                <div className="inf-muted">{f.congelada ? "Foto al enviar" : f.viva ? "En vivo" : ""}</div>
+                <div className="inf-muted">{f.congelada ? "Foto al enviar" : ""}</div>
               </td>
               <td>
                 {f.resultado ? <span className={`inf-pill ${TONO_RESULTADO[f.resultado]}`}>{f.resultado}</span> : <span className="inf-muted">—</span>}{" "}

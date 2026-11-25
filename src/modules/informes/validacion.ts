@@ -5,6 +5,7 @@
    controles laterales del editor salen de aquí y de tokens.ts.
    ========================================================================== */
 
+import { CIFRAS_VIVAS_ACTIVAS } from "./cifras-vivas";
 import type { CifraVista } from "./cifras-vivas";
 import { avanceAlineacion, controlesAlineacion } from "./alineacion";
 import { driveLibre, tablasLibre, textoLibre } from "./secciones-config";
@@ -39,7 +40,7 @@ export interface ContextoSeccion {
 export const sinJustificar = (cifras: CifraVista[]) => cifras.filter((c) => c.condicion === "justificar" && !c.justificacion.trim());
 
 /** Una cifra pedida sin indicador conectado (o escrito) no tiene qué justificar. */
-const pedidasDe = (cifras: CifraVista[]) => cifras.filter((c) => c.condicion === "justificar" && (c.valor !== null || c.propia));
+const pedidasDe = (cifras: CifraVista[]) => (CIFRAS_VIVAS_ACTIVAS ? cifras.filter((c) => c.condicion === "justificar" && (c.valor !== null || c.propia)) : []);
 
 export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | undefined, ctx: ContextoSeccion): Avance {
   const x = c ?? {};
@@ -116,11 +117,13 @@ export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | u
           : { nivel: "ok", texto: `Los ${req.total} datos que pide Planeación están respondidos` },
       );
     }
-    const n = sinJustificar(pedidasDe(ctx.cifras)).length;
-    out.push(n ? { nivel: "warn", texto: `${n} ${n === 1 ? "cifra que pide" : "cifras que pide"} Planeación aún sin justificación` } : { nivel: "ok", texto: "Todas las cifras pedidas están justificadas" });
-    const sinFuente = [...ctx.cifras, ...ctx.propias].filter((v) => v.propia && !v.fuente.trim()).length;
-    if (ctx.exigirFuente || sinFuente) {
-      out.push(sinFuente ? { nivel: "warn", texto: `${sinFuente} ${sinFuente === 1 ? "cifra con fuente propia" : "cifras con fuente propia"} sin nombre de fuente` } : { nivel: "ok", texto: "Cada cifra tiene su fuente" });
+    if (CIFRAS_VIVAS_ACTIVAS) {
+      const n = sinJustificar(pedidasDe(ctx.cifras)).length;
+      out.push(n ? { nivel: "warn", texto: `${n} ${n === 1 ? "cifra que pide" : "cifras que pide"} Planeación aún sin justificación` } : { nivel: "ok", texto: "Todas las cifras pedidas están justificadas" });
+      const sinFuente = [...ctx.cifras, ...ctx.propias].filter((v) => v.propia && !v.fuente.trim()).length;
+      if (ctx.exigirFuente || sinFuente) {
+        out.push(sinFuente ? { nivel: "warn", texto: `${sinFuente} ${sinFuente === 1 ? "cifra con fuente propia" : "cifras con fuente propia"} sin nombre de fuente` } : { nivel: "ok", texto: "Cada cifra tiene su fuente" });
+      }
     }
   }
   if (def.tipo === "narr" || def.tipo === "dim" || def.tipo === "matriz") {
@@ -145,9 +148,6 @@ export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | u
     const sinEvidencia = (x.logros ?? []).filter((l) => l.anexo === null).length;
     if (sinEvidencia) out.push({ nivel: "warn", texto: `${sinEvidencia} ${sinEvidencia === 1 ? "logro" : "logros"} sin evidencia` });
   }
-  out.push({
-    nivel: "ok",
-    texto: ctx.congelada ? "Cifras congeladas al enviar: el informe ya no cambia" : `Cifras en vivo hasta que envíe${ctx.corte ? `. Corte de referencia: ${ctx.corte}` : ""}`,
-  });
+  if (ctx.congelada) out.push({ nivel: "ok", texto: "Cifras congeladas al enviar: el informe ya no cambia" });
   return out;
 }

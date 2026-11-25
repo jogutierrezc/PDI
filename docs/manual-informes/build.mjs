@@ -30,7 +30,7 @@ for (const f of fs.readdirSync(path.join(here, "capturas")).filter((x) => x.ends
 
 // ---- contenido ----------------------------------------------------------------------------------
 const CAPS = [];
-for (const f of fs.readdirSync(path.join(here, "contenido")).filter((x) => /^cap\d+\.mjs$/.test(x)).sort()) {
+for (const f of fs.readdirSync(path.join(here, "contenido")).filter((x) => /^cap\d+\.mjs$/.test(x)).sort((a, b) => parseInt(a.slice(3)) - parseInt(b.slice(3)))) {
   CAPS.push((await import(pathToFileURL(path.join(here, "contenido", f)).href + "?v=" + Date.now())).default);
 }
 function openBlock(c) {

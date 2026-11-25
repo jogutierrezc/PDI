@@ -102,18 +102,16 @@ describe("0153 · enviar", () => {
     expect(await errorOf(t.asUser(P.contribuyente, (q) => enviar(q, inst)))).toMatch(/no permitido: draft → sent \(editor\)/);
   });
 
-  it("no se envía con secciones sin terminar, datos propios sin fuente ni cifras pedidas sin justificar", async () => {
+  it("no se envía con secciones sin terminar; la fuente de los datos propios y las cifras pedidas sin justificar ya no bloquean (0296)", async () => {
     await t.asUser(P.gestor, (q) => seccion(q, inst, "s2", false), { commit: true });
     expect(await errorOf(t.asUser(P.gestor, (q) => enviar(q, inst)))).toMatch(/Faltan secciones por terminar: s2/);
     await t.asUser(P.gestor, (q) => seccion(q, inst, "s2", true), { commit: true });
-    expect(await errorOf(t.asUser(P.gestor, (q) => enviar(q, inst)))).toMatch(/Falta el nombre de la fuente en: movi/);
-    await t.asUser(P.gestor, (q) => cifra(q, inst, "movi", { fuente_nombre: "Oficina de Internacionalización" }), { commit: true });
-    expect(await errorOf(t.asUser(P.gestor, (q) => enviar(q, inst)))).toMatch(/Falta justificar .*matric/);
-    await t.asUser(P.gestor, (q) => cifra(q, inst, "matric", { justificacion: "Creció por la nueva oferta virtual." }), { commit: true });
-    // Con la cifra pedida excluida tampoco: va bloqueada.
-    await t.asUser(P.gestor, (q) => cifra(q, inst, "matric", { incluida: false }), { commit: true });
-    expect(await errorOf(t.asUser(P.gestor, (q) => enviar(q, inst)))).toMatch(/Falta justificar/);
-    await t.asUser(P.gestor, (q) => cifra(q, inst, "matric", { incluida: true }), { commit: true });
+    // «movi» es un dato propio sin nombre de fuente y «matric» una cifra pedida sin justificar: antes de la 0296 frenaban el envío.
+    const motivo = await t.asUser(P.gestor, (q) => enviar(q, inst)).then(
+      () => "",
+      (e: unknown) => String((e as Error).message),
+    );
+    expect(motivo).not.toMatch(/Falta el nombre de la fuente|Falta el pilar|Falta justificar/);
     expect(await estadoActual()).toBe("draft");
   });
 

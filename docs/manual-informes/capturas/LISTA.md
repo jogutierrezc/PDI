@@ -46,6 +46,19 @@ Ruta base: `/admin/informes-gestion`. Roles simulados: **Planeación/Administrac
 | ges-guia-pilo | pestaña «Guía con Pilo» | Guía paso a paso de Pilo (paso 1 de 19) | 1 «Siguiente»; 2 «Escuchar»; 3 «Leer cada paso»; 4 «Reportar con Pilo» |
 | ges-movil | 390 px, `/mi-informe` | Editor en móvil: secciones como tira deslizable | 1 «Libro de Excel»; 2 «Enviar» |
 
+## Compilador con Pilo (Gestor)
+
+Ruta base: `/admin/informes-gestion/mi-informe`, rol Gestor, informe en borrador. Los libros son **ficticios** (`excel/09-libros-compilador/`, los genera un script con la `_Control` de este informe: ciclo `c-2026`, instancia `i-ing`): un ZIP con cuatro libros válidos (Secretaría académica, Dirección de programa, Bienestar universitario en plantilla B, Coordinación de investigación), uno de otra unidad (se rechaza), un `.xls` (se rechaza) y tres archivos de sistema (se ignoran). Pilo Astra está **simulado** en `fixtures.mjs` (`pilo-compilador`, respuesta SSE con el mismo formato que la función real); los textos de las capturas no son de Astra. Ventana 1200 px de ancho, a 2x.
+
+| Captura | Qué muestra | Marcas (texto exacto) |
+|---|---|---|
+| com-boton | Riel de Mi informe con los enlaces del libro y del compilador | 1 «Libro de Excel»; 2 «Compilar informe de colaboradores con Pilo» |
+| com-recibir | Paso 1 · Recibir: ZIP con 9 archivos (4 recibidos, 3 ignorados, 2 rechazados), adaptación de plantilla y una tarjeta por equipo | 1 zona de soltar; 2 registro del ZIP; 3 libro rechazado; 4 «Adaptar los libros de otra plantilla a la A»; 5 tarjeta de Bienestar (plantilla B adaptada); 6 «Organizar los datos» |
+| com-organizar | Paso 2 · Organizar: contadores, cobertura por equipo y «Retención de primer semestre» en conflicto abierto (tres equipos, dos valores) | 1 contadores; 2 matriz de cobertura; 3 indicador en conflicto; 4 «Usar el valor de la fuente primaria»; 5 filtros |
+| com-redactar | Paso 3 · Redactar: cuatro secciones redactadas, cifras tocables, «De dónde sale este dato» y razonamiento de Pilo | 1 nivel de razonamiento; 2 «Redactar todas las secciones»; 3 lista de secciones; 4 «Borrador de Pilo»; 5 cifra; 6 cuadro de origen; 7 «Cómo pensó Pilo» |
+| com-aprobar | Paso 4 · Aprobar: secciones con casilla, modos de aplicar, avisos y resumen | 1 secciones; 2 modos; 3 resumen; 4 «Aprobar e importar al informe» |
+| com-aplicado | Mensaje final «Listo: el informe ya tiene los datos» | 1 filas, secciones y textos; 2 «Borrador de Pilo»; 3 «Ir a Mi informe» |
+
 ## Contribuyente y Consulta
 
 | Captura | Rol | Qué muestra | Marcas |

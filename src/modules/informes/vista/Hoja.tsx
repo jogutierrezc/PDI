@@ -17,7 +17,7 @@ export const EDIFICIOS = "/boletin/cabecera-edificios.png";
 export const FOTO_PORTADA = "/boletin/portada.jpg";
 export const FOTO_CONTRAPORTADA = "/boletin/contraportada.jpg";
 
-/** Marca de estado del pie: cifras en vivo (borrador) o foto con su fecha (enviado o aprobado). */
+/** Marca de estado del pie: sin marca en borrador; «Foto del …» con su fecha cuando está enviado o aprobado. */
 export interface MarcaEstado {
   e: "vivo" | "foto";
   texto: string;
@@ -98,7 +98,7 @@ export function HojaContenido({
       <footer className="vi-ft" data-side={lado}>
         <span className="vi-ft-s">{pie}</span>
         <span className="vi-ft-t" data-e={ctx.marca.e}>
-          {ctx.marca.texto}
+          {ctx.marca.e === "foto" ? ctx.marca.texto : ""}
         </span>
         <span className="vi-ft-f">
           <b>{folio < 10 ? `0${folio}` : folio}</b>
@@ -335,10 +335,7 @@ const PARRAFOS = (t: string): string[] => t.split(/\n+/).map((x) => x.trim()).fi
 
 export function PaginaCierre({ ctx, cierre, folio, anioTexto }: { ctx: ContextoHoja; cierre: CierreDiseno; folio: number; anioTexto: string }) {
   const c = ctx.perfil.contacto;
-  const estado =
-    ctx.marca.e === "vivo"
-      ? "Las cifras de este borrador se leyeron en vivo y cambian hasta el envío del informe."
-      : `Las cifras son las que se guardaron al enviar el informe (${ctx.marca.texto.replace(/^Foto del /, "")}).`;
+  const estado = ctx.marca.e === "foto" ? `Las cifras son las que se guardaron al enviar el informe (${ctx.marca.texto.replace(/^Foto del /, "")}).` : "";
   return (
     <HojaContenido ctx={ctx} titulo="Cierre del informe" folio={folio}>
       <div className="vi-u">

@@ -11,7 +11,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { nombreRol } from "../../rankings/reporte/envio";
 import { movimientoReducido, useEntrada } from "../../rankings/movimiento";
-import { esViva } from "../cifras-vivas";
+import { CIFRAS_VIVAS_ACTIVAS, esViva } from "../cifras-vivas";
 import {
   piloRedactar,
   usePlanUnidad,
@@ -358,7 +358,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
           </span>
         </div>
         <Barra valor={listas / secciones.length} etiqueta="Secciones listas" />
-        <small className="inf-muted">{m.frio || estadoVista === "sent" || estadoVista === "ok" ? "Las cifras quedaron congeladas al enviar." : "Las cifras siguen en vivo hasta que envíe."}</small>
+        {(m.frio || estadoVista === "sent" || estadoVista === "ok") && <small className="inf-muted">Las cifras quedaron congeladas al enviar.</small>}
         <Link className="inf-link" to={enlaceInforme(`${BASE}/vista`, unidad.id, sede)}>
           Vista del informe en papel
         </Link>
@@ -772,7 +772,7 @@ function CuerpoSeccion({
               <div className="inf-blk__lab">
                 <Tag auto />
                 <span className="inf-src">
-                  {m.frio ? "Foto tomada al enviar" : "En vivo hasta que envíe"} · Indicadores del programa en Impacto. Las filas no se editan; añada su análisis.
+                  {m.frio ? "Foto tomada al enviar · " : ""}Indicadores del programa en Impacto. Las filas no se editan; añada su análisis.
                 </span>
               </div>
               <TablaMetasPrograma
@@ -831,14 +831,16 @@ function CuerpoSeccion({
               sugerir={(p) => sugerirCriterio.mutateAsync({ nombre: p.nombre, descripcion: "", unidad: inst.unit_id })}
             />
           </div>
+          {CIFRAS_VIVAS_ACTIVAS && (
           <details className="inf-blk inf-sug">
             <summary>Conectar indicadores de UDES en Cifras o del PDI (opcional)</summary>
             <div className="inf-blk__lab">
               <Tag auto />
-              <span className="inf-src">{m.frio ? "Foto tomada al enviar" : "En vivo hasta que envíe"} · UDES en Cifras y PDI</span>
+              <span className="inf-src">{m.frio ? "Foto tomada al enviar · " : ""}UDES en Cifras y PDI</span>
             </div>
             <DimensionesConectadas def={def} m={m} propias={propias} editable={editable} pilares={pilares} guardar={guardar} agregarPropio={agregarPropio} quitarPropio={quitarPropio} />
           </details>
+          )}
           <LoCargadoPorDimension resumen={resumen} editable={editable} usarEnTexto={(p) => cambiar({ ...c, texto: [c.texto?.trim(), p].filter(Boolean).join("\n\n") })} />
           {vigente && vigente.acciones.length > 0 && (
             <div className="inf-blk">
@@ -886,7 +888,7 @@ function CuerpoSeccion({
           <div className="inf-blk">
             <div className="inf-blk__lab">
               <Tag auto />
-              <span className="inf-src">Se arma sola con Objetivos y metas y con Resultados por dimensión. Sus cifras se pueden citar en el texto («Insertar una cifra viva»).</span>
+              <span className="inf-src">Se arma sola con Objetivos y metas y con Resultados por dimensión.</span>
             </div>
             <PanelSintesis s={m.sintesis} />
           </div>

@@ -127,7 +127,7 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
       acento: evaluarAcento(perfil.acento),
       anio: diseno.portada.anio || String(ciclo.anio),
       escudoUrl: perfil.logoRuta ? (escudo.data ?? null) : null,
-      marca: congelado(inst.estado) ? { e: "foto", texto: `Foto del ${inst.enviado_en ? fmtFecha(inst.enviado_en) : "envío"}` } : { e: "vivo", texto: "Cifras en vivo" },
+      marca: congelado(inst.estado) ? { e: "foto", texto: `Foto del ${inst.enviado_en ? fmtFecha(inst.enviado_en) : "envío"}` } : { e: "vivo", texto: "" },
     }),
     [diseno.papel, diseno.portada.anio, perfil, ciclo.anio, escudo.data, inst.estado, inst.enviado_en],
   );
@@ -196,10 +196,10 @@ function Visor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow;
             </button>
           </div>
 
-          <p className="vi-aviso" data-tono={vivo ? "vivo" : undefined} role="note">
+          <p className="vi-aviso" role="note">
             {vivo ? (
               <>
-                <b>Las cifras están en vivo.</b> Este informe es un borrador: las hojas llevan la marca «Cifras en vivo» y los valores cambian hasta que se envíe.
+                <b>Borrador.</b> Las hojas muestran el informe tal como está hoy.
               </>
             ) : (
               <>

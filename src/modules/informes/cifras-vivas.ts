@@ -15,13 +15,18 @@ import { cifraDef } from "./plantillas";
 import type { CifraRow, Condicion, EstadoInstancia, FuenteTipo, LecturaViva } from "./types";
 
 export const ETIQUETA_FUENTE: Record<FuenteTipo, string> = {
-  auto: "UDES en Cifras (en vivo)",
-  pdi: "Indicador del PDI (en vivo)",
-  aportes: "Aportes aprobados (en vivo)",
+  auto: "UDES en Cifras",
+  pdi: "Indicador del PDI",
+  aportes: "Aportes aprobados",
   excel: "Excel propio",
   manual: "Dato manual",
   url: "Documento o URL",
 };
+
+/** Las cifras conectadas a UDES en Cifras y al PDI no estaban funcionando (almacén en revisión): los programas
+ *  reportan a mano. En falso se oculta «Conectar indicadores…» y el envío ya no exige justificarlas (0296).
+ *  Para reactivarlas: poner en true y restituir los tres controles de la 0279 en informe_validar_envio. */
+export const CIFRAS_VIVAS_ACTIVAS = false;
 
 export const esViva = (t: FuenteTipo) => t === "auto" || t === "pdi" || t === "aportes";
 export const esPropia = (t: FuenteTipo) => !esViva(t);

@@ -1,11 +1,12 @@
-/* Texto con cifras enlazadas: el campo de escritura con «Insertar una cifra
-   viva» y la vista previa «Así se leerá». Lo usan el editor y la revisión. */
+/* Texto de una sección: el campo de escritura y, si el texto ya trae cifras
+   enlazadas ([[clave]] de informes anteriores), la vista «Así se leerá». Insertar
+   cifras vivas está desactivado: no estaban funcionando. Lo usan el editor y la revisión. */
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { ReactNode } from "react";
 import { formatoCifra } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
-import { insertarToken, palabras, partesTexto } from "../tokens";
+import { palabras, partesTexto } from "../tokens";
 import type { Resolver } from "../tokens";
 
 /** Resolver de tokens a partir de las cifras del informe. */
@@ -18,7 +19,7 @@ export function resolverDe(cifras: CifraVista[]): Resolver {
 }
 
 /** El texto leído: cada cifra como chip con su fuente al pasar o enfocar. */
-export function LecturaTexto({ texto, resolver, vacio = "Escriba o inserte una cifra." }: { texto: string; resolver: Resolver; vacio?: string }) {
+export function LecturaTexto({ texto, resolver, vacio = "Escriba el texto de la sección." }: { texto: string; resolver: Resolver; vacio?: string }) {
   if (!texto.trim()) return <span className="inf-muted">{vacio}</span>;
   return (
     <>
@@ -43,7 +44,6 @@ export function CampoTexto({
   etiqueta,
   valor,
   onChange,
-  cifras,
   resolver,
   editable,
   minimo,
@@ -53,8 +53,8 @@ export function CampoTexto({
   etiqueta: string;
   valor: string;
   onChange: (v: string) => void;
-  /** Cifras que se pueden insertar (las incluidas del informe). */
-  cifras: CifraVista[];
+  /** Sin uso: la inserción de cifras vivas está desactivada. Se conserva para no tocar a quienes lo pasan. */
+  cifras?: CifraVista[];
   resolver: Resolver;
   editable: boolean;
   minimo?: number;
@@ -63,37 +63,11 @@ export function CampoTexto({
   pie?: ReactNode;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [clave, setClave] = useState("");
   const n = palabras(valor);
-
-  const insertar = () => {
-    if (!clave) return;
-    const r = insertarToken(valor, ref.current?.selectionStart ?? null, clave);
-    onChange(r.texto);
-    requestAnimationFrame(() => {
-      ref.current?.focus();
-      ref.current?.setSelectionRange(r.cursor, r.cursor);
-    });
-  };
+  const conCifras = /\[\[[^\]]+\]\]/.test(valor);
 
   return (
     <>
-      {editable && cifras.length > 0 && (
-        <div className="inf-cite">
-          <select className="inf-in" value={clave} onChange={(e) => setClave(e.target.value)} aria-label="Cifra a insertar">
-            <option value="">Insertar una cifra viva…</option>
-            {cifras.map((c) => (
-              <option key={c.clave} value={c.clave}>
-                {c.etiqueta} ({formatoCifra(c.valor, c.unidad)})
-              </option>
-            ))}
-          </select>
-          <button type="button" className="inf-btn inf-btn--sm" onClick={insertar} disabled={!clave}>
-            Insertar
-          </button>
-          <span className="inf-hint">La cifra queda como vínculo: si la fuente cambia, el texto cambia.</span>
-        </div>
-      )}
       <div className="inf-fld">
         <textarea ref={ref} value={valor} onChange={(e) => onChange(e.target.value)} readOnly={!editable} placeholder={editable ? placeholder : ""} aria-label={etiqueta} />
         <div className="inf-fld__ft">
@@ -103,12 +77,14 @@ export function CampoTexto({
           {pie}
         </div>
       </div>
-      <div className="inf-blk" style={{ marginTop: "var(--space-2)" }}>
-        <span className="inf-eyebrow">Así se leerá, con las cifras vivas</span>
-        <div className="inf-pv" aria-live="polite">
-          <LecturaTexto texto={valor} resolver={resolver} />
+      {conCifras && (
+        <div className="inf-blk" style={{ marginTop: "var(--space-2)" }}>
+          <span className="inf-eyebrow">Así se leerá</span>
+          <div className="inf-pv" aria-live="polite">
+            <LecturaTexto texto={valor} resolver={resolver} />
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

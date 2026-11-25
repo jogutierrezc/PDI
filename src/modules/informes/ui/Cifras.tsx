@@ -41,12 +41,7 @@ function Fuente({ c, editable, guardar }: { c: CifraVista; editable: boolean; gu
       <div className="inf-tile__s">
         {c.congelada ? (
           <span className="inf-pill">Foto del {fmtFecha(c.corte)}</span>
-        ) : c.viva ? (
-          <span className="inf-pill is-teal">
-            <i className="inf-live" aria-hidden="true" />
-            En vivo
-          </span>
-        ) : (
+        ) : c.viva ? null : (
           <span className="inf-pill is-own">Fuente propia</span>
         )}
         <span>

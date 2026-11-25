@@ -96,12 +96,6 @@ export function validarTexto(texto: string, o: { claves: Iterable<string>; minim
     c.push(n >= o.minimo ? { nivel: "ok", texto: `Extensión adecuada (${n} palabras)` } : { nivel: "warn", texto: `Faltan ${o.minimo - n} palabras para el mínimo` });
   }
   c.push(textoDePlantilla(t) ? { nivel: "warn", texto: "El texto parece un ejemplo de la plantilla. Reemplácelo." } : { nivel: "ok", texto: "Sin frases de ejemplo de la plantilla" });
-  const mano = cifrasAMano(t).length;
-  c.push(
-    mano
-      ? { nivel: "warn", texto: `Hay ${mano} ${mano === 1 ? "cifra escrita" : "cifras escritas"} a mano. Use «Insertar una cifra viva» para que sigan a su fuente.` }
-      : { nivel: "ok", texto: "Las cifras del texto están enlazadas a su fuente" },
-  );
   const rotos = tokensDesconocidos(t, o.claves);
   if (rotos.length) c.push({ nivel: "warn", texto: `Cifras que no existen en este informe: ${rotos.map((k) => `[[${k}]]`).join(", ")}` });
   return c;

@@ -49,8 +49,9 @@ describe("advertencias del texto", () => {
 
   it("arma los controles con mínimo de palabras", () => {
     const c = validarTexto("Uno dos 3 [x]", { claves: ["matric"], minimo: 10 });
-    expect(c.map((x) => x.nivel)).toEqual(["warn", "warn", "warn"]);
+    expect(c.map((x) => x.nivel)).toEqual(["warn", "warn"]);
     expect(c[0].texto).toMatch(/Faltan 6 palabras/);
+    expect(c.map((x) => x.texto).join(" ")).not.toMatch(/cifra viva|a mano/);
     const bien = validarTexto("La matrícula llegó a [[matric]] estudiantes.", { claves: ["matric"] });
     expect(bien.every((x) => x.nivel === "ok")).toBe(true);
   });

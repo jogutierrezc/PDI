@@ -172,7 +172,7 @@ function Detalle({ inst, ciclo, requisitos, unidad, sede, esFacultad }: { inst: 
         <EstadoPill estado={inst.estado} />
       </div>
       <p className="inf-lead">
-        {m.frio ? "Las cifras son la foto tomada al enviar." : "Las cifras se leen en vivo: el informe no está enviado."}
+        {m.frio ? "Las cifras son la foto tomada al enviar." : ""}
         {inst.enviado_en ? ` Enviado el ${fmtFecha(inst.enviado_en)}.` : ""}
       </p>
       <div className="inf-row" style={{ flexWrap: "wrap" }}>

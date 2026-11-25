@@ -1,0 +1,243 @@
+Informes Institucionales
+Informes Institucionales · 2026
+Mi informe
+
+Las cifras de UDES en Cifras y del Plan de Desarrollo ya cargadas; usted escribe lo que solo su unidad puede decir
+
+Panel
+Mi informe
+Vista del informe
+Guía con Pilo
+PLANTILLA A · DECANATURA
+Facultad de Ingeniería ?
+Informe 2026 · su papel: Gestor
+◐
+Borrador
+7 de 10 listas
+Las cifras siguen en vivo hasta que envíe.
+Vista del informe en papel
+Libro de Excel
+Compilar informe de colaboradores con Pilo
+?
+1
+Resumen ejecutivo
+Lista
+2
+Alineación estratégica con el PDI
+Lista
+3
+Objetivos y metas 2026
+Lista
+4
+Resultados por dimensión estratégica
+En curso
+5
+Puntos críticos y acciones de mejora
+Lista
+6
+Logros destacados
+Lista
+7
+Evidencias y fuentes de verificación
+Lista
+8
+Conclusiones
+Sin empezar
+9
+Reconocimientos externos
+Sin empezar
+10
+Anexos
+Lista
+?
+Enviar
+Se habilita cuando las 10 secciones estén listas (van 7).
+SECCIÓN 1 DE 10
+Resumen ejecutivo ?
+Lista
+
+Lo escribe la unidad · 1 a 3 párrafos.
+
+APORTE
+1 a 3 párrafos
+Insertar una cifra viva…
+Matrícula total (2.851)
+Deserción anual (8,6 %)
+Retención de primer semestre (80,2 %)
+Saber PRO · promedio global (155)
+Profesores con doctorado (27 %)
+Evaluación docente (4,3)
+Registros calificados vigentes (14)
+Grupos categorizados (8)
+Semilleros activos (21)
+Convenios activos (35)
+Ejecución presupuestal (92 %)
+Prácticas en laboratorios externos (64)
+Egresados empleados a los 6 meses (83 %)
+Estudiantes en prácticas profesionales (64)
+Egresados vinculados laboralmente (83 %)
+Estudiantes con tutoría de pares (420)
+Artículos en revistas indexadas (38)
+Ejecución del presupuesto de laboratorios (92 %)
+Metas con resultado (3)
+Metas cumplidas o superadas (0)
+Indicadores reportados (18)
+Indicadores que cumplen o superan la meta (1)
+Indicadores que cumplen o superan la meta (%) (6 %)
+Indicadores rezagados (0)
+Indicadores que mejoraron frente al periodo anterior (17)
+Insertar
+La cifra queda como vínculo: si la fuente cambia, el texto cambia.
+67 palabras · mínimo 25
+Pilo redacta un borrador
+ASÍ SE LEERÁ, CON LAS CIFRAS VIVAS
+Durante 2026 la Facultad de Ingeniería llegó a 2.851 estudiantes, con una retención de primer semestre de 80,2 % y 27 % de profesores con doctorado. Los 8 grupos de investigación categorizados y los 21 semilleros activos sostuvieron la producción académica, mientras que la ejecución presupuestal cerró en 92 %.
+
+El año deja como reto principal reducir la deserción en los primeros semestres y consolidar la oferta nocturna de Sistemas.
+Tablas y gráficas de UDrive · se actualizan mientras el informe está en borrador
++ Agregar una tabla o gráfica de UDrive
+Abrir UDrive para crear una
+Controles ?
+✓
+Bien:
+Extensión adecuada (67 palabras)
+✓
+Bien:
+Sin frases de ejemplo de la plantilla
+✓
+Bien:
+Las cifras del texto están enlazadas a su fuente
+✓
+Bien:
+Cifras en vivo hasta que envíe. Corte de referencia: 31 de dic de 2026
+Datos que puede consultar ?
+UDES en Cifras
+Cifras del periodo con su fuente y corte
+Abrir UDES en Cifras
+Plan de Desarrollo
+Pilares, proyectos y su avance
+Abrir el portal de implementación
+Pilo
+Pregunte de dónde sale una cifra o pida comparar con otra unidad.
+Preguntar a Pilo
+Compilar informe de colaboradores con Pilo
+Facultad de Ingeniería · Informe de gestión 2026 · Plantilla A
+Exportar Excel
+Importar al informe
+Cerrar
+✓
+Recibir
+Libros de los equipos
+2
+Organizar
+Criterios y fuentes
+3
+Redactar
+Borrador con Pilo
+4
+Aprobar
+Importar al informe
+Datos organizados por criterio
+
+Pilo reúne lo que aportó cada equipo, unifica el nombre de cada indicador y deja como valor oficial el de su fuente primaria.
+
+7
+indicadores listos
+1
+conflictos
+1
+sin dato
+2
+nombres unificados
+SECCIÓN DEL INFORME	SECRETARÍA ACADÉMICA	DIRECCIÓN DE PROGRAMA	BIENESTAR UNIVERSITARIO	COORDINACIÓN DE INVESTIGACIÓN
+Resultados por dimensión estratégica	4	3	3	2
+Evidencias y fuentes de verificación	·	·	·	·
+Todos
+Conflictos
+Sin dato
+Nombre unificado
+ENSEÑANZA
+Retención de primer semestre
+3 equipos lo reportaron
+elegir valor
+UDES en Cifras
+fuente primaria Conflicto
+CÓMO LO ESCRIBIÓ CADA EQUIPO
+Secretaría académica
+escribió Retención de primer semestre en 04 Resultados por dimensión est, fila 5 · fuente: UDES en Cifras
+80,2 %
+Dirección de programa
+escribió Retención del primer semestre en 04 Resultados por dimensión est, fila 5 · fuente: Registro del programa
+81,3 %
+Bienestar universitario
+escribió Retención de primer semestre en 04 Resultados y evidencias, fila 5 · fuente: UDES en Cifras
+80,2 %
+Los equipos no coinciden.
+Usar el valor de la fuente primaria
+UDES en Cifras
+Se llamará en el informe:
+ENSEÑANZA
+Tasa de deserción anual
+2 equipos lo reportaron
+8,6%
+SPADIES
+fuente primaria Unificado
+ENSEÑANZA
+Profesores con doctorado
+1 equipo lo reportó
+27%
+Registro de talento humano
+fuente primaria Listo
+ENSEÑANZA
+Estudiantes matriculados
+1 equipo lo reportó
+2.851
+UDES en Cifras
+fuente primaria Listo
+ENSEÑANZA
+Estudiantes con tutoría de pares
+1 equipo lo reportó
+420
+Registro de la Coordinación de Tutorías
+fuente primaria Listo
+ENSEÑANZA
+Estudiantes con apoyo socioeconómico
+1 equipo lo reportó
+214
+Registro de Bienestar
+fuente primaria Listo
+ENSEÑANZA
+Estudiantes en riesgo de deserción atendidos
+1 equipo lo reportó
+sin dato
+Registro de Bienestar
+fuente primaria Sin dato
+INVESTIGACIÓN
+Grupos de investigación categorizados
+1 equipo lo reportó
+8
+Minciencias
+fuente primaria Listo
+INVESTIGACIÓN
+Semilleros de investigación activos
+1 equipo lo reportó
+21
+Registro de la unidad
+fuente primaria Listo
+Pilo Astra 1.0
+RAZONA ANTES DE ESCRIBIR
+Reuní 9 indicadores. 1 tiene valores distintos entre equipos: abra el indicador y elija el valor, o use el de la fuente primaria. 1 sin dato.
+NIVEL DE RAZONAMIENTO
+Rápida
+Compleja
+Investigación
+Equilibrio entre calidad y tiempo. Recomendado.
+Cómo pensó Pilo
+
+Regla de Pilo: no inventa cifras. Todo número del texto es una cifra enlazada a su fuente; lo que ningún equipo entregó queda como «sin dato».
+
+Sin tope fijo de longitud: Pilo escribe cada sección por partes, tan largas como lo pidan los datos, y las une.
+
+Atrás
+1 conflicto sin resolver. Puede seguir, pero Pilo no usará ese dato.
+Redactar con Pilo

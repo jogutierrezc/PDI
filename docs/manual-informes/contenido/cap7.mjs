@@ -49,6 +49,7 @@ export default {
       ["Cada equipo diligencia", "Solo en las celdas de color. Si el equipo no tiene la información, deja la fila vacía."],
       ["Recoja y devuelva", "Cada equipo devuelve su libro. El Gestor los importa uno tras otro; cada uno conserva la huella de la estructura."],
     ]),
+    ticket("¿Muchos libros a la vez?", `Si recibe libros de varios equipos y quiere unificar sus cifras y redactar un borrador de texto, use ${q("Compilar informe de colaboradores con Pilo")} en lugar de importar cada libro: reúne todos los libros, detecta los conflictos y deja que Pilo redacte (capítulo 8).`),
     h2("Las hojas ocultas", "ocultas"),
     p(`El libro lleva dos hojas ocultas que no se tocan. ${q("Listas")} alimenta las listas desplegables: si se borra, dejan de funcionar. ${q("_Control")} une el libro con el informe: guarda el formato, el ciclo, la plantilla, el informe, la unidad y la huella de la estructura.`),
     hoja({ f: "xls-control-oculta", alt: "Hoja oculta _Control con el formato, el ciclo, la plantilla, la unidad y la huella", maxh: 300 }),

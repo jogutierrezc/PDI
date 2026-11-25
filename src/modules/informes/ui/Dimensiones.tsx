@@ -253,9 +253,7 @@ function FilaCifra({ c, quitable, abierta, alternar, p }: { c: CifraVista; quita
         <th scope="row">
           {c.etiqueta}
           <small>
-            {c.congelada ? "Foto al enviar" : c.viva ? "En vivo" : "Fuente propia"}
-            {c.cambio ? " · cambió" : ""}
-            {pide ? " · falta justificar" : ""}
+            {[c.congelada ? "Foto al enviar" : c.viva ? "" : "Fuente propia", c.cambio ? "cambió" : "", pide ? "falta justificar" : ""].filter(Boolean).join(" · ")}
           </small>
         </th>
         <td className="inf-num">

@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe de Gestión 2026 · Guía del Gestor</title>
+<link rel="stylesheet" href="fuentes/local.css">
+<link rel="stylesheet" href="estilo.css">
+<link rel="stylesheet" href="estilo-extra.css">
+</head>
+<body>
+<div id="viewport"><div id="stage"><div id="bar"></div></div></div>
+<audio id="aud" src="audio/voz.wav" preload="auto"></audio>
+<script src="gsap.min.js"></script>
+<script src="timing.js"></script>
+<script>
+/* =====================================================================================================
+   Video: Guía del Gestor · Informe de Gestión 2026.
+   Cada animación está atada a una FRASE de la narración, no a un segundo: T("04","para entrar") busca esa frase en
+   la transcripción de la voz (timing.js). Con una voz nueva se corre audio.py y se vuelve a renderizar; nada más.
+   ===================================================================================================== */
+const E = "power4.out";
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const TM = window.TIMING;
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+const WS = TM.palabras.map(([w, s, e]) => ({ n: norm(w), s, e })).filter(w => w.n);
+function lev(a, b) { const m = a.length, n = b.length; if (Math.abs(m - n) > 1) return 9; const d = Array.from({ length: m + 1 }, (_, i) => [i]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
+const same = (a, b) => a === b || (a.length >= 5 && b.length >= 5 && lev(a, b) <= 1);
+const words = p => p.split(/\s+/).map(norm).filter(Boolean);
+function find(ws, from, to, skip = 0) {
+  let seen = 0;
+  for (let i = from; i <= to - ws.length; i++) { let ok = true; for (let k = 0; k < ws.length; k++) if (!same(WS[i + k].n, ws[k])) { ok = false; break; } if (ok && seen++ >= skip) return i; }
+  return -1;
+}
+window.__avisos = [];
+
+/* ---------- inicio de cada escena: primera frase de la narración ---------- */
+const INI = { "01": "bienvenido al informe de gestion", "02": "el informe de gestion recoge", "03": "existen cuatro papeles", "04": "para entrar abra el menu", "05": "las secciones de texto como", "06": "la alineacion estrategica se trabaja", "07": "en resultados por dimension se", "08": "hay tres maneras de cargar", "09": "cuando varios equipos de su", "10": "cuando los libros regresan se", "11": "hay un caso en el que", "12": "en recibir suba los libros", "13": "antes de enviar revise el", "14": "planeacion o la unidad de", "15": "la vista del informe muestra", "16": "para terminar una lista de" };
+const IDS = Array.from({ length: 16 }, (_, i) => String(i + 1).padStart(2, "0"));
+const I0 = {}; let cur = 0;
+IDS.forEach(id => { let i = find(words(INI[id]), cur, WS.length); if (i < 0) { window.__avisos.push("inicio no hallado: " + id); i = cur; } I0[id] = i; cur = i; });
+const D = TM.duracion + 1.5;
+const tIni = id => (TM.escenas && TM.escenas[id] !== undefined && I0[id] === undefined) ? TM.escenas[id] : WS[I0[id]].s;
+function nextId(id) { const k = IDS.indexOf(id); return IDS[k + 1]; }
+const tEnd = id => nextId(id) ? tIni(nextId(id)) : D;
+function T(id, phrase, nth = 0) {
+  const a = I0[id], b = nextId(id) ? I0[nextId(id)] : WS.length, ws = words(phrase);
+  let i = find(ws, a, b, nth);
+  if (i < 0 && ws.length >= 3) { for (let n = ws.length - 1; n >= 2 && i < 0; n--) for (let o = 0; o + n <= ws.length && i < 0; o++) i = find(ws.slice(o, o + n), a, b, nth); }
+  if (i < 0) { window.__avisos.push(id + ": «" + phrase + "»"); return tIni(id) + 1; }
+  (window.__pistas = window.__pistas || []).push({ id, phrase, t: +WS[i].s.toFixed(2), ctx: WS.slice(Math.max(a, i - 2), i + 5).map(w => w.n).join(" ") });
+  return WS[i].s;
+}
+
+const tl = gsap.timeline({ paused: true, defaults: { ease: E } });
+const IN = (sel, t, o = {}) => tl.fromTo(sel, { autoAlpha: 0, y: o.y ?? 26, x: o.x ?? 0, scale: o.s ?? 1 }, { autoAlpha: 1, y: 0, x: 0, scale: 1, duration: o.d ?? .55, ease: o.ease ?? E, stagger: o.st ?? 0 }, t);
+const DIM = (sel, t, to = .5) => tl.fromTo(sel, { opacity: 1 }, { opacity: to, duration: .4, ease: "power2.out" }, t);
+const LINE = (sel, t, o = {}) => tl.fromTo(sel + " > span", { yPercent: 110 }, { yPercent: 0, duration: o.d ?? .75, ease: E, stagger: o.st ?? .09 }, t);
+
+/* ---------- capturas con cámara y llamadas ---------- */
+function camKeys(el, f, r, keys, id) {
+  const [, , FW, FH] = f, IW = FW, IH = FW * r;
+  const pos = (s, fx, fy) => ({ scale: s, x: Math.min(0, Math.max(FW - IW * s, FW / 2 - fx * IW * s)), y: Math.min(0, Math.max(FH - IH * s, FH / 2 - fy * IH * s)) });
+  let prev = { scale: 1, x: 0, y: 0 };
+  tl.set(el, { transformOrigin: "0 0", ...prev }, 0);
+  keys.forEach(([cue, s, fx, fy]) => {
+    const t = typeof cue === "number" ? cue : T(id, cue) - .3, to = pos(s, fx, fy);
+    tl.fromTo(el, prev, { ...to, duration: .9, ease: "power3.inOut", immediateRender: false }, t);
+    prev = to;
+  });
+}
+function callout(host, [l, t, w, h], label, at, until, cls = "") {
+  const el = document.createElement("div");
+  el.className = "co " + cls + (t < 6 ? " in-b" : ""); el.style.cssText = `left:${l}%;top:${t}%;width:${w}%;height:${h}%`;
+  if (label) el.innerHTML = "<i>" + label + "</i>";
+  host.appendChild(el);
+  tl.fromTo(el, { autoAlpha: 0, scale: .97 }, { autoAlpha: 1, scale: 1, duration: .4, ease: E }, at);
+  if (until) tl.to(el, { autoAlpha: 0, duration: .3, ease: "power2.in" }, until);
+}
+function buildLayers(sc, id, layers) {
+  const starts = layers.map((L, k) => L.from ? T(id, L.from) - .3 : tIni(id) + .4);
+  layers.forEach((L, k) => {
+    const [x, y, w, h] = L.f, fr = document.createElement("div");
+    fr.className = "frame"; fr.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+    fr.innerHTML = `<div class="in"><img src="img/${L.src}.jpg" alt=""></div>`;
+    sc.appendChild(fr);
+    const inn = $(".in", fr), t0 = starts[k];
+    let tEndL = tEnd(id) + .1;
+    for (let j = k + 1; j < layers.length; j++) if (!layers[j].over) { tEndL = starts[j] + .15; break; }
+    if (k === 0 && !L.from) IN(fr, t0, { y: 40, s: .98, d: .8 });
+    else tl.fromTo(fr, { autoAlpha: 0, scale: .985 }, { autoAlpha: 1, scale: 1, duration: .45, ease: E }, t0);
+    if (tEndL < tEnd(id)) tl.to(fr, { autoAlpha: 0, duration: .35, ease: "power2.in" }, tEndL);
+    if (L.cam) camKeys(inn, L.f, L.r, L.cam, id);
+    const cos = L.co || [];
+    cos.forEach(([rect, label, cue, cls], i) => {
+      const at = T(id, cue) - .2;
+      if (i > 0 && at < T(id, cos[i - 1][2]) - .2) window.__avisos.push(id + ": llamada fuera de orden («" + cue + "»)");
+      let until = tEndL - .05; const nx = cos[i + 1]; if (nx) until = Math.min(until, T(id, nx[2]) - .1);
+      callout(inn, rect, label, at, until, cls || "");
+    });
+  });
+}
+function buildItems(sc, id, items, pos) {
+  const ol = document.createElement("ol"); ol.className = "stl"; ol.style.cssText = `left:${pos.x}px;top:${pos.y}px;width:${pos.w}px`;
+  ol.innerHTML = items.map((it, i) => `<li><i>${i + 1}</i><div><b>${it[0]}</b>${it[2] ? `<small>${it[2]}</small>` : ""}</div></li>`).join("");
+  sc.appendChild(ol);
+  const li = $$("li", ol);
+  let prevT = -1;
+  li.forEach((el, i) => { const t = T(id, items[i][1]) - .15; if (t < prevT) window.__avisos.push(id + ": ítem " + (i + 1) + " fuera de orden («" + items[i][1] + "»)"); prevT = t; IN(el, t, { y: 22, d: .5 }); if (i > 0) DIM(li[i - 1], t + .05, .5); });
+}
+function head(sc, id, kicker, title, theme, tag) {
+  const k = document.createElement("div"); k.className = "kicker"; k.style.cssText = "left:140px;top:104px"; k.textContent = kicker; sc.appendChild(k);
+  const h = document.createElement("h2"); h.style.cssText = "left:140px;top:150px;width:820px;font-size:62px";
+  h.innerHTML = title.map(t => `<span class="ln"><span>${t}</span></span>`).join("") + (tag ? `<span class="nuevo">${tag}</span>` : ""); sc.appendChild(h);
+  const t0 = tIni(id) + .15; IN(k, t0, { y: 14 }); LINE("#s" + id + " h2 .ln", t0 + .1);
+  if (tag) IN("#s" + id + " .nuevo", t0 + .7, { y: 10, d: .4 });
+}
+function foot(sc, id) { const f = document.createElement("div"); f.className = "ft"; f.innerHTML = `<span>Guía del Gestor · Informe de Gestión 2026</span><span>${id} / 16</span>`; sc.appendChild(f); const lg = document.createElement("img"); lg.className = "logo"; lg.src = sc.classList.contains("navy") ? "img/logo-udes-blanco.png" : "img/logo-udes.svg"; sc.insertBefore(lg, sc.firstChild); }
+
+const stage = $("#stage");
+function newScene(id, theme) { const s = document.createElement("section"); s.className = "sc " + theme; s.id = "s" + id; s.style.zIndex = +id; stage.appendChild(s); return s; }
+const CHECK = '<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#f6b93f" stroke-width="4"/><path class="tick" d="M18 33l10 10 19-22" fill="none" stroke="#f6b93f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/* ====================================== 01 · BIENVENIDA ====================================== */
+{
+  const id = "01", sc = newScene(id, "navy");
+  sc.innerHTML = `<img src="img/logo-udes-blanco.png" alt="" style="left:140px;top:84px;height:128px">
+  <div class="kicker" style="left:140px;top:330px">Planeación Institucional · Ciclo 2026</div>
+  <h1 style="left:140px;top:384px;width:1200px"><span class="ln"><span>Informe de</span></span><span class="ln"><span>Gestión 2026</span></span></h1>
+  <p class="lede" id="l01" style="left:140px;top:760px;width:1000px">Guía de trabajo del Gestor</p>
+  <div id="c01" style="left:140px;top:880px;display:flex;gap:14px">
+    <span class="chip" style="font-size:28px;padding:11px 24px">Cada sección</span><span class="chip" style="font-size:28px;padding:11px 24px">Cargar datos</span><span class="chip" style="font-size:28px;padding:11px 24px">Libro de Excel</span><span class="chip" style="font-size:28px;padding:11px 24px;background:#f6b93f;border-color:#f6b93f;color:#1d1402">Compilador con Pilo · Nuevo</span></div>
+  <img id="pilo01" src="img/pilo_emocionado.svg" alt="" style="right:210px;bottom:110px;height:560px">`;
+  IN("#s01 .kicker", .15, { y: 14 }); LINE("#s01 h1 .ln:nth-child(1)", .25, { d: .9 }); LINE("#s01 h1 .ln:nth-child(2)", .45, { d: .9 });
+  IN("#pilo01", .6, { y: 80, d: 1.1, s: .96 });
+  tl.fromTo("#pilo01", { rotation: 0 }, { rotation: -3, duration: 2.2, ease: "sine.inOut", yoyo: true, repeat: 7, transformOrigin: "50% 100%" }, 2);
+  IN("#l01", T(id, "guia de trabajo") - .2, { y: 22 });
+  [["cada seccion"], ["se cargan los datos"], ["libro de excel"], ["compilador de informes"]].forEach(([c], i) => IN($$("#c01 .chip")[i], T(id, c) - .1, { y: 18, d: .5 }));
+}
+
+/* ====================================== 02 · EL MÓDULO Y EL CICLO ====================================== */
+{
+  const id = "02", sc = newScene(id, "page");
+  head(sc, id, "El módulo y el ciclo", ["Un recorrido de siete pasos"], "page");
+  sc.insertAdjacentHTML("beforeend", `<p class="lede dk" id="l02" style="left:140px;top:280px;width:1500px;font-size:34px">Las cifras de UDES en Cifras y del Plan de Desarrollo ya están cargadas. Usted escribe lo que solo su unidad puede decir.</p>
+  <ol class="cad" id="cad">
+    <li><b>Ciclo</b><span>Planeación abre el año y fija la fecha límite.</span><em>Planeación</em></li>
+    <li><b>Estructura</b><span>Qué secciones lleva cada tipo de unidad.</span><em>Planeación</em></li>
+    <li><b>Responsables</b><span>Quién escribe el informe de cada unidad.</span><em>Planeación</em></li>
+    <li class="me"><b>Diligenciar</b><span>La unidad escribe, con cifras vivas y evidencias.</span><em>Su unidad</em><div class="here">Su trabajo</div></li>
+    <li class="me"><b>Enviar</b><span>El Gestor envía. El informe queda aprobado.</span><em>Gestor</em></li>
+    <li><b>Revisión</b><span>Se puede devolver con una nota.</span><em>Planeación</em></li>
+    <li><b>Salidas</b><span>Papel, PDF, Excel y presentación.</span><em>Sistema</em></li></ol>`);
+  foot(sc, id);
+  IN("#l02", T(id, "las cifras de udes") - .2, { y: 18 });
+  const cols = $$("#cad > li"), cues = ["abre el ciclo", "define que secciones", "asigna a las personas", "la unidad diligencia", "gestor lo envia", "devolverlo con una nota", "una vez aprobado"];
+  cols.forEach((li, i) => {
+    const t = T(id, cues[i]) - .15;
+    tl.fromTo(li, { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: .5, ease: E }, t);
+    tl.fromTo(li, { clipPath: "inset(-120px 100% -40px 0)" }, { clipPath: "inset(-120px -500px -40px 0)", duration: .55, ease: E }, t);
+  });
+  const tf = T(id, "ocupa la parte central");
+  cols.forEach((li, i) => { if (i !== 3 && i !== 4) DIM(li, tf, .38); });
+  tl.fromTo($("#cad li:nth-child(4) .here"), { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: .4 }, tf + .1);
+  tl.fromTo("#cad .me", { scale: 1 }, { scale: 1.04, duration: .6, ease: E, transformOrigin: "0 0" }, tf + .1);
+}
+
+/* ====================================== 03 · PAPELES ====================================== */
+{
+  const id = "03", sc = newScene(id, "navy");
+  head(sc, id, "Los cuatro papeles", ["Quién hace qué"], "navy");
+  sc.insertAdjacentHTML("beforeend", `<div class="rl" id="rl">
+    <div class="rr"><b>Administrador</b><span>Es Planeación. Prepara el ciclo y revisa.</span></div>
+    <div class="rr" id="rg"><b>Gestor</b><span>Diligencia y envía el informe de su unidad.</span><em>Envía</em></div>
+    <div class="rr"><b>Contribuyente</b><span>Ayuda a escribir y sube evidencias.</span><em>No envía</em></div>
+    <div class="rr"><b>Consulta</b><span>Solo lee.</span><em>Solo lee</em></div></div>
+    <div class="ways" id="ways"><span class="chip">Planeación lo asigna en «Responsables»</span><span class="chip">Rol de acceso «Diligencia y envía»</span><span class="chip">Varias unidades: abre la de mayor función</span></div>`);
+  foot(sc, id);
+  const rr = $$("#rl .rr"), cues = ["el administrador", "el gestor diligencia", "el contribuyente", "y consulta"];
+  rr.forEach((el, i) => IN(el, T(id, cues[i]) - .15, { y: 26, d: .55 }));
+  const tg = T(id, "el gestor diligencia");
+  tl.fromTo("#rg", { backgroundColor: "rgba(255,255,255,.07)" }, { backgroundColor: "#fff", borderColor: "#fff", duration: .4 }, tg);
+  tl.to("#rg b", { color: "#0a2d63", duration: .3 }, tg); tl.to("#rg span", { color: "#45566d", duration: .3 }, tg); tl.to("#rg em", { backgroundColor: "#f6b93f", color: "#1d1402", duration: .3 }, tg);
+  tl.to("#rg", { backgroundColor: "rgba(255,255,255,.07)", borderColor: "rgba(255,255,255,.22)", duration: .3 }, T(id, "el contribuyente") - .2);
+  tl.to("#rg b", { color: "#fff", duration: .3 }, T(id, "el contribuyente") - .2); tl.to("#rg span", { color: "#c3d5f2", duration: .3 }, T(id, "el contribuyente") - .2); tl.to("#rg em", { backgroundColor: "rgba(255,255,255,.14)", color: "#fff", duration: .3 }, T(id, "el contribuyente") - .2);
+  const ch = $$("#ways .chip");
+  IN(ch[0], T(id, "asigna en responsables") - .1, { y: 14, d: .45 }); IN(ch[1], T(id, "su rol de acceso") - .1, { y: 14, d: .45 }); IN(ch[2], T(id, "varias unidades") - .1, { y: 14, d: .45 });
+  buildLayers(sc, id, [{ src: "adm-responsables", r: 1.55, f: [1100, 110, 560, 868], from: "cuatro papeles", co: [[[3, 7, 93, 14], "Los papeles de la unidad", "cuatro papeles"], [[53.5, 26, 25.5, 5.4], "Papel: Gestor", "asigna en responsables"]] }]);
+}
+
+/* ====================================== 04 · ENTRAR A MI INFORME ====================================== */
+{
+  const id = "04", sc = newScene(id, "page");
+  head(sc, id, "Mi informe", ["Entrar y leer el estado", "del informe"], "page");
+  buildItems(sc, id, [["Menú «Informes Institucionales» → «Informes de gestión»", "para entrar"], ["Se abre «Mi informe»", "como gestor"], ["Pilo ofrece una guía la primera vez", "la primera vez"], ["Riel de estado y avance", "a la izquierda"], ["Lista de secciones y botón «Enviar»", "debajo"], ["Guardado automático", "el guardado es automatico"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "ges-mi-informe", r: 1.0753, f: [1010, 114, 770, 828], co: [[[3, 6, 9, 3], "Su pestaña", "como gestor"]], cam: [["como gestor", 1, .5, .5]] },
+    { src: "ges-guia-pilo", r: .9673, f: [1010, 114, 770, 745], from: "la primera vez", co: [[[56, 38, 43, 59], "Guía con Pilo", "la primera vez"]] },
+    { src: "ges-mi-informe", r: 1.0753, f: [1010, 114, 770, 828], from: "a la izquierda", cam: [["a la izquierda", 1.5, .2, .22], ["debajo", 1.4, .2, .62], ["boton enviar", 1.5, .2, .9], ["el guardado", 1, .5, .5]],
+      co: [[[3, 12, 26, 26], "Estado y avance", "a la izquierda"], [[4, 40, 24, 43], "Secciones", "debajo"], [[5, 91, 25, 5.5], "Enviar", "boton enviar"]] }]);
+  sc.insertAdjacentHTML("beforeend", `<div class="toast" id="tst"><i>✓</i>Cambios guardados</div>`);
+  IN("#tst", T(id, "cambios guardados") - .3, { y: 20, d: .5 });
+}
+
+/* ====================================== 05 · TEXTOS Y CIFRAS VIVAS ====================================== */
+{
+  const id = "05", sc = newScene(id, "page");
+  head(sc, id, "Secciones de texto", ["Cifras vivas", "y borrador de Pilo"], "page");
+  buildItems(sc, id, [["Extensión mínima de palabras", "las secciones de texto"], ["Cifras: «Insertar una cifra viva»", "no la escriba"], ["«Así se leerá, con las cifras vivas»", "asi se leera"], ["«Pilo redacta un borrador»", "si prefiere"], ["Usted confirma cada cifra y adapta el texto", "es solo un borrador"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  buildLayers(sc, id, [{ src: "ges-seccion-narrativa", r: .9677, f: [1000, 120, 780, 755], cam: [["insertar una cifra viva", 1.7, .62, .2], ["asi se leera", 1.5, .62, .62], ["pilo redacta un borrador", 1.7, .8, .46], ["confirmacion antes", 1, .5, .5]],
+    co: [[[33, 18.5, 46, 4.5], "Insertar una cifra viva", "insertar una cifra viva"], [[33, 26, 60, 24], "[[clave]] = cifra enlazada", "la cifra queda enlazada"], [[33, 53, 61, 27], "Así se leerá", "asi se leera"], [[73.5, 46.5, 18.5, 4], "Borrador de Pilo", "pilo redacta un borrador"]] }]);
+}
+
+/* ====================================== 06 · ALINEACIÓN Y METAS ====================================== */
+{
+  const id = "06", sc = newScene(id, "page");
+  head(sc, id, "Alineación y metas", ["Pilares del Plan", "de Desarrollo y metas"], "page");
+  buildItems(sc, id, [["Un pilar del Plan de Desarrollo", "la alineacion estrategica"], ["Aporte de al menos 10 palabras y acciones", "redacte el aporte"], ["Objetivos y metas: plan sincronizado", "en objetivos y metas"], ["Meta adicional: programado y alcanzado", "si necesita una meta"], ["El informe calcula el resultado", "superada"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  sc.insertAdjacentHTML("beforeend", `<div class="sw3" id="sw6" style="top:900px"><i style="background:#e6f4ea;color:#0d6a2e;border-color:#0d6a2e">Superada</i><i style="background:#e6f4ea;color:#0d6a2e;border-color:#0d6a2e">Cumplida</i><i style="background:#fbf2e0;color:#8a5f00;border-color:#8a5f00">Parcial</i></div>`);
+  IN("#sw6", T(id, "superada") - .1, { y: 16, d: .5 });
+  buildLayers(sc, id, [
+    { src: "ges-alineacion", r: 1.2505, f: [1010, 114, 680, 850], cam: [["elija un pilar", 1.5, .6, .26], ["redacte el aporte", 1.5, .6, .78], ["ya estan conectados", 1.4, .6, .53]],
+      co: [[[33, 17, 61, 22], "Pilares", "elija un pilar"], [[35, 69, 57, 14], "Aporte (mínimo 10 palabras)", "redacte el aporte"], [[35, 50, 58, 10], "Resultados conectados", "ya estan conectados"]] },
+    { src: "ges-metas", r: 1.2505, f: [1010, 114, 680, 850], from: "en objetivos y metas", cam: [["importar su seguimiento", 1.5, .5, .2], ["si necesita una meta", 1.4, .5, .55]],
+      co: [[[33, 17.6, 29, 3], "Importar JSON o PDF", "importar su seguimiento"], [[33, 45.5, 60, 15], "Meta adicional", "si necesita una meta"], [[34, 58, 26, 2.8], "Resultado calculado", "superada"]] }]);
+}
+
+/* ====================================== 07 · RESULTADOS POR DIMENSIÓN ====================================== */
+{
+  const id = "07", sc = newScene(id, "page");
+  head(sc, id, "Resultados por dimensión", ["Indicadores", "y acciones"], "page");
+  buildItems(sc, id, [["Criterios a los que reporta (opcional)", "primero marque"], ["«Lo que pide Planeación»: cifra, meta y justificación", "si planeacion configuro"], ["Indicador: unidad, anterior, actual y meta", "para cada indicador"], ["Cifra conectada: aviso si cambió", "si conecta"], ["Acciones: qué se hizo y fecha de finalización", "las acciones se describen"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "ges-dimensiones", r: 1.2003, f: [1000, 114, 700, 840], cam: [["primero marque", 1.3, .6, .12], ["lo que pide planeacion", 1.4, .62, .62], ["una justificacion", 1.5, .62, .84]],
+      co: [[[34, 0, 60, 28], "Criterios (opcional)", "primero marque"], [[33, 49.5, 60, 26], "Lo que pide Planeación", "lo que pide planeacion"], [[35, 81, 57, 7.5], "Fuente y justificación", "una justificacion"]] },
+    { src: "ges-cifras", r: 1.183, f: [1000, 114, 700, 828], from: "si conecta", cam: [["si conecta", 1.2, .6, .18], ["cuando la cifra cambio", 1.6, .6, .3]],
+      co: [[[33.5, 10, 58, 8], "Indicador conectado", "si conecta"], [[34.5, 27.5, 52, 3.5], "Cambió desde su última revisión", "cuando la cifra cambio"], [[37, 34.5, 52, 3.6], "Nota de la unidad", "usted decide"]] }]);
+}
+
+/* ====================================== 08 · CÓMO CARGAR LOS DATOS ====================================== */
+{
+  const id = "08", sc = newScene(id, "page");
+  head(sc, id, "Cargar los datos", ["Tres maneras,", "una para cada caso"], "page");
+  buildItems(sc, id, [["Conectar lo que ya existe", "primera", "UDES en Cifras y Plan de Desarrollo: se conectan, no se transcriben"], ["Escribir los datos propios", "segunda", "En la tabla de la sección, siempre con su fuente"], ["Importar el Excel de la sección", "tercera", "Plantilla → una fila por dato → «Importar Excel»"], ["Evidencias en su propia sección", "las evidencias", "PDF, Word, Excel o imagen hasta 15 MB, o enlace https · mínimo una"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "ges-cifras", r: 1.183, f: [1000, 114, 680, 804], co: [[[33.5, 10, 58, 8], "Conectado a la fuente", "primera"]] },
+    { src: "ges-dimensiones", r: 1.2003, f: [1000, 114, 680, 816], from: "segunda", cam: [["segunda", 1.5, .62, .84]], co: [[[35, 81, 57, 7.5], "Fuente de la unidad", "segunda"]] },
+    { src: "ges-metas", r: 1.2505, f: [1000, 114, 680, 850], from: "tercera", cam: [["tercera", 1.6, .5, .45]], co: [[[33, 42.5, 59, 3.8], "Plantilla e importación", "tercera"]] },
+    { src: "ges-anexos", r: 1.2503, f: [1000, 114, 680, 850], from: "las evidencias", cam: [["las evidencias", 1.3, .62, .24]], co: [[[33, 16.5, 61, 10.5], "Archivos hasta 15 MB", "archivos pdf"], [[33, 25.5, 61, 3.5], "Enlace https", "enlaces que empiecen"]] }]);
+}
+
+/* ====================================== 09 · LIBRO DE EXCEL: EXPORTAR ====================================== */
+{
+  const id = "09", sc = newScene(id, "page");
+  head(sc, id, "Libro de Excel · Exportar", ["Un libro por equipo"], "page");
+  buildItems(sc, id, [["Libro completo o un libro por equipo", "descargue el libro completo"], ["A cada equipo, solo su archivo", "envie a cada equipo"], ["Celdas grises bloqueadas", "bloquee"], ["Tres colores en cada hoja", "cada hoja usa tres colores"], ["Encabezado en la fila 4, datos desde la 5", "el encabezado"], ["Sin filas de ejemplo ni hojas renombradas", "borre las filas"]], { x: 140, y: 290, w: 740 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "adm-libro-exportar", r: 1.3004, f: [1010, 114, 640, 832], cam: [["descargue el libro completo", 1.18, .42, .2], ["bloquee las celdas grises", 1.22, .42, .78], ["cada hoja usa", 1, .5, .5]],
+      co: [[[2, 5, 26, 3.7], "Pestaña Exportar", "en libro de excel"], [[2, 12.5, 96, 12.5], "Completo o por equipo", "descargue el libro completo"], [[2, 77, 96, 6.5], "Bloquear celdas grises", "bloquee las celdas grises"]] },
+    { src: "xls-instrucciones", r: .582, f: [900, 250, 880, 512], from: "cada hoja usa tres colores", co: [[[3, 83.5, 60, 3.8], "Se diligencia · opcional", "azul claro", ""], [[3, 87.8, 60, 3.8], "Obligatorio", "amarillo", ""], [[3, 92, 60, 3.8], "Lo pone el sistema", "gris", ""]] },
+    { src: "xls-lleno-resultados-a", r: .424, f: [900, 280, 880, 373], from: "el encabezado esta", co: [[[2, 26, 96, 6], "Fila 4: encabezado", "el encabezado esta"], [[3, 31, 96, 56], "Datos desde la fila 5", "los datos empiezan"]] }]);
+  sc.insertAdjacentHTML("beforeend", `<div class="sw3" id="sw9" style="left:900px;top:820px"><i style="background:#dbe8fb">Azul claro</i><i style="background:#fff0a8">Amarillo</i><i style="background:#d4d8de">Gris</i></div>`);
+  const sw = $$("#sw9 i"); sw.forEach((el, i) => IN(el, T(id, ["azul claro", "amarillo", "gris"][i]) - .1, { y: 14, d: .4 }));
+}
+
+/* ====================================== 10 · IMPORTAR ====================================== */
+{
+  const id = "10", sc = newScene(id, "page");
+  head(sc, id, "Libro de Excel · Importar", ["Del libro", "al informe"], "page");
+  buildItems(sc, id, [["Pestaña «Importar»: cargue el .xlsx", "cuando los libros regresan"], ["Cada hoja → su sección; filas listas y avisos", "muestra a que seccion"], ["Elija cómo aplicarlo", "elija como aplicarlo"], ["Indique quién aporta el libro", "indique quien aporta"], ["Otra unidad, ciclo o plantilla: se rechaza", "otra unidad"], ["Avisos: hoja, fila y problema", "si una fila trae un aviso"]], { x: 140, y: 340, w: 780 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "adm-libro-importar", r: 1.3004, f: [1010, 114, 620, 806], cam: [["muestra a que seccion", 1.3, .5, .35]], co: [[[41, 8.3, 21, 2.3], "Libro del sistema · reconocido", "reconoce como libro"], [[2, 13, 96, 70], "Hoja → sección", "muestra a que seccion"]] },
+    { src: "adm-libro-importar", r: 1.3004, f: [1010, 114, 620, 806], from: "indique quien aporta" },
+    { src: "xls-otro-informe-error", r: .1807, f: [900, 150, 880, 159], from: "otra unidad" },
+    { src: "xls-errores-avisos", r: .5513, f: [900, 350, 880, 485], from: "si una fila trae un aviso", over: true,
+      co: [[[2, 6, 24, 10], "Filas listas · con aviso", "si una fila trae un aviso"], [[3, 24, 32, 3.4], "«cuatro» no es un número", "corrijalo"], [[3, 31.5, 34, 3.4], "«Tal vez» no es Sí ni No", "corrijalo"]] }]);
+  // los tres modos de aplicar
+  sc.insertAdjacentHTML("beforeend", `<div class="mdw" id="mdw"><h4>Cómo aplicar el libro</h4><div class="sg"><div class="hi" id="hi"></div><b>Agregar al final</b><b>Llenar solo lo vacío</b><b>Reemplazar la sección</b></div>
+    <p><span>Suma lo del libro sin tocar lo ya escrito.</span><span>Completa solo lo que está vacío.</span><span>Pide confirmación antes de reemplazar.</span></p><div class="df">Modo por defecto: agregar al final</div></div>`);
+  const t0 = T(id, "elija como aplicarlo") - .2, t1 = T(id, "llenar solo lo vacio"), t2 = T(id, "reemplazar la seccion"), t3 = T(id, "indique quien aporta") - .2;
+  tl.fromTo("#mdw", { autoAlpha: 0, y: 30 }, { autoAlpha: 1, y: 0, duration: .55, ease: E }, t0);
+  tl.to("#mdw", { autoAlpha: 0, y: -10, duration: .35, ease: "power2.in" }, t3);
+  const ps = $$("#mdw p span"), bs = $$("#mdw .sg b");
+  tl.set(ps, { autoAlpha: 0 }, 0); tl.set(bs[0], { color: "#fff" }, 0);
+  tl.set(ps[0], { autoAlpha: 1 }, t0 + .1);
+  tl.to(ps[0], { autoAlpha: 0, duration: .25 }, t1 - .1); tl.to(ps[1], { autoAlpha: 1, duration: .3 }, t1);
+  tl.to(ps[1], { autoAlpha: 0, duration: .25 }, t2 - .1); tl.to(ps[2], { autoAlpha: 1, duration: .3 }, t2);
+  const col = 700 / 3;
+  tl.to("#hi", { x: col, duration: .45, ease: "power3.inOut" }, t1); tl.to(bs[0], { color: "#45566d", duration: .3 }, t1); tl.to(bs[1], { color: "#fff", duration: .3 }, t1);
+  tl.to("#hi", { x: col * 2, duration: .45, ease: "power3.inOut" }, t2); tl.to(bs[1], { color: "#45566d", duration: .3 }, t2); tl.to(bs[2], { color: "#fff", duration: .3 }, t2);
+}
+
+/* ====================================== 11 · COMPILADOR: QUÉ ES ====================================== */
+{
+  const id = "11", sc = newScene(id, "navy");
+  head(sc, id, "Compilador de informes con Pilo", ["Integrar los libros", "de otras unidades"], "navy", "Nuevo");
+  buildItems(sc, id, [["Para quien recibe informes de otras unidades", "cuando su unidad recibe"], ["Lo ven el Gestor y Planeación", "lo ven el gestor"], ["Botón junto a «Libro de Excel»", "se abre con el boton"], ["Libros .xlsx, sueltos o en un ZIP", "en formato"], ["Cuatro pasos", "cuatro pasos"], ["Nada llega al informe sin su aprobación", "nada llega"]], { x: 140, y: 390, w: 860 });
+  foot(sc, id);
+  sc.insertAdjacentHTML("beforeend", `<div class="pasos4" id="p4" style="top:900px"><span class="chip">1 Recibir</span><span class="chip">2 Organizar</span><span class="chip">3 Redactar</span><span class="chip">4 Aprobar</span></div>`);
+  $$("#p4 .chip").forEach((c, i) => IN(c, T(id, ["recibir", "organizar", "redactar", "aprobar"][i], i === 0 ? 0 : 0) - .1 + (i === 0 ? 0 : 0), { y: 14, d: .4 }));
+  buildLayers(sc, id, [{ src: "com-boton", r: 1.5658, f: [1160, 114, 520, 814], cam: [["se abre con el boton", 1.12, .4, .78]],
+    co: [[[6, 77.5, 62, 8.5], "Compilar informe de colaboradores con Pilo", "se abre con el boton"], [[6, 69.5, 35, 4], "Libro de Excel", "junto"]] }]);
+}
+
+/* ====================================== 12 · COMPILADOR: LOS CUATRO PASOS ====================================== */
+{
+  const id = "12", sc = newScene(id, "page");
+  const k = document.createElement("div"); k.className = "kicker"; k.style.cssText = "left:140px;top:96px"; k.textContent = "Compilador · los cuatro pasos"; sc.appendChild(k);
+  IN(k, tIni(id) + .15, { y: 14 });
+  sc.insertAdjacentHTML("beforeend", `<ol class="stp" id="stp">
+    <li><i>1</i><b>Recibir</b><ul><li>Libros de los equipos, sueltos o en ZIP</li><li>Reconoce la plantilla y la adapta</li><li>Registro: aceptados, omitidos y rechazados</li></ul></li>
+    <li><i>2</i><b>Organizar</b><ul><li>Reúne los indicadores de todos los libros</li><li>Conflicto: elija el valor o la fuente primaria</li><li>Lo que nadie entregó queda «sin dato»</li></ul></li>
+    <li><i>3</i><b>Redactar con Pilo</b><ul><li>Nivel de razonamiento (recomendado: Compleja)</li><li>Sin inventar cifras: cada número, enlazado a su fuente</li><li>Al tocar una cifra, se ve quién la aportó</li><li>Usted puede escribir encima del texto</li></ul></li>
+    <li><i>4</i><b>Aprobar e importar</b><ul><li>«Aprobar e importar al informe»</li><li>Textos marcados «Borrador de Pilo»</li><li>El Compilador no envía el informe</li></ul></li></ol>`);
+  foot(sc, id);
+  const st = $$("#stp > li"), stT = ["en recibir", "pulse organizar", "despues pulse redactar", "por ultimo"];
+  const subC = [["suba los libros", "reconoce la plantilla", "el registro muestra"], ["reune los indicadores", "si dos equipos", "lo que nadie"], ["nivel de razonamiento", "sin inventar cifras", "al tocarla", "puede escribir encima"], ["aprobar e importar", "quedan marcados", "no envia el informe"]];
+  st.forEach((li, i) => {
+    const t = T(id, stT[i]) - .15;
+    tl.fromTo(li, { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: .5, ease: E }, t);
+    $$("ul li", li).forEach((s, j) => { tl.set(s, { autoAlpha: 0 }, 0); tl.fromTo(s, { autoAlpha: 0, x: -14 }, { autoAlpha: 1, x: 0, duration: .45, ease: E }, T(id, subC[i][j]) - .1); });
+    if (i > 0) { tl.to(st[i - 1], { opacity: .42, duration: .4 }, t + .1); }
+  });
+  buildLayers(sc, id, [
+    { src: "com-recibir", r: .9833, f: [1010, 114, 770, 757], cam: [["suba los libros", 1.45, .38, .3], ["el registro muestra", 1.45, .38, .58], ["cuando esten todos", 1.45, .75, .93]], co: [[[2, 29.3, 65, 9.8], "Libros .xlsx o un ZIP", "suba los libros"], [[2, 22, 41, 5.7], "Plantilla reconocida", "reconoce la plantilla"], [[2, 80.5, 45, 2.8], "Adaptar a la plantilla A", "si viene en otra"], [[2, 40.3, 65, 32.5], "Registro de archivos", "el registro muestra"], [[2, 57, 65, 13], "Rechazados", "rechazo"], [[83, 95.5, 15, 3.4], "Siguiente paso", "cuando esten todos"]] },
+    { src: "com-organizar", r: .9833, f: [1010, 114, 770, 757], from: "pilo reune los indicadores", cam: [["reune los indicadores", 1.4, .35, .22], ["si dos equipos", 1.4, .35, .62], ["fuente primaria", 1.5, .25, .72]], co: [[[2, 20, 44, 5.8], "Listos · conflictos · sin dato", "reune los indicadores"], [[2, 27, 65, 15.3], "Datos por equipo", "de todos los libros"], [[2, 48, 65, 32.5], "Conflicto entre equipos", "si dos equipos"], [[17.5, 72.5, 20, 3.3], "Fuente primaria", "fuente primaria"]] },
+    { src: "com-redactar", r: .9167, f: [1010, 114, 770, 706], from: "despues pulse redactar", cam: [["nivel de razonamiento", 1.4, .8, .3], ["pilo escribe cada seccion", 1.3, .4, .4], ["al tocarla", 1.5, .42, .5], ["puede escribir encima", 1.2, .4, .5]], co: [[[70.5, 30.5, 28, 4.5], "Nivel de razonamiento", "nivel de razonamiento"], [[24, 27, 43, 58], "Borrador por sección", "pilo escribe cada seccion"], [[70.5, 82.5, 28, 11], "Regla de Pilo", "sin inventar cifras"], [[36, 38.5, 5.5, 3.6], "Cifra enlazada", "todo numero"], [[36, 42.8, 25.5, 23.5], "De dónde sale el dato", "al tocarla"], [[24, 27, 43, 58], "Editable", "puede escribir encima"]] },
+    { src: "com-aprobar", r: .9167, f: [1010, 114, 770, 706], from: "por ultimo", cam: [["revisar y aprobar", 1.3, .3, .35], ["aprobar e importar al informe", 1.5, .55, .85]], co: [[[2, 22, 65, 25], "Qué pasa al informe", "revisar y aprobar"], [[44, 79.8, 22, 4.6], "Aprobar e importar", "aprobar e importar al informe"]] },
+    { src: "com-aplicado", r: .6667, f: [1010, 230, 770, 513], from: "los textos de pilo", co: [[[51, 63, 18, 4.5], "Borrador de Pilo", "borrador de pilo"]] }]);
+}
+
+/* ====================================== 13 · CONTROLES Y ENVÍO ====================================== */
+{
+  const id = "13", sc = newScene(id, "page");
+  head(sc, id, "Controles y envío", ["Revisar antes", "de enviar"], "page");
+  buildItems(sc, id, [["Panel «Controles»: ✓ bien · ! revisar", "revise el panel"], ["La sección pasa a «Lista» sola", "una seccion pasa"], ["«Enviar»: todas listas y una evidencia", "el boton enviar"], ["Si falta fuente, pilar o justificación, se detiene", "si una cifra exige"], ["Al enviar: cifras congeladas, informe aprobado y bloqueado", "al enviar"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "ges-enviar", r: 1.4663, f: [1050, 114, 600, 880], cam: [["revise el panel", 1.3, .3, .82], ["el boton enviar", 1, .5, .5]], co: [[[4, 76, 48, 14], "Controles", "revise el panel"], [[5, 78.2, 45, 2.6], "Algo por revisar", "signo de admiracion"], [[5, 67, 26, 6], "Aún no se habilita", "una seccion pasa"]] },
+    { src: "ges-enviar-listo", r: 1.0753, f: [1000, 114, 770, 828], from: "el boton enviar", co: [[[5, 24.4, 25, 3.2], "10 de 10 listas", "cuando todas"], [[5, 91, 22, 4.5], "Enviar habilitado", "mientras tanto"]] }]);
+}
+
+/* ====================================== 14 · SI LO DEVUELVEN ====================================== */
+{
+  const id = "14", sc = newScene(id, "page");
+  head(sc, id, "Devolución", ["Si el informe", "regresa con una nota"], "page");
+  buildItems(sc, id, [["Planeación o la unidad de destino lo devuelve, siempre con nota", "puede devolver"], ["Estado «Devuelto» y nota general en el riel", "usted vera"], ["Nota por sección donde corresponda", "una nota por seccion"], ["Cifras vivas; al guardar, vuelve a borrador", "las cifras vuelven"], ["Corrija y envíe de nuevo", "corrija"], ["Si recibe informes de otras unidades: pestaña «Revisión»", "si su unidad recibe"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "ges-devuelto", r: 1.3979, f: [1040, 114, 640, 895], cam: [["una nota general", 1.5, .2, .3]], co: [[[5, 19, 25, 3.4], "Devuelto", "estado devuelto"], [[5, 31, 22, 13], "Nota general", "una nota general"]] },
+    { src: "adm-revision", r: .7527, f: [900, 200, 880, 662], from: "si su unidad recibe", co: [[[3, 8, 40, 8], "Informes que le llegan", "si su unidad recibe"]] }]);
+}
+
+/* ====================================== 15 · VISTA, PDF ====================================== */
+{
+  const id = "15", sc = newScene(id, "page");
+  head(sc, id, "Vista del informe", ["Como saldrá", "en papel"], "page");
+  buildItems(sc, id, [["Carta o A4", "tamano carta"], ["Portada: acento, monograma, escudo y contacto", "personalizar la portada"], ["Valen para todos los informes de su unidad", "esos datos valen"], ["Descargar el PDF", "se descarga el pdf"], ["Manual: vista, PDF y presentación", "el manual dedica"]], { x: 140, y: 340, w: 800 });
+  foot(sc, id);
+  buildLayers(sc, id, [
+    { src: "adm-vista", r: 1.183, f: [1010, 114, 690, 816], co: [[[3, 11.5, 17, 3.8], "Carta · A4", "tamano carta"]] },
+    { src: "adm-portada", r: 1.2002, f: [1010, 114, 690, 828], from: "como gestor usted", co: [[[3, 73, 43, 5], "Color de acento", "color de acento"]] },
+    { src: "adm-vista", r: 1.183, f: [1010, 114, 690, 816], from: "desde alli", co: [[[30.8, 16.2, 16.5, 3.6], "Descargar PDF", "se descarga el pdf"], [[71, 11.5, 26, 3.8], "Presentación con Pilo", "la presentacion"]] }]);
+}
+
+/* ====================================== 16 · CIERRE ====================================== */
+{
+  const id = "16", sc = newScene(id, "navy");
+  head(sc, id, "Antes de enviar", ["Lista de verificación"], "navy");
+  sc.insertAdjacentHTML("beforeend", `<ul class="check" id="chk" style="top:300px;width:1000px">
+    <li>${CHECK}Todas las secciones en «Lista» y los controles en verde</li>
+    <li>${CHECK}Cifras conectadas, no transcritas, cada una con su fuente</li>
+    <li>${CHECK}Al menos una evidencia</li>
+    <li>${CHECK}Libros importados, sin avisos pendientes</li>
+    <li>${CHECK}Compilado de colaboradores revisado por usted</li></ul>
+    <div id="end" style="left:140px;top:420px;width:1200px"><div class="thanks"><span class="ln"><span>Gracias</span></span></div><div class="endk" style="position:static;margin-top:14px">Informe de Gestión 2026 · Planeación Institucional</div></div>
+    <img id="pilo16" src="img/pilo_atrevido.svg" alt="" style="right:180px;bottom:90px;height:600px">`);
+  foot(sc, id);
+  const cues = ["todas las secciones", "las cifras conectadas", "al menos una evidencia", "los libros importados", "si compilo"];
+  $$("#chk li").forEach((li, i) => {
+    const t = T(id, cues[i]) - .15;
+    tl.fromTo(li, { autoAlpha: 0, x: -30 }, { autoAlpha: 1, x: 0, duration: .5, ease: E }, t);
+    tl.fromTo($(".tick", li), { strokeDasharray: 60, strokeDashoffset: 60 }, { strokeDashoffset: 0, duration: .45, ease: "power2.out" }, t + .35);
+  });
+  IN("#pilo16", tIni(id) + .6, { y: 120, d: 1, s: .97 });
+  const tg = T(id, "gracias por su trabajo") - .2;
+  tl.to("#chk", { autoAlpha: 0, duration: .5 }, tg);
+  tl.fromTo("#end", { autoAlpha: 0 }, { autoAlpha: 1, duration: .5 }, tg + .05);
+  LINE("#end .thanks", tg + .1, { d: .9 });
+  tl.fromTo("#end .endk", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: .6 }, tg + .6);
+}
+
+/* ---------- transiciones entre escenas, barra y duración ---------- */
+const WIPE = .7;
+IDS.forEach((id, i) => {
+  const el = $("#s" + id), t = i === 0 ? 0 : tIni(id) - .45;
+  if (i === 0) tl.set(el, { autoAlpha: 1 }, 0);
+  else {
+    tl.set(el, { autoAlpha: 1 }, t);
+    tl.fromTo(el, { clipPath: "inset(100% 0% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: WIPE, ease: "power4.inOut" }, t);
+    tl.set("#s" + IDS[i - 1], { autoAlpha: 0 }, t + WIPE + .05);
+  }
+});
+tl.to("#bar", { scaleX: 1, duration: D, ease: "none" }, 0);
+tl.to({}, { duration: .01 }, D);
+
+/* ---------- control: render (seek) y vista previa (audio) ---------- */
+window.__dur = D;
+window.__seek = t => { tl.time(Math.max(0, Math.min(D, t)), false); return t; };
+window.__ready = document.fonts.ready.then(() => Promise.all($$("img").map(i => i.decode ? i.decode().catch(() => {}) : 0))).then(() => true);
+if (window.__avisos.length) console.warn("PISTAS SIN HALLAR (" + window.__avisos.length + "):\n" + window.__avisos.join("\n"));
+const q = new URLSearchParams(location.search);
+function fit() { const s = Math.min(innerWidth / 1920, innerHeight / 1080); $("#stage").style.transform = q.has("render") ? "none" : `scale(${s})`; }
+addEventListener("resize", fit); fit();
+tl.time(+(q.get("t") || 0));
+if (!q.has("render")) {
+  const a = $("#aud"); let playing = false;
+  const tick = () => { if (playing) tl.time(Math.min(D, a.currentTime)); requestAnimationFrame(tick); }; tick();
+  addEventListener("keydown", e => {
+    if (e.code === "Space") { e.preventDefault(); playing = !playing; if (playing) { a.currentTime = tl.time(); a.play(); } else a.pause(); }
+    if (e.code === "ArrowRight") { a.currentTime = Math.min(D, tl.time() + 5); tl.time(a.currentTime); }
+    if (e.code === "ArrowLeft") { a.currentTime = Math.max(0, tl.time() - 5); tl.time(a.currentTime); }
+  });
+}
+</script>
+</body>
+</html>

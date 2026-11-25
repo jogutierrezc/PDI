@@ -9,7 +9,7 @@ export default {
     shot({ f: "ges-mi-informe", url: "/admin/informes-gestion/mi-informe", alt: "Mi informe: riel con estado y secciones, la sección al centro y los controles a la derecha", maxh: 600 }),
     steps([
       ["El avance", "«N de M listas» y la barra dicen cuántas secciones están terminadas. Arriba están la plantilla, la unidad, su papel y el estado."],
-      ["Libro de Excel", "Junto a «Vista del informe en papel», abre el cajón para descargar el informe en Excel o importarlo (capítulo 7)."],
+      ["Libro de Excel", "Junto a «Vista del informe en papel», abre el cajón para descargar el informe en Excel o importarlo (capítulo 7). Debajo, «Compilar informe de colaboradores con Pilo» reúne los libros que devuelven varios equipos y propone un borrador de texto (capítulo 8)."],
       ["La lista de secciones", "Cada sección tiene su número, su título y un punto: «Sin empezar», «En curso» o «Lista». Al centro está la sección abierta, con su título, su línea de ayuda y su avance. A la derecha, «Controles» dice qué falta: un «!» ámbar es algo por corregir y un «✓» es algo bien."],
       ["Enviar", "Está al pie del riel. Mientras haya algo pendiente, está deshabilitado y debajo dice qué falta."],
     ], { c: true }),

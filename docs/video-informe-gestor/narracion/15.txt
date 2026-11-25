@@ -1,0 +1,1 @@
+La «Vista del informe» muestra el documento tal como saldrá en papel, en tamaño Carta o A4. Como Gestor, usted puede personalizar la portada con el color de acento, el monograma, el escudo y los datos de contacto; esos datos valen para todos los informes de su unidad. Desde allí se descarga el PDF. El manual dedica un capítulo a la vista, el PDF y la presentación.

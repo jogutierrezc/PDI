@@ -20,6 +20,19 @@ const libroImportar = async (p) => {
 const abrirLibro = (extra, admin = false) => async (p) => { if (admin) await abrirUnidadAdmin(p); await p.getByRole("button", { name: "Libro de Excel" }).first().click(); await ESPERA(p); if (extra) await extra(p); };
 const irSeccion = (n) => async (p) => { await p.locator(".inf-secs button, nav button", { hasText: n }).first().click(); await ESPERA(p); };
 
+
+/* ---------- Compilador de informes con Pilo (ZIP ficticio de libros de los equipos: excel/09-libros-compilador) ---------- */
+const ZIP_COM = new URL("../excel/09-libros-compilador/libros-de-los-equipos.zip", import.meta.url).pathname;
+const abrirCompilador = async (p) => { await p.getByRole("button", { name: /Compilar informe de colaboradores/ }).click(); await ESPERA(p, 1500); };
+const comRecibir = async (p) => { await abrirCompilador(p); await p.setInputFiles("input[type=file]", [ZIP_COM]); await ESPERA(p, 5500); };
+const comSiguiente = async (p) => { await p.locator(".cp-foot .is-pri").click(); await ESPERA(p, 1300); };
+const comOrganizar = async (p) => { await comRecibir(p); await comSiguiente(p); };
+/** Abre el indicador en conflicto («Retención de primer semestre»: tres equipos, dos valores) para ver cómo lo escribió cada equipo. */
+const comAbrirConflicto = async (p) => { await p.locator(".cp-item.is-bad .cp-exp").first().click(); await ESPERA(p, 600); };
+const comResolver = async (p) => { await comOrganizar(p); await comAbrirConflicto(p); await p.getByRole("button", { name: "Usar el valor de la fuente primaria" }).first().click(); await ESPERA(p, 600); };
+const comRedactar = async (p) => { await comResolver(p); await comSiguiente(p); await p.getByRole("button", { name: "Redactar todas las secciones" }).click(); await ESPERA(p, 6000); };
+const comAprobar = async (p) => { await comRedactar(p); await comSiguiente(p); };
+
 export const LISTA = [
   /* ================= ADMINISTRADOR ================= */
   { n: "adm-tablero", r: TAB, desde: "Entrega por unidad", maxH: 900, marks: [[1, "text=avance general", 6, -6], [2, "label:has-text('Buscar unidad')", -10, 0], [3, "button:has-text('Abrir los')", -10, -6], [4, "a:has-text('Responsables'), button:has-text('Responsables') >> nth=0", -12, 0], [5, "text=Revisar >> nth=0", -12, 0]] },
@@ -57,6 +70,15 @@ export const LISTA = [
   { papel: "gestor", n: "ges-libro", r: TAB + "/mi-informe", fijo: true, h: 1300, raiz: ".inf-resp", fn: abrirLibro(), marks: [[1, ".inf-resp [role=tab] >> nth=0", -4, -4], [2, "text=Un libro por equipo", -12, 0], [3, "text=Bloquear las celdas grises", -12, 0], [4, ".inf-resp [role=tab] >> nth=1", -4, -4]] },
   { papel: "gestor", n: "ges-guia-pilo", r: TAB + "/mi-informe", fijo: true, h: 900, fn: async (p) => { await p.getByRole("button", { name: /Guía con Pilo/ }).first().click(); await ESPERA(p, 1500); }, marks: [[1, "button:has-text('Siguiente')", -6, -6], [2, "button:has-text('Escuchar')", -6, -6], [3, "text=Leer cada paso", -6, -6], [4, "button:has-text('Reportar con Pilo')", -6, -6]] },
   { papel: "gestor", n: "ges-movil", w: 390, h: 900, r: TAB + "/mi-informe", maxH: 1400, marks: [[1, "text=Libro de Excel >> nth=0", -4, 0], [2, "button:has-text('Enviar')", -4, 0]] },
+
+  /* ================= COMPILADOR CON PILO (Gestor) ================= */
+  { papel: "gestor", n: "com-boton", r: TAB + "/mi-informe", fijo: true, h: 360, w: 1180, raiz: ".inf-rail", marks: [[1, "button:has-text('Libro de Excel') >> nth=0", -12, 0], [2, "button:has-text('Compilar informe de colaboradores')", -12, 0]] },
+  { papel: "gestor", n: "com-recibir", r: TAB + "/mi-informe", fijo: true, w: 1200, h: 1180, raiz: ".cp", fn: comRecibir, marks: [[1, ".cp-drop", -4, -4], [2, ".cp-zh", -4, -4], [3, ".cp-zrow >> nth=4", -4, -4], [4, ".cp-kpis", -4, -4], [5, ".cp-foot .is-pri", -8, -8]] },
+  { papel: "gestor", n: "com-equipos", r: TAB + "/mi-informe", fijo: true, w: 1200, h: 1000, raiz: ".cp", fn: async (p) => { await comRecibir(p); await p.locator(".cp-col").nth(2).locator("summary").click(); await ESPERA(p, 500); await p.locator(".cp-cards").evaluate((e) => e.scrollIntoView({ block: "start" })); await ESPERA(p, 600); }, marks: [[1, ".cp-col >> nth=2 >> .cp-pl", -6, -6], [2, ".cp-col >> nth=2 >> .cp-st", -6, -6], [3, ".cp-col >> nth=2 >> .cp-adp", -6, -6], [4, ".cp-col >> nth=2 >> .cp-avisos", -6, -6], [5, ".cp-col >> nth=2 >> button:has-text('Quitar')", -8, -8]] },
+  { papel: "gestor", n: "com-organizar", r: TAB + "/mi-informe", fijo: true, w: 1200, h: 1180, raiz: ".cp", fn: async (p) => { await comOrganizar(p); await comAbrirConflicto(p); }, marks: [[1, ".cp-kpis", -4, -4], [2, ".cp-matrix", -4, -4], [3, ".cp-item.is-bad", -4, -4], [4, "button:has-text('Usar el valor de la fuente primaria')", -8, -8], [5, ".cp-chips", -4, -4]] },
+  { papel: "gestor", n: "com-redactar", r: TAB + "/mi-informe", fijo: true, w: 1200, h: 1100, raiz: ".cp", fn: async (p) => { await comRedactar(p); await p.locator(".cp-sbtn").first().click(); await ESPERA(p, 600); await p.locator(".cp-doc .cp-cx").first().click(); await ESPERA(p, 600); }, marks: [[1, ".cp-seg", -4, -4], [2, "button:has-text('Redactar todas las secciones')", -8, -8], [3, ".cp-sbtn >> nth=0", -4, -4], [4, ".cp-doc .cp-mark", -6, -6], [5, ".cp-doc .cp-cx >> nth=0", -8, -8], [6, ".cp-pop", -8, -8], [7, ".cp-think", -4, -4]] },
+  { papel: "gestor", n: "com-aprobar", r: TAB + "/mi-informe", fijo: true, w: 1200, h: 1100, raiz: ".cp", fn: comAprobar, marks: [[1, ".cp-appr", -4, -4], [2, ".cp-modes", -4, -4], [3, ".cp-sumbar", -4, -4], [4, ".cp-sumbar .is-sig", -8, -8]] },
+  { papel: "gestor", n: "com-aplicado", r: TAB + "/mi-informe", fijo: true, w: 1200, h: 800, raiz: ".cp", fn: async (p) => { await comAprobar(p); await p.getByRole("button", { name: "Aprobar e importar al informe" }).click(); await ESPERA(p, 1500); }, marks: [[1, ".cp-res", -4, -4], [2, ".cp-modal .cp-mark", -6, -6], [3, "button:has-text('Ir a Mi informe')", -8, -8]] },
 
   /* ================= CONTRIBUYENTE / CONSULTA ================= */
   { papel: "contribuyente", n: "con-mi-informe", r: TAB + "/mi-informe", maxH: 1000, marks: [[1, "text=su papel: Contribuyente", -14, 0], [2, "text=/Solo el Gestor de la unidad/", -14, 0], [3, "textarea", -14, -4]] },

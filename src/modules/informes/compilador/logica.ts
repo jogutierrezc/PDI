@@ -267,7 +267,7 @@ export function observaciones(libros: LibroRecibido[], secciones: SeccionDef[]):
       b.filas.forEach((f, i) => {
         const texto = (f[iInd] ?? "").trim();
         if (!texto) return;
-        if (iTipo >= 0 && (f[iTipo] ?? "").trim()) return; // una acción, no una cifra
+        if (iTipo >= 0 && sinTildes(f[iTipo] ?? "").startsWith("accion")) return; // una acción, no una cifra (el libro del sistema escribe «Cifra» en las cifras)
         const cr = (iAct >= 0 ? f[iAct] : "") ?? "";
         const act = leerNumero(cr);
         out.push({

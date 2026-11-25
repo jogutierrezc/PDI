@@ -104,7 +104,7 @@ describe("tabla de metas del programa", () => {
     expect(html).toContain("debe bajar");
     expect(html).toContain("Superada");
     expect(html).toContain("Subió por tutorías");
-    expect(html).toContain("En vivo");
+    expect(html).not.toContain("En vivo");
     expect(html.match(/<input/g)).toHaveLength(2);
   });
 });

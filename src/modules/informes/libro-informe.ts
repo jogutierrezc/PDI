@@ -160,7 +160,7 @@ const INSTRUCCIONES = [
 ];
 
 const AYUDA_HOJA: Record<string, string> = {
-  narr: "Escriba el texto de la sección en la celda amarilla. Las cifras vivas se citan en el informe con [[clave]]; aquí escriba solo texto.",
+  narr: "Escriba el texto de la sección en la celda amarilla.",
   libre: "Un párrafo por fila. Las tablas y gráficas de UDrive se agregan desde el informe.",
   pdi: "Pilares y avance vienen del Plan de Desarrollo. Marque Sí en los pilares con los que se articula su unidad y escriba su aporte.",
   metas: "Una fila por objetivo o meta anual. Programado y Alcanzado: solo números. El resultado (Superada, Cumplida o Parcial) lo calcula el informe.",

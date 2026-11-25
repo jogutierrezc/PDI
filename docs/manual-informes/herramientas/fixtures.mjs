@@ -169,6 +169,50 @@ const CORPUS = { total: 46, por_origen: { informe2025: 38, aprobados2026: 8 }, p
   { tipo: "logros", textos: 10, mediana_palabras: 55, aperturas: [{ texto: "Se logró", veces: 5 }], conectores: [], frases: [{ texto: "con el respaldo de", veces: 3 }] },
 ] };
 
+/* ---------- Pilo Astra (compilador): respuesta SSE simulada con el mismo formato que la función real ---------- */
+const sse = (e, d) => `event: ${e}\ndata: ${JSON.stringify(d)}\n\n`;
+const norma = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function redaccionAstra(D) {
+  const ind = (s) => { const i = D.indicadores.find((x) => norma(x.nombre).includes(s)); return i && i.valor !== null && !i.conflicto ? `[[${i.clave}]]` : null; };
+  const pend = (s) => { const i = D.indicadores.find((x) => norma(x.nombre).includes(s)); return i && (i.valor === null || i.conflicto) ? i.nombre : null; };
+  const eq = D.equipos.map((e) => e.nombre);
+  const titulo = norma(D.seccion.titulo);
+  let texto;
+  if (titulo.includes("resumen")) {
+    texto = [
+      `Durante ${D.anio} la ${D.unidad} consolidó su oferta académica con ${ind("matriculados") ?? "una matrícula por confirmar"} estudiantes matriculados y una retención de primer semestre de ${ind("retencion") ?? "valor pendiente"}, cifra que Secretaría académica, Dirección de programa y Bienestar universitario reportaron por separado y que se tomó de UDES en Cifras, fuente primaria del indicador.`,
+      `La deserción anual bajó a ${ind("desercion") ?? "un valor pendiente"} y los profesores con doctorado llegaron a ${ind("doctorado") ?? "un valor pendiente"}. En investigación, la Coordinación de investigación reportó ${ind("grupos") ?? "sin dato"} grupos categorizados y ${ind("semilleros") ?? "sin dato"} semilleros activos.`,
+      `Queda un dato pendiente: ${pend("riesgo") ?? "ninguno"}, que Bienestar universitario no había cerrado al recibir su libro.`,
+    ].join("\n\n");
+  } else if (titulo.includes("alineacion")) {
+    texto = [
+      `Las tutorías por pares y el acompañamiento temprano sostienen el pilar de formación personalizada: ${ind("tutoria") ?? "sin dato"} estudiantes participaron, según la Dirección de programa, y la retención de primer semestre llegó a ${ind("retencion") ?? "valor pendiente"}.`,
+      `Bienestar universitario sumó ${ind("socioeconomico") ?? "sin dato"} estudiantes con apoyo socioeconómico, lo que respalda el mismo pilar desde la permanencia.`,
+    ].join("\n\n");
+  } else if (titulo.includes("resultados")) {
+    texto = [
+      `Enseñanza. La retención de primer semestre fue de ${ind("retencion") ?? "valor pendiente"}, frente a su meta anual. Los tres equipos que la reportaron no coincidieron: Dirección de programa escribió un valor distinto y se usó el de UDES en Cifras. La deserción anual fue de ${ind("desercion") ?? "valor pendiente"}.`,
+      `- Estudiantes matriculados: ${ind("matriculados") ?? "sin dato"}.\n- Profesores con doctorado: ${ind("doctorado") ?? "sin dato"}.\n- Estudiantes con tutoría de pares: ${ind("tutoria") ?? "sin dato"}.`,
+      `Investigación. Los grupos categorizados llegaron a ${ind("grupos") ?? "sin dato"} y los semilleros activos a ${ind("semilleros") ?? "sin dato"}, según la Coordinación de investigación.`,
+    ].join("\n\n");
+  } else {
+    texto = [
+      `${D.unidad} cierra ${D.anio} con una permanencia en mejora, con una retención de primer semestre de ${ind("retencion") ?? "valor pendiente"} y una deserción anual de ${ind("desercion") ?? "valor pendiente"}.`,
+      `Para el siguiente ciclo queda por cerrar el dato de estudiantes en riesgo atendidos y por acordar entre los equipos una sola forma de escribir cada indicador.`,
+    ].join("\n\n");
+  }
+  const usados = [...texto.matchAll(/\[\[([a-z0-9_]+)\]\]/g)].map((m) => m[1]);
+  const palabras = texto.trim().split(/\s+/).length;
+  return (
+    sse("step", { id: "leer", label: `Leyendo ${D.indicadores.length} indicadores y ${D.hojas.length} hojas de ${eq.length} equipos` }) +
+    sse("step", { id: "razonar", label: `Razonando «${D.seccion.titulo}»` }) +
+    sse("thinking", { text: `Reviso cada indicador de «${D.seccion.titulo}»: primero los que tienen valor, luego los que están pendientes. La retención de primer semestre la reportaron tres equipos con valores distintos; la persona que gestiona el informe ya eligió el de la fuente primaria, así que la cito con su token. Los datos sin valor los dejo como pendientes, sin inventar cifras.\n` }) +
+    sse("part", { n: 1, palabras }) +
+    sse("step", { id: "listo", label: "Texto verificado" }) +
+    sse("done", { seccion: D.seccion.clave, texto, partes: 1, palabras, usados, no_verificado: [], pensamiento_s: 7.4, reintento: false, modelo: { id: "astra", label: "Pilo Astra 1.0" } })
+  );
+}
+
 export function fixtures(papelCompleto = "admin") {
   // «gestor:u-sal» = el mismo papel, pero en otra unidad (para ver informes enviados o devueltos).
   const [papel, unidadId = "u-ing"] = papelCompleto.split(":");
@@ -239,10 +283,22 @@ export function fixtures(papelCompleto = "admin") {
     }, informe_enviar: {}, informe_cambiar_estado: {}, informe_abrir: "i-nuevo",
     informe_metas_sincronizar: 0,
   };
+  // Compilador de colaboradores: los libros recibidos viven en memoria y se devuelven tal cual (escribir: POST/DELETE).
+  const librosCompilador = [];
+  tablas.informe_compilacion_libros = () => librosCompilador;
+  tablas.informe_compilacion = [];
+  const escribir = {
+    informe_compilacion_libros: (metodo, cuerpo, sp) => {
+      if (metodo === "POST") { const f = { id: `lb${librosCompilador.length + 1}`, creado_en: ahora, ...cuerpo }; librosCompilador.push(f); return [{ id: f.id }]; }
+      if (metodo === "DELETE") { const m = /^eq\.(.*)$/.exec(sp.get("id") || ""); const i = librosCompilador.findIndex((x) => x.id === (m && m[1])); if (i >= 0) librosCompilador.splice(i, 1); }
+      return [];
+    },
+  };
   const funciones = {
+    "pilo-compilador": (a) => ({ __sse: redaccionAstra(a.datos) }),
     "pilo-informes": (a) => (a.action === "corpus" ? CORPUS : a.action === "redactar" ? { texto: "Durante 2026 la facultad consolidó su oferta y mejoró la permanencia.", usadas: [{ clave: "matric", etiqueta: "Matrícula total" }], avisos: [] } : {}),
     "informe-plan": { acciones: [] },
   };
-  return { papel: papelCompleto, perfil, tablas, rpc, funciones };
+  return { papel: papelCompleto, perfil, tablas, rpc, funciones, escribir };
 }
 export { PILARES, UNIDADES as UNIDADES_FX, INSTANCIAS as INSTANCIAS_FX, CICLO };

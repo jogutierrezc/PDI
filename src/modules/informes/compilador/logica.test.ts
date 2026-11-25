@@ -154,6 +154,15 @@ describe("indicadores: agrupar, unificar y resolver", () => {
     expect(r.conflictos).toBe(1);
     expect(r.listos).toBeGreaterThanOrEqual(2);
   });
+  it("lee como cifra la fila con Tipo «Cifra» (así sale del libro del sistema) y salta las «Acción»", () => {
+    const o = observaciones([recibir("x.xlsx", [hojaResultados("Resultados", [
+      { Criterio: "Enseñanza", Indicador: "Retención de primer semestre", "Cifra actual": "80,2", Tipo: "Cifra", Fuente: "UDES en Cifras" },
+      { Criterio: "Enseñanza", Indicador: "Programa de nivelación", Tipo: "Acción", "Descripción de la acción": "Curso corto" },
+    ])])], A);
+    expect(o.map((x) => x.texto)).toEqual(["Retención de primer semestre"]);
+    expect(o[0].actual).toBe(80.2);
+  });
+
   it("una cifra con letras se lee como número", () => {
     expect(numeroEnLetras("mil ciento veintiséis")).toBe(1126);
     expect(numeroEnLetras("treinta y ocho")).toBe(38);

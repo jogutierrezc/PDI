@@ -21,12 +21,18 @@ end $$;
 create schema if not exists auth;
 create schema if not exists storage;
 create schema if not exists extensions;
+-- En Supabase, pgcrypto vive en «extensions»; en PGlite queda en «public». Este puente deja que
+-- las migraciones llamen extensions.gen_random_bytes (0155) igual que en el proyecto real.
+create or replace function extensions.gen_random_bytes(n integer) returns bytea
+language plpgsql as $$ begin return public.gen_random_bytes(n); end $$;
 
 create table if not exists auth.users (
   id uuid primary key,
   email text,
   raw_user_meta_data jsonb not null default '{}'::jsonb,
   raw_app_meta_data jsonb not null default '{}'::jsonb,
+  email_confirmed_at timestamptz,
+  last_sign_in_at timestamptz,
   created_at timestamptz not null default now()
 );
 

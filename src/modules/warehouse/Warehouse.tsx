@@ -18,8 +18,8 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
 import { Icon } from "../../components/ui/Icon";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
-import { mezclarPeriodos, SEDES } from "./conjuntos";
-import { useCobertura, useEstadoServidor, usePeriodosPlataforma, usePermisosWarehouse } from "./store";
+import { mezclarPeriodos, periodoPorDefecto, SEDES } from "./conjuntos";
+import { useCobertura, useEstadoServidor, usePeriodosPlataforma, usePeriodosWh, usePermisosWarehouse } from "./store";
 import { Tablero } from "./Tablero";
 import { Catalogo } from "./Catalogo";
 import { Cargas } from "./Cargas";
@@ -62,9 +62,11 @@ export function Warehouse() {
   // los guardados y los que se calculan desde 2018b. Cada sede pide la suya: nunca se reutiliza la lista de otra.
   const servidor = useEstadoServidor(permisos.ver);
   const plataforma = usePeriodosPlataforma(sede, permisos.ver && Boolean(servidor.data?.configurado));
-  const guardados = useMemo(() => (cobertura.data ?? []).map((c) => c.periodo), [cobertura.data]);
+  // Los periodos creados por adelantado (2027a…) viven en wh_periodos aunque no tengan cargas.
+  const creados = usePeriodosWh(permisos.ver);
+  const guardados = useMemo(() => [...(cobertura.data ?? []).map((c) => c.periodo), ...(creados.data ?? []).map((p) => p.periodo)], [cobertura.data, creados.data]);
   const periodos = useMemo(() => mezclarPeriodos(plataforma.data?.periodos, guardados), [plataforma.data, guardados]);
-  const porDefecto = plataforma.data?.actual && periodos.includes(plataforma.data.actual) ? plataforma.data.actual : periodos[0];
+  const porDefecto = periodoPorDefecto(periodos, plataforma.data?.actual) ?? periodos[0];
   const periodo = periodos.includes(params.get("periodo") ?? "") ? (params.get("periodo") as string) : porDefecto;
   const seccion = SECCIONES.find((s) => s.id === seccionParam)?.id ?? "tablero";
   const actual = SECCIONES.find((s) => s.id === seccion)!;
@@ -150,7 +152,7 @@ export function Warehouse() {
         {seccion === "explorar" && <Explorar ctx={contexto} cobertura={datos} />}
         {seccion === "tableros" && <Tableros ctx={contexto} cobertura={datos} />}
         {seccion === "crear" && <CrearTablero ctx={contexto} cobertura={datos} />}
-        {seccion === "almacen" && <Almacen ctx={contexto} cobertura={datos} permisos={permisos} />}
+        {seccion === "almacen" && <Almacen ctx={contexto} cobertura={datos} permisos={permisos} periodos={periodos} />}
       </div>
     );
   }

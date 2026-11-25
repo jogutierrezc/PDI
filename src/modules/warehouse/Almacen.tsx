@@ -1,21 +1,58 @@
 /* Warehouse UDES · Almacén: cómo se guarda, periodos cerrados y política de privacidad. */
 
 import { useState } from "react";
-import { CONJUNTOS, conjuntoPorId } from "./conjuntos";
-import { mensajeDe, useCerrarPeriodo, usePeriodosWh, usePoliticas, useReabrirPeriodo, type Cobertura } from "./store";
+import { CONJUNTOS, conjuntoPorId, errorPeriodoNuevo, normalizarPeriodo, periodosSugeridos } from "./conjuntos";
+import { mensajeDe, useCerrarPeriodo, useCrearPeriodo, useEliminarPeriodo, usePeriodosWh, usePoliticas, useReabrirPeriodo, type Cobertura } from "./store";
 import type { Contexto } from "./Warehouse";
 
-export function Almacen({ ctx, cobertura, permisos }: { ctx: Contexto; cobertura: Cobertura[]; permisos: { administrar: boolean } }) {
+export function Almacen({ ctx, cobertura, permisos, periodos: existentes }: { ctx: Contexto; cobertura: Cobertura[]; permisos: { administrar: boolean }; periodos: string[] }) {
   const periodos = usePeriodosWh();
   const politicas = usePoliticas();
   const cerrar = useCerrarPeriodo();
   const reabrir = useReabrirPeriodo();
+  const crear = useCrearPeriodo();
+  const quitar = useEliminarPeriodo();
+  const [nuevo, setNuevo] = useState("");
+  const [mensajeNuevo, setMensajeNuevo] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [nota, setNota] = useState("");
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
   const estado = periodos.data?.find((p) => p.periodo === ctx.periodo);
   const cerrado = estado?.estado === "cerrado";
   const enPeriodo = cobertura.filter((c) => c.periodo === ctx.periodo);
+
+  const errorNuevo = nuevo.trim() ? errorPeriodoNuevo(nuevo, existentes) : null;
+  const sugeridos = periodosSugeridos(existentes);
+  const cargados = new Set(cobertura.map((c) => c.periodo));
+  // Se pueden quitar los periodos creados que siguen abiertos y sin cargas.
+  const quitables = (periodos.data ?? []).filter((p) => p.estado === "abierto" && p.periodo !== "permanente" && !cargados.has(p.periodo)).map((p) => p.periodo).sort().reverse();
+
+  const crearPeriodo = async (texto: string) => {
+    setMensajeNuevo(null);
+    const periodo = normalizarPeriodo(texto);
+    const problema = errorPeriodoNuevo(texto, existentes);
+    if (!periodo || problema) {
+      setMensajeNuevo({ tipo: "error", texto: problema ?? "Escriba el año y la letra A o B, por ejemplo 2027A." });
+      return;
+    }
+    try {
+      await crear.mutateAsync({ periodo });
+      setMensajeNuevo({ tipo: "ok", texto: `${periodo.toUpperCase()} quedó creado y abierto. Ya aparece en el selector de periodo.` });
+      setNuevo("");
+    } catch (e) {
+      setMensajeNuevo({ tipo: "error", texto: mensajeDe(e) });
+    }
+  };
+
+  const quitarPeriodo = async (periodo: string) => {
+    setMensajeNuevo(null);
+    try {
+      await quitar.mutateAsync(periodo);
+      setMensajeNuevo({ tipo: "ok", texto: `${periodo.toUpperCase()} se quitó.` });
+    } catch (e) {
+      setMensajeNuevo({ tipo: "error", texto: mensajeDe(e) });
+    }
+  };
 
   const accion = async (cerrando: boolean) => {
     setMensaje(null);
@@ -110,6 +147,76 @@ export function Almacen({ ctx, cobertura, permisos }: { ctx: Contexto; cobertura
               {mensaje.texto}
             </p>
           )}
+        </div>
+      </section>
+
+      <section className="wh-panel" aria-labelledby="wh-nuevo">
+        <div className="wh-panel__cabeza">
+          <div>
+            <h2 id="wh-nuevo">Crear un periodo nuevo</h2>
+            <p className="wh-muted">Para preparar un periodo que la plataforma aún no tiene (2027A, 2027B…). Queda abierto y vacío, y aparece en el selector de periodo.</p>
+          </div>
+        </div>
+        <div className="wh-panel__cuerpo" style={{ display: "grid", gap: "var(--space-3)" }}>
+          <form
+            className="wh-fila"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void crearPeriodo(nuevo);
+            }}
+          >
+            <label style={{ display: "grid", gap: 6 }}>
+              <span className="wh-muted">Periodo (año y letra)</span>
+              <input
+                className="wh-texto"
+                value={nuevo}
+                maxLength={8}
+                placeholder="2027A"
+                aria-invalid={errorNuevo ? true : undefined}
+                aria-describedby={errorNuevo ? "wh-nuevo-error" : undefined}
+                onChange={(e) => setNuevo(e.target.value)}
+              />
+            </label>
+            <button type="submit" className="button-primary" disabled={!nuevo.trim() || Boolean(errorNuevo) || crear.isPending} style={{ alignSelf: "end" }}>
+              {crear.isPending ? "Creando…" : "Crear periodo"}
+            </button>
+          </form>
+          {errorNuevo && (
+            <p id="wh-nuevo-error" className="wh-muted">
+              {errorNuevo}
+            </p>
+          )}
+          {sugeridos.length > 0 && (
+            <div className="wh-fila" role="group" aria-label="Periodos sugeridos">
+              <span className="wh-muted">Sugeridos:</span>
+              {sugeridos.map((p) => (
+                <button key={p} type="button" className="button-secondary" disabled={crear.isPending} onClick={() => void crearPeriodo(p)}>
+                  Crear {p.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+          {quitables.length > 0 && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <span className="wh-muted">Abiertos y sin cargas (se pueden quitar):</span>
+              <div className="wh-fila">
+                {quitables.map((p) => (
+                  <span key={p} className="wh-etiqueta">
+                    {p.toUpperCase()}
+                    <button type="button" className="oda-link-button" disabled={quitar.isPending} aria-label={`Quitar el periodo ${p.toUpperCase()}`} onClick={() => void quitarPeriodo(p)} style={{ marginLeft: 8 }}>
+                      Quitar
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {mensajeNuevo && (
+            <p className={mensajeNuevo.tipo === "ok" ? "wh-aviso wh-aviso--verde" : "wh-aviso wh-aviso--rojo"} role={mensajeNuevo.tipo === "error" ? "alert" : "status"}>
+              {mensajeNuevo.texto}
+            </p>
+          )}
+          <p className="wh-nota-chica">Traer datos de la plataforma a un periodo futuro solo funciona cuando la plataforma ya lo tenga abierto; mientras tanto se puede cargar un Excel a mano.</p>
         </div>
       </section>
 

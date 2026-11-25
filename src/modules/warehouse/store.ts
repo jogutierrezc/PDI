@@ -175,8 +175,9 @@ export function useCargas(limite = 200) {
   });
 }
 
-export function usePeriodosWh() {
+export function usePeriodosWh(habilitado = true) {
   return useQuery({
+    enabled: habilitado,
     queryKey: whKeys.periodos,
     queryFn: async () => {
       const { data, error } = await supabase.from("wh_periodos").select("periodo,estado,nota,cerrado_en");
@@ -711,6 +712,30 @@ export function useEstadoServidor(habilitado: boolean) {
 export function useAlRefrescar() {
   const cliente = useQueryClient();
   return () => cliente.invalidateQueries({ queryKey: whKeys.all });
+}
+
+/** Crea un periodo por adelantado (2027a…): queda abierto y vacío. */
+export function useCrearPeriodo() {
+  const refrescar = useAlRefrescar();
+  return useMutation({
+    mutationFn: async (p: { periodo: string; nota?: string }) => {
+      const r = await supabase.rpc("wh_crear_periodo", { p_periodo: p.periodo, p_nota: p.nota ?? "" });
+      if (r.error) throw new Error(mensajeDe(r.error));
+    },
+    onSuccess: refrescar,
+  });
+}
+
+/** Quita un periodo que sigue abierto y sin cargas. */
+export function useEliminarPeriodo() {
+  const refrescar = useAlRefrescar();
+  return useMutation({
+    mutationFn: async (periodo: string) => {
+      const r = await supabase.rpc("wh_eliminar_periodo", { p_periodo: periodo });
+      if (r.error) throw new Error(mensajeDe(r.error));
+    },
+    onSuccess: refrescar,
+  });
 }
 
 export function useCerrarPeriodo() {

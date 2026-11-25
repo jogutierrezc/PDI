@@ -644,3 +644,52 @@ export function mezclarPeriodos(plataforma: string[] | undefined, guardados: str
   const todos = new Set<string>([...(plataforma?.length ? plataforma : periodosDisponibles(hoy)).filter(valido), ...guardados.filter(valido)]);
   return [...todos].sort().reverse();
 }
+
+/* --- Periodos nuevos (futuros) ------------------------------------------------------------------ */
+
+/** Cuántos años por delante se puede crear un periodo (la base aplica el mismo tope). */
+export const ANIOS_ADELANTE = 5;
+
+/** «2027A», «2027 b» o «2027-b» → «2027b»; null si no se parece a un periodo. */
+export function normalizarPeriodo(texto: string): string | null {
+  const m = /^\s*(\d{4})\s*[-_ ]?\s*([abAB])\s*$/.exec(texto);
+  return m ? `${m[1]}${m[2].toLowerCase()}` : null;
+}
+
+/** Por qué un periodo no se puede crear (texto para la persona), o null si está bien. */
+export function errorPeriodoNuevo(texto: string, existentes: string[], hoy = new Date()): string | null {
+  const periodo = normalizarPeriodo(texto);
+  if (!periodo) return "Escriba el año y la letra A o B, por ejemplo 2027A.";
+  const anio = Number(periodo.slice(0, 4));
+  const tope = hoy.getFullYear() + ANIOS_ADELANTE;
+  if (anio < 2018 || anio > tope) return `El año debe estar entre 2018 y ${tope}.`;
+  if (existentes.includes(periodo)) return `${periodo.toUpperCase()} ya existe.`;
+  return null;
+}
+
+/** Los próximos periodos que aún no existen, para ofrecerlos con un clic (el semestre en curso y los siguientes). */
+export function periodosSugeridos(existentes: string[], cantidad = 4, hoy = new Date()): string[] {
+  let anio = hoy.getFullYear();
+  let letra = hoy.getMonth() >= 6 ? "b" : "a";
+  const salida: string[] = [];
+  for (let i = 0; i < 12 && salida.length < cantidad; i++) {
+    const p = `${anio}${letra}`;
+    if (!existentes.includes(p)) salida.push(p);
+    if (letra === "a") letra = "b";
+    else {
+      letra = "a";
+      anio += 1;
+    }
+  }
+  return salida;
+}
+
+/**
+ * El periodo que se abre por defecto: el que la plataforma dice que está en curso; si no lo dice, el semestre de hoy o el
+ * último anterior. Un periodo creado por adelantado (2027a) nunca queda de entrada solo por ser el más reciente.
+ */
+export function periodoPorDefecto(periodos: string[], actualPlataforma?: string | null, hoy = new Date()): string | undefined {
+  if (actualPlataforma && periodos.includes(actualPlataforma)) return actualPlataforma;
+  const hoyClave = `${hoy.getFullYear()}${hoy.getMonth() >= 6 ? "b" : "a"}`;
+  return periodos.find((p) => p <= hoyClave) ?? periodos[0];
+}

@@ -115,6 +115,7 @@ Una celda a la vez por sede; sedes en paralelo; los reportes pesados (`REPORTES_
 
 ## Periodo
 Toda carga se guarda con un periodo (`2026b`) o con `permanente` (catálogos).
+- **Periodos futuros** (migración 0295): en Almacén → «Crear un periodo nuevo» se crea `2027a`, `2027b`… antes de que la plataforma los tenga (`wh_crear_periodo`: año de 2018 a hoy + 5, abierto y vacío). Aparecen en el selector, pero el de entrada sigue siendo el en curso (`periodoPorDefecto`). Mientras estén abiertos y sin cargas se pueden quitar (`wh_eliminar_periodo`). Traer datos de la plataforma a un periodo que ella aún no lista falla; con un Excel a mano se puede cargar.
 - **ruta** (Davinci, aspirantes): el periodo va en la URL; se valida contra la lista de la plataforma y, si el Excel lo dice (títulos, nombre de hojas), contra el archivo.
 - **consulta** (`ma_rendimiento`, `ms_comp`, `ms_eval`): `?selected_period=`. `ma_rendimiento` está probado; los otros dos no dicen su periodo en el archivo y, si se pide uno distinto del abierto, se guardan marcados «sin confirmar».
 - **cuerpo** (`ms_nom`, `ms_nuevos`, `ms_activos`): `selected_period` en el cuerpo (`null` si es el abierto) y también en la URL. Nómina y activos dicen su periodo (título del Excel, nombre de la tarea) y se comparan; nuevos matriculados no lo dice, así que solo se acepta el periodo abierto de la sede.

@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El Gestor y el libro de Excel</title>
+<meta name="description" content="Introducción al rol de Gestor en Informes de gestión y capítulo 7, el libro de Excel.">
+<link rel="stylesheet" href="fuentes/local.css">
+<style>
+:root{
+  --navy:#0a2d63; --navy-deep:#061e46; --blue:#2166d6; --blue-soft:#eaf1fd; --blue-mid:#cfdef7;
+  --page:#f4f7fb; --paper:#fff; --ink:#0d1c31; --ink-2:#45566d; --ink-3:#5b6c83; --on-navy:#c3d5f2;
+  --line:rgba(13,40,84,.2); --signal:#f6b93f; --signal-ink:#1d1402;
+  --done:#0d6a2e; --done-soft:#e6f4ea; --pending:#8a5f00; --pending-soft:#fbf2e0; --risk:#b52e2e; --risk-soft:#fceaea;
+  --xl-blue:#dbe8fb; --xl-yellow:#fff0a8; --xl-grey:#e3e6ea;
+  --f-display:"Fraunces",Georgia,serif; --f-sans:"Open Sans",system-ui,sans-serif; --f-sign:"Barlow Condensed","Arial Narrow",sans-serif;
+  --out:cubic-bezier(.23,1,.32,1);
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--navy-deep);overflow:hidden}
+body{font-family:var(--f-sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+#viewport{position:fixed;inset:0;overflow:hidden;background:var(--navy-deep)}
+#stage{position:absolute;left:50%;top:50%;margin:-540px 0 0 -960px;width:1920px;height:1080px;transform-origin:center center;background:var(--paper);overflow:hidden}
+
+.slide{position:absolute;inset:0;padding:120px 140px 110px;visibility:hidden;display:flex;flex-direction:column}
+.slide.on{visibility:visible}
+.slide.navy{background:var(--navy);color:#fff}
+.slide.page{background:var(--page)}
+.kicker{font-family:var(--f-sign);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:26px;color:var(--blue);margin-bottom:22px}
+.navy .kicker{color:var(--signal)}
+h1,h2{font-family:var(--f-display);font-weight:700;color:var(--navy);letter-spacing:-.01em;text-wrap:balance}
+.navy h1,.navy h2{color:#fff}
+h1{font-size:132px;line-height:.98}
+h2{font-size:78px;line-height:1.04;max-width:1400px}
+.lede{font-size:34px;line-height:1.5;color:var(--ink-2);max-width:1250px;margin-top:30px;text-wrap:pretty}
+.navy .lede{color:var(--on-navy)}
+p,li{text-wrap:pretty}
+.body{flex:1;display:flex;gap:80px;align-items:center;margin-top:30px;min-height:0}
+.col{flex:1;min-width:0}
+
+/* chrome */
+#chrome{position:absolute;inset:0;z-index:5;pointer-events:none;color:var(--ink-3);font-size:20px;font-weight:600}
+#chrome.dark{color:var(--on-navy)}
+#logo{position:absolute;right:140px;top:38px;height:60px;transition:height .5s var(--out),top .5s var(--out),right .5s var(--out)}
+#logo img{height:100%;width:auto;display:block;position:absolute;right:0;top:0;transition:opacity .25s}
+#logo .w{opacity:0}#chrome.dark #logo .w{opacity:1}#chrome.dark #logo .c{opacity:0}
+#chrome.hero #logo{height:150px;right:auto;left:140px;top:84px}
+#chrome.hero #logo img{right:auto;left:0}
+#foot{position:absolute;left:140px;bottom:30px;letter-spacing:.02em}
+#chrome.hero #foot{opacity:0}
+#count{position:absolute;right:210px;bottom:30px}
+#fs{position:absolute;right:140px;bottom:20px;width:46px;height:46px;border-radius:8px;border:2px solid currentColor;background:transparent;color:inherit;cursor:pointer;pointer-events:auto;opacity:.65;display:grid;place-items:center;transition:opacity .2s,transform .16s var(--out)}
+#fs:hover{opacity:1}#fs:active{transform:scale(.94)}
+#fs svg{width:22px;height:22px}
+body.fs{cursor:none}body.fs #fs{opacity:0}
+.slide.navy::before{content:"";position:absolute;inset:0;background:radial-gradient(1200px 800px at 85% 90%,rgba(33,102,214,.35),transparent 70%);pointer-events:none}
+.slide.navy::after{content:"";position:absolute;left:0;top:0;bottom:0;width:18px;background:var(--signal)}
+.slide.navy>*{position:relative;z-index:1}
+.slide.navy>.pilo{position:absolute}
+.slide.cover{padding-top:330px}
+#bar{position:absolute;left:0;top:0;height:6px;width:100%;background:var(--signal);transform-origin:left;transform:scaleX(0);z-index:6}
+
+/* pieces */
+.cadena{display:flex;gap:0;margin-top:120px;width:100%}
+.cadena li{list-style:none;flex:1;padding:0 22px 0 0;position:relative}
+.cadena li::before{content:"";display:block;height:4px;background:var(--navy);margin-bottom:26px;transform-origin:left;transform:scaleX(var(--s,1))}
+.cadena b{display:block;font-family:var(--f-display);font-size:36px;color:var(--navy);margin-bottom:8px}
+.cadena span{font-size:25px;line-height:1.4;color:var(--ink-2)}
+.cadena li.me::before{background:var(--signal);height:10px;margin-top:-3px}
+.cadena li.me b{color:var(--navy)}
+
+.roles{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;margin-top:50px;width:100%}
+.role{background:#fff;border:2px solid var(--line);border-radius:6px;padding:34px 32px;min-height:300px}
+.role b{font-family:var(--f-display);font-size:38px;color:var(--navy);display:block;margin-bottom:12px}
+.role p{font-size:25px;line-height:1.45;color:var(--ink-2)}
+.role.me{background:var(--navy);border-color:var(--navy);transform-origin:center}
+.role.me b{color:#fff}.role.me p{color:var(--on-navy)}
+.role small{font-family:var(--f-sign);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:22px;color:var(--signal);display:block;margin-bottom:14px}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:48px;width:100%}
+.box{background:#fff;border-radius:6px;padding:38px 44px;border-left:10px solid var(--done)}
+.box.no{border-left-color:var(--risk)}
+.box h3{font-family:var(--f-sign);font-size:34px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:18px;color:var(--done)}
+.box.no h3{color:var(--risk)}
+.box li{list-style:none;font-size:27px;line-height:1.4;padding:10px 0;border-top:1px solid var(--line);color:var(--ink)}
+.box li:first-of-type{border-top:0}
+
+.steps{counter-reset:s;display:grid;gap:0;width:100%}
+.steps li{list-style:none;display:grid;grid-template-columns:90px 1fr;align-items:baseline;padding:20px 0;border-top:1px solid var(--line)}
+.steps li:first-child{border-top:0}
+.steps li::before{counter-increment:s;content:counter(s);font-family:var(--f-sign);font-weight:700;font-size:56px;color:var(--blue);line-height:1}
+.steps.tight li{padding:11px 0}.steps.tight b{font-size:27px}.steps.tight span{font-size:22px}.steps b{font-size:30px;color:var(--navy);display:block}
+.steps span{font-size:25px;color:var(--ink-2);line-height:1.4}
+.navy .steps li{border-color:rgba(255,255,255,.2)}.navy .steps b{color:#fff}.navy .steps span{color:var(--on-navy)}.navy .steps li::before{color:var(--signal)}
+
+.shot{border-radius:8px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(6,30,70,.5);border:1px solid var(--line);background:#fff;position:relative}
+.shot img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.tag{display:inline-block;padding:6px 18px;border-radius:4px;font-weight:700;font-size:25px}
+.pill{display:inline-flex;align-items:center;gap:10px;padding:8px 22px;border-radius:40px;font-weight:700;font-size:26px}
+.pill.pe{background:var(--pending-soft);color:var(--pending)}.pill.ok{background:var(--done-soft);color:var(--done)}.pill.ri{background:var(--risk-soft);color:var(--risk)}
+
+.swatches{display:grid;gap:26px;width:100%}
+.sw{display:grid;grid-template-columns:330px 1fr;align-items:center;gap:36px}
+.sw i{font-style:normal;display:grid;place-items:center;height:130px;border-radius:6px;font-family:var(--f-sign);font-weight:700;font-size:44px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);border:2px solid rgba(13,40,84,.15)}
+.sw p{font-size:32px;line-height:1.35;color:var(--ink)}
+.sw p em{font-style:normal;color:var(--ink-3);font-size:26px;display:block;margin-top:4px}
+
+.sheets{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;width:100%}
+.sh{background:#fff;border:2px solid var(--line);border-radius:6px;padding:22px 22px 20px;min-height:156px}
+.sh small{font-family:var(--f-sign);font-weight:700;font-size:30px;color:var(--blue);display:block}
+.sh b{font-size:24px;color:var(--navy);display:block;line-height:1.25;margin:2px 0 8px}
+.sh span{font-size:21px;color:var(--ink-2);line-height:1.3;display:block}
+.sh.y{border-color:var(--signal);background:#fffaf0}
+.sh.g{background:var(--xl-grey);border-color:transparent}
+.sh.g small{color:var(--ink-3)}
+
+table{border-collapse:collapse;width:100%}
+th{font-family:var(--f-sign);letter-spacing:.1em;text-transform:uppercase;font-size:24px;text-align:left;color:var(--ink-3);padding:0 20px 14px}
+td{font-size:26px;line-height:1.35;padding:20px;border-top:1px solid var(--line);vertical-align:top;color:var(--ink)}
+td:first-child{font-weight:700;color:var(--navy);width:26%}
+td q{quotes:"«" "»"}
+tr{background:transparent}
+
+.quote{border-left:10px solid var(--signal);padding:10px 0 10px 36px;font-size:34px;line-height:1.4;color:var(--navy);font-family:var(--f-display);max-width:1100px}
+.navy .quote{color:#fff}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:.86em;background:var(--blue-soft);padding:2px 10px;border-radius:4px;color:var(--navy)}
+.navy .mono{background:rgba(255,255,255,.12);color:#fff}
+.pilo{position:absolute;pointer-events:none}
+.big{font-family:var(--f-display);font-size:230px;line-height:.8;color:var(--signal);font-weight:700}
+.check li{list-style:none;font-size:34px;line-height:1.35;padding:22px 0 22px 80px;position:relative;border-top:1px solid rgba(255,255,255,.2)}
+.check li:first-child{border-top:0}
+.check li::before{content:"";position:absolute;left:8px;top:30px;width:40px;height:40px;border:4px solid var(--signal);border-radius:6px}
+.check li::after{content:"";position:absolute;left:19px;top:36px;width:12px;height:22px;border:solid var(--signal);border-width:0 5px 5px 0;transform:rotate(40deg)}
+.hint{position:absolute;right:140px;top:50px;font-size:20px;font-weight:600;color:var(--ink-3);z-index:5}
+.navy .hint{color:var(--on-navy)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage">
+<div id="bar"></div>
+
+<!-- 1 PORTADA -->
+<section class="slide navy cover" data-title="Portada">
+  <div class="kicker" data-a>Informes Institucionales · Ciclo 2026</div>
+  <h1 data-a style="margin-top:10px">El Gestor<br>y el libro de Excel</h1>
+  <p class="lede" data-a style="max-width:860px">Quién es el Gestor del informe de gestión, qué hace en cada paso y cómo usa el libro de Excel para recoger lo que otros equipos saben.</p>
+  <img class="pilo" data-pilo src="img/pilo_emocionado.svg" alt="Pilo, la mascota de la UDES, con expresión de entusiasmo" style="right:130px;bottom:70px;height:760px">
+</section>
+
+<!-- 2 EL MÓDULO -->
+<section class="slide" data-title="El módulo">
+  <div class="kicker" data-a>Primero, el contexto</div>
+  <h2 data-a>Un solo recorrido, de izquierda a derecha</h2>
+  <p class="lede" data-a>Cada unidad escribe su informe en la pantalla, con las cifras del portal ya cargadas. El Gestor está en el cuarto paso.</p>
+  <ol class="cadena">
+    <li data-a><b>Ciclo</b><span>Planeación abre el año y fija la fecha límite.</span></li>
+    <li data-a><b>Estructura</b><span>Qué secciones lleva cada tipo de unidad.</span></li>
+    <li data-a><b>Responsables</b><span>Quién escribe el informe de cada unidad.</span></li>
+    <li data-a class="me"><b>Diligenciar</b><span>La unidad escribe, con cifras vivas y evidencias.</span></li>
+    <li data-a class="me"><b>Enviar</b><span>El Gestor envía. El informe queda aprobado.</span></li>
+    <li data-a><b>Revisión</b><span>Se puede devolver con una nota.</span></li>
+    <li data-a><b>Exportables</b><span>Excel, vista en papel, PDF y presentación.</span></li>
+  </ol>
+</section>
+
+<!-- 3 PAPELES -->
+<section class="slide page" data-title="Papeles">
+  <div class="kicker" data-a>Los cuatro papeles</div>
+  <h2 data-a>Usted es quien lidera el informe</h2>
+  <div class="roles">
+    <div class="role" data-a><b>Administrador</b><p>Es Planeación. Abre el ciclo, define la estructura y asigna responsables.</p></div>
+    <div class="role me" data-a><small>Usted</small><b>Gestor</b><p>Diligencia y envía el informe de su unidad.</p></div>
+    <div class="role" data-a><b>Contribuyente</b><p>Ayuda a escribir las secciones, pero no envía el informe.</p></div>
+    <div class="role" data-a><b>Consulta</b><p>Lee el informe completo. No escribe nada.</p></div>
+  </div>
+  <p class="lede" data-a style="margin-top:auto;font-size:30px">Se llega a ser Gestor porque Planeación lo asigna en «Responsables» o porque su rol de acceso dice «Diligencia y envía».</p>
+</section>
+
+<!-- 4 PUEDE / NO PUEDE -->
+<section class="slide page" data-title="Alcance">
+  <div class="kicker" data-a>Alcance del papel</div>
+  <h2 data-a>Lo que sí hace y lo que no le toca</h2>
+  <div class="body">
+    <div class="duo">
+      <div class="box" data-a><h3>Puede</h3><ul>
+        <li>Escribir todas las secciones mientras esté en borrador o devuelto</li>
+        <li>Enviar: al enviar, el informe queda aprobado</li>
+        <li>Reabrir un informe devuelto</li>
+        <li>Usar el libro de Excel, el PDF y a Pilo</li>
+        <li>Cambiar el perfil de la oficina: acento, escudo y pie</li></ul></div>
+      <div class="box no" data-a><h3>No puede</h3><ul>
+        <li>Abrir el informe si Planeación no lo ha abierto</li>
+        <li>Cambiar la plantilla, la estructura o los requisitos</li>
+        <li>Editar después del envío: solo se devuelve desde Planeación o la unidad destino</li>
+        <li>Escribir en el informe de otra unidad</li>
+        <li>Editar si el ciclo no está «Abierto»</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 RECORRIDO -->
+<section class="slide" data-title="Recorrido">
+  <div class="kicker" data-a>Su recorrido</div>
+  <h2 data-a>De «Mi informe» al botón Enviar</h2>
+  <div class="body">
+    <ol class="steps col" style="flex:1.1">
+      <li data-a><div><b>Entre a Mi informe</b><span>Informes Institucionales → Informes de gestión. El riel izquierdo muestra su papel y el avance.</span></div></li>
+      <li data-a><div><b>Abra cada sección</b><span>Texto, cifras, alineación con el PDI, metas, resultados, puntos críticos, logros y evidencias.</span></div></li>
+      <li data-a><div><b>Deje los controles en verde</b><span>El guardado es automático, 800 ms después de escribir.</span></div></li>
+      <li data-a><div><b>Envíe</b><span>Con todas las secciones en «Lista», las cifras se congelan y el informe se bloquea.</span></div></li>
+    </ol>
+    <div class="shot col" data-a data-shot style="flex:.9;height:680px"><img src="img/ges-mi-informe.jpg" alt="Pantalla Mi informe del Gestor con el riel de secciones"></div>
+  </div>
+</section>
+
+<!-- 6 ESTADOS -->
+<section class="slide page" data-title="Estados">
+  <div class="kicker" data-a>Qué le pasa al informe</div>
+  <h2 data-a>Tres estados que conviene reconocer</h2>
+  <div class="body" style="align-items:flex-start;margin-top:50px">
+    <table class="col" style="flex:1.2">
+      <tr><th>Estado</th><th>Qué hace usted</th></tr>
+      <tr data-a><td><span class="pill pe">◐ Borrador</span></td><td>Escribe y guarda. «Enviar» se habilita cuando las N secciones estén listas.</td></tr>
+      <tr data-a><td><span class="pill ok">✓ Aprobado</span></td><td>Solo lee. Las cifras quedaron congeladas al enviar.</td></tr>
+      <tr data-a><td><span class="pill ri">↩ Devuelto</span></td><td>Ve la nota general y la de cada sección. Al guardar vuelve a borrador y usted lo reenvía.</td></tr>
+    </table>
+    <div class="shot col" data-a data-shot style="flex:.8;height:610px"><img src="img/ges-devuelto.jpg" alt="Informe devuelto con la nota de Planeación"></div>
+  </div>
+</section>
+
+<!-- 7 DIVISOR CAP 7 -->
+<section class="slide navy" data-title="Capítulo 7">
+  <div class="big" data-a>7</div>
+  <h1 data-a style="margin-top:40px">El libro de Excel</h1>
+  <p class="lede" data-a style="max-width:1100px">El Gestor lo descarga, cada equipo llena sus hojas y el Gestor lo importa de vuelta sin perder nada.</p>
+  <img class="pilo" data-pilo src="img/pilo_pensar.svg" alt="Pilo pensando" style="right:150px;bottom:80px;height:640px">
+</section>
+
+<!-- 8 DESCARGAR -->
+<section class="slide" data-title="Descargar">
+  <div class="kicker" data-a>Paso 1 · Exportar</div>
+  <h2 data-a>Se descarga desde «Libro de Excel»</h2>
+  <div class="body">
+    <ol class="steps col" style="flex:1.15">
+      <li data-a><div><b>Un libro completo</b><span>Todas las hojas en un solo archivo. Cada hoja se marca «Automática», «Cifras y acciones de la unidad» o «Se diligencia».</span></div></li>
+      <li data-a><div><b>Un libro por equipo</b><span>Reparte las secciones y baja un archivo por equipo, solo con sus hojas.</span></div></li>
+      <li data-a><div><b>Bloquear las celdas grises</b><span>Viene marcada. Se escribe solo en las celdas de color; se quita en Revisar → Desproteger hoja.</span></div></li>
+    </ol>
+    <div class="shot col" data-a data-shot style="flex:.85;height:620px"><img src="img/ges-libro.jpg" alt="Cajón Libro de Excel, paso Exportar"></div>
+  </div>
+  <p data-a style="font-size:25px;color:var(--ink-3);margin-top:10px">Nombre del archivo: <span class="mono">Informe_Gestion_2026_A.xlsx</span> · por equipo: <span class="mono">…_secretaria-academica.xlsx</span></p>
+</section>
+
+<!-- 9 COLORES -->
+<section class="slide page" data-title="Colores">
+  <div class="kicker" data-a>Cómo leer cada hoja</div>
+  <h2 data-a>Tres colores, siempre los mismos</h2>
+  <div class="body">
+    <div class="swatches col" style="flex:1">
+      <div class="sw" data-a><i style="background:var(--xl-blue)">Azul claro</i><p>Se diligencia, pero es opcional.</p></div>
+      <div class="sw" data-a><i style="background:var(--xl-yellow)">Amarillo</i><p>Es obligatoria.<em>Sin ella la sección no queda lista.</em></p></div>
+      <div class="sw" data-a><i style="background:var(--xl-grey)">Gris</i><p>La pone el sistema.<em>Está bloqueada: no se escribe.</em></p></div>
+    </div>
+    <div class="col" style="flex:.85">
+      <div class="shot" data-a data-shot style="height:480px"><img src="img/xls-instrucciones.jpg" alt="Hoja 00 Portada del libro"></div>
+      <p data-a style="font-size:26px;color:var(--ink-2);margin-top:22px;line-height:1.4">Cada hoja lleva una banda azul de tres filas. El encabezado está en la <b>fila 4</b>; los datos empiezan en la fila 5.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10 HOJAS -->
+<section class="slide" data-title="Las hojas">
+  <div class="kicker" data-a>Qué trae el libro</div>
+  <h2 data-a>Una hoja por cada sección del informe</h2>
+  <div class="body" style="align-items:flex-start;margin-top:50px">
+    <div class="sheets">
+      <div class="sh y" data-a><small>01</small><b>Resumen ejecutivo</b><span>Texto de la sección</span></div>
+      <div class="sh" data-a><small>02</small><b>Alineación con el PDI</b><span>Sí/No y aporte por pilar</span></div>
+      <div class="sh y" data-a><small>03</small><b>Objetivos y metas</b><span>Programado y alcanzado</span></div>
+      <div class="sh" data-a><small>04</small><b>Criterios</b><span>¿Reporta aquí? Sí/No</span></div>
+      <div class="sh y" data-a><small>04</small><b>Resultados</b><span>Una fila por cifra o acción</span></div>
+      <div class="sh g" data-a><small>05</small><b>Síntesis</b><span>Solo referencia</span></div>
+      <div class="sh y" data-a><small>06</small><b>Puntos críticos</b><span>Dimensión, acción, tiempo</span></div>
+      <div class="sh" data-a><small>07</small><b>Logros destacados</b><span>Con número de anexo</span></div>
+      <div class="sh y" data-a><small>08</small><b>Evidencias</b><span>Documento y enlace https://</span></div>
+      <div class="sh g" data-a><small>10</small><b>Anexos</b><span>Solo referencia</span></div>
+    </div>
+  </div>
+  <p data-a style="font-size:26px;color:var(--ink-2);line-height:1.4;max-width:1500px">Fondo gris: no se importa. Borde ámbar: tiene columnas obligatorias. La hoja 09 es Conclusiones, igual que el resumen. Las cifras vivas se citan con <span class="mono">[[clave]]</span>.</p>
+</section>
+
+<!-- 11 RESULTADOS -->
+<section class="slide page" data-title="Resultados">
+  <div class="kicker" data-a>La hoja más larga</div>
+  <h2 data-a>Resultados: una fila por cifra o por acción</h2>
+  <div class="body" style="flex-direction:column;align-items:stretch;gap:36px;margin-top:40px">
+    <div class="shot" data-a data-shot style="height:400px"><img src="img/xls-lleno-resultados-a.jpg" alt="Hoja de Resultados diligenciada" style="object-position:left top"></div>
+    <div class="duo" style="grid-template-columns:repeat(3,1fr);gap:28px">
+      <div data-a><b style="font-size:30px;color:var(--navy)">Cifra</b><p style="font-size:25px;line-height:1.4;color:var(--ink-2);margin-top:6px">Criterio, indicador, año anterior, cifra actual y meta. Solo números; admite coma decimal.</p></div>
+      <div data-a><b style="font-size:30px;color:var(--navy)">Acción</b><p style="font-size:25px;line-height:1.4;color:var(--ink-2);margin-top:6px">Hacen falta la descripción y «qué se ha hecho» para darla por completa.</p></div>
+      <div data-a><b style="font-size:30px;color:var(--navy)">Estado</b><p style="font-size:25px;line-height:1.4;color:var(--ink-2);margin-top:6px">Cumplida o Parcial. Lo calcula el sistema; la celda es gris.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 EQUIPOS -->
+<section class="slide" data-title="Equipos">
+  <div class="kicker" data-a>Repartir el trabajo</div>
+  <h2 data-a>Un libro por equipo</h2>
+  <div class="body">
+    <ol class="steps col" style="flex:1">
+      <li data-a><div><b>Reparta</b><span>Envíe a cada equipo solo su archivo. Si recibe el completo, puede escribir encima de lo de otros.</span></div></li>
+      <li data-a><div><b>Cada equipo diligencia</b><span>Solo en las celdas de color. Sin información, deja la fila vacía.</span></div></li>
+      <li data-a><div><b>Recoja e importe</b><span>Uno tras otro. Cada libro conserva la huella de la estructura.</span></div></li>
+    </ol>
+    <div class="shot col" data-a data-shot style="flex:1;height:480px"><img src="img/xls-equipo-secretaria.jpg" alt="Libro del equipo Secretaría académica" style="object-position:left top"></div>
+  </div>
+  <p data-a style="font-size:25px;color:var(--ink-3)">Equipos sugeridos: quien lidera el informe, Decanatura, Dirección de programa, Coordinación de investigación, Coordinación de extensión y Secretaría académica.</p>
+</section>
+
+<!-- 13 OCULTAS -->
+<section class="slide navy" data-title="Hojas ocultas">
+  <div class="kicker" data-a>No se tocan</div>
+  <h2 data-a>Dos hojas ocultas sostienen el libro</h2>
+  <div class="body">
+    <div class="col" style="flex:1.05">
+      <ol class="steps">
+        <li data-a><div><b>Listas</b><span>Alimenta los desplegables. Si se borra, dejan de funcionar.</span></div></li>
+        <li data-a><div><b>_Control</b><span>Une el libro con el informe: formato, ciclo, plantilla, unidad y huella.</span></div></li>
+      </ol>
+      <p class="quote" data-a style="margin-top:34px;font-size:30px">La huella es un código de la estructura. Si Planeación la cambia después de su descarga, el sistema avisa.</p>
+    </div>
+    <div class="shot col" data-a data-shot style="flex:.9;height:520px"><img src="img/xls-control-oculta.jpg" alt="Hoja oculta _Control"></div>
+  </div>
+  <p data-a style="font-size:25px;color:var(--on-navy)">Tampoco renombre hojas ni encabezados, ni mueva la fila 4. Sin <span class="mono">_Control</span> el sistema tiene que adivinar por los encabezados.</p>
+</section>
+
+<!-- 14 IMPORTAR -->
+<section class="slide" data-title="Importar">
+  <div class="kicker" data-a>Paso 2 · Importar</div>
+  <h2 data-a>Importar, en seis pasos</h2>
+  <div class="body">
+    <ol class="steps tight col" style="flex:1.2">
+      <li data-a><div><b>Cargue el .xlsx</b><span>Lo rechaza si es de otra unidad, otro ciclo u otra plantilla.</span></div></li>
+      <li data-a><div><b>Revise el destino de cada hoja</b><span>«Por _Control · 100 %», «Reconocida», «Revisar» o «Sin destino».</span></div></li>
+      <li data-a><div><b>Mire el conteo y los avisos</b><span>Filas listas, con aviso y sin importar. Cada aviso dice hoja, fila y problema.</span></div></li>
+      <li data-a><div><b>Elija cómo aplicar</b><span>Vea la lámina siguiente.</span></div></li>
+      <li data-a><div><b>Indique quién aporta</b><span>Queda anotado en el aviso final y en las evidencias nuevas.</span></div></li>
+      <li data-a><div><b>Aplique al informe</b><span>Guardado inmediato y recálculo de las secciones.</span></div></li>
+    </ol>
+    <div class="shot col" data-a data-shot style="flex:.7;height:700px"><img src="img/adm-libro-importar.jpg" alt="Paso Importar con clasificación de hojas"></div>
+  </div>
+</section>
+
+<!-- 15 MODOS -->
+<section class="slide page" data-title="Modos">
+  <div class="kicker" data-a>Cómo aplicar</div>
+  <h2 data-a>Tres modos de aplicar</h2>
+  <div class="roles" style="grid-template-columns:repeat(3,1fr);margin-top:60px">
+    <div class="role me" data-a style="min-height:380px"><small>Por defecto</small><b>Agregar al final</b><p>Suma lo del libro a lo escrito. Lo que ya existe no se toca y las filas idénticas se omiten.</p></div>
+    <div class="role" data-a style="min-height:380px"><b>Llenar solo lo vacío</b><p>Completa las celdas vacías y suma las filas que no existen. Nada de lo escrito se cambia.</p><p style="margin-top:20px;color:var(--navy);font-weight:600">Úselo cuando el equipo completó lo que faltaba.</p></div>
+    <div class="role" data-a style="min-height:380px"><b>Reemplazar la sección</b><p>Lo del libro queda en lugar de lo que había. Pide confirmación.</p><p style="margin-top:20px;color:var(--risk);font-weight:600">No reemplaza evidencias: solo agrega las nuevas.</p></div>
+  </div>
+</section>
+
+<!-- 16 AVISOS -->
+<section class="slide" data-title="Avisos">
+  <div class="kicker" data-a>Cuando algo no entra</div>
+  <h2 data-a>Los avisos más frecuentes y qué hacer</h2>
+  <div class="body" style="align-items:flex-start;margin-top:36px">
+    <table class="col" style="flex:1.5">
+      <tr><th>Aviso</th><th>Qué hacer</th></tr>
+      <tr data-a><td>«cuatro» no es un número</td><td>Escriba el número con cifras.</td></tr>
+      <tr data-a><td>«Tal vez» no es Sí ni No</td><td>Solo valen Sí o No.</td></tr>
+      <tr data-a><td>El pilar «…» no existe</td><td>Elija uno de la lista desplegable.</td></tr>
+      <tr data-a><td>Sin enlace https://</td><td>Escriba el enlace; un archivo se sube desde Evidencias.</td></tr>
+      <tr data-a><td>El informe ya se envió</td><td>Pida que lo devuelvan.</td></tr>
+    </table>
+    <div class="shot col" data-a data-shot style="flex:.7;height:640px"><img src="img/xls-errores-avisos.jpg" alt="Panel de avisos de importación" style="object-position:left top"></div>
+  </div>
+</section>
+
+<!-- 17 TRAMPA -->
+<section class="slide page" data-title="Trampas">
+  <div class="kicker" data-a>Antes de devolver el libro</div>
+  <h2 data-a>Tres trampas que ya conocemos</h2>
+  <div class="roles" style="grid-template-columns:repeat(3,1fr);margin-top:56px">
+    <div class="role" data-a style="min-height:330px"><b>El libro vacío</b><p>Se reconoce al 100 %, pero avisa que falta el texto y los «¿Reporta aquí?». Las filas de puntos críticos con solo la dimensión sí entran. Bórrelas.</p></div>
+    <div class="role" data-a style="min-height:330px"><b>El libro equivocado</b><p>Si es de otra unidad, ciclo o plantilla, el sistema lo rechaza sin leerlo. Descargue uno nuevo desde este informe.</p></div>
+    <div class="role" data-a style="min-height:330px"><b>Filas de ejemplo</b><p>Si dicen «(borre esta fila)» se omiten. Si no lo dicen, entran. Revíselas antes de enviar el archivo.</p></div>
+  </div>
+</section>
+
+<!-- 18 PLANTILLAS -->
+<section class="slide" data-title="Plantillas">
+  <div class="kicker" data-a>Más sencillo</div>
+  <h2 data-a>Plantillas de una sola sección</h2>
+  <div class="body">
+    <div class="col" style="flex:1.1">
+      <p class="lede" data-a style="margin-top:0;font-size:30px">Dentro de cada sección hay tres botones: <b>Descargar plantilla</b>, <b>Importar Excel</b> y <b>Bajar lo escrito</b>. Una hoja, <span class="mono">Filas</span>, con encabezado en la fila 1.</p>
+      <table style="margin-top:30px">
+        <tr data-a><td style="width:40%">Puntos críticos</td><td style="font-size:23px">Dimensión, punto crítico, acción, tiempo, recursos</td></tr>
+        <tr data-a><td>Metas</td><td style="font-size:23px">Objetivo, programado, alcanzado</td></tr>
+        <tr data-a><td>Logros</td><td style="font-size:23px">Logro, contexto y resultado, anexo</td></tr>
+        <tr data-a><td>Resultados</td><td style="font-size:23px">Hojas Cifras y Acciones</td></tr>
+      </table>
+      <p data-a style="font-size:24px;color:var(--ink-3);margin-top:20px">Vista previa, luego «Añadir a lo que ya hay» o «Reemplazar todo». Hasta 500 filas.</p>
+    </div>
+    <div class="shot col" data-a data-shot style="flex:.9;height:430px"><img src="img/xls-plantilla-puntos-criticos.jpg" alt="Plantilla de puntos críticos" style="object-position:left top"></div>
+  </div>
+</section>
+
+<!-- 19 CIERRE -->
+<section class="slide navy" data-title="Cierre">
+  <div class="kicker" data-a>Para llevarse</div>
+  <h2 data-a>Antes de importar, esta lista</h2>
+  <div class="body" style="align-items:flex-start;margin-top:40px">
+    <ul class="check col" style="flex:none;width:1000px">
+      <li data-a>El libro salió de <b>este</b> informe, ciclo y plantilla.</li>
+      <li data-a>Nadie renombró hojas ni movió la fila 4.</li>
+      <li data-a>Los números van con cifras; Sí o No donde toca.</li>
+      <li data-a>Se borraron las filas de ejemplo.</li>
+      <li data-a>El modo elegido fue «Agregar al final», salvo razón clara.</li>
+    </ul>
+  </div>
+  <img class="pilo" data-pilo src="img/pilo_atrevido.svg" alt="Pilo con gesto de confianza" style="right:130px;bottom:80px;height:640px">
+</section>
+
+<div id="chrome"><div id="logo"><img class="c" src="img/logo-udes.svg" alt="Universidad de Santander"><img class="w" src="img/logo-udes-blanco.png" alt=""></div>
+<span id="foot">Informes de gestión · El Gestor y el libro de Excel</span><span id="count"></span>
+<button id="fs" type="button" aria-label="Pantalla completa (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
+</div></div>
+
+<script src="gsap.min.js"></script>
+<script>
+(function(){
+  var stage=document.getElementById('stage'), slides=[].slice.call(document.querySelectorAll('.slide')),
+      bar=document.getElementById('bar'), chrome=document.getElementById('chrome'),
+      count=document.getElementById('count');
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var cur=-1, tl=null, busy=false, x0=null;
+  var EASE='expo.out';
+
+  function fit(){var w=document.documentElement.clientWidth||innerWidth,h=innerHeight,s=Math.min(w/1920,h/1080);stage.style.transform='scale('+s+')'}
+  addEventListener('resize',fit);document.addEventListener('fullscreenchange',function(){document.body.classList.toggle('fs',!!document.fullscreenElement);fit();setTimeout(fit,120)});fit();
+  function toggleFs(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}
+  document.getElementById('fs').addEventListener('pointerdown',function(e){e.stopPropagation()});
+  document.getElementById('fs').addEventListener('pointerup',function(e){e.stopPropagation();x0=null;toggleFs()});
+
+  function enter(i,dir){
+    var el=slides[i], items=el.querySelectorAll('[data-a]'), shots=el.querySelectorAll('[data-shot]'),
+        pilo=el.querySelector('[data-pilo]'), h=el.querySelector('h1,h2,.big');
+    el.classList.add('on');
+    if(tl)tl.kill();
+    if(reduce){gsap.set(items,{clearProps:'all'});return}
+    tl=gsap.timeline({defaults:{ease:EASE}});
+    // items arrive in reading order, short stagger; the heading leads
+    gsap.set(items,{autoAlpha:0,y:26});
+    tl.to(items,{autoAlpha:1,y:0,duration:.7,stagger:{each:.07,from:'start'}},0);
+    shots.forEach(function(s){
+      var img=s.querySelector('img');
+      tl.fromTo(s,{clipPath:'inset(0 0 100% 0)'},{clipPath:'inset(0 0 0% 0)',duration:.9,ease:'power3.inOut'},.25);
+      tl.fromTo(img,{scale:1.06},{scale:1,duration:1.2},.25);
+    });
+    if(pilo)tl.fromTo(pilo,{y:50,rotation:-5,scale:.94,autoAlpha:0},{y:0,rotation:0,scale:1,autoAlpha:1,duration:1,ease:'expo.out',transformOrigin:'50% 90%'},.4);
+    var rules=el.querySelectorAll('.cadena li');
+    if(rules.length)tl.fromTo(rules,{'--s':0},{'--s':1,duration:.8,stagger:.07,ease:'power3.inOut'},.1);
+  }
+  function leave(i,done){
+    var el=slides[i];
+    if(reduce){el.classList.remove('on');done();return}
+    gsap.to(el,{autoAlpha:0,duration:.18,ease:'power1.out',onComplete:function(){
+      el.classList.remove('on');gsap.set(el,{clearProps:'opacity,visibility'});done();
+    }});
+  }
+  function go(n){
+    n=Math.max(0,Math.min(slides.length-1,n));
+    if(n===cur||busy)return;
+    var prev=cur; cur=n; busy=true;
+    var show=function(){
+      enter(cur);busy=false;
+      var dark=slides[cur].classList.contains('navy');
+      chrome.classList.toggle('dark',dark);
+      chrome.classList.toggle('hero',cur===0);
+      count.textContent=(cur+1)+' / '+slides.length;
+      gsap.to(bar,{scaleX:(cur+1)/slides.length,duration:.5,ease:'power2.out'});
+      history.replaceState(null,'','#'+(cur+1));
+    };
+    prev<0?show():leave(prev,show);
+  }
+  addEventListener('keydown',function(e){
+    if(['ArrowRight','PageDown',' ','Enter'].indexOf(e.key)>-1){e.preventDefault();go(cur+1)}
+    else if(['ArrowLeft','PageUp','Backspace'].indexOf(e.key)>-1){e.preventDefault();go(cur-1)}
+    else if(e.key==='Home')go(0); else if(e.key==='End')go(slides.length-1);
+    else if(e.key==='f'||e.key==='F')toggleFs();
+  });
+    addEventListener('pointerdown',function(e){x0=e.clientX});
+  addEventListener('pointerup',function(e){
+    if(x0===null)return; var d=e.clientX-x0; x0=null;
+    if(Math.abs(d)>60)go(cur+(d<0?1:-1));
+    else go(cur+(e.clientX>innerWidth/2?1:-1));
+  });
+  go((parseInt(location.hash.slice(1),10)||1)-1);
+})();
+</script>
+</body>
+</html>

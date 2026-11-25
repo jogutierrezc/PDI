@@ -7,7 +7,7 @@
    (el Tablero del ciclo); ?s=<n> la sección.
    ========================================================================== */
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { nombreRol } from "../../rankings/reporte/envio";
 import { movimientoReducido, useEntrada } from "../../rankings/movimiento";
@@ -52,6 +52,8 @@ import { EncabezadoObjetivo, enlaceInforme, useObjetivoInforme } from "./objetiv
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
 import { Dimensiones } from "./Dimensiones";
 import { LibroExcel } from "./LibroExcel";
+/** El compilador carga solo al abrirlo: arrastra GSAP y el lector de ZIP, que el resto de Mi informe no usa. */
+const Compilador = lazy(() => import("../compilador/Compilador"));
 import { ElementosDrive } from "./ElementosDrive";
 import { TablaMetasPrograma } from "./MetasPrograma";
 import { ResumenPlan } from "./PlanFacultad";
@@ -162,6 +164,7 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
   const guardarSeccion = useGuardarSeccion(ciclo.id);
   const criteriosLibro = useCriterios();
   const [libroAbierto, setLibroAbierto] = useState(false);
+  const [compiladorAbierto, setCompiladorAbierto] = useState(false);
   const guardarCifra = useGuardarCifra(ciclo.id);
   const asegurar = useAsegurarCifras();
   const quitarCifra = useQuitarCifra();
@@ -362,6 +365,11 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
         <button type="button" className="inf-link inf-lx-abrir" onClick={() => setLibroAbierto(true)} aria-haspopup="dialog">
           Libro de Excel
         </button>
+        {!soloVer && (actor === "jefe" || actor === "planeacion") && (
+          <button type="button" className="inf-link inf-lx-abrir" onClick={() => setCompiladorAbierto(true)} aria-haspopup="dialog">
+            Compilar informe de colaboradores con Pilo
+          </button>
+        )}
         {demo && (
           <small className="inf-muted" role="status">
             Demostración de la guía: su informe no cambió.
@@ -533,6 +541,24 @@ function Editor({ inst, ciclo, requisitos, unidad, sede, actor, soloVer = false 
           </ul>
         </div>
       </aside>
+      {compiladorAbierto && (
+        <Suspense fallback={null}>
+          <Compilador
+            inst={inst}
+            ciclo={ciclo}
+            unidad={unidad.name}
+            secciones={secciones}
+            contenido={contenido}
+            aprobados={aprobadosPara(criteriosLibro.data?.filas ?? [], inst.plantilla, ciclo.anio)}
+            pilares={pilares.data ?? []}
+            anexos={m.anexos.data ?? []}
+            actor={actor}
+            escribir={escribirYa}
+            agregarEvidencias={(enlaces) => enlazarVarios.mutateAsync({ instancia: inst.id, enlaces, anexos: m.anexos.data ?? [] })}
+            onCerrar={() => setCompiladorAbierto(false)}
+          />
+        </Suspense>
+      )}
       {libroAbierto && (
         <LibroExcel
           inst={inst}

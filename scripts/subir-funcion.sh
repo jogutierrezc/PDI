@@ -30,16 +30,29 @@ echo "→ Paquete de $FN: $(ls "$ORIGEN" | tr '\n' ' ')"
 scp -q "$PAQUETE" "$SERVIDOR:$PAQUETE"
 
 # Parte remota: halla la carpeta de funciones montada en el contenedor, respalda y copia.
-ssh -t "$SERVIDOR" bash -s -- "$FN" "$PAQUETE" "${CONTENEDOR:-}" "${SIN_REINICIO:-}" <<'REMOTO'
+# Va como archivo (no por la entrada estándar) para que ssh -t abra terminal y sudo pueda pedir la contraseña.
+REMOTO_LOCAL="$(mktemp)"
+REMOTO_SCRIPT="/tmp/subir-$FN-$$.sh"
+trap 'rm -f "$PAQUETE" "$REMOTO_LOCAL"' EXIT
+cat > "$REMOTO_LOCAL" <<'REMOTO'
 set -euo pipefail
-FN="$1"; PAQUETE="$2"; CONTENEDOR="$3"; SIN_REINICIO="$4"
+# ssh une los argumentos en una sola cadena y descarta los vacíos: $3 y $4 pueden no llegar.
+FN="$1"; PAQUETE="$2"; CONTENEDOR="${3:--}"; SIN_REINICIO="${4:--}"
+[ "$CONTENEDOR" != "-" ] || CONTENEDOR=""
+[ "$SIN_REINICIO" != "-" ] || SIN_REINICIO=""
 trap 'rm -f "$PAQUETE"' EXIT
 
 [ -n "$CONTENEDOR" ] || CONTENEDOR="$(sudo docker ps --format '{{.Names}}' | grep '^supabase-edge-functions' | head -1)"
 [ -n "$CONTENEDOR" ] || { echo "No encontré el contenedor de funciones (pase CONTENEDOR=...)"; exit 1; }
 
 CARPETA="$(sudo docker inspect "$CONTENEDOR" --format '{{range .Mounts}}{{if eq .Destination "/home/deno/functions"}}{{.Source}}{{end}}{{end}}')"
-[ -n "$CARPETA" ] && [ -d "$CARPETA" ] || { echo "No encontré la carpeta de funciones del contenedor $CONTENEDOR"; exit 1; }
+# La carpeta suele estar bajo un directorio de root (Coolify): se comprueba con sudo, no con el usuario normal.
+if [ -z "$CARPETA" ] || ! sudo test -d "$CARPETA"; then
+  echo "No encontré la carpeta de funciones del contenedor $CONTENEDOR (busqué un montaje en /home/deno/functions)."
+  echo "Montajes del contenedor (origen → destino); copie ahí lo que falta a mano o avíseme cuál es:"
+  sudo docker inspect "$CONTENEDOR" --format '{{range .Mounts}}  {{.Source}} → {{.Destination}}{{"\n"}}{{end}}'
+  exit 1
+fi
 echo "→ Contenedor: $CONTENEDOR"
 echo "→ Carpeta:    $CARPETA/$FN"
 
@@ -58,5 +71,7 @@ if [ -z "$SIN_REINICIO" ]; then
   echo "→ Contenedor reiniciado."
 fi
 REMOTO
+scp -q "$REMOTO_LOCAL" "$SERVIDOR:$REMOTO_SCRIPT"
+ssh -t "$SERVIDOR" "bash $REMOTO_SCRIPT '$FN' '$PAQUETE' '${CONTENEDOR:--}' '${SIN_REINICIO:--}'; r=\$?; rm -f $REMOTO_SCRIPT; exit \$r"
 
 echo "✓ $FN subida. Pruebe en el chat de At Work."

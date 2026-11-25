@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe de Gestión 2026 · Cómo construirlo</title>
+<link rel="stylesheet" href="fuentes/local.css">
+<style>
+:root{
+  --navy:#0a2d63; --navy-deep:#061e46; --blue:#2166d6; --blue-soft:#eaf1fd;
+  --page:#f4f7fb; --paper:#fff; --ink:#0d1c31; --ink-2:#45566d; --ink-3:#5b6c83; --on-navy:#c3d5f2;
+  --line:rgba(13,40,84,.2); --signal:#f6b93f; --signal-ink:#1d1402;
+  --done:#0d6a2e; --done-soft:#e6f4ea; --pending:#8a5f00; --pending-soft:#fbf2e0; --risk:#b52e2e; --risk-soft:#fceaea;
+  --xl-blue:#dbe8fb; --xl-yellow:#fff0a8; --xl-grey:#d4d8de;
+  --f-display:"Fraunces",Georgia,serif; --f-sans:"Open Sans",system-ui,sans-serif; --f-sign:"Barlow Condensed","Arial Narrow",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden}
+body{font-family:var(--f-sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+#viewport{position:fixed;inset:0;overflow:hidden}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;margin:-540px 0 0 -960px;background:var(--navy-deep);overflow:hidden;transform-origin:center center}
+
+.sc{position:absolute;inset:0;visibility:hidden;overflow:hidden}
+.sc.page{background:var(--page)}
+.sc.navy{background:var(--navy);color:#fff}
+.sc.navy::before{content:"";position:absolute;inset:0;background:radial-gradient(1200px 800px at 85% 95%,rgba(33,102,214,.38),transparent 70%)}
+.sc.navy::after{content:"";position:absolute;left:0;top:0;bottom:0;width:18px;background:var(--signal)}
+.sc>*{position:absolute}
+.sc.navy>*{z-index:1}
+
+.kicker{font-family:var(--f-sign);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:28px;color:var(--blue)}
+.navy .kicker{color:var(--signal)}
+h1,h2{font-family:var(--f-display);font-weight:700;color:var(--navy);letter-spacing:-.01em;text-wrap:balance}
+.navy h1,.navy h2{color:#fff}
+h1{font-size:164px;line-height:.96}
+h2{font-size:68px;line-height:1.04}
+.lede{font-size:38px;line-height:1.45;color:var(--on-navy);text-wrap:pretty}
+.ln{display:block;overflow:hidden;padding-bottom:.08em}
+.ln>span{display:block}
+
+.logo{right:140px;top:44px;height:58px}
+.ft{left:140px;right:140px;bottom:30px;display:flex;justify-content:space-between;font-size:20px;font-weight:600;color:var(--ink-3);letter-spacing:.02em}
+.navy .ft{color:var(--on-navy)}
+#bar{position:absolute;left:0;top:0;height:7px;width:100%;background:var(--signal);transform-origin:left;transform:scaleX(0);z-index:60}
+
+/* encuadres */
+.frame{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 40px 90px -36px rgba(3,14,36,.7),0 0 0 1px rgba(13,40,84,.18)}
+.frame .in{position:absolute;left:0;top:0;width:100%;transform-origin:50% 0}
+.frame img{display:block;width:100%;height:auto}
+.frame .in.swap{inset:0}
+.co{position:absolute;border:5px solid var(--signal);border-radius:10px;box-shadow:0 0 0 6px rgba(246,185,63,.28);pointer-events:none}
+.co.red{border-color:var(--risk);box-shadow:0 0 0 6px rgba(181,46,46,.2)}
+.co.green{border-color:#12833a;box-shadow:0 0 0 6px rgba(18,131,58,.2)}
+.co i{position:absolute;left:-5px;top:-36px;background:var(--signal);color:var(--signal-ink);font:700 21px/1 var(--f-sign);letter-spacing:.08em;text-transform:uppercase;padding:7px 11px 5px;border-radius:5px 5px 5px 0;font-style:normal;white-space:nowrap}
+.co.red i{background:var(--risk);color:#fff}.co.green i{background:#12833a;color:#fff}
+.co.in-b i{top:auto;bottom:-36px;border-radius:0 5px 5px 5px}
+
+/* listas de pasos */
+.stl{list-style:none;display:block}
+.stl li{display:flex;gap:26px;align-items:flex-start;margin-bottom:22px}
+.stl li>i{font:700 56px/.95 var(--f-sign);color:var(--blue);font-style:normal;min-width:44px}
+.navy .stl li>i{color:var(--signal)}
+.stl b{display:block;font-size:34px;line-height:1.2;color:var(--navy);font-weight:700}
+.navy .stl b{color:#fff}
+.stl small{display:block;font-size:24px;line-height:1.35;color:var(--ink-2);margin-top:6px;font-weight:500}
+.navy .stl small{color:var(--on-navy)}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;width:700px}
+.chip{font-size:24px;font-weight:700;padding:8px 18px;border-radius:40px;background:var(--blue-soft);color:var(--navy);border:2px solid rgba(33,102,214,.28)}
+.navy .chip{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.3)}
+.mono{font-family:ui-monospace,Menlo,monospace;font-weight:600;font-size:26px;background:var(--blue-soft);padding:6px 14px;border-radius:6px;color:var(--navy)}
+.navy .mono{background:rgba(255,255,255,.12);color:#fff}
+.val{display:inline-block;background:#d6f1ef;color:#0a5560;font:700 26px var(--f-sans);padding:5px 14px;border-radius:6px}
+
+/* cadena (escena 2) */
+.cad{left:140px;top:500px;width:1640px;display:flex}
+.cad li{list-style:none;flex:1;padding-right:24px;position:relative}
+.cad li::before{content:"";display:block;height:6px;background:var(--navy);margin-bottom:28px;transform-origin:left;border-radius:3px}
+.cad b{display:block;font:700 40px/1.1 var(--f-display);color:var(--navy);margin-bottom:10px}
+.cad span{display:block;font-size:25px;line-height:1.4;color:var(--ink-2)}
+.cad em{display:inline-block;margin-top:16px;font:700 22px var(--f-sign);letter-spacing:.1em;text-transform:uppercase;font-style:normal;color:var(--ink-3);border:2px solid var(--line);padding:5px 12px 3px;border-radius:5px}
+.cad li.me::before{background:var(--signal);height:14px;margin-top:-4px;margin-bottom:22px}
+.cad li.me em{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.here{position:absolute;left:0;top:-70px;white-space:nowrap;background:var(--signal);color:var(--signal-ink);font:700 28px/1 var(--f-sign);letter-spacing:.1em;text-transform:uppercase;padding:11px 18px 8px;border-radius:6px 6px 6px 0}
+
+/* papeles (escena 3) */
+.roles{left:140px;top:370px;width:1640px;display:grid;grid-template-columns:repeat(4,1fr);gap:40px}
+.role{position:relative;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.2);border-radius:10px;padding:40px 36px;height:430px}
+.role b{display:block;font:700 46px/1.05 var(--f-display);color:#fff;margin-bottom:16px}
+.role p{font-size:28px;line-height:1.42;color:var(--on-navy)}
+.role .tg{position:absolute;left:36px;bottom:34px;font:700 28px/1 var(--f-sign);letter-spacing:.1em;text-transform:uppercase;padding:11px 18px 8px;border-radius:6px;background:rgba(255,255,255,.14);color:#fff}
+.role.me{background:#fff;border-color:#fff}
+.role.me b{color:var(--navy)}.role.me p{color:var(--ink-2)}
+.role.me .tg{background:var(--signal);color:var(--signal-ink)}
+.asg{left:140px;top:860px;display:flex;gap:18px;align-items:center;font-size:34px;color:#fff}
+.asg .mono{font-size:32px}
+
+/* estados */
+.pill{display:inline-flex;align-items:center;gap:10px;padding:10px 26px;border-radius:40px;font-weight:700;font-size:28px;white-space:nowrap}
+.pill.pe{background:var(--pending-soft);color:var(--pending)}.pill.ok{background:var(--done-soft);color:var(--done)}.pill.ri{background:var(--risk-soft);color:var(--risk)}
+.states{display:flex;gap:16px}
+.states .pill{opacity:.35}
+
+/* escena 6 */
+.duo2{display:grid;grid-template-columns:1fr 1fr;gap:28px;width:780px}
+.box{background:#fff;border-radius:8px;padding:28px 32px;border-left:10px solid var(--done);height:330px}
+.box.no{border-left-color:var(--risk)}
+.box h3{font:700 32px var(--f-sign);letter-spacing:.1em;text-transform:uppercase;color:var(--done);margin-bottom:12px}
+.box.no h3{color:var(--risk)}
+.box li{list-style:none;font-size:27px;line-height:1.3;padding:11px 0;border-top:1px solid var(--line);color:var(--ink)}
+.box li:first-of-type{border-top:0}
+.note{display:flex;align-items:center;gap:22px;font-size:34px;font-weight:700;color:var(--navy)}
+.note svg{flex:none}
+
+/* excel */
+.team{background:#fff;color:var(--ink);border-radius:8px;padding:16px 22px;display:flex;align-items:center;gap:16px;width:690px;border-left:10px solid #1d6f42;box-shadow:0 18px 40px -22px rgba(0,0,0,.7)}
+.team svg{flex:none}
+.team b{font-size:27px;display:block;color:var(--navy)}
+.team small{font-size:20px;color:var(--ink-3);font-weight:600}
+.sw{display:flex;gap:18px}
+.sw i{font:700 30px var(--f-sign);letter-spacing:.08em;text-transform:uppercase;font-style:normal;padding:14px 26px 11px;border-radius:6px;border:2px solid rgba(13,40,84,.25);color:var(--ink)}
+.tint{position:absolute;border-radius:4px;mix-blend-mode:multiply}
+
+/* aplicar */
+.modes{left:1030px;top:640px;width:720px;background:#fff;border-radius:12px;padding:20px;box-shadow:0 30px 70px -20px rgba(0,0,0,.65);color:var(--ink)}
+.seg{position:relative;display:grid;grid-template-columns:repeat(3,1fr);background:var(--blue-soft);border-radius:10px;padding:6px}
+.seg span{position:relative;z-index:1;text-align:center;font-weight:700;font-size:22px;line-height:1.2;padding:14px 8px;color:var(--ink-2)}
+.seg span:nth-child(2){color:#fff}
+.seg .hi{position:absolute;left:6px;top:6px;bottom:6px;width:calc(33.333% - 4px);background:var(--navy);border-radius:8px;z-index:0}
+.modes p{font-size:26px;line-height:1.35;margin-top:16px;color:var(--ink-2);min-height:70px;position:relative}
+.modes p span{position:absolute;left:0;top:0;right:0}
+.who{display:flex;gap:16px;align-items:center;height:0;overflow:hidden}
+.who .f{flex:1;border:2px solid var(--line);border-radius:8px;padding:11px 16px;font-size:24px;font-weight:600;color:var(--ink)}
+.btn{background:var(--navy);color:#fff;font-weight:700;font-size:26px;border-radius:40px;padding:14px 30px;white-space:nowrap}
+.rev{left:1330px;top:180px;width:430px;height:210px;overflow:hidden;border-radius:10px;background:#fff;box-shadow:0 30px 70px -20px rgba(0,0,0,.65);border:1px solid var(--line)}
+.rev img{position:absolute;width:1290px;left:-48px;top:-34px}
+
+/* cierre */
+.check{left:140px;top:330px;width:1100px;list-style:none}
+.check li{position:relative;font-size:44px;line-height:1.3;padding:28px 0 28px 100px;border-top:2px solid rgba(255,255,255,.2);font-weight:600}
+.check li:first-child{border-top:0}
+.check svg{position:absolute;left:0;top:26px}
+.chk-note{color:var(--signal)}
+.hold{font:700 118px/.95 var(--f-display)}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage">
+<div id="bar"></div>
+
+<!-- 1 · APERTURA -->
+<section class="sc navy" id="s1" style="z-index:1">
+  <img src="img/logo-udes-blanco.png" alt="" style="left:140px;top:84px;height:128px">
+  <div class="kicker" style="left:140px;top:330px">Informes Institucionales · Ciclo 2026</div>
+  <h1 style="left:140px;top:384px;width:1100px"><span class="ln"><span>Informe de</span></span><span class="ln"><span>Gestión 2026</span></span></h1>
+  <p class="lede" id="s1-lede" style="left:140px;top:760px;width:960px">Cómo lo construimos entre todos: la plataforma y el libro de Excel.</p>
+  <div id="s1-chips" style="left:140px;top:915px;display:flex;gap:16px">
+    <span class="chip" style="font-size:28px;padding:11px 24px">Plataforma</span>
+    <span class="chip" style="font-size:28px;padding:11px 24px">Cifras del portal ya cargadas</span>
+    <span class="chip" style="font-size:28px;padding:11px 24px">Libro de Excel</span>
+  </div>
+  <img id="pilo1" src="img/pilo_emocionado.svg" alt="" style="right:210px;bottom:110px;height:560px">
+</section>
+
+<!-- 2 · RECORRIDO -->
+<section class="sc page" id="s2" style="z-index:2">
+  <img class="logo" src="img/logo-udes.svg" alt="">
+  <div class="kicker" style="left:140px;top:110px">El recorrido</div>
+  <h2 style="left:140px;top:158px;width:1300px"><span class="ln"><span>Siete pasos, de izquierda a derecha</span></span></h2>
+  <ol class="cad" id="cad">
+    <li><b>Ciclo</b><span>Planeación abre el año y fija la fecha límite.</span><em>Planeación</em></li>
+    <li><b>Estructura</b><span>Qué secciones lleva cada unidad.</span><em>Planeación</em></li>
+    <li><b>Responsables</b><span>Quién escribe el informe de cada unidad.</span><em>Planeación</em></li>
+    <li class="me"><b>Diligenciar</b><span>La unidad escribe, con cifras vivas y evidencias.</span><em>Su unidad</em><div class="here">Usted entra aquí</div></li>
+    <li><b>Enviar</b><span>El Gestor envía. El informe queda aprobado.</span><em>Gestor</em></li>
+    <li><b>Revisión</b><span>Se puede devolver con una nota.</span><em>Planeación</em></li>
+    <li><b>Exportables</b><span>Excel, vista en papel, PDF y presentación.</span><em>Sistema</em></li>
+  </ol>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>02 / 11</span></div>
+</section>
+
+<!-- 3 · PAPELES -->
+<section class="sc navy" id="s3" style="z-index:3">
+  <img class="logo" src="img/logo-udes-blanco.png" alt="">
+  <div class="kicker" style="left:140px;top:110px">Los cuatro papeles</div>
+  <h2 style="left:140px;top:158px;width:1500px"><span class="ln"><span>Quién hace qué en el informe</span></span></h2>
+  <div class="roles" id="roles">
+    <div class="role"><b>Administrador</b><p>Es Planeación. Abre el ciclo, define la estructura y asigna responsables.</p></div>
+    <div class="role me"><b>Gestor</b><p>Diligencia el informe de su unidad y lo envía.</p><span class="tg">Envía</span></div>
+    <div class="role"><b>Contribuyente</b><p>Ayuda a escribir las secciones.</p><span class="tg">No envía</span></div>
+    <div class="role"><b>Consulta</b><p>Lee el informe completo. No escribe nada.</p><span class="tg">Solo lee</span></div>
+  </div>
+  <div class="asg" id="asg"><span>Se llega a ser Gestor cuando Planeación lo asigna en</span><span class="mono">Responsables</span></div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>03 / 11</span></div>
+</section>
+
+<!-- 4 · GESTOR -->
+<section class="sc page" id="s4" style="z-index:4">
+  <img class="logo" src="img/logo-udes.svg" alt="">
+  <div class="kicker" style="left:140px;top:104px">El Gestor · Mi informe</div>
+  <h2 style="left:140px;top:150px;width:780px;font-size:62px"><span class="ln"><span>Su informe,</span></span><span class="ln"><span>sección por sección</span></span></h2>
+  <ol class="stl" id="st4" style="left:140px;top:340px;width:790px">
+    <li><i>1</i><div><b>Entre a «Mi informe»</b></div></li>
+    <li><i>2</i><div><b>Mire su papel y el avance</b></div></li>
+    <li><i>3</i><div><b>Abra cada sección</b>
+      <div class="chips" id="ch4"><span class="chip">Texto</span><span class="chip">Cifras</span><span class="chip">Alineación con el PDI</span><span class="chip">Metas</span><span class="chip">Resultados</span><span class="chip">Puntos críticos</span><span class="chip">Logros</span><span class="chip">Evidencias</span></div></div></li>
+    <li><i>4</i><div><b>Cite las cifras vivas</b>
+      <div style="margin-top:12px;display:flex;gap:14px;align-items:center" id="tok"><span class="mono">[[matric]]</span><span style="font-size:30px;color:var(--ink-3)">→</span><span class="val">2.851</span></div></div></li>
+    <li><i>5</i><div><b>Deje los controles en verde</b></div></li>
+    <li><i>6</i><div><b>Guardado automático</b></div></li>
+  </ol>
+  <div class="frame" id="f4" style="left:1000px;top:120px;width:780px;height:840px"><div class="in" id="in4"><img src="img/ges-mi-informe.jpg" data-r="1.07527" alt=""></div></div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>04 / 11</span></div>
+</section>
+
+<!-- 5 · ENVIAR Y DEVOLVER -->
+<section class="sc navy" id="s5" style="z-index:5">
+  <img class="logo" src="img/logo-udes-blanco.png" alt="">
+  <div class="kicker" style="left:140px;top:104px">Enviar y devolver</div>
+  <h2 style="left:140px;top:150px;width:780px;font-size:62px"><span class="ln"><span>De «Lista»</span></span><span class="ln"><span>a «Aprobado»</span></span></h2>
+  <ol class="stl" id="st5" style="left:140px;top:340px;width:790px">
+    <li><i>1</i><div><b>Todas las secciones en «Lista»</b></div></li>
+    <li><i>2</i><div><b>Al menos una evidencia cargada</b></div></li>
+    <li><i>3</i><div><b>«Enviar» se habilita</b><small>Las cifras quedan congeladas.</small></div></li>
+    <li><i>4</i><div><b>Planeación puede devolverlo</b><small>Con una nota general y una por sección.</small></div></li>
+    <li><i>5</i><div><b>Corrija, guarde y reenvíe</b></div></li>
+  </ol>
+  <div class="states" id="states5" style="left:140px;top:900px"><span class="pill pe" id="p-bo">◐ Borrador</span><span class="pill ok" id="p-ap">✓ Aprobado</span><span class="pill ri" id="p-de">↩ Devuelto</span></div>
+  <svg id="lock" width="110" height="110" viewBox="0 0 48 48" style="left:700px;top:880px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.4))">
+    <path id="shackle" d="M15 22 V15 a9 9 0 0 1 18 0 V22" fill="none" stroke="#f6b93f" stroke-width="4.5" stroke-linecap="round"/>
+    <rect x="9" y="22" width="30" height="21" rx="4" fill="#f6b93f"/><circle cx="24" cy="31" r="3.2" fill="#1d1402"/><rect x="22.6" y="32" width="2.8" height="6" rx="1.2" fill="#1d1402"/>
+  </svg>
+  <div class="frame" id="f5" style="left:1000px;top:120px;width:780px;height:840px">
+    <div class="in" id="in5a"><img src="img/ges-enviar-listo.jpg" data-r="1.07527" alt=""></div>
+    <div class="in" id="in5b"><img src="img/ges-devuelto.jpg" data-r="1.39795" alt=""></div>
+  </div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>05 / 11</span></div>
+</section>
+
+<!-- 6 · CONTRIBUYENTE -->
+<section class="sc page" id="s6" style="z-index:6">
+  <img class="logo" src="img/logo-udes.svg" alt="">
+  <div class="kicker" style="left:140px;top:104px">El Contribuyente</div>
+  <h2 style="left:140px;top:150px;width:780px;font-size:62px"><span class="ln"><span>Escribe, sube y</span></span><span class="ln"><span>avisa al Gestor</span></span></h2>
+  <div class="duo2" style="left:140px;top:350px">
+    <div class="box" id="bx-ok"><h3>Puede</h3><ul><li>Escribir las mismas secciones</li><li>Subir evidencias</li><li>Pedir ayuda a Pilo</li></ul></div>
+    <div class="box no" id="bx-no"><h3>No puede</h3><ul><li>Enviar el informe</li><li>El botón dice por qué</li></ul></div>
+  </div>
+  <div class="note" id="avise" style="left:140px;top:740px">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#0a2d63" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    <span>Cuando todo esté listo, avise al Gestor</span>
+  </div>
+  <div class="note" id="nomail" style="left:140px;top:850px;color:var(--ink-2);font-weight:600">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#45566d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3 7l9 6 9-6"/><path id="slash" d="M4 21 L20 3" stroke="#b52e2e" stroke-width="2.6"/></svg>
+    <span>La plataforma no lo envía por correo</span>
+  </div>
+  <div class="frame" id="f6" style="left:1000px;top:120px;width:780px;height:840px"><div class="in" id="in6"><img src="img/con-mi-informe.jpg" data-r="1.07527" alt=""></div></div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>06 / 11</span></div>
+</section>
+
+<!-- 7 · EXCEL: DESCARGAR -->
+<section class="sc navy" id="s7" style="z-index:7">
+  <img class="logo" src="img/logo-udes-blanco.png" alt="">
+  <div class="kicker" style="left:140px;top:104px">El libro de Excel · 1 Exportar</div>
+  <h2 style="left:140px;top:150px;width:780px;font-size:62px"><span class="ln"><span>Un libro para cada</span></span><span class="ln"><span>equipo</span></span></h2>
+  <div id="teams" style="left:140px;top:340px;width:760px">
+    <div class="team" id="t0" style="width:690px;margin-bottom:36px"><svg width="46" height="52" viewBox="0 0 46 52"><path d="M4 2h26l12 12v36H4z" fill="#1d6f42"/><path d="M30 2v12h12z" fill="#33a367"/><path d="M14 24l16 20M30 24L14 44" stroke="#fff" stroke-width="4.5"/></svg><div><b>Informe_Gestion_2026_A.xlsx</b><small>Libro completo · todas las hojas</small></div></div>
+    <div class="team tm" style="margin-bottom:14px"><svg width="40" height="46" viewBox="0 0 46 52"><path d="M4 2h26l12 12v36H4z" fill="#1d6f42"/><path d="M30 2v12h12z" fill="#33a367"/></svg><div><b>Quien lidera el informe</b><small>solo sus hojas</small></div></div>
+    <div class="team tm" style="margin-bottom:14px"><svg width="40" height="46" viewBox="0 0 46 52"><path d="M4 2h26l12 12v36H4z" fill="#1d6f42"/><path d="M30 2v12h12z" fill="#33a367"/></svg><div><b>Decanatura</b><small>solo sus hojas</small></div></div>
+    <div class="team tm" style="margin-bottom:14px"><svg width="40" height="46" viewBox="0 0 46 52"><path d="M4 2h26l12 12v36H4z" fill="#1d6f42"/><path d="M30 2v12h12z" fill="#33a367"/></svg><div><b>Dirección de programa</b><small>solo sus hojas</small></div></div>
+    <div class="team tm" style="margin-bottom:14px"><svg width="40" height="46" viewBox="0 0 46 52"><path d="M4 2h26l12 12v36H4z" fill="#1d6f42"/><path d="M30 2v12h12z" fill="#33a367"/></svg><div><b>Coordinaciones de investigación y extensión</b><small>solo sus hojas</small></div></div>
+    <div class="team tm"><svg width="40" height="46" viewBox="0 0 46 52"><path d="M4 2h26l12 12v36H4z" fill="#1d6f42"/><path d="M30 2v12h12z" fill="#33a367"/></svg><div><b>Secretaría académica</b><small>solo sus hojas</small></div></div>
+  </div>
+  <div class="frame" id="f7" style="left:1000px;top:120px;width:780px;height:840px"><div class="in" id="in7"><img src="img/ges-libro.jpg" data-r="1.30040" alt=""></div></div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>07 / 11</span></div>
+</section>
+
+<!-- 8 · COMO SE LLENA -->
+<section class="sc page" id="s8" style="z-index:8">
+  <img class="logo" src="img/logo-udes.svg" alt="">
+  <div class="kicker" style="left:140px;top:84px">Cómo se llena</div>
+  <h2 style="left:140px;top:126px;width:1300px;font-size:60px"><span class="ln"><span>Tres colores, siempre los mismos</span></span></h2>
+  <div class="frame" id="f8" style="left:180px;top:240px;width:1560px;height:661px"><div class="in" id="in8"><img src="img/xls-lleno-resultados-a.jpg" data-r="0.42400" alt=""></div></div>
+  <div class="sw" id="sw8" style="left:180px;top:934px">
+    <i style="background:var(--xl-blue)">Azul claro · opcional</i>
+    <i style="background:var(--xl-yellow)">Amarillo · obligatoria</i>
+    <i style="background:var(--xl-grey)">Gris · la pone el sistema</i>
+  </div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>08 / 11</span></div>
+</section>
+
+<!-- 9 · IMPORTAR -->
+<section class="sc navy" id="s9" style="z-index:9">
+  <img class="logo" src="img/logo-udes-blanco.png" alt="">
+  <div class="kicker" style="left:140px;top:104px">El libro de Excel · 2 Importar</div>
+  <h2 style="left:140px;top:150px;width:780px;font-size:62px"><span class="ln"><span>Subirlo a la</span></span><span class="ln"><span>página, en seis pasos</span></span></h2>
+  <ol class="stl" id="st9" style="left:140px;top:340px;width:790px">
+    <li><i>1</i><div><b>Cargue el archivo .xlsx</b></div></li>
+    <li><i>2</i><div><b>Revise el destino de cada hoja</b></div></li>
+    <li><i>3</i><div><b>Mire las filas listas y los avisos</b></div></li>
+    <li><i>4</i><div><b>Elija cómo aplicar</b></div></li>
+    <li><i>5</i><div><b>Indique quién aporta</b></div></li>
+    <li><i>6</i><div><b>Aplique al informe</b></div></li>
+  </ol>
+  <div class="frame" id="f9" style="left:1000px;top:120px;width:780px;height:840px"><div class="in" id="in9"><img src="img/adm-libro-importar.jpg" data-r="1.30040" alt=""></div></div>
+  <div class="rev" id="rev9"><img src="img/xls-errores-avisos.jpg" data-r="0.55133" alt=""></div>
+  <div class="modes" id="modes9">
+    <div class="seg"><div class="hi" id="hi9"></div><span>Agregar al final</span><span>Llenar solo lo vacío</span><span>Reemplazar la sección</span></div>
+    <p><span class="m0">Suma lo del libro sin tocar lo escrito. Es el modo por defecto.</span><span class="m1">Completa lo que falta y suma las filas que no existen.</span><span class="m2">Lo del libro queda en lugar de lo que había. Pide confirmación.</span></p>
+    <div class="who" id="who9"><div class="f">Aporta: Secretaría académica</div><div class="btn" id="btn9">Aplicar al informe</div></div>
+  </div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>09 / 11</span></div>
+</section>
+
+<!-- 10 · SI ALGO NO ENTRA -->
+<section class="sc page" id="s10" style="z-index:10">
+  <img class="logo" src="img/logo-udes.svg" alt="">
+  <div class="kicker" style="left:140px;top:104px">Si algo no entra</div>
+  <h2 style="left:140px;top:150px;width:520px;font-size:62px"><span class="ln"><span>El sistema</span></span><span class="ln"><span>dice qué falló</span></span></h2>
+  <ol class="stl" id="st10" style="left:140px;top:380px;width:520px">
+    <li><i>1</i><div><b>Libro de otro informe</b><small>Se rechaza sin leerlo. Descargue uno nuevo.</small></div></li>
+    <li><i>2</i><div><b>Fila con aviso</b><small>Dice la hoja, la fila y el problema.</small></div></li>
+    <li><i>3</i><div><b>La causa casi siempre</b><small>Un número con letras o un Sí o No mal escrito.</small></div></li>
+  </ol>
+  <img id="pilo10" src="img/pilo-cuidado.webp" alt="" style="left:140px;bottom:90px;height:200px">
+  <div class="frame" id="f10a" style="left:700px;top:120px;width:1080px;height:152px"><div class="in"><img src="img/xls-otro-informe-error.jpg" alt=""></div></div>
+  <div class="frame" id="f10b" style="left:700px;top:302px;width:1080px;height:555px"><div class="in" id="in10b"><img src="img/xls-errores-avisos.jpg" data-r="0.55133" alt=""></div></div>
+  <div class="btn" id="btn10" style="left:700px;top:890px;font-size:30px;padding:16px 36px">Descargar libro nuevo</div>
+  <div class="ft"><span>Informes de gestión · Ciclo 2026</span><span>10 / 11</span></div>
+</section>
+
+<!-- 11 · CIERRE -->
+<section class="sc navy" id="s11" style="z-index:11">
+  <img class="logo" src="img/logo-udes-blanco.png" alt="">
+  <div class="kicker" style="left:140px;top:110px">Antes de importar</div>
+  <h2 style="left:140px;top:158px;width:1300px"><span class="ln"><span>Revise cuatro cosas</span></span></h2>
+  <ul class="check" id="chk">
+    <li><svg width="56" height="56" viewBox="0 0 56 56"><rect x="3" y="3" width="50" height="50" rx="8" fill="none" stroke="#f6b93f" stroke-width="5"/><path class="tick" d="M14 29 L25 40 L43 16" fill="none" stroke="#f6b93f" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>El libro salió de este informe</li>
+    <li><svg width="56" height="56" viewBox="0 0 56 56"><rect x="3" y="3" width="50" height="50" rx="8" fill="none" stroke="#f6b93f" stroke-width="5"/><path class="tick" d="M14 29 L25 40 L43 16" fill="none" stroke="#f6b93f" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Nadie renombró hojas ni movió la fila 4</li>
+    <li><svg width="56" height="56" viewBox="0 0 56 56"><rect x="3" y="3" width="50" height="50" rx="8" fill="none" stroke="#f6b93f" stroke-width="5"/><path class="tick" d="M14 29 L25 40 L43 16" fill="none" stroke="#f6b93f" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Los números van con cifras</li>
+    <li><svg width="56" height="56" viewBox="0 0 56 56"><rect x="3" y="3" width="50" height="50" rx="8" fill="none" stroke="#f6b93f" stroke-width="5"/><path class="tick" d="M14 29 L25 40 L43 16" fill="none" stroke="#f6b93f" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Se borraron las filas de ejemplo</li>
+  </ul>
+  <img id="pilo11" src="img/pilo_atrevido.svg" alt="" style="right:190px;bottom:150px;height:520px">
+  <div id="ready" style="left:140px;top:850px;width:1000px;height:110px"><div id="readybar" style="position:absolute;inset:0;background:var(--signal);border-radius:10px;transform-origin:left"></div><div id="readytxt" style="position:absolute;inset:0;display:flex;align-items:center;padding-left:40px;font:700 52px var(--f-display);color:var(--signal-ink)">Listo para enviar</div></div>
+  <div id="endcard" style="inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding-left:140px;z-index:5">
+    <img src="img/logo-udes-blanco.png" alt="" style="height:128px;margin-bottom:70px">
+    <div class="kicker">Informes Institucionales · Ciclo 2026</div>
+    <div class="hold" style="color:#fff;margin:20px 0 40px"><span class="ln"><span>Gracias por aportar</span></span><span class="ln"><span>al Informe de Gestión 2026</span></span></div>
+  </div>
+</section>
+
+</div></div>
+<audio id="aud" src="audio/voz-demo.wav" preload="auto"></audio>
+<script src="gsap.min.js"></script>
+<script>
+const D = 210;                 // duración total (s): voz 208,5 + cola
+const E = "power4.out";
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const tl = gsap.timeline({ paused:true, defaults:{ ease:E } });
+
+/* ---------- utilidades ---------- */
+// entrada: de invisible+desplazado a su sitio (fromTo para que el salto atrás sea exacto)
+const IN = (sel, t, o={}) => tl.fromTo(sel, { autoAlpha:0, y:o.y??26, x:o.x??0, scale:o.s??1 }, { autoAlpha:1, y:0, x:0, scale:1, duration:o.d??.55, ease:o.ease??E, stagger:o.st??0 }, t);
+const OUT = (sel, t, d=.3) => tl.to(sel, { autoAlpha:0, duration:d, ease:"power2.in" }, t);
+const DIM = (sel, t, to=.5) => tl.fromTo(sel, { opacity:1 }, { opacity:to, duration:.4, ease:"power2.out" }, t);
+const LINE = (sel, t, o={}) => tl.fromTo(sel+" > span", { yPercent:110 }, { yPercent:0, duration:o.d??.75, ease:E, stagger:o.st??.09 }, t);
+// llamada sobre una captura: rectángulo en % de la imagen
+function CO(inSel, [l,t,w,h], label, at, until, cls=""){
+  const host = $(inSel); const el = document.createElement("div");
+  el.className = "co "+cls; el.style.cssText = `left:${l}%;top:${t}%;width:${w}%;height:${h}%`;
+  if(label) el.innerHTML = "<i>"+label+"</i>";
+  host.appendChild(el);
+  tl.fromTo(el, { autoAlpha:0, scale:.97 }, { autoAlpha:1, scale:1, duration:.4, ease:E }, at);
+  if(until) tl.to(el, { autoAlpha:0, duration:.3, ease:"power2.in" }, until);
+  return el;
+}
+// pasos de una lista: aparece el i-ésimo; el anterior baja a 55 %
+function STEPS(listSel, times){
+  const li = $$(listSel+" > li");
+  li.forEach((el,i)=>{
+    IN(el, times[i], { y:22, d:.5 });
+    if(i>0) DIM(li[i-1], times[i]+.05, .5);
+  });
+  return li;
+}
+// recorrido lento de la captura (vida continua en pantalla, sin cambiar lo que se ve)
+// cámara sobre una captura: claves [t, zoom, fx, fy] (fx, fy = punto a centrar, en fracción de la imagen)
+function CAM(sel, keys, d=.9){
+  const el = $(sel), fr = el.parentElement, img = el.querySelector("img");
+  const FW = fr.clientWidth, FH = fr.clientHeight, IW = FW, IH = FW * parseFloat(img.dataset.r);
+  const pos = (s,fx,fy) => ({ scale:s,
+    x: Math.min(0, Math.max(FW - IW*s, FW/2 - fx*IW*s)),
+    y: Math.min(0, Math.max(FH - IH*s, FH/2 - fy*IH*s)) });
+  let prev = { scale:1, x:0, y:0 };
+  tl.set(el, { transformOrigin:"0 0", ...prev }, 0);
+  keys.forEach(([t,s,fx,fy])=>{
+    const to = pos(s,fx,fy);
+    tl.fromTo(el, prev, { ...to, duration:d, ease:"power3.inOut", immediateRender:false }, t);
+    prev = to;
+  });
+}
+
+/* ---------- escenas (inicio de cada una) ---------- */
+const S = { 1:0, 2:14.55, 3:34.1, 4:49.75, 5:75.35, 6:91.9, 7:107.6, 8:122.8, 9:146.3, 10:170.85, 11:189.35 };
+const WIPE = .7;
+for(let i=2;i<=11;i++){
+  const el = $("#s"+i), t = S[i];
+  tl.set(el, { autoAlpha:1 }, t);
+  tl.fromTo(el, { clipPath:"inset(100% 0% 0% 0%)" }, { clipPath:"inset(0% 0% 0% 0%)", duration:WIPE, ease:"power4.inOut" }, t);
+  tl.set("#s"+(i-1), { autoAlpha:0 }, t+WIPE+.05);
+}
+tl.set("#s1", { autoAlpha:1 }, 0);
+tl.to("#bar", { scaleX:1, duration:D, ease:"none" }, 0);
+
+/* ===== 1 · APERTURA 0–14 ===== */
+LINE("#s1 h1 .ln:nth-child(1)", .25, {d:.9}); LINE("#s1 h1 .ln:nth-child(2)", .45, {d:.9});
+IN("#s1 .kicker", .15, {y:14});
+IN("#pilo1", .6, { y:80, d:1.1, s:.96 });
+tl.fromTo("#pilo1", { rotation:0 }, { rotation:-3, duration:2.2, ease:"sine.inOut", yoyo:true, repeat:5, transformOrigin:"50% 100%" }, 2);
+IN("#s1-lede", 3.7, { y:22 });
+IN("#s1-chips .chip:nth-child(1)", 5.2, { y:18, d:.5 });
+IN("#s1-chips .chip:nth-child(2)", 6.9, { y:18, d:.5 });
+IN("#s1-chips .chip:nth-child(3)", 10.1, { y:18, d:.5 });
+tl.fromTo("#pilo1", { y:0 }, { y:-26, duration:.35, ease:"power2.out", yoyo:true, repeat:1 }, 12.98);
+
+/* ===== 2 · RECORRIDO 14.7–34 ===== */
+{
+  const t0 = S[2]+.4;
+  IN("#s2 .kicker", t0, {y:14}); LINE("#s2 h2 .ln", t0+.05);
+  const cols = $$("#cad > li"), T = [17.08,20.08,22.34,24.10,25.66,26.78,28.70];
+  cols.forEach((li,i)=>{
+    tl.fromTo(li, { autoAlpha:0, y:22 }, { autoAlpha:1, y:0, duration:.5, ease:E }, T[i]-.05);
+  });
+  // la línea de cada paso se dibuja
+  cols.forEach((li,i)=>tl.fromTo(li, { clipPath:"inset(-120px 100% -40px 0)" }, { clipPath:"inset(-120px -500px -40px 0)", duration:.55, ease:E }, T[i]-.05));
+  // al final, el paso 4 es «usted»: los demás bajan
+  cols.forEach((li,i)=>{ if(i!==3) DIM(li, 32.5, .38); });
+  IN("#cad .here", 32.6, { y:10, d:.4 });
+  tl.fromTo("#cad .me", { scale:1 }, { scale:1.05, duration:.6, ease:E, transformOrigin:"0 0" }, 32.6);
+}
+
+/* ===== 3 · PAPELES 34.5–49.7 ===== */
+{
+  const t0 = S[3]+.4; IN("#s3 .kicker", t0, {y:14}); LINE("#s3 h2 .ln", t0+.05);
+  const r = $$("#roles .role"), T = [35.72, 37.62, 41.66, 45.24];
+  r.forEach((c,i)=>IN(c, T[i]-.1, { y:34, s:.97, d:.6 }));
+  tl.fromTo("#roles .me", { y:0 }, { y:-14, duration:.5, ease:E }, 39.4);
+  IN("#roles .me .tg", 39.5, { y:8, d:.35 });
+  IN("#roles .role:nth-child(3) .tg", 43.2, { y:8, d:.35 });
+  IN("#roles .role:nth-child(4) .tg", 45.6, { y:8, d:.35 });
+  IN("#asg", 46.7, { y:20 });
+}
+
+/* ===== 4 · GESTOR 49.8–75 ===== */
+{
+  const t0 = S[4]+.4; IN("#s4 .kicker", t0, {y:14}); LINE("#s4 h2 .ln", t0+.05);
+  IN("#f4", t0, { y:40, s:.98, d:.8 }); CAM("#in4",[[54.0,1.55,.2,.2],[56.6,1.5,.17,.63],[66.3,1.35,.55,.36],[68.3,1.35,.62,.74],[71.7,1.55,.2,.66],[74.0,1,.5,.5]]);
+  const li = STEPS("#st4", [50.2, 54.04, 56.62, 66.36, 71.74, 73.90]);
+  const chips = $$("#ch4 .chip"), CT = [57.9, 58.6, 59.5, 61.3, 62.2, 63.0, 64.0, 64.8];
+  chips.forEach((c,i)=>IN(c, CT[i], { y:12, d:.4 }));
+  tl.fromTo("#tok .mono", { opacity:1 }, { opacity:1 }, 66.4);
+  IN("#tok", 67.0, { y:12, d:.5 });
+  // llamadas sobre la captura
+  CO("#in4", [3.4,13,24.7,16.7], "Su papel y el avance", 54.1, 56.4);
+  CO("#in4", [5.3,40.8,21.1,47.9], "Sección por sección", 56.7, 66.1);
+  CO("#in4", [33.3,30.8,45.3,3.7], "Insertar cifra viva", 66.4, 70.6);
+  CO("#in4", [33.3,63.9,60.4,22.5], "Se lee con la cifra", 68.4, 71.4);
+  CO("#in4", [24,41.5,2.2,46.2], "Todo en verde", 71.8, 73.7, "green");
+  // guardado automático
+  const g = document.createElement("div"); g.className="pill ok"; g.textContent="✓ Guardado automático"; g.style.cssText="position:absolute;right:26px;bottom:26px;box-shadow:0 14px 30px -14px rgba(0,0,0,.5)";
+  $("#f4").appendChild(g); tl.fromTo(g, { autoAlpha:0, y:16 }, { autoAlpha:1, y:0, duration:.45, ease:E }, 74.0);
+}
+
+/* ===== 5 · ENVIAR Y DEVOLVER 75.4–92 ===== */
+{
+  const t0 = S[5]+.4; IN("#s5 .kicker", t0, {y:14}); LINE("#s5 h2 .ln", t0+.05);
+  IN("#f5", t0, { y:40, s:.98, d:.8 });
+  tl.set("#in5b", { autoAlpha:0 }, 0);
+  CAM("#in5a",[[75.9,1.6,.17,.27],[79.6,1.6,.17,.9],[82.0,1,.5,.5]]); CAM("#in5b",[[86.9,1.45,.17,.37],[90.3,1.45,.17,.88]]);
+  STEPS("#st5", [75.9, 78.0, 79.64, 86.2, 90.36]);
+  // estados
+  IN("#states5", 75.9, { y:14, d:.45 });
+  const act = (sel,t)=>tl.fromTo(sel, { opacity:.35, scale:1 }, { opacity:1, scale:1.06, duration:.4, ease:E, transformOrigin:"0 50%" }, t);
+  act("#p-bo", 75.9); tl.to("#p-bo", { opacity:.35, scale:1, duration:.3 }, 82.0);
+  act("#p-ap", 82.04); tl.to("#p-ap", { opacity:.35, scale:1, duration:.3 }, 86.1);
+  act("#p-de", 86.3);  tl.to("#p-de", { opacity:.35, scale:1, duration:.3 }, 90.3);
+  act("#p-bo", 90.5); // reabre como borrador
+  // llamadas sobre «lista»
+  CO("#in5a", [3.4,24,24.7,5.4], "10 de 10 listas", 76.0, 79.4);
+  CO("#in5a", [5.3,91.5,21.1,3.9], "Enviar", 79.7, 85.9, "green");
+  // candado: se cierra al enviar
+  tl.set("#lock", { autoAlpha:0 }, 0);
+  tl.fromTo("#lock", { autoAlpha:0, y:20, scale:.9 }, { autoAlpha:1, y:0, scale:1, duration:.45, ease:E }, 82.04);
+  tl.fromTo("#shackle", { y:-9 }, { y:0, duration:.35, ease:"power3.in" }, 82.3);
+  tl.to("#lock", { autoAlpha:0, duration:.3 }, 86.1);
+  // cambio de captura a «devuelto»
+  tl.fromTo("#in5b", { autoAlpha:0 }, { autoAlpha:1, duration:.6, ease:"power2.out" }, 86.2);
+  tl.to("#in5a", { autoAlpha:0, duration:.3, ease:"power2.in" }, 86.7);
+    CO("#in5b", [5.2,31.5,21.2,6], "Nota general", 86.9, 88.9);
+  CO("#in5b", [5.2,37.5,21.2,6.6], "Nota por sección", 88.4, 90.3, "red");
+  CO("#in5b", [5.3,84,21.2,12], "Qué falta", 90.4, 91.9);
+}
+
+/* ===== 6 · CONTRIBUYENTE 92–107.6 ===== */
+{
+  const t0 = S[6]+.4; IN("#s6 .kicker", t0, {y:14}); LINE("#s6 h2 .ln", t0+.05);
+  IN("#f6", t0, { y:40, s:.98, d:.8 }); CAM("#in6",[[92.3,1.6,.17,.22],[98.9,1.6,.17,.93],[102.3,1,.5,.5]]);
+  IN("#bx-ok", 92.5, { y:26 }); IN("#bx-no", 98.3, { y:26 });
+  $$("#bx-ok li").forEach((el,i)=>IN(el, [92.9, 95.2, 96.6][i], { y:10, d:.4 }));
+  $$("#bx-no li").forEach((el,i)=>IN(el, [98.5, 99.9][i], { y:10, d:.4 }));
+  CO("#in6", [5.3,21.2,15.5,3.1], "Su papel", 92.4, 96.2);
+  CO("#in6", [5.3,93.3,21,3.7], "Enviar: deshabilitado", 99.0, 102.3, "red");
+  IN("#avise", 102.5, { x:-30, y:0, d:.6 });
+  IN("#nomail", 105.1, { y:16, d:.5 });
+  tl.fromTo("#slash", { strokeDasharray:30, strokeDashoffset:30 }, { strokeDashoffset:0, duration:.5, ease:"power2.out" }, 105.4);
+}
+
+/* ===== 7 · EXCEL: DESCARGAR 107.6–123 ===== */
+{
+  const t0 = S[7]+.4; IN("#s7 .kicker", t0, {y:14}); LINE("#s7 h2 .ln", t0+.05);
+  IN("#f7", t0, { y:40, s:.98, d:.8 }); CAM("#in7",[[111.7,1.2,.4,.16],[116.2,1.1,.4,.45],[118.4,1,.5,.5]]);
+  IN("#t0", 108.6, { y:22 });
+  CO("#in7", [2.4,12.8,95,5.6], "Un libro completo", 111.8, 114.2);
+  CO("#in7", [2.4,19,95,5.6], "Un libro por equipo", 114.4, 116.2);
+  CO("#in7", [2.4,26.3,95,45.5], "Solo con sus hojas", 116.3, 118.2);
+  // el libro se reparte: cinco archivos salen en cascada
+  tl.fromTo("#t0", { opacity:1 }, { opacity:.45, duration:.4 }, 118.5);
+  $$("#teams .tm").forEach((el,i)=>IN(el, 118.45+i*.5, { x:-40, y:0, d:.5 }));
+}
+
+/* ===== 8 · CÓMO SE LLENA 123–146 ===== */
+{
+  const t0 = S[8]+.4; IN("#s8 .kicker", t0, {y:14}); LINE("#s8 h2 .ln", t0+.05);
+  IN("#f8", t0, { y:40, s:.98, d:.8 }); CAM("#in8",[[125.3,1.2,.5,.55],[134.2,1.5,.5,.3],[138.6,1.4,.62,.5],[142.6,1.5,.5,.85],[145.5,1,.5,.5]]);
+  const sw = $$("#sw8 i");
+  IN(sw[0], 125.3, { y:16, d:.45 }); IN(sw[1], 128.08, { y:16, d:.45 }); IN(sw[2], 131.34, { y:16, d:.45 });
+  // colores sobre la hoja (celdas amarillas A-B, azules C-I; filas 5-18)
+  CO("#in8", [35.3,31.8,64.7,58.6], "Opcional", 125.35, 128.0);
+  CO("#in8", [2.9,31.8,32.4,58.6], "Obligatoria", 128.1, 131.2);
+  // gris: el sistema calcula «Estado»
+  const gr = document.createElement("div");
+  gr.className="pill"; gr.style.cssText="position:absolute;left:0;right:0;margin:0 auto;width:max-content;top:12px;background:#d4d8de;color:#1d2a3a;font-size:30px;box-shadow:0 16px 36px -14px rgba(0,0,0,.5);z-index:3";
+  gr.textContent="Estado: Cumplida o Parcial · lo calcula el sistema"; $("#f8").appendChild(gr);
+  tl.fromTo(gr, { autoAlpha:0, y:-14 }, { autoAlpha:1, y:0, duration:.5, ease:E }, 131.5); tl.to(gr, { autoAlpha:0, duration:.3 }, 134.1);
+  CO("#in8", [2.9,26,97.2,5.8], "Fila 4 · encabezado", 134.3, 136.6);
+  CO("#in8", [2.9,31.8,97.2,3.8], "Fila 5 · primeros datos", 135.4, 138.4, "in-b");
+  CO("#in8", [49.7,31.8,21.5,43.7], "Solo números · coma decimal", 138.7, 142.4);
+  CO("#in8", [2.9,78.6,97.2,11.8], "Sin información: fila vacía", 142.7, 146, "red");
+}
+
+/* ===== 9 · IMPORTAR 146.3–171 ===== */
+{
+  const t0 = S[9]+.4; IN("#s9 .kicker", t0, {y:14}); LINE("#s9 h2 .ln", t0+.05);
+  IN("#f9", t0, { y:40, s:.98, d:.8 }); CAM("#in9",[[149.9,1.35,.5,.1],[151.7,1.3,.8,.45],[153.7,1,.5,.35]]);
+  STEPS("#st9", [149.52, 151.6, 153.62, 156.82, 168.70, 169.95]);
+  CO("#in9", [40.8,8.4,21,2.2], "Libro reconocido", 150.0, 151.4);
+  CO("#in9", [75.8,16.4,15.1,65.9], "Destino de cada hoja", 151.8, 153.4);
+  tl.fromTo("#rev9", { autoAlpha:0, y:-30, scale:.97 }, { autoAlpha:1, y:0, scale:1, duration:.6, ease:E }, 153.7);
+  tl.to("#rev9", { autoAlpha:0, duration:.3, ease:"power2.in" }, 156.7);
+  // cómo aplicar
+  tl.fromTo("#modes9", { autoAlpha:0, y:40 }, { autoAlpha:1, y:0, duration:.6, ease:E }, 156.9);
+  tl.set("#modes9 .m1, #modes9 .m2", { autoAlpha:0 }, 0);
+  tl.set("#hi9", { x:0 }, 0);
+  const sp = $$("#modes9 .seg > span"), ON = "#ffffff", OFF = "#45566d";
+  const col = (i, from, to, t) => tl.fromTo(sp[i], { color:from }, { color:to, duration:.3, ease:"power2.out" }, t);
+  col(0,ON,OFF,162.9); col(1,OFF,ON,162.9); col(1,ON,OFF,166.14); col(2,OFF,ON,166.14); col(2,ON,OFF,168.6); col(0,OFF,ON,168.6);
+  tl.fromTo("#modes9 .m0", { autoAlpha:0 }, { autoAlpha:1, duration:.3 }, 158.1);
+  tl.to("#modes9 .m0", { autoAlpha:0, duration:.2 }, 162.7);
+  tl.fromTo("#hi9", { x:0 }, { x:222.67, duration:.45, ease:"power3.inOut" }, 162.9);
+  tl.fromTo("#modes9 .m1", { autoAlpha:0 }, { autoAlpha:1, duration:.3 }, 163.0);
+  tl.to("#modes9 .m1", { autoAlpha:0, duration:.2 }, 166.0);
+  tl.to("#hi9", { x:445.33, duration:.45, ease:"power3.inOut" }, 166.14);
+  tl.fromTo("#modes9 .m2", { autoAlpha:0 }, { autoAlpha:1, duration:.3 }, 166.25);
+  tl.to("#modes9 .m2", { autoAlpha:0, duration:.2 }, 168.6);
+  tl.to("#hi9", { x:0, duration:.4, ease:"power3.inOut" }, 168.6);
+  tl.fromTo("#who9", { autoAlpha:0, height:0, marginTop:0 }, { autoAlpha:1, height:68, marginTop:12, duration:.5, ease:E }, 168.75);
+  tl.fromTo("#btn9", { scale:1 }, { scale:.95, duration:.12, ease:"power2.out", yoyo:true, repeat:1 }, 170.3);
+}
+
+/* ===== 10 · SI ALGO NO ENTRA 170.9–189.3 ===== */
+{
+  const t0 = S[10]+.4; IN("#s10 .kicker", t0, {y:14}); LINE("#s10 h2 .ln", t0+.05);
+  IN("#f10a", 171.3, { y:36, s:.98, d:.7 });
+  CO("#f10a .in", [2,18,96,40], "Es de otro informe", 172.2, 176.7, "red");
+  STEPS("#st10", [171.5, 179.24, 183.12]);
+  IN("#btn10", 176.9, { y:16, d:.5 });
+  tl.fromTo("#btn10", { scale:1 }, { scale:.95, duration:.12, yoyo:true, repeat:1, ease:"power2.out" }, 178.4);
+  IN("#f10b", 179.1, { y:40, s:.98, d:.7 });
+  OUT("#btn10", 179.0, .25);
+  CAM("#in10b",[[179.9,1.4,.3,.27],[187.7,1,.5,.5]]);
+  CO("#in10b", [3.9,21,94,3.7], "Hoja, fila y problema", 180.0, 183.0);
+  CO("#in10b", [3.9,24.2,46.6,3.7], "«cuatro» no es un número", 183.2, 185.2, "red");
+  CO("#in10b", [3.9,31.6,35,3.7], "«Tal vez» no es Sí ni No", 185.3, 187.6, "red");
+  CO("#in10b", [3.9,24.2,46.6,3.7], "Corregido", 187.8, 189.2, "green");
+  tl.fromTo("#pilo10", { autoAlpha:0, y:40 }, { autoAlpha:1, y:0, duration:.6, ease:E }, 183.2);
+}
+
+/* ===== 11 · CIERRE 189.4–210 ===== */
+{
+  const t0 = S[11]+.4; IN("#s11 .kicker", t0, {y:14}); LINE("#s11 h2 .ln", t0+.05);
+  const T = [192.0, 194.52, 197.30, 199.08];
+  $$("#chk li").forEach((li,i)=>{
+    tl.fromTo(li, { autoAlpha:0, x:-30 }, { autoAlpha:1, x:0, duration:.5, ease:E }, T[i]-.15);
+    const tk = li.querySelector(".tick");
+    tl.fromTo(tk, { strokeDasharray:60, strokeDashoffset:60 }, { strokeDashoffset:0, duration:.45, ease:"power2.out" }, T[i]+.35);
+  });
+  IN("#pilo11", 190.2, { y:120, d:1, s:.97 });
+  tl.fromTo("#readybar", { scaleX:0 }, { scaleX:1, duration:.8, ease:E }, 201.7);
+  tl.fromTo("#readytxt", { autoAlpha:0, x:-20 }, { autoAlpha:1, x:0, duration:.5, ease:E }, 202.1);
+  // tarjeta final
+  tl.set("#endcard", { autoAlpha:0 }, 0);
+  tl.fromTo("#endcard", { autoAlpha:0 }, { autoAlpha:1, duration:.6, ease:"power2.out" }, 205.1);
+  LINE("#endcard .ln:nth-child(1)", 205.35, {d:.9}); LINE("#endcard .ln:nth-child(2)", 205.5, {d:.9});
+  tl.fromTo("#endcard img", { autoAlpha:0, y:20 }, { autoAlpha:1, y:0, duration:.7, ease:E }, 205.2);
+  tl.fromTo("#endcard .kicker", { autoAlpha:0 }, { autoAlpha:1, duration:.5 }, 205.3);
+}
+tl.to({}, { duration:.01 }, D);   // fija la duración total
+
+/* ---------- control: render (seek) y vista previa (audio) ---------- */
+window.__dur = D;
+window.__seek = t => { tl.time(Math.max(0, Math.min(D, t)), false); return t; };
+window.__ready = document.fonts.ready.then(()=>Promise.all($$("img").map(i=>i.decode?i.decode().catch(()=>{}):0))).then(()=>true);
+
+const q = new URLSearchParams(location.search);
+function fit(){ const s=Math.min(innerWidth/1920, innerHeight/1080); $("#stage").style.transform = q.has("render") ? "none" : `scale(${s})`; }
+addEventListener("resize", fit); fit();
+tl.time(+(q.get("t")||0));
+if(!q.has("render")){
+  const a = $("#aud"); let playing = false;
+  const tick = () => { if(playing){ tl.time(Math.min(D, a.currentTime)); } requestAnimationFrame(tick); }; tick();
+  addEventListener("keydown", e=>{
+    if(e.code==="Space"){ e.preventDefault(); playing=!playing; if(playing){ a.currentTime=tl.time(); a.play(); } else a.pause(); }
+    if(e.code==="ArrowRight"){ a.currentTime=Math.min(D,tl.time()+5); tl.time(a.currentTime); }
+    if(e.code==="ArrowLeft"){ a.currentTime=Math.max(0,tl.time()-5); tl.time(a.currentTime); }
+  });
+}
+</script>
+</body>
+</html>

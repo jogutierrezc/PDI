@@ -32,8 +32,6 @@ import { destinoAstra, leerConfig } from "../pilo-work/proveedor.ts";
 import { crearManejador } from "./handler.ts";
 
 const ENV = (n: string) => Deno.env.get(n) ?? "";
-/** Tope de tokens de la presentación: el JSON es largo y el razonamiento gasta tope. */
-const TOKENS_PRESENTACION = 16000;
 /** Tope del silencio tolerado de Astra (la espera máxima de Pilo Work, hasta 600 s). */
 const TOPE_ESPERA_MS = 600_000;
 
@@ -65,7 +63,8 @@ Deno.serve(
         // Medido con Pilo Astra 1.0: con razonamiento «bajo» y 16 000 tokens se gastó todo pensando (115 s) y no escribió nada;
         // sin razonamiento el JSON de 9 diapositivas sale en ~12 s. Armar el JSON no necesita razonar.
         effort: "none" as const,
-        maxTokens: pw.astra_max_tokens === 0 ? 0 : Math.max(TOKENS_PRESENTACION, pw.astra_max_tokens),
+        // Sin tope fijo de tokens (igual que pilo-compilador): la presentación se escribe completa, tan larga como pida el informe.
+        maxTokens: 0,
         esperaMs: Math.min(TOPE_ESPERA_MS, Math.max(1, pw.astra_espera_s) * 1000),
         limiteHora: pw.astra_limite_hora,
       };

@@ -1,0 +1,1 @@
+Cuando todas las secciones estén en «Lista» y haya al menos una evidencia, el botón «Enviar» se habilita. [surprise-oh] Al enviar, las cifras quedan congeladas y el informe queda aprobado. Si Planeación lo devuelve, usted verá una nota general y una por sección. Corrige, guarda y lo reenvía.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMBED_DIM, canUse, embedBody, embedModelsIn, embedTarget, fitVector, fuseHits, modelGone, parseEmbeddings, vectorText } from "./logic";
+import { EMBED_DIM, astraEmbedTarget, canUse, embedBody, embedModelsIn, embedTarget, fitVector, fuseHits, modelGone, parseEmbeddings, vectorText } from "./logic";
 import type { Rules } from "./logic";
 
 const vec = (x: number) => Array.from({ length: EMBED_DIM }, () => x);
@@ -95,5 +95,20 @@ describe("búsqueda por significado (0108)", () => {
     expect(canUse(off, "", "indexar", "admin").ok).toBe(true);
     expect(canUse(off, "", "indexar", "planeacion")).toMatchObject({ ok: false, reason: /Solo la administración/ });
     expect(canUse(off, "", "indexar", null).ok).toBe(false);
+  });
+});
+
+describe("embeddings del servidor de Pilo Astra (0298)", () => {
+  it("usa /embeddings del mismo servidor y pide el modelo", () => {
+    expect(astraEmbedTarget("https://astra.example/v1", "bge-m3")).toEqual({ url: "https://astra.example/v1/embeddings", model: "bge-m3", nvidia: false });
+    expect(astraEmbedTarget("https://astra.example/v1/", " mxbai-embed-large ")?.model).toBe("mxbai-embed-large");
+  });
+  it("sin modelo, sin dirección o sin https no hay destino", () => {
+    expect(astraEmbedTarget("https://astra.example/v1", "")).toBeNull();
+    expect(astraEmbedTarget("", "bge-m3")).toBeNull();
+    expect(astraEmbedTarget("http://astra.example/v1", "bge-m3")).toBeNull();
+  });
+  it("reconoce los modelos de embeddings de Ollama en la lista", () => {
+    expect(embedModelsIn({ data: [{ id: "bge-m3:latest" }, { id: "pilo-astra:1.0" }, { id: "mxbai-embed-large:latest" }, { id: "qwen3:8b" }] })).toEqual(["bge-m3:latest", "mxbai-embed-large:latest"]);
   });
 });

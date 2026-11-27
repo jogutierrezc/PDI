@@ -223,12 +223,25 @@ export async function destinoAstra(admin: Admin, cfg: Config): Promise<Destino |
     admin.from("pilo_ai_settings").select("*").eq("id", 1).maybeSingle(),
     admin.from("pilo_ai_secret").select("*").eq("id", 1).maybeSingle(),
   ]);
-  const base = cfg.astra_base_url || String(settings?.speech_base_url ?? "") || String(settings?.base_url ?? "");
-  const key = String(secret?.speech_key ?? "") || String(secret?.otro_key ?? "");
+  const { base, key } = servidorAstra(cfg, settings, secret);
   if (!base || !key || !cfg.astra_modelo) return null;
   const url = endpoint("otro", base, "/chat/completions");
   if (!url.startsWith("https://")) return null;
   return { url, model: cfg.astra_modelo, key, provider: "otro" };
+}
+
+/**
+ * La dirección y la clave del servidor de Astra, de la configuración ya leída. La usan el chat
+ * (destinoAstra) y la búsqueda por significado (0298), que pide /embeddings al mismo servidor.
+ */
+export function servidorAstra(
+  cfg: Pick<Config, "astra_base_url">,
+  settings: Record<string, unknown> | null | undefined,
+  secret: Record<string, unknown> | null | undefined,
+): { base: string; key: string } {
+  const base = cfg.astra_base_url || String(settings?.speech_base_url ?? "") || String(settings?.base_url ?? "");
+  const key = String(secret?.speech_key ?? "") || String(secret?.otro_key ?? "");
+  return { base, key };
 }
 
 /** El razonamiento que se pide al servidor (Ollama: reasoning_effort). El proxy apaga el razonamiento si no se pide. */

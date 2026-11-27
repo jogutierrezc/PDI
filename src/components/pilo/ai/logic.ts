@@ -1037,6 +1037,17 @@ export const EMBED_PRESETS: Record<string, EmbedTarget> = {
 export const embedTarget = (provider: string): EmbedTarget | null => EMBED_PRESETS[provider] ?? null;
 
 /**
+ * Embeddings del servidor de Pilo Astra (0298): Ollama u otro servidor con /v1/embeddings
+ * al estilo de OpenAI. No hay modelo de partida: hay que nombrarlo (p. ej. bge-m3, de 1024).
+ */
+export function astraEmbedTarget(base: string, model: string): EmbedTarget | null {
+  const m = String(model ?? "").trim();
+  if (!String(base ?? "").trim() || !m) return null;
+  const url = endpoint("otro", base, "/embeddings");
+  return url.startsWith("https://") ? { url, model: m, nvidia: false } : null;
+}
+
+/**
  * El pedido de embeddings. «full»: con dimensiones y recorte (NVIDIA);
  * «plain»: solo pregunta o pasaje, para el modelo que no acepta lo demás.
  */
@@ -1063,11 +1074,14 @@ export function fitVector(v: number[]): number[] | null {
 /** ¿El proveedor dice que el modelo ya no existe (retirado o mal escrito)? */
 export const modelGone = (status: number, detail: string) => status === 410 || status === 404 || /end of life|no longer available|not found|does not exist/i.test(detail);
 
+/** Nombres que delatan un modelo de embeddings (también los de Ollama: bge-m3, mxbai-embed-large, nomic…). */
+const EMBED_NAME = /embed|bge|\be5\b|e5-|gte|minilm|mxbai|nomic|arctic/i;
+
 /** De la lista de modelos del proveedor (/v1/models), los de embeddings. */
 export function embedModelsIn(data: unknown): string[] {
   const list = (data as { data?: unknown } | null)?.data;
   if (!Array.isArray(list)) return [];
-  return [...new Set(list.map((m) => String((m as { id?: unknown })?.id ?? "")).filter((id) => /embed/i.test(id)))].sort();
+  return [...new Set(list.map((m) => String((m as { id?: unknown })?.id ?? "")).filter((id) => EMBED_NAME.test(id)))].sort();
 }
 
 /** Los vectores de la respuesta, en el orden de lo enviado y a la medida de la base; null si falta uno o es corto. */

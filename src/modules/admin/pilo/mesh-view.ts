@@ -64,7 +64,7 @@ const SECTION_FIELDS: Partial<Record<SectionId, (keyof PiloSettings)[]>> = {
   ],
   portales: ["impacto_report", "widget_on", "widget_origins"],
   pregunta: ["ask_temperature", "ask_max_tokens", "ask_context_tokens", "ask_history_turns", "system_role", "ask_stream", "visitor_limit", "visitor_window_seconds"],
-  memoria: ["memory_sources", "embed_model"],
+  memoria: ["memory_sources", "embed_model", "embed_provider"],
   uso: ["daily_limit", "voice_daily_limit", "max_rows", "cache_days"],
 };
 

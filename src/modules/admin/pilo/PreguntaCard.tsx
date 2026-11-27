@@ -589,6 +589,8 @@ export function MemorySection({
       <SemanticGroup
         model={s.embed_model}
         onModel={s.needs0109 ? undefined : (v) => set("embed_model", v)}
+        source={s.embed_provider}
+        onSource={s.needs0298 ? undefined : (v) => set("embed_provider", v)}
         status={embedStatus.data ?? null} error={embedStatus.error as Error | null} loading={embedStatus.isPending} progress={progress} running={indexer.isPending} runError={indexer.error as Error | null} onRun={runIndex} />
 
       <Group
@@ -665,6 +667,8 @@ const VIA = { palabras: "por palabras", significado: "por significado", ambas: "
 function SemanticGroup({
   model,
   onModel,
+  source,
+  onSource,
   status,
   error,
   loading,
@@ -676,6 +680,9 @@ function SemanticGroup({
   model: string;
   /** Sin 0109 no hay dónde guardar otro modelo. */
   onModel?: (v: string) => void;
+  /** De dónde salen los embeddings (0298). Sin la migración no se puede cambiar. */
+  source: "" | "astra";
+  onSource?: (v: "" | "astra") => void;
   status: EmbedStatus | null;
   error: Error | null;
   loading: boolean;
@@ -693,7 +700,8 @@ function SemanticGroup({
       <div className="pis-row">
         <p className="pis-note">
           Cada pasaje y cada indicador guardan un vector que dice de qué hablan. Así Pilo encuentra «tasa de deserción» cuando le preguntan «¿cuántos se fueron?», aunque no
-          compartan palabras. Se combina con la búsqueda por palabras. Funciona con NVIDIA o Mistral y usa la misma clave.
+          compartan palabras. Se combina con la búsqueda por palabras.{" "}
+          {source === "astra" ? "Usa el servidor de Pilo Astra con el modelo de embeddings que elija." : "Funciona con NVIDIA o Mistral y usa la misma clave, o con el servidor de Pilo Astra."}
         </p>
         <button type="button" className="button-secondary" onClick={onRun} disabled={running || loading || Boolean(error) || !now || pending === 0}>
           {running ? "Indexando…" : pending === 0 && now ? "Al día" : "Indexar por significado"}
@@ -720,14 +728,25 @@ function SemanticGroup({
         <details className="pis-adv">
           <summary>Opciones avanzadas</summary>
           <div className="pis-grid">
+            {onSource && (
+              <label>
+                De dónde salen los embeddings
+                <select value={source} onChange={(e) => onSource(e.target.value === "astra" ? "astra" : "")}>
+                  <option value="">El proveedor de Conexión (NVIDIA o Mistral)</option>
+                  <option value="astra">El servidor de Pilo Astra (Ollama)</option>
+                </select>
+              </label>
+            )}
             <label>
-              Modelo de embeddings (vacío: el de partida del proveedor)
-              <input value={model} onChange={(e) => onModel(e.target.value.trim())} placeholder={status?.model || "nvidia/llama-nemotron-embed-1b-v2"} spellCheck={false} />
+              {source === "astra" ? "Modelo de embeddings del servidor (obligatorio)" : "Modelo de embeddings (vacío: el de partida del proveedor)"}
+              <input value={model} onChange={(e) => onModel(e.target.value.trim())} placeholder={source === "astra" ? "bge-m3" : status?.model || "nvidia/llama-nemotron-embed-1b-v2"} spellCheck={false} />
             </label>
           </div>
           <p className="pis-small">
-            Solo si el proveedor retira el de partida. Debe dar vectores de 1024 dimensiones o más (los más largos se recortan). Al cambiarlo, guarde los cambios y vuelva a
-            indexar.
+            {source === "astra"
+              ? "Use la misma dirección y clave de Pilo Astra (Pilo Work). El modelo debe estar descargado en el servidor (ollama pull bge-m3) y dar vectores de 1024 dimensiones o más: sirven bge-m3, mxbai-embed-large o qwen3-embedding. nomic-embed-text (768) no sirve."
+              : "Solo si el proveedor retira el de partida. Debe dar vectores de 1024 dimensiones o más (los más largos se recortan)."}{" "}
+            Al cambiarlo, guarde los cambios y vuelva a indexar.
           </p>
           <div className="pis-row">
             <button type="button" className="button-secondary" onClick={() => list.mutate()} disabled={list.isPending}>

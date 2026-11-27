@@ -106,6 +106,10 @@ export interface PiloSettings {
   embed_model: string;
   /** La base aún no tiene la migración 0109 (Pilo aprende). */
   needs0109?: boolean;
+  /** De dónde salen los embeddings (0298): «» el proveedor de Conexión; «astra» el servidor de Pilo Astra. */
+  embed_provider: "" | "astra";
+  /** La base aún no tiene la migración 0298. */
+  needs0298?: boolean;
   /** Pregúntele a Pilo con IA siempre (0110): cómo redacta, la voz aparte y el límite por visitante. */
   ask_temperature: number;
   ask_max_tokens: number;
@@ -220,6 +224,8 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     needs0106: !("voice_expressions" in raw),
     embed_model: typeof raw.embed_model === "string" ? raw.embed_model : "",
     needs0109: !("embed_model" in raw),
+    embed_provider: raw.embed_provider === "astra" ? "astra" : "",
+    needs0298: !("embed_provider" in raw),
     ask_temperature: clampAsk("ask_temperature", raw.ask_temperature),
     ask_max_tokens: clampAsk("ask_max_tokens", raw.ask_max_tokens),
     ask_context_tokens: clampAsk("ask_context_tokens", raw.ask_context_tokens),
@@ -353,7 +359,7 @@ export function useSavePiloSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: PiloSettings) => {
-      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, needs0172, needs0106, needs0109, needs0110, needs0111, needs0283, memory_indexed_at: _indexed, ...all } = settings;
+      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, needs0172, needs0106, needs0109, needs0110, needs0111, needs0283, needs0298, memory_indexed_at: _indexed, ...all } = settings;
       // Sin 0090 no existen las columnas nuevas: no se mandan.
       const rest: Record<string, unknown> = { ...all };
       if (needs0090) for (const k of ["provider", "speech_provider", "speech_base_url"]) delete rest[k];
@@ -378,6 +384,8 @@ export function useSavePiloSettings() {
       }
       // Sin 0109, tampoco el modelo de embeddings.
       if (needs0109) delete rest.embed_model;
+      // Sin 0298, los embeddings salen del proveedor de Conexión.
+      if (needs0298) delete rest.embed_provider;
       // Sin 0110, tampoco los ajustes de «preguntar», el cupo de la voz ni el límite por visitante.
       if (needs0110) for (const k of [...Object.keys(ASK_LIMITS), "system_role", "ask_stream"]) delete rest[k];
       // Sin 0283, tampoco el interruptor de Astra en el chat.

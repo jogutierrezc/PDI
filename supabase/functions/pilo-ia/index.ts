@@ -116,7 +116,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 // La voz de ElevenLabs y «cantar» (0172) viven en sus propios archivos.
 import { makeEleven } from "./elevenlabs-voz.ts";
-import { destinoAstra, leerConfig } from "../pilo-work/proveedor.ts";
+import { destinoAstra, leerConfig, servidorAstra } from "../pilo-work/proveedor.ts";
 import { elegirModelo, esfuerzoPorNivel, metaModelo, modelosDisponibles, opcionesAstra, parseNivel, segundosPensando, type Eleccion } from "./modelos.ts";
 import { makeVoiceDesign } from "./voz-diseno.ts";
 // La capa profunda (0173): los lectores directos de los portales, que arman pasajes desde las tablas.
@@ -1156,6 +1156,17 @@ export const EMBED_PRESETS: Record<string, EmbedTarget> = {
 export const embedTarget = (provider: string): EmbedTarget | null => EMBED_PRESETS[provider] ?? null;
 
 /**
+ * Embeddings del servidor de Pilo Astra (0298): Ollama u otro servidor con /v1/embeddings
+ * al estilo de OpenAI. No hay modelo de partida: hay que nombrarlo (p. ej. bge-m3, de 1024).
+ */
+export function astraEmbedTarget(base: string, model: string): EmbedTarget | null {
+  const m = String(model ?? "").trim();
+  if (!String(base ?? "").trim() || !m) return null;
+  const url = endpoint("otro", base, "/embeddings");
+  return url.startsWith("https://") ? { url, model: m, nvidia: false } : null;
+}
+
+/**
  * El pedido de embeddings. «full»: con dimensiones y recorte (NVIDIA);
  * «plain»: solo pregunta o pasaje, para el modelo que no acepta lo demás.
  */
@@ -1182,11 +1193,14 @@ export function fitVector(v: number[]): number[] | null {
 /** ¿El proveedor dice que el modelo ya no existe (retirado o mal escrito)? */
 export const modelGone = (status: number, detail: string) => status === 410 || status === 404 || /end of life|no longer available|not found|does not exist/i.test(detail);
 
+/** Nombres que delatan un modelo de embeddings (también los de Ollama: bge-m3, mxbai-embed-large, nomic…). */
+const EMBED_NAME = /embed|bge|\be5\b|e5-|gte|minilm|mxbai|nomic|arctic/i;
+
 /** De la lista de modelos del proveedor (/v1/models), los de embeddings. */
 export function embedModelsIn(data: unknown): string[] {
   const list = (data as { data?: unknown } | null)?.data;
   if (!Array.isArray(list)) return [];
-  return [...new Set(list.map((m) => String((m as { id?: unknown })?.id ?? "")).filter((id) => /embed/i.test(id)))].sort();
+  return [...new Set(list.map((m) => String((m as { id?: unknown })?.id ?? "")).filter((id) => EMBED_NAME.test(id)))].sort();
 }
 
 /** Los vectores de la respuesta, en el orden de lo enviado y a la medida de la base; null si falta uno o es corto. */
@@ -6828,8 +6842,20 @@ async function handle(request: Request): Promise<Response> {
 
   /* --- Búsqueda por significado (0108) ------------------------------------------ */
   // Otro modelo si el de partida se retira (0109); vacío, el de partida.
-  const preset = embedTarget(settings.provider ?? "mistral");
-  const embedder = preset && String(settings.embed_model ?? "").trim() ? { ...preset, model: String(settings.embed_model).trim() } : preset;
+  // Con «astra» (0298), del servidor de Pilo Astra con su clave; si no, del proveedor de Conexión.
+  const embedFromAstra = settings.embed_provider === "astra";
+  const embedder: (EmbedTarget & { key: string }) | null = await (async () => {
+    if (embedFromAstra) {
+      const { base, key } = servidorAstra(await leerConfig(admin), settings, secret);
+      const t = astraEmbedTarget(base, String(settings.embed_model ?? ""));
+      return t && key ? { ...t, key } : null;
+    }
+    const preset = embedTarget(settings.provider ?? "mistral");
+    if (!preset) return null;
+    const model = String(settings.embed_model ?? "").trim();
+    return { ...preset, model: model || preset.model, key: textKey };
+  })();
+  const embedHeaders = { Authorization: `Bearer ${embedder?.key ?? ""}`, "Content-Type": "application/json" };
 
   /** La bandeja de lo que Pilo no supo (0109). Sin esa migración, no anota y sigue. */
   // «general» (0110): la IA respondió de conocimiento general, sin fuente institucional.
@@ -6843,10 +6869,10 @@ async function handle(request: Request): Promise<Response> {
   // Si el modelo no acepta dimensiones ni recorte, se repite el pedido sin ellos; un
   // vector más largo que 1024 se recorta y normaliza (fitVector).
   const embed = async (input: string[], kind: "query" | "passage", ms = 20_000): Promise<{ vectors: number[][] | null; error?: string; gone?: boolean }> => {
-    if (!embedder || !textKey || !input.length) return { vectors: null, error: "sin proveedor de embeddings" };
+    if (!embedder || !embedder.key || !input.length) return { vectors: null, error: "sin proveedor de embeddings" };
     try {
       const ask = (mode: "full" | "plain") =>
-        callProvider(embedder.url, { method: "POST", headers, signal: AbortSignal.timeout(ms), body: JSON.stringify(embedBody(embedder, input, kind, mode)) });
+        callProvider(embedder.url, { method: "POST", headers: embedHeaders, signal: AbortSignal.timeout(ms), body: JSON.stringify(embedBody(embedder, input, kind, mode)) });
       let r = await ask("full");
       if (!r.ok && embedder.nvidia && (r.status === 400 || r.status === 422)) {
         await r.body?.cancel();
@@ -6949,7 +6975,10 @@ async function handle(request: Request): Promise<Response> {
     // La capa profunda no necesita el proveedor de significado: sus pasajes se indexan después con «lote».
     if (String(body.step ?? "estado") === "profunda") return await deepLayer();
     if (!embedder) {
-      return json({ error: "Este proveedor no ofrece búsqueda por significado.", advice: "Use NVIDIA o Mistral en Conexión: la misma clave sirve para los embeddings." }, 400);
+      if (embedFromAstra) {
+        return json({ error: "Falta el modelo de embeddings del servidor de Pilo Astra, o su dirección https o su clave.", advice: "Escriba el modelo (p. ej. bge-m3) en Búsqueda por significado › Opciones avanzadas, y revise la dirección y la clave del servidor de Astra en Pilo Work." }, 400);
+      }
+      return json({ error: "Este proveedor no ofrece búsqueda por significado.", advice: "Use NVIDIA o Mistral en Conexión, o elija «Servidor de Pilo Astra» en Búsqueda por significado › Opciones avanzadas." }, 400);
     }
     const model = embedder.model;
     const status = async () => {
@@ -6984,7 +7013,7 @@ async function handle(request: Request): Promise<Response> {
       }
       if (what === "modelos") {
         // Los modelos de embeddings que el proveedor tiene activos hoy, con la misma clave.
-        const r = await callProvider(embedder.url.replace(/\/embeddings$/, "/models"), { headers, signal: AbortSignal.timeout(15_000) });
+        const r = await callProvider(embedder.url.replace(/\/embeddings$/, "/models"), { headers: embedHeaders, signal: AbortSignal.timeout(15_000) });
         if (!r.ok) return json({ error: `El proveedor no dio su lista de modelos (${r.status}): ${await providerDetail(r)}` }, 502);
         return json({ ok: true, current: model, models: embedModelsIn(await r.json()) });
       }

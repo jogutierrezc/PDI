@@ -38,6 +38,7 @@ export const SERVIDOR_EN: Record<string, string> = {
   "Pilo tuvo un problema al responder. Intente de nuevo en un momento.": "Pilo had a problem answering. Try again in a moment.",
   "Pilo respondió algo que no pude leer. Intente de nuevo.": "Pilo answered something I couldn't read. Try again.",
   "No pude conectarme con Pilo. Revise su conexión a internet e intente de nuevo.": "I couldn't connect to Pilo. Check your internet connection and try again.",
+  "No pude confirmar quién pregunta en el aula. Recargue la página e intente de nuevo.": "I couldn't confirm who is asking in the classroom. Reload the page and try again.",
   "El servicio de voz no devolvió audio.": "The voice service returned no audio.",
   // Los pasos de «Cómo respondí».
   Enrutador: "Router",
@@ -89,6 +90,7 @@ export const SERVIDOR_PT: Record<string, string> = {
   "Pilo tuvo un problema al responder. Intente de nuevo en un momento.": "O Pilo teve um problema ao responder. Tente de novo em um momento.",
   "Pilo respondió algo que no pude leer. Intente de nuevo.": "O Pilo respondeu algo que não consegui ler. Tente de novo.",
   "No pude conectarme con Pilo. Revise su conexión a internet e intente de nuevo.": "Não consegui me conectar ao Pilo. Verifique a sua conexão com a internet e tente de novo.",
+  "No pude confirmar quién pregunta en el aula. Recargue la página e intente de nuevo.": "Não consegui confirmar quem está perguntando na sala de aula. Recarregue a página e tente de novo.",
   "El servicio de voz no devolvió audio.": "O serviço de voz não devolveu áudio.",
   Enrutador: "Roteador",
   Página: "Página",

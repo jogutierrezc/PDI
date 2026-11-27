@@ -33,7 +33,7 @@ import { useGreeting } from "../../components/pilo/greetings";
 import type { SpaceConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
-import { askQuestionStream, buildHistory, capturePage, PiloError, prefetchPilo, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
+import { askAulaStream, askQuestionStream, buildHistory, capturePage, PiloError, prefetchPilo, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
 import type { AskHandlers, AskMeta, AskOptions, AskPortal } from "../../components/pilo/ai/client";
 import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
 import { Pilo as PiloMoji } from "../pregunta/Pilo";
@@ -49,7 +49,7 @@ import { AnswerText, parseAnswer, useTypewriter } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
 import { interruptedTurn, notesOf, originOf, reduceSteps, seedOf, showsSources, waitingFace, waitingLine, waitingTip } from "../pregunta/answer-state";
 import type { ThinkStep } from "../pregunta/answer-state";
-import { captureLine, captureStatus, frameMessage, hostLabel, hostOrigin, pageForQuestion, pageRequest, pageStamp, readHostMessage, readHostPage, readParams, sourceUrl, spaceWidget, widgetAllowed } from "./embed";
+import { captureLine, captureStatus, firmaRequest, frameMessage, hostLabel, hostOrigin, pageForQuestion, pageRequest, pageStamp, readHostFirma, readHostMessage, readHostPage, readParams, sourceUrl, spaceWidget, widgetAllowed } from "./embed";
 import type { CaptureStatus, FrameState, HostPage, TurnPage } from "./embed";
 import "../pregunta/ask-pilo.css";
 import "./pilo-embed.css";
@@ -223,7 +223,9 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
   const KEY_PAGES = storageKey(space.embedPrefix, "paginas");
   const usual = space.id === "planeacion";
   // Quién pregunta: solo en los espacios que lo piden. Se recuerda por navegador y por espacio, igual que en la página.
-  const askRol = asksRol(space, cfg);
+  // En Moodle (0299) el rol lo firma el aula: no se le pregunta a la persona.
+  const [aula, setAula] = useState(false);
+  const askRol = asksRol(space, cfg) && !aula;
   const [rol, setRol] = useState<Rol | null>(() => (askRol ? readRol(space.storagePrefix) : null));
   const [asking, setAsking] = useState(false);
   const pickRol = (chosen: Rol) => {
@@ -292,6 +294,7 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
       if (!m) return;
       setFull(m.full);
       setCanRead(m.read === true && host !== null && e.origin === host);
+      setAula(m.aula === true && host !== null && e.origin === host);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -322,6 +325,35 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
       timer = window.setTimeout(() => finish(null), PAGE_WAIT_MS);
       try {
         window.parent.postMessage(pageRequest(id), host);
+      } catch {
+        finish(null);
+      }
+    });
+
+  /** La credencial del aula (0299): se pide al cargador para cada pregunta. null fuera de Moodle o si no llega a tiempo. */
+  const requestFirma = (signal: AbortSignal): Promise<{ site: string; firma: string } | null> =>
+    new Promise((resolve) => {
+      if (!aula || !host) return resolve(null);
+      const id = newId();
+      let timer = 0;
+      const finish = (v: { site: string; firma: string } | null) => {
+        window.clearTimeout(timer);
+        window.removeEventListener("message", onReply);
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      };
+      const onReply = (e: MessageEvent) => {
+        if (e.source !== window.parent || e.origin !== host) return;
+        const got = readHostFirma(e.data, id);
+        if (got) finish(got);
+        else if ((e.data as { type?: unknown; id?: unknown } | null)?.type === "firma" && (e.data as { id?: unknown }).id === id) finish(null);
+      };
+      const onAbort = () => finish(null);
+      window.addEventListener("message", onReply);
+      signal.addEventListener("abort", onAbort);
+      timer = window.setTimeout(() => finish(null), PAGE_WAIT_MS);
+      try {
+        window.parent.postMessage(firmaRequest(id), host);
       } catch {
         finish(null);
       }
@@ -511,8 +543,12 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
           show();
         },
       };
+      // En Moodle (0299) pregunta Pilo en el Aula, con la credencial firmada; la página no se lee.
+      const firma = aula ? await requestFirma(ctl.signal) : null;
+      if (run.current !== mine) return;
+      if (aula && !firma) throw new PiloError(tr("No pude confirmar quién pregunta en el aula. Recargue la página e intente de nuevo."), "firma");
       // La página se lee ahora, no al cargar: así vale también si cambió sin recargar.
-      const hostPage = await requestPage(ctl.signal);
+      const hostPage = firma ? null : await requestPage(ctl.signal);
       if (run.current !== mine) return;
       const read = hostPage ? pageForQuestion(hostPage, q) : null;
       if (hostPage && read) {
@@ -520,7 +556,9 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
         show();
         sendCapture(hostPage);
       }
-      const answer = read
+      const answer = firma
+        ? await askAulaStream(q, history, firma, handlers)
+        : read
         ? await askQuestionStream(q, history, handlers, { ...wire, page: read.wire })
         : wire
           ? await askQuestionStream(q, history, handlers, wire)

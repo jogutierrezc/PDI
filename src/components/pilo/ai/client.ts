@@ -556,6 +556,30 @@ export async function askQuestionStream(question: string, history: { q: string; 
 }
 
 /**
+ * Pilo en el Aula (0299): la pregunta va a la función pilo-aula con la credencial
+ * que firmó Moodle. El flujo es el mismo de siempre (meta, delta, done), así que
+ * la página lo lee igual. Sin sesión de Supabase: quien pregunta lo dice la firma.
+ */
+export async function askAulaStream(question: string, history: { q: string; a: string }[], aula: { site: string; firma: string }, handlers: AskHandlers = {}): Promise<AskResult> {
+  const base = (import.meta.env.VITE_SUPABASE_URL ?? "http://localhost:54321").replace(/\/+$/, "");
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "public-anon-key";
+  if (handlers.signal?.aborted) throw new PiloError("", "cancelado");
+  let response: Response;
+  try {
+    response = await fetch(`${base}/functions/v1/pilo-aula`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+      body: JSON.stringify({ action: "preguntar", site: aula.site, firma: aula.firma, question, history }),
+      signal: handlers.signal,
+    });
+  } catch (e) {
+    if (isAbort(e) || handlers.signal?.aborted) throw new PiloError("", "cancelado");
+    throw new PiloError(tr("No pude conectarme con Pilo. Revise su conexión a internet e intente de nuevo."), "red");
+  }
+  return readAskResponse(response, handlers);
+}
+
+/**
  * La lectura de una página anfitriona, para la bandeja de la administración
  * (0127). Va aparte de la pregunta y una sola vez por página: la administración
  * decide si entra a la memoria. Nunca falla hacia fuera: si algo sale mal, o

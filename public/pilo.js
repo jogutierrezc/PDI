@@ -26,6 +26,12 @@
    plegado (pestañas, acordeones, <details> cerrados, bloques ocultos que son
    contenido). Solo lee: no pulsa nada ni cambia la página. Qué cuenta como
    contenido plegado y qué no, abajo, en «Las reglas de lectura».
+
+   Pilo en el Aula (0299): en Moodle, la línea la escribe el plugin local_pilo
+   con data-moodle (el id del sitio) y data-firma (una credencial que Moodle
+   firmó en su servidor y vence en 5 minutos). El cargador la guarda, la renueva
+   con el servicio AJAX de Moodle (local_pilo_firma) cuando está por vencer y
+   solo se la entrega al marco de Pilo, cuando la pide para una pregunta.
    ========================================================================== */
 (function () {
   "use strict";
@@ -71,6 +77,13 @@
   var mode = leerModo(script.getAttribute("data-leer"));
   var canRead = mode !== "no";
 
+  // El aula de Moodle: el sitio y la credencial firmada. Solo en el Pilo de Enseñanza.
+  var aulaSite = space === SPACES.ensenanza ? (script.getAttribute("data-moodle") || "").toLowerCase() : "";
+  if (!/^[a-z][a-z0-9-]{1,23}$/.test(aulaSite)) aulaSite = "";
+  var aulaFirma = aulaSite ? script.getAttribute("data-firma") || "" : "";
+  var aulaCurso = parseInt(script.getAttribute("data-curso") || "1", 10) || 1;
+  var aula = Boolean(aulaSite && aulaFirma);
+
   var SIZE = { cerrado: [96, 104], saludo: [336, 120], abierto: [412, 680] };
   var state = "cerrado";
   var frame = null;
@@ -98,7 +111,56 @@
 
   function tellFrame() {
     if (!frame || !frame.contentWindow) return;
-    frame.contentWindow.postMessage({ source: "pilo-host", full: isSmall(), read: canRead }, origin);
+    var m = { source: "pilo-host", full: isSmall(), read: canRead };
+    // «aula» solo viaja dentro de Moodle: sin él, el mensaje es el de siempre.
+    if (aula) m.aula = true;
+    frame.contentWindow.postMessage(m, origin);
+  }
+
+  /* --- La credencial del aula (0299) --------------------------------------------- */
+
+  /** Cuándo vence la credencial (segundos Unix), leído sin verificarla: solo para saber si renovarla. */
+  function firmaExp(t) {
+    try {
+      var p = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      return Number(JSON.parse(atob(p + "===".slice((p.length + 3) % 4))).exp) || 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /** Una credencial nueva al servicio AJAX de Moodle, con la sesión de la persona (sesskey). */
+  function renovarFirma(done) {
+    var M = window.M;
+    if (!M || !M.cfg || !M.cfg.wwwroot || !M.cfg.sesskey || !window.fetch) return done(aulaFirma);
+    fetch(M.cfg.wwwroot + "/lib/ajax/service.php?sesskey=" + encodeURIComponent(M.cfg.sesskey) + "&info=local_pilo_firma", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{ index: 0, methodname: "local_pilo_firma", args: { courseid: aulaCurso } }]),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (list) {
+        var got = list && list[0] && !list[0].error && list[0].data && list[0].data.firma;
+        if (got) aulaFirma = got;
+        done(aulaFirma);
+      })
+      .catch(function () {
+        done(aulaFirma);
+      });
+  }
+
+  /** La credencial para una pregunta: la de ahora si le queda más de un minuto; si no, una nueva. */
+  function sendFirma(id) {
+    var reply = function (firma) {
+      if (!frame || !frame.contentWindow) return;
+      frame.contentWindow.postMessage({ source: "pilo-host", type: "firma", id: id, site: aulaSite, firma: firma }, origin);
+    };
+    if (!aula) return reply("");
+    if (firmaExp(aulaFirma) - Date.now() / 1000 > 60) return reply(aulaFirma);
+    renovarFirma(reply);
   }
 
   /* --- Leer la página ------------------------------------------------------------ */
@@ -327,6 +389,7 @@
     var m = e.data;
     if (!m || m.source !== "pilo-embed") return;
     if (m.type === "leer") return sendPage(m.id);
+    if (m.type === "firma" && typeof m.id === "string") return sendFirma(m.id);
     if (m.type !== "estado") return;
     if (m.state !== "oculto" && !SIZE[m.state]) return;
     state = m.state;

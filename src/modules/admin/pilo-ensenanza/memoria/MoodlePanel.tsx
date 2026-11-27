@@ -30,7 +30,7 @@ import { MOODLE_ALLOWED } from "../../../../components/pilo/ai/logic";
 import { Icon } from "../../../../components/ui/Icon";
 import { Group, StatusMark, Switch, plural, when } from "../../pilo/ui";
 import { Skeleton, useEnter } from "../ui";
-import { courseSet, deleteMoodleSite, indexPending, moodleCategories, moodleCourse, moodleCourses, moodleProbe, reading, saveMoodleSite, saveMoodleToken, useDocs, useMoodle, useRefreshMemory } from "./data";
+import { courseSet, deleteMoodleSite, dropFirmaKey, indexPending, newFirmaKey, useFirmaStatus, moodleCategories, moodleCourse, moodleCourses, moodleProbe, reading, saveMoodleSite, saveMoodleToken, useDocs, useMoodle, useRefreshMemory } from "./data";
 import type { CourseRow, DocRow, MoodleCategory, MoodleProbe, MoodleSiteRow } from "./data";
 import type { MemoryPartProps } from "./DocumentsPanel";
 import { MAX_MOODLE_SITES, StepError, checkMoodleUrl, faultOf, moodleSiteId, stagesOf } from "./flow";
@@ -511,6 +511,8 @@ function MoodleSite({ space, data, courses, docById, several, onBusy }: MoodleSi
                 </div>
               )}
             </div>
+
+            <PluginKey space={space} site={data.id} name={data.name} />
           </div>
 
           <div className="pis-actions">
@@ -684,6 +686,120 @@ function MoodleSite({ space, data, courses, docById, several, onBusy }: MoodleSi
 }
 
 /* --- La guía ------------------------------------------------------------------------------------ */
+
+/**
+ * Pilo en el Aula (0299): la clave con que el plugin local_pilo firma quién pregunta.
+ * Se crea aquí, se ve entera una sola vez y se pega en Moodle; después solo sus cuatro últimos.
+ */
+function PluginKey({ space, site, name }: { space: MemoryPartProps["space"]; site: string; name: string }) {
+  const status = useFirmaStatus(space);
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [confirm, setConfirm] = useState<"nueva" | "quitar" | null>(null);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (status.data === null) {
+    return (
+      <div className="pis-key">
+        <span className="pis-key__label">
+          Clave del plugin del aula
+          <small>Falta la migración 0299: sin ella Pilo no puede entrar a los cursos de {name}.</small>
+        </span>
+      </div>
+    );
+  }
+  const st = status.data?.[site];
+  const run = async (what: "nueva" | "quitar") => {
+    setWorking(true);
+    setError(null);
+    try {
+      if (what === "nueva") {
+        const r = await newFirmaKey(space, site);
+        setFresh(r.key);
+        setCopied(false);
+      } else {
+        await dropFirmaKey(space, site);
+        setFresh(null);
+      }
+      setConfirm(null);
+      await status.refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cambiar la clave.");
+    } finally {
+      setWorking(false);
+    }
+  };
+  const copy = async () => {
+    if (!fresh) return;
+    try {
+      await navigator.clipboard.writeText(fresh);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <div className="pis-key">
+      <span className="pis-key__label">
+        Clave del plugin del aula
+        <small>
+          El plugin local_pilo la usa para firmar quién pregunta dentro de Moodle. En Moodle va en Administración del sitio › Extensiones › Locales › Pilo en el Aula, con el id
+          del sitio <b>{site}</b>.
+        </small>
+      </span>
+      {fresh ? (
+        <div className="pis-key__form" role="status">
+          <input readOnly value={fresh} aria-label="Clave nueva del plugin" onFocus={(e) => e.currentTarget.select()} spellCheck={false} />
+          <button type="button" className="button-primary" onClick={() => void copy()}>
+            {copied ? "Copiada" : "Copiar clave"}
+          </button>
+          <button type="button" className="button-secondary" onClick={() => setFresh(null)}>
+            Ya la pegué en Moodle
+          </button>
+          <small>Cópiela ahora: no se vuelve a mostrar. Mientras no la pegue en Moodle, el chat del aula dirá que no puede confirmar quién pregunta.</small>
+        </div>
+      ) : st?.on ? (
+        <div className="pis-key__saved">
+          <Icon name="lock" size={17} />
+          <span>
+            Creada {st.at ? when(st.at) : ""} · termina en <b>••••{st.last4}</b>
+          </span>
+          {confirm ? (
+            <>
+              <span className="pis-small">{confirm === "nueva" ? "La actual deja de servir y hay que pegar la nueva en Moodle." : "El chat del aula de este sitio deja de funcionar."}</span>
+              <button type="button" className={confirm === "nueva" ? "button-primary" : "button-danger"} disabled={working} onClick={() => void run(confirm)}>
+                {working ? "Un momento…" : confirm === "nueva" ? "Crear otra clave" : "Quitar la clave"}
+              </button>
+              <button type="button" className="button-secondary" disabled={working} onClick={() => setConfirm(null)}>
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="button-secondary" onClick={() => setConfirm("nueva")}>
+                Crear otra
+              </button>
+              <button type="button" className="pis-link pis-link--danger" onClick={() => setConfirm("quitar")}>
+                Quitar
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="pis-key__form">
+          <button type="button" className="button-primary" disabled={working || status.isPending} onClick={() => void run("nueva")}>
+            {working ? "Creando…" : "Crear clave del plugin"}
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="pis-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function MoodleGuide() {
   return (

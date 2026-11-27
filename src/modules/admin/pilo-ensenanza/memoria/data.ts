@@ -394,6 +394,34 @@ export const deleteMoodleSite = (space: PiloSpace, site: string) => rpc<{ course
 /** Guarda el token de un sitio (o lo quita, con vacío). Devuelve solo sus cuatro últimos caracteres. */
 export const saveMoodleToken = (space: PiloSpace, site: string, value: string) => rpc<string>("pilo_moodle_site_set_token", { p_space: space, p_site: site, p_value: value });
 
+/* --- Pilo en el Aula: la clave del plugin local_pilo (0299) ---------------------------------- */
+
+export interface FirmaStatus {
+  on: boolean;
+  last4: string;
+  at: string | null;
+}
+
+/** Por sitio: si tiene clave del plugin, sus cuatro últimos y cuándo se creó. null si falta la migración 0299. */
+export async function fetchFirmaStatus(space: PiloSpace): Promise<Record<string, FirmaStatus> | null> {
+  const { data, error } = await supabase.rpc("pilo_moodle_firma_status" as never, { p_space: space } as never);
+  if (error) {
+    if (/pilo_moodle_firma_status|function|schema cache/i.test(error.message ?? "")) return null;
+    dbFail({ code: error.code, message: `${error.message} pilo_moodle_firma_status` });
+  }
+  return (data ?? {}) as Record<string, FirmaStatus>;
+}
+
+export function useFirmaStatus(space: PiloSpace) {
+  return useQuery({ queryKey: ["pilo-ia", "memoria", "firma", space], queryFn: () => fetchFirmaStatus(space) });
+}
+
+/** Crea (o cambia) la clave del plugin de un sitio. Es la única vez que se ve entera. */
+export const newFirmaKey = (space: PiloSpace, site: string) => rpc<{ key: string; last4: string; at: string }>("pilo_moodle_site_new_firma_key", { p_space: space, p_site: site });
+
+/** Borra la clave del plugin: el chat de ese Moodle deja de funcionar. */
+export const dropFirmaKey = (space: PiloSpace, site: string) => rpc<null>("pilo_moodle_site_drop_firma_key", { p_space: space, p_site: site });
+
 export const courseSet = (space: PiloSpace, site: string, course: number, patch: { selected?: boolean; vis?: "publico" | "sesion" }) =>
   rpc<unknown>("pilo_moodle_course_set", { p_space: space, p_site: site, p_course: course, p_patch: patch });
 

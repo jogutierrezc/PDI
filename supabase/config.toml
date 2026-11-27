@@ -13,6 +13,11 @@ verify_jwt = false
 # cada portal por su cuenta.
 verify_jwt = false
 
+[functions.pilo-aula]
+# Pilo en el Aula (0299): quien pregunta no tiene sesión de Supabase; lo dice la
+# credencial que firma el plugin local_pilo de Moodle, y la función la verifica.
+verify_jwt = false
+
 [functions.sync-facultades]
 # Admite dos formas de identificarse —la sesión del portal o la cabecera
 # x-sync-token de un cron— y las comprueba por su cuenta. Validar antes un JWT

@@ -72,11 +72,26 @@ export function spaceWidget(config: { widget?: Widget | null; spaces?: Record<st
 export const frameMessage = (state: FrameState) => ({ source: "pilo-embed", type: "estado", state }) as const;
 
 /** El mensaje de la página anfitriona, o null si no es suyo o no se entiende. */
-export function readHostMessage(data: unknown): { full: boolean; read?: true } | null {
-  const m = data as { source?: unknown; full?: unknown; read?: unknown } | null;
-  if (!m || typeof m !== "object" || m.source !== "pilo-host") return null;
+export function readHostMessage(data: unknown): { full: boolean; read?: true; aula?: true } | null {
+  const m = data as { source?: unknown; full?: unknown; read?: unknown; aula?: unknown } | null;
+  if (!m || typeof m !== "object" || m.source !== "pilo-host" || (m as { type?: unknown }).type !== undefined) return null;
   // «read» solo viaja cuando la línea lo pide: sin él, el mensaje es el de siempre.
-  return { full: m.full === true, ...(m.read === true ? { read: true as const } : {}) };
+  // «aula» solo dentro de Moodle, con el plugin local_pilo (0299).
+  return { full: m.full === true, ...(m.read === true ? { read: true as const } : {}), ...(m.aula === true ? { aula: true as const } : {}) };
+}
+
+/* --- Pilo en el Aula (0299) --------------------------------------------------------- */
+
+/** Lo que el marco le pide al cargador en Moodle: la credencial firmada, para una pregunta. */
+export const firmaRequest = (id: string) => ({ source: "pilo-embed", type: "firma", id }) as const;
+
+/** La credencial que devuelve el cargador: el sitio y el JWT. null si no es la respuesta a ese pedido o viene vacía. */
+export function readHostFirma(data: unknown, id: string): { site: string; firma: string } | null {
+  const m = data as { source?: unknown; type?: unknown; id?: unknown; site?: unknown; firma?: unknown } | null;
+  if (!m || typeof m !== "object" || m.source !== "pilo-host" || m.type !== "firma" || m.id !== id) return null;
+  const site = typeof m.site === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(m.site) ? m.site : "";
+  const firma = typeof m.firma === "string" && m.firma.length <= 8000 && /^[\w-]+\.[\w-]+\.[\w-]+$/.test(m.firma) ? m.firma : "";
+  return site && firma ? { site, firma } : null;
 }
 
 /* --- Leer la página anfitriona (0127) -------------------------------------------------- */

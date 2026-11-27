@@ -6844,11 +6844,13 @@ async function handle(request: Request): Promise<Response> {
   // Otro modelo si el de partida se retira (0109); vacío, el de partida.
   // Con «astra» (0298), del servidor de Pilo Astra con su clave; si no, del proveedor de Conexión.
   const embedFromAstra = settings.embed_provider === "astra";
+  // El servidor de Astra sin modelo todavía: basta para listar sus modelos y elegir uno.
+  let astraServer: { base: string; key: string } | null = null;
   const embedder: (EmbedTarget & { key: string }) | null = await (async () => {
     if (embedFromAstra) {
-      const { base, key } = servidorAstra(await leerConfig(admin), settings, secret);
-      const t = astraEmbedTarget(base, String(settings.embed_model ?? ""));
-      return t && key ? { ...t, key } : null;
+      astraServer = servidorAstra(await leerConfig(admin), settings, secret);
+      const t = astraEmbedTarget(astraServer.base, String(settings.embed_model ?? ""));
+      return t && astraServer.key ? { ...t, key: astraServer.key } : null;
     }
     const preset = embedTarget(settings.provider ?? "mistral");
     if (!preset) return null;
@@ -6975,6 +6977,16 @@ async function handle(request: Request): Promise<Response> {
     // La capa profunda no necesita el proveedor de significado: sus pasajes se indexan después con «lote».
     if (String(body.step ?? "estado") === "profunda") return await deepLayer();
     if (!embedder) {
+      // «Ver modelos disponibles» con Astra y el modelo aún vacío: se listan con la dirección y la clave del servidor.
+      const srv = astraServer as { base: string; key: string } | null;
+      if (embedFromAstra && String(body.step ?? "") === "modelos" && srv?.key) {
+        const t = astraEmbedTarget(srv.base, "listar");
+        if (t) {
+          const r = await callProvider(t.url.replace(/\/embeddings$/, "/models"), { headers: { Authorization: `Bearer ${srv.key}` }, signal: AbortSignal.timeout(15_000) });
+          if (!r.ok) return json({ error: `El servidor de Pilo Astra no dio su lista de modelos (${r.status}): ${await providerDetail(r)}` }, 502);
+          return json({ ok: true, current: "", models: embedModelsIn(await r.json()) });
+        }
+      }
       if (embedFromAstra) {
         return json({ error: "Falta el modelo de embeddings del servidor de Pilo Astra, o su dirección https o su clave.", advice: "Escriba el modelo (p. ej. bge-m3) en Búsqueda por significado › Opciones avanzadas, y revise la dirección y la clave del servidor de Astra en Pilo Work." }, 400);
       }
@@ -7685,7 +7697,10 @@ async function handle(request: Request): Promise<Response> {
     if (what !== "probar" && row.enabled !== true) return json({ error: "Este sitio de Moodle está apagado.", advice: "Enciéndalo en Mr. Pilo en Enseñanza › Memoria › Moodle.", code: "apagado" }, 400);
     // Un nombre público que resuelve a una red interna tampoco pasa (donde la plataforma deja preguntar).
     const dns = (Deno as unknown as { resolveDns?: (host: string, type: string) => Promise<unknown[]> }).resolveDns;
-    if (typeof dns === "function") {
+    // MOODLE_HOSTS_INTERNOS: dominios que la administración del servidor sabe que viven en la red
+    // de la institución (su DNS interno da una IP privada). Solo esos, por nombre exacto.
+    const trusted = (Deno.env.get("MOODLE_HOSTS_INTERNOS") ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
+    if (typeof dns === "function" && !trusted.includes(endpoint.host.toLowerCase())) {
       const found = await Promise.all(["A", "AAAA"].map((type) => dns(endpoint.host, type).then((list) => (Array.isArray(list) ? list.map(String) : []), () => [] as string[])));
       if (found.flat().some(privateAddress)) return json({ error: "La dirección de Moodle lleva a una red interna.", code: "config" }, 400);
     }

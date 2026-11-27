@@ -41,7 +41,7 @@ describe("el service worker de la app", () => {
   it("precarga el esqueleto, el manifiesto, los iconos y los cuadros de la cara de Pilo", () => {
     expect(rules.PRECACHE[0]).toBe(APP_BASE);
     expect(rules.PRECACHE).toContain("/manifest.webmanifest");
-    for (const part of ["open", "closed", "tongue", "plate", "pupils", "white", "eyes", "wink", "pensar", "graduado", "obra"]) expect(rules.PRECACHE).toContain(`/pilo-face/${part}.png`);
+    for (const part of ["open", "closed", "tongue", "plate", "pupils", "white", "eyes", "wink", "pensar", "graduado", "obra"]) expect(rules.PRECACHE).toContain(`/pilo-svg/pilo-face/${part}.png`);
     for (const icon of ["icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"]) expect(rules.PRECACHE).toContain(`/pilo-app/${icon}`);
     expect(new Set(rules.PRECACHE).size).toBe(rules.PRECACHE.length);
   });
@@ -82,7 +82,7 @@ describe("el service worker de la app", () => {
   });
 
   it("guarda las imágenes de Pilo y los archivos del sitio, y nada más", () => {
-    expect(rules.kindOf(get("/pilo-face/open.png"), ORIGIN)).toBe("archivo");
+    expect(rules.kindOf(get("/pilo-svg/pilo-face/open.png"), ORIGIN)).toBe("archivo");
     expect(rules.kindOf(get("/pilo-app/icon-192.png"), ORIGIN)).toBe("archivo");
     expect(rules.kindOf(get("/assets/PiloApp-a1b2c3.js"), ORIGIN)).toBe("archivo");
     expect(rules.kindOf(get("/manifest.webmanifest"), ORIGIN)).toBe("archivo");

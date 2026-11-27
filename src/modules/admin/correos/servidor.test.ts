@@ -314,7 +314,7 @@ describe("el correo", () => {
     expect(c.html).toContain("background:#06142b");
     expect(c.html).toContain("background:#4fd3e0");
     expect(c.html).toContain("color:#04222a");
-    expect(c.html).toMatch(/<img src="https:\/\/planeacion\.udes\.edu\.co\/pilo-face\/closed\.png" width="46" height="64" alt="Mr\. Pilo"/);
+    expect(c.html).toMatch(/<img src="https:\/\/planeacion\.udes\.edu\.co\/pilo-svg\/pilo-face\/closed\.png" width="46" height="64" alt="Mr\. Pilo"/);
     expect(c.html).toContain("Con su cuenta de Cúcuta puedo apoyarle en su labor docente");
     expect(c.html).not.toContain("ayudarle a estudiar");
   });

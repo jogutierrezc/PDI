@@ -22,7 +22,7 @@
    (src/modules/pilo-app/sw.test.ts), que carga este mismo archivo.
    ========================================================================== */
 
-const VERSION = "v3";
+const VERSION = "v4";
 const PREFIX = "pilo-app-";
 const SHELL = `${PREFIX}esqueleto-${VERSION}`;
 const ASSETS = `${PREFIX}archivos-${VERSION}`;
@@ -40,17 +40,17 @@ const PRECACHE = [
   "/pilo-app/icon-512.png",
   "/pilo-app/icon-maskable-512.png",
   "/pilo-app/apple-touch-icon.png",
-  "/pilo-face/open.png",
-  "/pilo-face/closed.png",
-  "/pilo-face/tongue.png",
-  "/pilo-face/plate.png",
-  "/pilo-face/pupils.png",
-  "/pilo-face/white.png",
-  "/pilo-face/eyes.png",
-  "/pilo-face/wink.png",
-  "/pilo-face/pensar.png",
-  "/pilo-face/graduado.png",
-  "/pilo-face/obra.png",
+  "/pilo-svg/pilo-face/open.png",
+  "/pilo-svg/pilo-face/closed.png",
+  "/pilo-svg/pilo-face/tongue.png",
+  "/pilo-svg/pilo-face/plate.png",
+  "/pilo-svg/pilo-face/pupils.png",
+  "/pilo-svg/pilo-face/white.png",
+  "/pilo-svg/pilo-face/eyes.png",
+  "/pilo-svg/pilo-face/wink.png",
+  "/pilo-svg/pilo-face/pensar.png",
+  "/pilo-svg/pilo-face/graduado.png",
+  "/pilo-svg/pilo-face/obra.png",
 ];
 
 /** Lo que jamás se guarda aunque sea de este sitio: funciones, datos, sesión y voz. */
@@ -76,7 +76,7 @@ function kindOf(request, origin) {
   if (url.search) return "pasar";
   if (PRECACHE.includes(url.pathname)) return "archivo";
   // /Pilo2: las vistas de cuerpo entero de la entrada a un modo secreto. No se precargan: se guardan al usarse.
-  if (/^\/(assets|pilo-face|pilo-app|Pilo2)\//.test(url.pathname)) return "archivo";
+  if (/^\/(assets|pilo-svg|pilo-app)\//.test(url.pathname)) return "archivo";
   return "pasar";
 }
 

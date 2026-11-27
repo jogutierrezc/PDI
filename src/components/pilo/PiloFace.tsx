@@ -70,7 +70,7 @@ const LOOKS: Record<PiloExpression, Look> = {
   obra: { pose: "obra" },
 };
 
-const FRAME = (name: string) => `/pilo-face/${name}.png`;
+const FRAME = (name: string) => `/pilo-svg/pilo-face/${name}.png`;
 const PARTS = ["open", "closed", "tongue", "plate", "pupils", "eyes", "wink"];
 
 /** Cuánto se desplaza la mirada, en % del ancho y del alto del dibujo (unos 3 y 2 px de 450 × 631). */

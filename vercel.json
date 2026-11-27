@@ -3,7 +3,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "redirects": [
-    { "source": "/presentacion", "destination": "/presentacion/", "permanent": false }
+    { "source": "/presentacion", "destination": "/presentacion/", "permanent": false },
+    { "source": "/pilo-face/:ruta*", "destination": "/pilo-svg/pilo-face/:ruta*", "permanent": true },
+    { "source": "/Pilo2/:ruta*", "destination": "/pilo-svg/Pilo2/:ruta*", "permanent": true }
   ],
   "rewrites": [
     {

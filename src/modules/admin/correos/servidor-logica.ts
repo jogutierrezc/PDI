@@ -89,8 +89,8 @@ export const MARCAS: Record<Identidad, Marca> = {
   },
 };
 
-/** Dónde publica el portal la cara de Pilo (public/pilo-face/closed.png). */
-export const CARA_DE_PILO = "/pilo-face/closed.png";
+/** Dónde publica el portal la cara de Pilo (public/pilo-svg/pilo-face/closed.png). */
+export const CARA_DE_PILO = "/pilo-svg/pilo-face/closed.png";
 
 /* --- Plantillas ------------------------------------------------------------------------------ */
 

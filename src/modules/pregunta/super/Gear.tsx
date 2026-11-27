@@ -3,7 +3,7 @@
 
    Pilo no se redibuja: el equipo son piezas que van ENCIMA del dibujo
    aprobado. Están dibujadas una sola vez, en las medidas del Pilo de cuerpo
-   entero (public/Pilo2/Recurso 1.png, 1023 × 1550), y sirven en los dos sitios:
+   entero (public/pilo-svg/Pilo2/Recurso 1.png, 1023 × 1550), y sirven en los dos sitios:
 
      · en la entrada (SuperEntrance), sobre la cabeza del cuerpo entero;
      · en la cara del chat (PiloFace, 450 × 631), movidas a su encuadre.

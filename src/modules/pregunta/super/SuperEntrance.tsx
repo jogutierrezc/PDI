@@ -36,7 +36,7 @@ import "../welcome.css";
 import "./super.css";
 
 /** Las vistas de Pilo. Los nombres de archivo llevan un espacio. */
-const art = (n: number) => `/Pilo2/Recurso%20${n}.png`;
+const art = (n: number) => `/pilo-svg/Pilo2/Recurso%20${n}.png`;
 const WAVE = art(1);
 
 /** Las vistas del giro, cada una en su sitio para que los pies no salten. */

@@ -155,7 +155,7 @@ function PiloAppBody({ diseno }: { diseno: Diseno }) {
     registerAppWorker();
     preloadPiloFace();
     // Las poses también, y sobre todo «en obra»: sin conexión ya no se podría descargar.
-    for (const pose of ["obra", "pensar", "graduado"]) new Image().src = `/pilo-face/${pose}.png`;
+    for (const pose of ["obra", "pensar", "graduado"]) new Image().src = `/pilo-svg/pilo-face/${pose}.png`;
   }, []);
 
   /* El nombre de la pestaña y el color de la barra del teléfono son los de la app mientras está abierta. */

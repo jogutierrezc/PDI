@@ -46,8 +46,8 @@
 
 /* Las pupilas se mueven dentro del blanco del ojo y no salen de él. */
 .pilo-face__white {
-  -webkit-mask: url("/pilo-face/white.png") center / 100% 100% no-repeat;
-  mask: url("/pilo-face/white.png") center / 100% 100% no-repeat;
+  -webkit-mask: url("/pilo-svg/pilo-face/white.png") center / 100% 100% no-repeat;
+  mask: url("/pilo-svg/pilo-face/white.png") center / 100% 100% no-repeat;
 }
 
 /* Las poses de una sola imagen tienen otro encuadre: caben enteras. */

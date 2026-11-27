@@ -1,7 +1,7 @@
 /* =============================================================================
    Los iconos de la app móvil de Mr. Pilo (public/pilo-app).
 
-   Salen de la cara aprobada (public/pilo-face/open.png, 450 × 631, que prepara
+   Salen de la cara aprobada (public/pilo-svg/pilo-face/open.png, 450 × 631, que prepara
    scripts/pilo-face.py). No se redibuja, no se recorta y no se estira: la
    imagen se reduce entera, a su proporción, y se centra sobre el azul marino
    institucional.
@@ -18,7 +18,7 @@
 import { mkdir, stat } from "node:fs/promises";
 import sharp from "sharp";
 
-const SOURCE = "public/pilo-face/open.png";
+const SOURCE = "public/pilo-svg/pilo-face/open.png";
 const OUT = "public/pilo-app";
 const NAVY = "#0a2d63";
 

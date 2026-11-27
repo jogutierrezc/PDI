@@ -64,6 +64,7 @@ interface UnitRow {
   modality?: Modality | null;
   substantive_function?: SubstantiveFunction | null;
   reports_to?: string | null;
+  campus_id?: string | null;
 }
 
 interface MemberRow {
@@ -92,9 +93,13 @@ const toUnit = (r: UnitRow): InstUnit => ({
   modality: r.modality ?? null,
   substantiveFunction: r.substantive_function ?? null,
   reportsTo: r.reports_to ?? null,
+  campusId: r.campus_id ?? null,
 });
 
 async function loadUnits(): Promise<{ units: InstUnit[]; ready: boolean }> {
+  // Con 0297 trae la sede de la unidad; sin ella, como antes.
+  const conSede = (await supabase.from("units").select(`${UNIT_FULL},campus_id`).order("position")) as Result<UnitRow[]>;
+  if (!conSede.error) return { units: (conSede.data ?? []).map(toUnit), ready: true };
   const full = (await supabase.from("units").select(UNIT_FULL).order("position")) as Result<UnitRow[]>;
   if (!full.error) return { units: (full.data ?? []).map(toUnit), ready: true };
   if (!MISSING_COLUMN.has(full.error.code ?? "")) return { units: rows(full).map(toUnit), ready: true };
@@ -165,6 +170,8 @@ export interface UnitPayload {
   modality: Modality | null;
   substantive_function: SubstantiveFunction | null;
   reports_to: string | null;
+  /** 0297. Sin la migración la base lo ignora (lee las claves que conoce). */
+  campus_id: string | null;
 }
 
 /** El error de una RPC, dicho para quien administra. */

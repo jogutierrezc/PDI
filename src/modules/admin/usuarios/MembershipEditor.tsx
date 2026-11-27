@@ -63,14 +63,17 @@ export function MembershipEditor({
     if (!unit || unit.kind !== "programa") return [];
     return offer?.byProgram.get(unit.id) ?? [];
   };
-  /** Las sedes que se pueden elegir: las del programa, o todas en cualquier otra unidad (un vicerrector o rector de campus). */
+  /** Las sedes que se pueden elegir: las del programa, la de una unidad con sede (la rectoría o la vicerrectoría de
+   *  un campus, 0297), o todas en cualquier otra unidad. */
   const sedesDe = (unit: UnitOption | undefined) => {
     if (!unit) return [];
-    return unit.kind === "programa" ? campusesOf(unit) : (offer?.campuses ?? []).map((c) => c.id);
+    if (unit.kind === "programa") return campusesOf(unit);
+    if (unit.campusId) return [unit.campusId];
+    return (offer?.campuses ?? []).map((c) => c.id);
   };
-  /** «Medicina · MED — Bucaramanga, Cúcuta»: un programa se reconoce por las sedes donde se ofrece. */
+  /** «Medicina · MED — Bucaramanga, Cúcuta»: un programa se reconoce por las sedes donde se ofrece; una unidad con sede, por la suya. */
   const optionLabel = (item: UnitOption) => {
-    const sedes = campusesOf(item).map((id) => campusName.get(id) ?? "Sede");
+    const sedes = (item.campusId ? [item.campusId] : campusesOf(item)).map((id) => campusName.get(id) ?? "Sede");
     return `${item.name} · ${item.code}${sedes.length > 0 ? ` — ${sedes.join(", ")}` : ""}`;
   };
   const grouped = useMemo(

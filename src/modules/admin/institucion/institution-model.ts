@@ -49,6 +49,8 @@ export interface InstUnit {
   modality: Modality | null;
   substantiveFunction: SubstantiveFunction | null;
   reportsTo: string | null;
+  /** Sede de la unidad (0297): la Rectoría o la Vicerrectoría Académica de un campus. null = toda la universidad. */
+  campusId: string | null;
 }
 
 export interface Campus {

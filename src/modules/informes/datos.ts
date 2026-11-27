@@ -202,9 +202,29 @@ export function useUnidades() {
     queryKey: CLAVES.unidades,
     retry: false,
     staleTime: 60_000,
-    queryFn: async (): Promise<UnidadRef[]> =>
-      revisar<UnidadRef[] | null>(await supabase.from("units").select("id, name, kind, code, parent_id").order("position")) ?? [],
+    queryFn: async (): Promise<UnidadRef[]> => {
+      // Con 0297 la unidad puede tener sede (la rectoría o la vicerrectoría de un campus): su nombre la lleva,
+      // para distinguir la Vicerrectoría Académica de Cúcuta de la de Valledupar. Sin la migración, como antes.
+      const conSede = await supabase.from("units").select("id, name, kind, code, parent_id, campus_id").order("position");
+      if (conSede.error) {
+        return revisar<UnidadRef[] | null>(await supabase.from("units").select("id, name, kind, code, parent_id").order("position")) ?? [];
+      }
+      const sedes = await supabase.from("campuses").select("id, name");
+      const nombreSede = new Map(((sedes.data ?? []) as { id: string; name: string }[]).map((s) => [s.id, s.name]));
+      return ((conSede.data ?? []) as (UnidadRef & { campus_id: string | null })[]).map(({ campus_id, ...u }) => ({
+        ...u,
+        name: nombreConSedeDeUnidad(u.name, campus_id ? nombreSede.get(campus_id) : undefined),
+      }));
+    },
   });
+}
+
+const sinTildes = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** «Vicerrectoría Académica · Cúcuta»; si el nombre ya dice la sede, queda igual. */
+export function nombreConSedeDeUnidad(nombre: string, sede: string | undefined): string {
+  if (!sede || sinTildes(nombre).includes(sinTildes(sede))) return nombre;
+  return `${nombre} · ${sede}`;
 }
 
 const COLS_INSTANCIA = "id, ciclo_id, unit_id, plantilla, destino, estado, nota_revision, enviado_en, enviado_por, aprobado_en, aprobado_por";

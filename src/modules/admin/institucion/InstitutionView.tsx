@@ -425,6 +425,8 @@ interface Draft {
   modality: Modality | "";
   substantiveFunction: SubstantiveFunction | "";
   reportsTo: string;
+  /** Sede de la unidad (0297); vacío = toda la universidad. No aplica a programas ni facultades. */
+  campusId: string;
   campuses: string[];
 }
 
@@ -450,6 +452,7 @@ function draftOf(unit: InstUnit | null, data: Institution, defaults: { kind?: Un
     modality: unit?.modality ?? "",
     substantiveFunction: unit?.substantiveFunction ?? "",
     reportsTo: unit?.reportsTo ?? (kind === "facultad" && parent?.kind === "vicerrectoria" ? parent.id : ""),
+    campusId: unit?.campusId ?? "",
     campuses: activeCampuses,
   };
 }
@@ -502,11 +505,18 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
   const officeParents = units
     .filter((item) => !blocked.has(item.id) && (item.kind === "vicerrectoria" || isOffice(item)))
     .sort((a, b) => (a.kind === b.kind ? byName(a, b) : a.kind === "vicerrectoria" ? -1 : 1));
+  // Una vicerrectoría o una rectoría de campus sube a otra rectoría o vicerrectoría (organigrama).
+  const reportTargets = units
+    .filter((item) => item.id !== unit?.id && (item.kind === "otra" || item.kind === "vicerrectoria"))
+    .sort((a, b) => (a.kind === b.kind ? byName(a, b) : a.kind === "otra" ? -1 : 1));
+  const campusName = (id: string | null) => data.campuses.find((campus) => campus.id === id)?.name ?? "";
   const children = unit ? units.filter((item) => item.parentId === unit.id) : [];
   const members = unit ? data.members.filter((member) => member.unitId === unit.id) : [];
 
   const isProgram = draft.kind === "programa";
   const office = draft.kind === "oficina" || draft.kind === "otra";
+  const hasCampus = draft.kind === "vicerrectoria" || office;
+  const reportsChoice = draft.kind === "vicerrectoria" || draft.kind === "otra";
   const sameFunction =
     draft.kind === "vicerrectoria" && draft.substantiveFunction
       ? vices.find((vice) => vice.id !== unit?.id && vice.substantiveFunction === draft.substantiveFunction)
@@ -515,7 +525,7 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
     ? data.offer.filter((item) => item.programId === unit.id && !item.active).map((item) => item.campusId)
     : [];
   const parentUnit = units.find((item) => item.id === (unit ? unit.parentId : draft.parentId));
-  const reportsUnit = units.find((item) => item.id === (unit?.kind === "facultad" ? unit.reportsTo : parentUnit?.reportsTo ?? ""));
+  const reportsUnit = units.find((item) => item.id === (unit?.reportsTo || (unit ? "" : parentUnit?.reportsTo ?? "")));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -552,7 +562,8 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
       degree_level: isProgram ? draft.degreeLevel || null : null,
       modality: isProgram ? draft.modality || null : null,
       substantive_function: draft.kind === "vicerrectoria" ? draft.substantiveFunction || null : null,
-      reports_to: draft.kind === "facultad" ? draft.reportsTo || null : null,
+      reports_to: draft.kind === "facultad" || reportsChoice ? draft.reportsTo || null : null,
+      campus_id: hasCampus ? draft.campusId || null : null,
     };
     try {
       await save.mutateAsync({ unit: payload, campuses: isProgram ? draft.campuses : null });
@@ -599,6 +610,7 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
           {unit && (
             <p className="inst-sheet__path">
               {KIND_LABEL[unit.kind].label} · {unit.code}
+              {unit.campusId && ` · Sede ${campusName(unit.campusId)}`}
               {parentUnit && (
                 <>
                   {" · "}
@@ -749,6 +761,40 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
               </select>
               <small>
                 Es el organigrama y nada más: no le da a la vicerrectoría acceso a los datos de la facultad.
+              </small>
+            </label>
+          )}
+
+          {hasCampus && (
+            <label className="admin-field">
+              <span>Sede</span>
+              <select value={draft.campusId} onChange={(event) => set("campusId", event.target.value)}>
+                <option value="">Toda la universidad</option>
+                {data.campuses.map((campus) => (
+                  <option key={campus.id} value={campus.id}>
+                    {campus.name}
+                  </option>
+                ))}
+              </select>
+              <small>Para la rectoría o la vicerrectoría de un campus. Su gente solo puede trabajar en esa sede.</small>
+            </label>
+          )}
+
+          {reportsChoice && (
+            <label className="admin-field inst-grid__wide">
+              <span>Reporta a</span>
+              <select value={draft.reportsTo} onChange={(event) => set("reportsTo", event.target.value)}>
+                <option value="">{draft.kind === "otra" ? "Nadie, o la unidad de la que depende" : "Nadie"}</option>
+                {reportTargets.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                    {item.campusId ? ` · ${campusName(item.campusId)}` : ""}
+                  </option>
+                ))}
+              </select>
+              <small>
+                Organigrama: su informe de gestión sube a esta unidad (p. ej. la Vicerrectoría Académica de Cúcuta a la Rectoría de
+                Cúcuta). No da acceso a sus datos.
               </small>
             </label>
           )}

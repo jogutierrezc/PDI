@@ -1,0 +1,72 @@
+# Video: Guía del Contribuyente · Informe de Gestión 2026
+
+Duración aproximada: 9 a 10 minutos de voz (15 escenas, unas 1.510 palabras). Tono profesional, de «usted». Capturas de la aplicación real con datos ficticios (`docs/manual-informes/capturas`).
+
+Para grabar: use `guion-voicestudio.txt` (un solo archivo, un párrafo por escena, separados por línea en blanco, sin títulos).
+
+| # | Escena | En pantalla | Capturas existentes / por hacer |
+|---|---|---|---|
+| 01 | Bienvenida | Título, Pilo, chips (escribir, Excel, evidencias, listo para enviar) | — |
+| 02 | Su papel | Gestor vs Contribuyente: qué hace y qué no | con-mi-informe |
+| 03 | Dos formas de trabajar | Plataforma y Excel convergen en el mismo informe | — |
+| 04 | Entrar a Mi informe | Menú, tres pestañas, riel, «Enviar» deshabilitado | con-mi-informe, con-sin-acceso |
+| 05 | Escribir las secciones | Lista con puntos, «Cambios guardados», tipos de sección | ges-mi-informe, ges-seccion-narrativa, ges-alineacion, ges-metas |
+| 06 | Controles y Pilo | Controles ✓/!, «Lista», borrador de Pilo | ges-enviar-listo, ges-guia-pilo |
+| 07 | Tabla de resultados | Cifra y acción, «Lo que pide Planeación» | ges-dimensiones, ges-cifras (**rehacer sin cifras vivas**) |
+| 08 | Subir evidencias | Archivos, enlace, tabla numerada, logros | ges-anexos |
+| 09 | Descargar el libro | Cajón Libro de Excel, hoja 00, fila 4, ocultas | ges-libro, xls-instrucciones, xls-control-oculta |
+| 10 | Llenar el libro | Amarillo, azul, gris; listas; lo que no se toca | xls-lleno-metas, xls-lleno-resultados-a |
+| 11 | Devolver o importar | Tres modos de aplicar | adm-libro-importar |
+| 12 | Avisos y rechazos | Lista de avisos, rechazo de otro informe | xls-errores-avisos, xls-otro-informe-error |
+| 13 | Listo para el envío | Controles, razón bajo «Enviar», vista del informe, portada | ges-enviar, vista-carta, vista-portada |
+| 14 | Después del envío | Aprobado/Devuelto, notas | ges-devuelto, con-solo-lectura |
+| 15 | Cierre | Lista de verificación | — |
+
+---
+
+## Narración por escena
+
+### 01 · Bienvenida
+Bienvenido al Informe de Gestión 2026 de Planeación Institucional de la Universidad de Santander. Este video es la guía del Contribuyente: la persona que ayuda a su unidad a construir el informe. En los próximos minutos veremos qué puede hacer en la plataforma, cómo escribir sus secciones, cómo trabajar con el libro de Excel que le envía el Gestor, cómo subir evidencias y cómo dejar todo listo para el envío. Puede verlo completo o ir directamente a la parte que necesite.
+
+### 02 · Su papel en el informe
+El Informe de Gestión recoge, una vez al año, lo que cada unidad logró, y lo presenta en un formato común. Cada informe tiene un Gestor, que es el responsable de la unidad y el único que lo envía. Usted es Contribuyente: escribe las mismas secciones que el Gestor, sube evidencias y usa a Pilo, pero no envía el informe ni cambia el perfil de la oficina. Su trabajo termina cuando deja todo listo para que el Gestor pueda enviarlo. Planeación le asigna este papel en «Responsables», y también puede llegarle por su rol de acceso.
+
+### 03 · Dos formas de trabajar
+Hay dos maneras de aportar, y puede combinarlas. La primera es escribir directamente en la plataforma, en la pantalla «Mi informe». La segunda es trabajar en un libro de Excel que le envía el Gestor, llenar sus hojas y devolverlo, o importarlo usted mismo. Las dos escriben en el mismo informe, y todo lo que haga en una aparece en la otra. Elija la que le resulte más cómoda para cada sección: el texto suele escribirse mejor en pantalla, y las listas de metas o resultados suelen avanzar más rápido en Excel.
+
+### 04 · Entrar a Mi informe
+Para entrar, abra el menú «Informes Institucionales» y elija «Informes de gestión». Verá tres pestañas: «Mi informe», «Vista del informe» y «Guía con Pilo». En el riel de la izquierda aparece el nombre de su unidad, el estado del informe y su papel, que dice «Contribuyente». Más abajo está el botón «Enviar», deshabilitado, con el aviso de que solo el Gestor o Planeación envían el informe. Es normal. Si en cambio la pantalla le dice que no tiene unidad asignada, o que Planeación todavía no abre el informe, pida a Planeación que lo asigne en «Responsables» o espere a que lo abra.
+
+### 05 · Escribir las secciones
+La lista de secciones está bajo el riel. Cada una tiene un punto que indica si está sin empezar, en curso o lista. Ábrala y escriba: la plataforma guarda sola, unos instantes después de teclear, y se lo confirma con «Cambios guardados». Hay secciones de texto, como el resumen ejecutivo y las conclusiones; la alineación con el Plan de Desarrollo, donde cada pilar lleva el aporte de la unidad; los objetivos y metas, con lo programado y lo alcanzado; los resultados por dimensión; los puntos críticos y los logros. Algunas son de solo lectura porque las define Planeación, y no necesitan nada de usted.
+
+### 06 · Los controles y la ayuda de Pilo
+A un lado de cada sección está la lista de controles. Una marca verde significa que ese punto está resuelto; un signo de exclamación, que falta algo, y el texto dice exactamente qué. Cuando todos los puntos están en verde, la sección pasa a «Lista». Si se queda sin palabras, Pilo, el asistente de la plataforma, puede proponerle un borrador o mejorar lo que usted ya escribió. Revíselo siempre: Pilo ayuda a redactar, pero lo que dice el informe debe ser cierto y usted es quien lo conoce.
+
+### 07 · Cargar los datos: la tabla de resultados
+Los datos de cada unidad se escriben a mano. En la sección de resultados por dimensión, cada fila es una cifra o una acción. Para una cifra se indica el indicador, la unidad de medida, el año anterior, la cifra actual, la meta y la fuente. Para una acción se escribe qué se planeó y qué se ha hecho. La plataforma calcula sola el estado de cada fila, de modo que usted no lo escribe. Si Planeación pide un dato específico, aparece destacado en «Lo que pide Planeación», con su casilla para responder o justificar. Complete todo lo que pueda: una fila incompleta se guarda, pero la sección no queda lista.
+
+### 08 · Subir evidencias
+Las evidencias son obligatorias: sin al menos un archivo o enlace, el informe no puede enviarse. Abra la sección «Evidencias y fuentes de verificación». Puede soltar archivos PDF, Word, Excel o imagen, de hasta quince megas cada uno, y subir varios a la vez. También puede añadir un enlace: escriba la dirección completa, que empiece por «https», ponga el nombre del documento y pulse «Añadir enlace». Cada anexo recibe un número, y la tabla le permite abrirlo, editarlo o quitarlo. En la sección de logros puede enlazar cada logro con su anexo; por eso conviene subir primero los archivos y escribir los logros después.
+
+### 09 · Descargar el libro de Excel
+Lo habitual es que el Gestor le envíe un libro ya preparado para su equipo, con solo las hojas que le tocan. Si no lo tiene, también puede descargarlo usted: en Mi informe, abra «Libro de Excel» en el riel y elija «Exportar». El archivo se llama «Informe Gestión 2026» seguido de la plantilla, y trae una hoja por sección. La primera, «00 Portada», dice de quién es el libro y trae las instrucciones. Los encabezados están en la fila cuatro y los datos empiezan en la fila cinco. Hay dos hojas ocultas, «Listas» y «Control»: no las toque, porque con ellas la plataforma reconoce su libro.
+
+### 10 · Llenar el libro sin errores
+Los colores del libro son siempre los mismos. El amarillo es obligatorio, el azul claro es opcional, y el gris lo pone el sistema: está bloqueado y no se escribe. Llene solo las celdas de color. Donde hay una lista desplegable, elija de la lista: un Sí o un No, un pilar del Plan, una dimensión. Escriba los números con cifras. Si no tiene información para una fila, déjela vacía. Hay cuatro cosas que no debe hacer: no cambie el nombre de las hojas, no cambie los encabezados, no mueva la fila cuatro y no borre las hojas ocultas. Si el libro trae filas de ejemplo que dicen «borre esta fila», bórrelas antes de devolverlo. Los archivos nuevos no se suben desde el libro: en la hoja de evidencias solo se escribe el enlace, que debe empezar por «https», y el archivo se sube desde el informe.
+
+### 11 · Devolver o importar el libro
+Cuando termine, tiene dos caminos. Si el Gestor es quien importa, devuélvale el archivo tal como lo llenó, sin cambiarle el nombre. Si importa usted, abra «Libro de Excel», pase a «Importar» y arrastre el archivo, que debe ser un .xlsx. La plataforma muestra a qué sección va cada hoja, cuántas filas están listas y cuáles tienen aviso. Indique quién aporta el libro, para que quede constancia, y elija cómo aplicarlo. «Agregar al final» suma lo del libro sin tocar lo escrito y es el modo por defecto. «Llenar solo lo vacío» completa lo que falta. «Reemplazar la sección» pide confirmación, porque sustituye lo que ya había.
+
+### 12 · Avisos y rechazos
+Un aviso dice la hoja, la fila y el problema, y casi siempre se corrige en el mismo libro. Los más frecuentes: un número escrito con letras, una celda amarilla vacía, una respuesta distinta de Sí o No, o un enlace que no empieza por «https». Una fila con aviso suele entrar, pero la sección no queda lista hasta completarla. Hay un caso distinto: si el libro es de otra unidad, de otro ciclo o de otra plantilla, el sistema lo rechaza sin leerlo y dice a qué informe pertenece. Descargue entonces un libro nuevo desde su propio informe. Y si el informe ya fue enviado o aprobado, no admite cambios: pida al Gestor que lo devuelvan.
+
+### 13 · Dejar todo listo para el envío
+Revise la lista de secciones: todas deben estar en «Lista», con sus controles en verde y al menos una evidencia cargada. Si algo falta, la razón aparece debajo del botón «Enviar»; léasela al Gestor, porque dice exactamente qué falta. Y avíselo usted: la plataforma no le envía un correo cuando termina. Puede revisar cómo quedó en «Vista del informe», que muestra las hojas tal como saldrán en el PDF. Allí también puede personalizar la portada y el cierre: la composición, los textos, la imagen, las firmas y los créditos. El color de acento, el escudo y el contacto de la oficina los cambia solo el Gestor.
+
+### 14 · Después del envío
+Cuando el Gestor envía el informe, usted pasa a solo lectura: el informe queda aprobado y no admite cambios. Planeación o la unidad de destino pueden devolverlo con una nota general y otra por sección. En ese caso usted ve las notas, corrige y guarda; al guardar, el informe vuelve a ser borrador, y el Gestor lo reenvía. Cuando el informe termina, puede descargarlo en PDF desde la vista del informe.
+
+### 15 · Cierre
+Para terminar, una lista de verificación. Entre a Mi informe y confirme su papel. Escriba sus secciones, en pantalla o en Excel. Cargue datos y evidencias. Resuelva los controles hasta que cada sección diga «Lista». Revise la vista del informe. Y avise al Gestor. Gracias por contribuir al Informe de Gestión 2026 de Planeación Institucional de la Universidad de Santander. Si algo no le queda claro, el manual de informes de gestión tiene un capítulo para cada paso, y Pilo está en la pestaña «Guía con Pilo».

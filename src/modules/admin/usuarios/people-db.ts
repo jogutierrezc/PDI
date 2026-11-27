@@ -22,6 +22,8 @@ export interface UnitOption {
   code: string;
   name: string;
   slug: string;
+  /** Sede de la unidad (0297); null = toda la universidad o base sin la migración. */
+  campusId: string | null;
 }
 
 export interface Membership {
@@ -81,12 +83,13 @@ export function useUnitOptions() {
   return useQuery({
     queryKey: peopleKeys.units(),
     queryFn: async (): Promise<UnitOption[]> => {
-      const rows = unwrap(
-        (await supabase.from("units").select("id,parent_id,kind,code,name,slug").order("position")) as Row<
-          { id: string; parent_id: string | null; kind: UnitKind; code: string; name: string; slug: string }[]
-        >,
-      );
-      return rows.map((u) => ({ id: u.id, parentId: u.parent_id, kind: u.kind, code: u.code, name: u.name, slug: u.slug }));
+      type U = { id: string; parent_id: string | null; kind: UnitKind; code: string; name: string; slug: string; campus_id?: string | null };
+      // Con 0297 trae la sede de la unidad; sin ella, como antes.
+      const conSede = (await supabase.from("units").select("id,parent_id,kind,code,name,slug,campus_id").order("position")) as Row<U[]>;
+      const rows = conSede.error
+        ? unwrap((await supabase.from("units").select("id,parent_id,kind,code,name,slug").order("position")) as Row<U[]>)
+        : unwrap(conSede);
+      return rows.map((u) => ({ id: u.id, parentId: u.parent_id, kind: u.kind, code: u.code, name: u.name, slug: u.slug, campusId: u.campus_id ?? null }));
     },
     staleTime: 60 * 1000,
   });

@@ -223,6 +223,14 @@ Planeación arma, en el Tablero del ciclo («La estructura de cada informe»), q
 3. **Plantillas Excel nuevas:** «Logros» (Logro, Contexto y resultado, N.º de anexo) y «Objetivos y metas anuales» (Objetivo o meta anual, Programado, Alcanzado). Lógica en `excel-secciones.ts`; la lectura la hace `ImportarFilas`.
 4. **Un informe por unidad:** las facultades son multicampus, así que el informe ya no se parte por sede. `sedes.ts` deja de repartir las unidades por sede y `unaPorUnidad` muestra un solo informe por unidad (el más avanzado) mientras queden los que 0272 partió. La migración `0280_informes_una_sola_sede.sql` deja sin sede los que son únicos en su ciclo y avisa (`raise notice`) de las unidades con varios; esos se reúnen a mano.
 
+## Unidades por campus (migración 0297)
+
+Las rectorías de campus (Cúcuta, Valledupar) y las vicerrectorías académicas de cada campus son **unidades aparte**, cada una con su informe (sigue valiendo un informe por unidad).
+- `units.campus_id`: la sede de la unidad (vacío = toda la universidad; los programas siguen con `program_campuses`). Se elige en la ficha de la Estructura institucional para vicerrectorías, oficinas y otras dependencias.
+- **Reporta a** (`reports_to`) ahora también en vicerrectorías y rectorías: la Vicerrectoría Académica de Cúcuta sube a la Rectoría de Cúcuta, y esta a la Rectoría General. Es el `destino` del informe (`informe_abrir`). Al cambiarlo, `admin_save_unit` mueve el destino de los informes abiertos (borrador o devuelto, ciclo abierto) si quien guarda gestiona los informes; los enviados y aprobados no cambian.
+- En «Dónde trabaja», una unidad con sede solo ofrece esa sede, y la base lo exige (trigger `unit_members_sede_de_la_unidad`).
+- El nombre en Informes lleva la sede si el nombre no la dice ya: «Vicerrectoría Académica · Cúcuta» (`nombreConSedeDeUnidad`, `datos.ts`).
+
 ## Logros libres, evidencias editables, pilares y Mi informe responsivo
 
 1. **Logros:** sin tope. Cada logro lleva título, contexto y resultado, su anexo y, si se quiere, tablas o gráficas de UDrive (`Logro.drive`); en el PDF cada logro se dibuja con su título, su texto justificado, la evidencia y sus tablas con el mismo diseño de las demás (`armado.tsx`, `.vi-logro`). La Vista justifica todo texto corrido (`vista.css`).
